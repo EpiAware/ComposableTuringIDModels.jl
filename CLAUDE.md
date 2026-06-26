@@ -102,20 +102,25 @@ as_turing_model(model, args...; kwargs...)  # returns a DynamicPPL.Model
 
 ## Build strategy
 
-Prioritise a **working vertical slice** over breadth: scaffold + skeleton +
-attribution/licence, then port a coherent end-to-end subset (a couple of latent
-models, an infection model, an observation model, and a composed model) onto the
-new `as_turing_model` API on the latest Turing, validated to load and sample,
-**before** porting the remaining components.
+**Port the whole package**, not a subset. Scaffold + skeleton + attribution/licence,
+then port **all** components from upstream onto the new `as_turing_model` API on the
+latest Turing (every latent model, infection model, observation model, their
+manipulators/modifiers, the inference methods, and the problem/method glue), keeping
+the package coherent and loading throughout. The target is a **working full version**
+that loads, samples end-to-end, and passes the core EpiAwareTestUtils checks.
+
+Sequence the work so `main` stays loadable (port in dependency order, commit in
+logical chunks), but the deliverable is full feature parity adapted to the new API —
+not a slice. Only switch to the review-PR workflow once there is a working version.
 
 ## Current status
 
 - [ ] Repo scaffolded from EpiAwarePackageTools (`scaffold`)
 - [ ] Package skeleton renamed to `EpiAwarePrototype` (fresh UUID)
 - [ ] Apache-2.0 LICENSE + NOTICE + attribution disclaimer in place
-- [ ] Vertical-slice port onto `as_turing_model` (latest Turing) loads + samples
+- [ ] All components ported onto `as_turing_model` (latest Turing); package loads
+- [ ] Representative composed model samples end-to-end (rand/fix/condition/NUTS)
 - [ ] Core tests pass via EpiAwareTestUtils helpers
-- [ ] Remaining components ported
 - [ ] Docs ported + decluttered
 - [ ] Issues filed against EpiAwarePackageTools for any template gaps
-- [ ] Working port → branch protection added → switch to review-PR workflow
+- [ ] Working full port → branch protection added → switch to review-PR workflow
