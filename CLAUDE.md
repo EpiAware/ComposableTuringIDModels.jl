@@ -118,6 +118,38 @@ ported model can be constructed and sampled, end-to-end composed models run
 (rand/fix/condition/NUTS), and the full EpiAwareTestUtils test suite passes. Only
 switch to the review-PR workflow once that complete version works.
 
+### Porting order — submodule by submodule, starting with the core
+
+Port and stabilise **one submodule at a time**, in dependency order, getting each to
+load + its tests pass before moving on:
+
+1. `EpiAwareBase` (core: the single supertype, the `as_turing_model` generic, glue)
+2. `EpiAwareUtils` (accumulate_scan, distributions/helpers, submodel handling)
+3. `EpiLatentModels`
+4. `EpiInfModels`
+5. `EpiObsModels`
+6. `EpiInference`
+7. `EpiProblem` / `EpiMethod` glue
+
+### Dependency: use CensoredDistributions.jl for censoring
+
+Upstream rolls its own **double interval censoring** (`censored_pmf` / `censored_cdf`
+in `EpiAwareUtils/censored_pmf.jl`). **Do not port that bespoke code.** Instead depend
+on **CensoredDistributions.jl** (the EpiAware org package; local at
+`~/code/EpiAware/CensoredDistributions.jl`, exports `double_interval_censored`,
+`interval_censored`, `primary_censored`, …) and use it to produce the discretised
+PMFs. Affected call sites to migrate:
+- `EpiInfModels/EpiData.jl` — generation-interval discretisation (`gen_int = censored_pmf(...)`).
+- `EpiObsModels/modifiers/LatentDelay.jl` — delay PMF (`pmf = censored_pmf(...)`).
+
+Read CensoredDistributions.jl's API/docs to find the right call that yields the
+right-truncated discretised PMF vector these sites need. Drop `censored_pmf.jl`.
+
+> **UUID caution:** CensoredDistributions.jl currently shares the *same* UUID as the
+> upstream EpiAware package (`b2eeebe4-5992-4301-9193-7ebc9f62c855`). EpiAwarePrototype
+> MUST take a fresh, distinct UUID, and the env must resolve CensoredDistributions by
+> its registered/repo UUID — watch for a clash.
+
 ## Current status
 
 - [ ] Repo scaffolded from EpiAwarePackageTools (`scaffold`)
