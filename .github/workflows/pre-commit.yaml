@@ -1,0 +1,12 @@
+name: pre-commit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+
+jobs:
+  pre-commit:
+    uses: EpiAware/.github/.github/workflows/format-check.yml@dc919e0d1674c16d1518df07eda5ee0be09b47e2
+    secrets: inherit  # pragma: allowlist secret

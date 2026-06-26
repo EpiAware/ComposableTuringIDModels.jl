@@ -1,0 +1,9 @@
+# MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
+# Isolated JET environment so JET's JuliaSyntax pin does not clash with the
+# main test deps. Add any extra packages JET needs to load the target here.
+[deps]
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+EpiAwarePrototype = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
+
+[sources]
+EpiAwarePrototype = {path = "../.."}

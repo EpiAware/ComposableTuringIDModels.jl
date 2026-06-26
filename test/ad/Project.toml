@@ -1,0 +1,20 @@
+# PACKAGE-OWNED — scaffold writes this once and never overwrites it.
+# The isolated AD environment (Enzyme, Mooncake, etc. are not main-test deps).
+# Add/trim AD backends to match the package's `ADFixtures` registry and the
+# backends its `test/ad/scenarios.jl` exercises.
+[deps]
+ADFixtures = "a039981f-f823-4177-b744-be8de6cdc156"
+ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
+DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
+DifferentiationInterfaceTest = "a82114a7-5aa3-49a8-9643-716bb13727a3"
+EpiAwarePackageTools = "7aaea248-0d11-4a0d-a7dc-86da30abb951"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
+TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
+EpiAwarePrototype = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
+
+[sources]
+ADFixtures = {path = "../ADFixtures"}
+EpiAwarePrototype = {path = "../.."}

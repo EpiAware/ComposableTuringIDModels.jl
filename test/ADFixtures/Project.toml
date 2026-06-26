@@ -1,0 +1,15 @@
+# PACKAGE-OWNED — scaffold writes this once and never overwrites it.
+name = "ADFixtures"
+uuid = "a039981f-f823-4177-b744-be8de6cdc156"
+authors = ["Sam Abbott"]
+version = "0.1.0"
+
+[deps]
+ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
+DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
+DifferentiationInterfaceTest = "a82114a7-5aa3-49a8-9643-716bb13727a3"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+EpiAwarePrototype = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
+
+[sources]
+EpiAwarePrototype = {path = "../.."}

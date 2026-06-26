@@ -1,0 +1,33 @@
+EpiAwarePrototype.jl
+Copyright 2026 Sam Abbott
+
+This product includes software developed as part of the open-source, Apache-2.0
+licensed EpiAware package:
+
+  - Upstream:  https://github.com/CDCgov/Rt-without-renewal  (EpiAware/)
+  - Fork:      https://github.com/seabbs/Rt-without-renewal
+
+The original EpiAware package was developed by Samuel Abbott, Samuel Brand,
+Zachary Susswein, and the EpiAware contributors, and is licensed under the
+Apache License, Version 2.0.
+
+EpiAwarePrototype.jl is a MODIFIED, DERIVED WORK based on that package.
+Significant changes have been made, including (but not limited to):
+
+  - The package has been renamed from `EpiAware` to `EpiAwarePrototype`, with a
+    fresh package UUID.
+  - The deep abstract type hierarchy and the per-concept model-generating
+    functions (`generate_latent`, `generate_latent_infs`,
+    `generate_observations`, `generate_epiaware`) have been re-architected
+    around a single generic constructor, `as_turing_model`.
+  - The package has been upgraded to build against the latest released
+    Turing.jl and DynamicPPL.jl, replacing the removed `@submodel` macro with
+    the `~ to_submodel(...)` form.
+  - The components of the original package are ported and adapted to the new
+    `as_turing_model` API. This is an early-stage prototype under active
+    development.
+
+This product is licensed under the Apache License, Version 2.0. See the LICENSE
+file for the full terms. As required by the License, modified files carry
+notices stating that they have been changed, and the attribution notices above
+are retained.

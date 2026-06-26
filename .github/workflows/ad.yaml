@@ -1,0 +1,20 @@
+name: AD
+
+# Drives the per-backend AD gradient matrix (the shipped `test/ad/` harness).
+# The backend matrix and per-flag coverage upload live in the reusable; this is
+# the thin caller. Without it the AD harness the kit ships never runs in CI.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ad:
+    uses: EpiAware/.github/.github/workflows/ad.yml@dc919e0d1674c16d1518df07eda5ee0be09b47e2
+    secrets: inherit  # pragma: allowlist secret
