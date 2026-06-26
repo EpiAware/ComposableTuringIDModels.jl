@@ -71,9 +71,14 @@ as_turing_model(model, args...; kwargs...)  # returns a DynamicPPL.Model
   # new:  ϵ_t ~ to_submodel(as_turing_model(m.ϵ_t, n - p), false)
   ```
 
-  The second arg `false` disables automatic variable prefixing (preserve
-  existing flat naming unless prefixing is explicitly required). Replace the
-  old `prefix_submodel` helper with `to_submodel`-based prefixing.
+  **Prefix off is the standard here.** The current DynamicPPL default for
+  `to_submodel` is **prefix = true** (it prefixes the submodel's variables with
+  the left-hand name), which differs from upstream's flat `@submodel` behaviour.
+  Pass `false` as the standard on *every* submodel conversion to preserve the
+  existing variable names/behaviour. The only exceptions are the components that
+  upstream deliberately prefixed (`PrefixLatentModel`, `PrefixObservationModel`,
+  `StackObservationModels`, the old `prefix_submodel` call sites) — implement
+  their prefixing explicitly via `to_submodel`'s prefix argument.
 
 ## Naming
 
