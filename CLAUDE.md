@@ -212,6 +212,15 @@ right-truncated discretised PMF vector these sites need. Drop `censored_pmf.jl`.
   `generate_observations`, `generate_epiaware`) and the deep `AbstractTuring*`
   hierarchy are replaced by the single `as_turing_model` + `AbstractEpiAwareModel`,
   per the brief. `prefix_submodel` is replaced by `DynamicPPL.prefix`.
+- Pretty-printing: upstream's `EpiAwareBase/prettyprinting.jl` (a PrettyPrinting.jl
+  tree display) is replaced by a dependency-free `Base.show(::MIME"text/plain",
+  ::AbstractEpiAwareModel)` in `base.jl` that lists the component's fields as a
+  tree — equivalent readable output without the heavy dep.
+- `EpiObsModels/utils.jl`'s `generate_observation_kernel` (a sparse delay-kernel
+  matrix builder) is NOT ported: it is unexported and called nowhere in upstream
+  (dead code), and porting it would add a `SparseArrays` dependency solely for an
+  unused function. No functional surface is affected. The mean-cluster negative
+  binomial helper from the same file IS ported (`NegativeBinomialMeanClust`).
 
 ### Deviations forced by the upgraded ecosystem (documented in code)
 
