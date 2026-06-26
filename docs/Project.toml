@@ -1,0 +1,11 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+EpiAwarePrototype = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
+
+[sources]
+EpiAwarePrototype = {path = ".."}
+
+[compat]
+Documenter = "1"
