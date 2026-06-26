@@ -22,11 +22,10 @@ here as exploratory and clearly labelled as a prototype.
   - Add a short **"Adapted from"** disclaimer in the `README` and docs index.
   - State that significant changes have been made (renamed, re-architected
     around `as_turing_model`, upgraded to the latest Turing).
-- **Do NOT reference any private repository in any package-facing file, commit
-  message, issue, or docs page.** In particular, never name or link the private
-  "case for composability" / composability paper repository. Attribute **only**
-  the open Apache-2.0 code above. Doc content drawn from internal sources must be
-  rewritten in our own words as original package documentation.
+- Attribute **only** the open Apache-2.0 code above. Do **not** reference any
+  non-public repositories or unpublished material in package-facing files, commit
+  messages, issues, or docs. All package documentation must be original to this
+  package.
 
 ## Tooling & template
 
@@ -85,9 +84,9 @@ as_turing_model(model, args...; kwargs...)  # returns a DynamicPPL.Model
 
 - Make it clear throughout that this is a **prototype for composable infectious
   disease modelling**.
-- Port the composable-modelling narrative (the DSL idea + the Turing.jl backend /
-  `as_turing_model` design) into the package docs, **rewritten as original
-  package documentation** — adapt to the new API.
+- Document the composable-modelling design (the component DSL idea + the
+  Turing.jl backend / `as_turing_model` API) with **original, package-specific
+  documentation** written for this package.
 - **Declutter:** remove stub/placeholder pages for features we are not shipping
   in the prototype. Keep a focused, honest set of pages (getting started, the
   composable design, a worked example, API reference).
@@ -109,8 +108,8 @@ Turing. **Nothing stubbed, nothing deferred, no functionality dropped.** Full fe
 parity with upstream `EpiAware`, just re-architected and renamed.
 
 The scaffold-from-EpiAwarePackageTools, Apache-2.0 licence + NOTICE/attribution,
-"never reference the private repo", commit-to-`main`, and issue-logging rules are
-*how* the port is done — they are not a reduction of scope.
+originality, commit-to-`main`, and issue-logging rules are *how* the port is done
+— they are not a reduction of scope.
 
 Sequence the work so `main` stays loadable (port in dependency order, commit in
 logical chunks). The deliverable is the **complete, working package**: it loads, every
