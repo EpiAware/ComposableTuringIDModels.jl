@@ -4,6 +4,7 @@
 [deps]
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 EpiAwarePrototype = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
+DynamicPPL = "366bfd00-2699-11ea-058f-f148b4cae6d8"
 
 [sources]
 EpiAwarePrototype = {path = "../.."}
