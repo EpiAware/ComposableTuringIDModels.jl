@@ -4,6 +4,13 @@ These are template/scaffold gaps encountered while adopting EpiAwarePackageTools
 in EpiAwarePrototype.jl. Each is a candidate GitHub issue. The minimal local
 workaround actually applied is noted under each.
 
+**Filed:**
+- #1 (MIT LICENSE / managed-file revert) → already tracked upstream as
+  [EpiAwarePackageTools#14](https://github.com/EpiAware/EpiAwarePackageTools.jl/issues/14)
+- #2 (JET vs DynamicPPL `@model`) → [#16](https://github.com/EpiAware/EpiAwarePackageTools.jl/issues/16)
+- #3 (`test_explicit_imports` vs `@reexport`) → [#17](https://github.com/EpiAware/EpiAwarePackageTools.jl/issues/17)
+- #4 (`test_doctest` `@meta` under TestItemRunner) → [#18](https://github.com/EpiAware/EpiAwarePackageTools.jl/issues/18)
+
 ---
 
 ## 1. `scaffold` writes an MIT `LICENSE`; no way to request a different licence
