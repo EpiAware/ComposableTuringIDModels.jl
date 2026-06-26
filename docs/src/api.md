@@ -114,8 +114,5 @@ HalfNormal
 SafePoisson
 SafeNegativeBinomial
 NegativeBinomialMeanClust
-censored_pmf
-censored_cdf
-∫F
 condition_model
 ```

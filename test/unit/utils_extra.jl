@@ -1,13 +1,18 @@
-@testitem "censored_pmf and censored_cdf discretise a distribution" begin
+@testitem "continuous distributions discretise into valid PMFs (CensoredDistributions)" begin
     using EpiAwarePrototype, Distributions
-    pmf = censored_pmf(Gamma(2.0, 1.0))
+    # EpiData and LatentDelay discretise a continuous distribution into a PMF via
+    # CensoredDistributions.double_interval_censored (internal `_discretised_pmf`).
+    pmf = EpiAwarePrototype._discretised_pmf(Gamma(2.0, 1.0); D = 10.0)
     @test isapprox(sum(pmf), 1.0)
     @test all(>=(0), pmf)
 
-    cdf_ = censored_cdf(Exponential(1.0); D = 10)
-    @test cdf_[1] == 0.0
-    @test issorted(cdf_)
-    @test EpiAwarePrototype.∫F(Exponential(1.0), 2.0, 1.0) > 0
+    data = EpiData(; gen_distribution = Gamma(2.0, 1.0), D_gen = 10.0)
+    @test isapprox(sum(data.gen_int), 1.0)
+    @test all(>=(0), data.gen_int)
+
+    obs = LatentDelay(PoissonError(), truncated(Normal(5.0, 2.0), 0.0, Inf))
+    @test isapprox(sum(obs.rev_pmf), 1.0)
+    @test all(>=(0), obs.rev_pmf)
 end
 
 @testitem "expected_Rt inverts the renewal relationship" begin

@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "08b468940cc0140a885b8d0deb1909f92a2c39da"
+project_hash = "cdc01f92682cffa23b5862c51961b9c7cf766980"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "d9aaef7c63466eee4de23b4d9dad03629df54bea"
@@ -291,6 +291,31 @@ weakdeps = ["ChainRulesCore", "ForwardDiff"]
     [deps.BracketingNonlinearSolve.extensions]
     BracketingNonlinearSolveChainRulesCoreExt = ["ChainRulesCore", "ForwardDiff"]
     BracketingNonlinearSolveForwardDiffExt = "ForwardDiff"
+
+[[deps.CensoredDistributions]]
+deps = ["Distributions", "DocStringExtensions", "FastGaussQuadrature", "LogExpFunctions", "Optimization", "OptimizationOptimJL", "PrecompileTools", "Random", "SpecialFunctions", "Statistics"]
+git-tree-sha1 = "3d6fd1ba2e595784de7d147842a838e05b94773d"
+uuid = "b2eeebe4-5992-4301-9193-7ebc9f62c855"
+version = "0.2.21"
+
+    [deps.CensoredDistributions.extensions]
+    CensoredDistributionsChainRulesCoreExt = "ChainRulesCore"
+    CensoredDistributionsEnzymeExt = "Enzyme"
+    CensoredDistributionsForwardDiffExt = "ForwardDiff"
+    CensoredDistributionsIntegralsExt = "Integrals"
+    CensoredDistributionsMooncakeExt = ["ChainRulesCore", "Mooncake"]
+    CensoredDistributionsReverseDiffExt = "ReverseDiff"
+
+    [deps.CensoredDistributions.weakdeps]
+    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+    DynamicPPL = "366bfd00-2699-11ea-058f-f148b4cae6d8"
+    Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+    FlexiChains = "4a37a8b9-6e57-4b92-8664-298d46e639f7"
+    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+    Integrals = "de52edbc-65ea-441a-8357-d3a637375a31"
+    Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
+    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+    Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [[deps.Chain]]
 git-tree-sha1 = "765487f32aeece2cf28aa7038e29c31060cb5a69"
@@ -659,7 +684,7 @@ weakdeps = ["Adapt", "ChainRulesCore"]
     EnzymeCoreChainRulesCoreExt = "ChainRulesCore"
 
 [[deps.EpiAwarePrototype]]
-deps = ["ADTypes", "AbstractMCMC", "AdvancedHMC", "DataFramesMeta", "Distributions", "DocStringExtensions", "DynamicPPL", "LinearAlgebra", "LogExpFunctions", "MCMCChains", "OrdinaryDiffEq", "Pathfinder", "QuadGK", "Random", "Reexport", "Statistics", "Turing"]
+deps = ["ADTypes", "AbstractMCMC", "AdvancedHMC", "CensoredDistributions", "DataFramesMeta", "Distributions", "DocStringExtensions", "DynamicPPL", "LinearAlgebra", "LogExpFunctions", "MCMCChains", "OrdinaryDiffEq", "Pathfinder", "Random", "Reexport", "Statistics", "Tables", "Turing"]
 path = "."
 uuid = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
 version = "0.1.0-DEV"
@@ -698,6 +723,12 @@ version = "1.3.3"
 git-tree-sha1 = "acebe244d53ee1b461970f8910c235b259e772ef"
 uuid = "9aa1b823-49e4-5ca5-8b0f-3971ec8bab6a"
 version = "0.3.2"
+
+[[deps.FastGaussQuadrature]]
+deps = ["LinearAlgebra", "SpecialFunctions", "StaticArrays"]
+git-tree-sha1 = "4916117dd032ec5959b7633aedbbac408ca5ddeb"
+uuid = "442a2c76-b920-505d-bb47-c5924d526838"
+version = "1.3.0"
 
 [[deps.FastPower]]
 git-tree-sha1 = "ef0a4b9c01b02b117376ad403464621e74aacdc9"

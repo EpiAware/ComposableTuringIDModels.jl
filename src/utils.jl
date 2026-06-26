@@ -377,101 +377,28 @@ function NegativeBinomialMeanClust(μ, α)
     return SafeNegativeBinomial(r, p)
 end
 
-# Check `censored_cdf` arguments and return the time steps at the right edges of
-# the censor intervals. When `D` is `nothing` it is set to the `upper`th quantile
-# rounded to a multiple of `Δd`.
-function _check_and_give_ts(dist::Distribution, Δd, D, upper)
+# Right-truncated, double-interval-censored discrete PMF of a continuous
+# distribution, built with CensoredDistributions.jl rather than a bespoke
+# quadrature (the original EpiAware shipped its own `censored_pmf`/`censored_cdf`;
+# here that is delegated to the org's CensoredDistributions package).
+#
+# `double_interval_censored(dist; upper = D, interval = Δd)` applies primary
+# (uniform-window) censoring, right-truncation at `D`, then secondary interval
+# censoring of width `Δd`. Evaluating its `pdf` on the bin left-edges
+# `0, Δd, …, D-Δd` and normalising gives the discrete PMF the models consume.
+# When `D` is `nothing` it defaults to the `upper`th quantile rounded to a
+# multiple of `Δd`, matching the original behaviour.
+function _discretised_pmf(dist::Distribution; Δd = 1.0, D = nothing, upper = 0.99)
     @assert minimum(dist)>=0.0 "Distribution must be non-negative."
     @assert Δd>0.0 "Δd must be positive."
     if isnothing(D)
-        x_q = invlogcdf(dist, log(upper))
-        D = round(Int64, x_q / Δd) * Δd
+        D = round(Int64, invlogcdf(dist, log(upper)) / Δd) * Δd
     end
     @assert D>=Δd "D can't be shorter than Δd."
-    ts = Δd:Δd:D |> collect
-    @assert ts[end]==D "D must be a multiple of Δd."
-    return ts
-end
-
-@doc raw"
-CDF of ``X + U`` where ``X`` has the CDF of `dist` and ``U`` is uniform on
-``[0, Δd)``, evaluated at `t` by quadrature. Used to build the double-censored
-CDF and PMF.
-
-# Arguments
-
-  - `dist`: the continuous distribution.
-  - `t`: the evaluation point.
-  - `Δd`: the censoring-interval width.
-
-# Examples
-```@example intF
-using EpiAwarePrototype, Distributions
-EpiAwarePrototype.∫F(Exponential(1.0), 2.0, 1.0)
-```
-"
-function ∫F(dist, t, Δd)
-    return quadgk(u -> exp(logcdf(dist, t - u) - log(Δd)), 0.0, min(Δd, t))[1]
-end
-
-@doc raw"
-Discrete, double-interval-censored cumulative distribution function of a
-continuous distribution.
-
-Assumes a uniform distribution over primary-event times within censoring
-intervals of width `Δd`. Returns the (non-truncated) CDF with `0.0` prepended.
-
-# Arguments
-
-  - `dist`: the continuous distribution to discretise.
-
-# Keyword Arguments
-
-  - `Δd`: the censoring-interval width (default `1.0`).
-  - `D`: the right-truncation point; `nothing` (default) uses the `upper`th
-    quantile rounded to a multiple of `Δd`.
-  - `upper`: the quantile used when `D` is `nothing` (default `0.999`).
-
-# Examples
-```@example censored_cdf
-using EpiAwarePrototype, Distributions
-censored_cdf(Exponential(1.0); D = 10)
-```
-"
-function censored_cdf(dist::Distribution; Δd = 1.0, D = nothing, upper = 0.999)
-    ts = _check_and_give_ts(dist, Δd, D, upper)
-    cens_F = ts .|> t -> ∫F(dist, t, Δd)
-    return [0.0; cens_F]
-end
-
-@doc raw"
-Discrete, right-truncated, double-interval-censored probability mass function of
-a continuous distribution.
-
-Differences the double-censored CDF from [`censored_cdf`](@ref) and normalises.
-Used to turn a continuous generation interval or reporting delay into the
-discrete PMF the models consume.
-
-# Arguments
-
-  - `dist`: the continuous distribution to discretise.
-
-# Keyword Arguments
-
-  - `Δd`: the censoring-interval width (default `1.0`).
-  - `D`: the right-truncation point; `nothing` (default) uses the `upper`th
-    quantile rounded to a multiple of `Δd`.
-  - `upper`: the quantile used when `D` is `nothing` (default `0.99`).
-
-# Examples
-```@example censored_pmf
-using EpiAwarePrototype, Distributions
-censored_pmf(Gamma(2.0, 1.0))
-```
-"
-function censored_pmf(dist::Distribution; Δd = 1.0, D = nothing, upper = 0.99)
-    cens_cdf = censored_cdf(dist; Δd, D, upper)
-    return cens_cdf |> diff |> p -> p ./ sum(p)
+    censored = double_interval_censored(dist; upper = D, interval = Δd)
+    ts = 0.0:Δd:(D - Δd)
+    probs = [pdf(censored, t) for t in ts]
+    return probs ./ sum(probs)
 end
 
 @doc raw"

@@ -11,7 +11,7 @@ and a transformation linking the unconstrained and constrained domains.
     vector (must be non-negative and sum to 1) and a transformation function.
   - `EpiData(; gen_distribution, D_gen, Δd = 1.0, transformation = exp)` —
     discretise a continuous generation-interval distribution via
-    [`censored_pmf`](@ref).
+    double-interval censoring (CensoredDistributions.jl).
 
 ## Fields
 
@@ -44,7 +44,9 @@ end
 
 function EpiData(; gen_distribution::ContinuousDistribution, D_gen = nothing,
         Δd = 1.0, transformation::Function = exp)
-    gen_int = censored_pmf(gen_distribution; Δd = Δd, D = D_gen) |>
+    # Drop the delay-0 bin (a generation interval has no mass at lag 0) and
+    # renormalise, as the original EpiAware did.
+    gen_int = _discretised_pmf(gen_distribution; Δd = Δd, D = D_gen) |>
               p -> p[2:end] ./ sum(p[2:end])
     return EpiData(gen_int, transformation)
 end

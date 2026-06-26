@@ -145,7 +145,7 @@ observed data.
 ## Constructors
   - `LatentDelay(model, pmf)` — from a delay PMF (non-negative, sums to 1).
   - `LatentDelay(model, distribution; D, Δd)` — discretise a continuous delay
-    distribution via [`censored_pmf`](@ref).
+    distribution via double-interval censoring (CensoredDistributions.jl).
 
 ## Fields
 
@@ -178,7 +178,7 @@ end
 function LatentDelay(model::M, distribution::C; D = nothing,
         Δd = 1.0) where {
         M <: AbstractEpiAwareModel, C <: ContinuousDistribution}
-    pmf = censored_pmf(distribution; Δd = Δd, D = D)
+    pmf = _discretised_pmf(distribution; Δd = Δd, D = D)
     return LatentDelay(model, pmf)
 end
 

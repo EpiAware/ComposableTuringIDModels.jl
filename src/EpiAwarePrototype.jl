@@ -34,10 +34,10 @@ using Turing: Turing, filldist, arraydist, sample, NUTS, MCMCSerial
 # keyword named `sampler` (kept for parity) collides with the reexported
 # `Distributions.sampler`, which the analysis otherwise reports as implicit.
 using Turing: sampler
+using CensoredDistributions: double_interval_censored
 using LinearAlgebra: dot
 using LogExpFunctions: softmax, xexpy, log1pexp
 using OrdinaryDiffEq: ODEProblem, ODEFunction, solve, remake, AutoVern7, Rodas5P
-using QuadGK: quadgk
 using Random: AbstractRNG, randexp
 
 # Inference-layer dependencies.
@@ -64,8 +64,10 @@ using Statistics: Statistics
 export AbstractEpiAwareModel, as_turing_model
 
 # --- utilities and distributions ---
+# (double-interval censoring is provided by CensoredDistributions.jl, used
+# internally by `EpiData` / `LatentDelay`; it is not re-exported here.)
 export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial,
-       NegativeBinomialMeanClust, censored_pmf, censored_cdf, ∫F, condition_model
+       NegativeBinomialMeanClust, condition_model
 
 # --- latent models ---
 export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept, FixedIntercept,

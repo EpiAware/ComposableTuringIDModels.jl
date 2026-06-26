@@ -234,10 +234,19 @@ right-truncated discretised PMF vector these sites need. Drop `censored_pmf.jl`.
   gone) and Pathfinder no longer exposes `draws_transformed.value`; the Pathfinder
   pre-step still runs and its result is returned.
 
-### Open decision (from brief, flagged to the team lead)
+### Censoring via CensoredDistributions.jl (done)
 
-- The brief asks to migrate censoring to **CensoredDistributions.jl** (dropping the
-  bespoke `censored_pmf`), but CensoredDistributions.jl currently shares the *same*
-  UUID as upstream EpiAware (`b2eeebe4-...`), risking a resolution clash. Pending a
-  decision, the package keeps a faithful local double-interval-censored
-  `censored_pmf`/`censored_cdf` (ported from upstream, not from a private source).
+- Per the brief, the bespoke double-interval-censoring code is dropped and censoring
+  is delegated to **CensoredDistributions.jl**. The internal `_discretised_pmf`
+  helper (in `utils.jl`) builds the right-truncated discrete PMF with
+  `double_interval_censored(dist; upper = D, interval = Δd)`, evaluating its `pdf`
+  on the bin left-edges and normalising. The two call sites — `EpiData(;
+  gen_distribution = …)` and `LatentDelay(model, distribution)` — use it. The
+  exported `censored_pmf`/`censored_cdf`/`∫F` are removed (users wanting censoring
+  use CensoredDistributions directly).
+- **UUID caution resolved.** CensoredDistributions.jl is registered in General under
+  UUID `b2eeebe4-...` (the same UUID upstream EpiAware once used). Because
+  EpiAwarePrototype has its own distinct UUID (`cbebd14a-…`) and does NOT depend on
+  the upstream EpiAware package, the env resolves CensoredDistributions cleanly from
+  the registry with no clash. Verified: added, freed to the registered version
+  (0.2.21), suite green.
