@@ -28,9 +28,10 @@ using Reexport: @reexport
 @reexport using Distributions
 @reexport using Turing
 
-using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition
+using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix
 using Turing: Turing, filldist, arraydist
 using LinearAlgebra: dot
+using LogExpFunctions: softmax
 using QuadGK: quadgk
 using Random: AbstractRNG, randexp
 
@@ -56,6 +57,12 @@ export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial
 export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept, FixedIntercept,
        Null, DiffLatentModel
 
+# --- latent modifiers / manipulators / combinations / broadcasting ---
+export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
+       CombineLatentModels, ConcatLatentModels, BroadcastLatentModel,
+       RepeatEach, RepeatBlock, broadcast_rule, broadcast_n, broadcast_dayofweek,
+       broadcast_weekly, equal_dimensions, arma, arima
+
 # --- infection models ---
 export EpiData, DirectInfections
 
@@ -69,6 +76,7 @@ export EpiAwareModel
 include("base.jl")
 include("utils.jl")
 include("latent.jl")
+include("latent_extra.jl")
 include("infections.jl")
 include("observations.jl")
 include("compose.jl")

@@ -21,6 +21,26 @@ Null
 DiffLatentModel
 ```
 
+## Latent modifiers, manipulators, and combinations
+
+```@docs
+TransformLatentModel
+PrefixLatentModel
+RecordExpectedLatent
+CombineLatentModels
+ConcatLatentModels
+BroadcastLatentModel
+RepeatEach
+RepeatBlock
+broadcast_rule
+broadcast_n
+broadcast_dayofweek
+broadcast_weekly
+equal_dimensions
+arma
+arima
+```
+
 ## Infection models
 
 ```@docs

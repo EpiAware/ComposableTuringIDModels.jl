@@ -653,7 +653,7 @@ uuid = "7aaea248-0d11-4a0d-a7dc-86da30abb951"
 version = "0.1.0"
 
 [[deps.EpiAwarePrototype]]
-deps = ["Distributions", "DocStringExtensions", "DynamicPPL", "LinearAlgebra", "QuadGK", "Random", "Reexport", "Statistics", "Turing"]
+deps = ["Distributions", "DocStringExtensions", "DynamicPPL", "LinearAlgebra", "LogExpFunctions", "QuadGK", "Random", "Reexport", "Statistics", "Turing"]
 path = ".."
 uuid = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
 version = "0.1.0-DEV"

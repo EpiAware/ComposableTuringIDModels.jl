@@ -68,12 +68,14 @@ Alternatively allow `qa_config.jl` to disable the JET testset for `@model`
 packages.
 
 **Local workaround applied:** replaced the managed `test/jet/runtests.jl` with a
-version that runs `report_package`, drops exactly the `UndefVarErrorReport`s
-arising in `@model`-generated methods (matched on the evaluator signature), and
-fails on any *other* report. Added `DynamicPPL` to `test/jet/Project.toml`
-(within the template's stated "add packages JET needs" allowance). A
-template-sync will revert the runner; it must be re-applied until the helper
-supports a filter.
+version that runs `report_package` and drops every report arising inside a
+`@model`-generated method (matched on the DynamicPPL evaluator signature
+`(::Model, ::AbstractVarInfo, ...)`), failing on any *other* report. This covers
+both classes of macro artifact: `UndefVarErrorReport`s for `~`-assigned locals
+and `MethodErrorReport`s through the `:=` (coloneq) tracking machinery
+(`store_coloneq_value!!`). Added `DynamicPPL` to `test/jet/Project.toml` (within
+the template's stated "add packages JET needs" allowance). A template-sync will
+revert the runner; it must be re-applied until the helper supports a filter.
 
 ---
 
