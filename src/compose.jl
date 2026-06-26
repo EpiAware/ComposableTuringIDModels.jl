@@ -16,8 +16,14 @@ y_t \;\xrightarrow{\text{observations}}\; \text{data}
 The returned generated quantities are `(; generated_y_t, I_t, Z_t)`. Pass
 `y_t = missing` to simulate from the prior, or a data vector to condition.
 
+## Fields
+
+  - `latent_model`: the latent process model generating ``Z_t``.
+  - `epi_model`: the infection process model mapping ``Z_t`` to ``I_t``.
+  - `observation_model`: the observation model mapping ``I_t`` to ``y_t``.
+
 # Examples
-```jldoctest EpiAwareModel; output = false
+```@example EpiAwareModel
 using EpiAwarePrototype, Distributions
 data = EpiData([0.2, 0.3, 0.5], exp)
 model = EpiAwareModel(
@@ -26,8 +32,6 @@ model = EpiAwareModel(
     PoissonError())
 mdl = as_turing_model(model, missing, 20)
 rand(mdl)
-nothing
-# output
 ```
 "
 struct EpiAwareModel{

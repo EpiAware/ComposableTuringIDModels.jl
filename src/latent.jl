@@ -11,13 +11,11 @@ draws from `ϵ_t`.
 ```
 
 # Examples
-```jldoctest IID; output = false
+```@example IID
 using EpiAwarePrototype, Distributions
 model = IID(Normal(0, 1))
 mdl = as_turing_model(model, 10)
 rand(mdl)
-nothing
-# output
 ```
 "
 @kwdef struct IID{D <: Sampleable} <: AbstractEpiAwareModel
@@ -37,14 +35,19 @@ A non-centred hierarchical normal latent process.
 \mathrm{Normal}(0, 1), \quad \sigma \sim \text{std\_prior}
 ```
 
+## Fields
+
+  - `mean`: the mean of the normal process.
+  - `std_prior`: the prior distribution for the standard deviation ``\sigma``.
+  - `add_mean`: flag controlling whether `mean` is added (false when
+    `mean == 0`).
+
 # Examples
-```jldoctest HierarchicalNormal; output = false
+```@example HierarchicalNormal
 using EpiAwarePrototype, Distributions
 hn = HierarchicalNormal()
 mdl = as_turing_model(hn, 10)
 rand(mdl)
-nothing
-# output
 ```
 "
 @kwdef struct HierarchicalNormal{R <: Real, D <: Sampleable, M <: Bool} <:
@@ -81,13 +84,11 @@ from the error model `ϵ_t` (a `HierarchicalNormal` by default, giving an
 inferred step standard deviation).
 
 # Examples
-```jldoctest RandomWalk; output = false
+```@example RandomWalk
 using EpiAwarePrototype, Distributions
 rw = RandomWalk()
 mdl = as_turing_model(rw, 10)
 rand(mdl)
-nothing
-# output
 ```
 "
 @kwdef struct RandomWalk{D <: Sampleable, E <: AbstractEpiAwareModel} <:
@@ -122,13 +123,11 @@ with damping coefficients ``\rho`` from `damp_prior`, initial conditions from
 length of the damping/initial priors.
 
 # Examples
-```jldoctest AR; output = false
+```@example AR
 using EpiAwarePrototype, Distributions
 ar = AR()
 mdl = as_turing_model(ar, 10)
 rand(mdl)
-nothing
-# output
 ```
 "
 struct AR{D <: Sampleable, I <: Sampleable, P <: Int, E <: AbstractEpiAwareModel} <:
@@ -198,13 +197,11 @@ with coefficients ``\theta`` from the prior in `θ` and innovations from the
 error model `ϵ_t`. The order `q` is the length of the coefficient prior.
 
 # Examples
-```jldoctest MA; output = false
+```@example MA
 using EpiAwarePrototype, Distributions
 ma = MA()
 mdl = as_turing_model(ma, 10)
 rand(mdl)
-nothing
-# output
 ```
 "
 struct MA{C <: Sampleable, Q <: Int, E <: AbstractEpiAwareModel} <:
@@ -264,14 +261,15 @@ end
 @doc raw"
 Broadcast a single sampled intercept value to a length-`n` latent process.
 
+The field `intercept_prior` sets the prior distribution the intercept is drawn
+from.
+
 # Examples
-```jldoctest Intercept; output = false
+```@example Intercept
 using EpiAwarePrototype, Distributions
 int = Intercept(Normal(0, 1))
 mdl = as_turing_model(int, 10)
 rand(mdl)
-nothing
-# output
 ```
 "
 @kwdef struct Intercept{D <: Sampleable} <: AbstractEpiAwareModel
@@ -332,13 +330,11 @@ are inferred from `init_prior`; `d` equals the length of `init_priors`.
 Composing `DiffLatentModel` over an `AR` gives an ARIMA-style latent process.
 
 # Examples
-```jldoctest DiffLatentModel; output = false
+```@example DiffLatentModel
 using EpiAwarePrototype, Distributions
 diff = DiffLatentModel(; model = RandomWalk(), init_priors = [Normal(), Normal()])
 mdl = as_turing_model(diff, 10)
 rand(mdl)
-nothing
-# output
 ```
 "
 struct DiffLatentModel{M <: AbstractEpiAwareModel, P <: Distribution} <:

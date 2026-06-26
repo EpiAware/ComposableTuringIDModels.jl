@@ -13,12 +13,17 @@ and a transformation linking the unconstrained and constrained domains.
     discretise a continuous generation-interval distribution via
     [`censored_pmf`](@ref).
 
+## Fields
+
+  - `gen_int`: the discrete generation interval vector.
+  - `len_gen_int`: the length of the discrete generation interval.
+  - `transformation`: the transformation between unconstrained and constrained
+    domains.
+
 # Examples
-```jldoctest EpiData; output = false
+```@example EpiData
 using EpiAwarePrototype
 data = EpiData([0.2, 0.3, 0.5], exp)
-nothing
-# output
 ```
 "
 struct EpiData{T <: Real, F <: Function}
@@ -54,15 +59,19 @@ I_t = g\!\left(\hat I_0 + Z_t\right)
 where ``g`` is `data.transformation` and the unconstrained initial infections
 ``\hat I_0`` are drawn from `initialisation_prior`.
 
+## Fields
+
+  - `data`: the [`EpiData`](@ref) object holding the generation interval and
+    transformation.
+  - `initialisation_prior`: the prior for the unconstrained initial infections.
+
 # Examples
-```jldoctest DirectInfections; output = false
+```@example DirectInfections
 using EpiAwarePrototype, Distributions
 data = EpiData([0.2, 0.3, 0.5], exp)
 inf = DirectInfections(; data = data, initialisation_prior = Normal())
 mdl = as_turing_model(inf, randn(10))
 rand(mdl)
-nothing
-# output
 ```
 "
 @kwdef struct DirectInfections{S <: Sampleable} <: AbstractEpiAwareModel

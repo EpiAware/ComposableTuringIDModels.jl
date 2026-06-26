@@ -11,6 +11,16 @@ submodels, so a full model is assembled rather than hand-written.
 This package is **ported and adapted** from the open-source, Apache-2.0 licensed
 `EpiAware` package; see the `NOTICE` file for attribution. It is exploratory and
 clearly labelled as a prototype.
+
+# Examples
+```@example
+using EpiAwarePrototype, Distributions
+data = EpiData([0.2, 0.3, 0.5], exp)
+model = EpiAwareModel(RandomWalk(),
+    DirectInfections(; data = data, initialisation_prior = Normal()),
+    PoissonError())
+rand(as_turing_model(model, missing, 20))
+```
 "
 module EpiAwarePrototype
 

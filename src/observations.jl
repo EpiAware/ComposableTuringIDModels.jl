@@ -48,6 +48,19 @@ end
 @doc raw"
 Generate the priors required by an observation-error model. Returns a named
 tuple consumed by [`observation_error`](@ref). The default is an empty tuple.
+
+# Arguments
+
+  - `obs_model`: the observation-error model whose priors are generated.
+  - `y_t`: the observed series (or `missing` when simulating predictively).
+  - `Y_t`: the expected-observation series.
+
+# Examples
+```@example generate_observation_error_priors
+using EpiAwarePrototype
+m = generate_observation_error_priors(NegativeBinomialError(), missing, fill(10.0, 5))
+rand(m)
+```
 "
 @model function generate_observation_error_priors(
         obs_model::AbstractObservationErrorModel, y_t, Y_t)
@@ -57,6 +70,20 @@ end
 @doc raw"
 The per-time-point observation-error distribution given an expected value and
 the sampled priors. Each error family implements its own method.
+
+# Arguments
+
+  - `obs_model`: the observation-error model.
+  - `Y_t`: the expected observation at a single time point.
+  - additional positional arguments: any sampled priors produced by
+    [`generate_observation_error_priors`](@ref) for the family (e.g. the squared
+    cluster factor for [`NegativeBinomialError`](@ref)).
+
+# Examples
+```@example observation_error
+using EpiAwarePrototype
+observation_error(PoissonError(), 10.0)
+```
 "
 function observation_error end
 
@@ -80,14 +107,15 @@ observation_error(::PoissonError, Y_t) = SafePoisson(Y_t)
 @doc raw"
 A negative-binomial observation-error model with an inferred cluster factor.
 
+The field `cluster_factor_prior` sets the prior distribution for the cluster
+factor that is sampled and used to parameterise the negative-binomial error.
+
 # Examples
-```jldoctest NegativeBinomialError; output = false
+```@example NegativeBinomialError
 using EpiAwarePrototype, Distributions
 nb = NegativeBinomialError()
 mdl = as_turing_model(nb, missing, fill(10, 10))
 rand(mdl)
-nothing
-# output
 ```
 "
 @kwdef struct NegativeBinomialError{S <: Sampleable} <: AbstractObservationErrorModel
@@ -119,14 +147,18 @@ observed data.
   - `LatentDelay(model, distribution; D, Δd)` — discretise a continuous delay
     distribution via [`censored_pmf`](@ref).
 
+## Fields
+
+  - `model`: the wrapped observation model the delayed expected observations are
+    passed to.
+  - `rev_pmf`: the reversed delay PMF convolved with the expected observations.
+
 # Examples
-```jldoctest LatentDelay; output = false
+```@example LatentDelay
 using EpiAwarePrototype, Distributions
 obs = LatentDelay(NegativeBinomialError(), truncated(Normal(5.0, 2.0), 0.0, Inf))
 mdl = as_turing_model(obs, missing, fill(10, 30))
 mdl()
-nothing
-# output
 ```
 "
 struct LatentDelay{M <: AbstractEpiAwareModel, T <: AbstractVector{<:Real}} <:
