@@ -10,9 +10,16 @@ Manifest.toml
 *.cov
 *.mem
 
-# Documenter build output
+# Documenter / DocumenterVitepress build output
 /docs/build/
 /docs/site/
+# Generated API reference pages (written by docs/make.jl from module bindings)
+/docs/src/lib/
+# VitePress / Node build artefacts
+/docs/node_modules/
+/docs/src/.vitepress/cache/
+/docs/src/.vitepress/dist/
+/docs/package-lock.json
 
 # OS cruft
 .DS_Store
