@@ -2,6 +2,7 @@ name = "EpiAwarePrototype"
 uuid = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
 version = "0.1.0-DEV"
 authors = ["Sam Abbott"]
+license = "Apache-2.0"
 
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
