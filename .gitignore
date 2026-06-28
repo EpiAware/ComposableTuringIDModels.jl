@@ -1,7 +1,18 @@
+# Julia resolved environments — never commit Manifests (they pin to one Julia
+# version and break the lts/downgrade CI jobs; commit only Project.toml + compat).
+Manifest.toml
+**/Manifest.toml
+
+# Coverage / profiling artefacts
 *.jl.cov
 *.jl.*.cov
 *.jl.mem
+*.cov
+*.mem
+
+# Documenter build output
 /docs/build/
 /docs/site/
-/docs/Manifest.toml
+
+# OS cruft
 .DS_Store
