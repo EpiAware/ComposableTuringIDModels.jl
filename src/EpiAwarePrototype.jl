@@ -97,16 +97,16 @@ export EpiProblem, EpiMethod, NUTSampler, ManyPathfinder, DirectSample,
        manypathfinder, apply_method, EpiAwareObservables, generated_observables,
        spread_draws, get_param_array
 
-include("base.jl")
-include("utils.jl")
-include("latent.jl")
-include("latent_extra.jl")
-include("infections.jl")
-include("infections_extra.jl")
-include("ode.jl")
-include("observations.jl")
-include("observations_extra.jl")
+include("base/base.jl")
+include("utils/utils.jl")
+include("latent_models/latent.jl")
+include("latent_models/latent_extra.jl")
+include("infection_models/infections.jl")
+include("infection_models/infections_extra.jl")
+include("ode/ode.jl")
+include("observation_models/observations.jl")
+include("observation_models/observations_extra.jl")
 include("compose.jl")
-include("inference.jl")
+include("inference/inference.jl")
 
 end
