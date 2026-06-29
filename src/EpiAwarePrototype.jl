@@ -97,16 +97,79 @@ export EpiProblem, EpiMethod, NUTSampler, ManyPathfinder, DirectSample,
        manypathfinder, apply_method, EpiAwareObservables, generated_observables,
        spread_draws, get_param_array
 
+# --- core architecture ---
 include("base/base.jl")
-include("utils/utils.jl")
-include("latent_models/latent.jl")
-include("latent_models/latent_extra.jl")
-include("infection_models/infections.jl")
-include("infection_models/infections_extra.jl")
-include("ode/ode.jl")
-include("observation_models/observations.jl")
-include("observation_models/observations_extra.jl")
+include("base/accumulation.jl")
+include("base/prettyprinting.jl")
+
+# --- utilities and distributions ---
+include("utils/accumulate_scan.jl")
+include("utils/HalfNormal.jl")
+include("utils/SafeInt.jl")
+include("utils/SafePoisson.jl")
+include("utils/SafeNegativeBinomial.jl")
+include("utils/censored_pmf.jl")
+include("utils/turing-methods.jl")
+
+# --- latent models ---
+include("latent_models/utils.jl")
+include("latent_models/models/IID.jl")
+include("latent_models/models/HierarchicalNormal.jl")
+include("latent_models/models/RandomWalk.jl")
+include("latent_models/models/AR.jl")
+include("latent_models/models/MA.jl")
+include("latent_models/models/Intercept.jl")
+include("latent_models/models/Null.jl")
+include("latent_models/modifiers/DiffLatentModel.jl")
+include("latent_models/modifiers/TransformLatentModel.jl")
+include("latent_models/modifiers/PrefixLatentModel.jl")
+include("latent_models/modifiers/RecordExpectedLatent.jl")
+include("latent_models/manipulators/CombineLatentModels.jl")
+include("latent_models/manipulators/ConcatLatentModels.jl")
+include("latent_models/manipulators/broadcast/LatentModel.jl")
+include("latent_models/manipulators/broadcast/rules.jl")
+include("latent_models/manipulators/broadcast/helpers.jl")
+include("latent_models/combinations/arma.jl")
+include("latent_models/combinations/arima.jl")
+
+# --- infection models ---
+include("infection_models/EpiData.jl")
+include("infection_models/utils.jl")
+include("infection_models/DirectInfections.jl")
+include("infection_models/ExpGrowthRate.jl")
+include("infection_models/RenewalSteps.jl")
+include("infection_models/Renewal.jl")
+
+# --- ODE compartmental models ---
+include("ode/SIRParams.jl")
+include("ode/SEIRParams.jl")
+include("ode/ODEProcess.jl")
+
+# --- observation models ---
+include("observation_models/ObservationErrorModels/methods.jl")
+include("observation_models/ObservationErrorModels/PoissonError.jl")
+include("observation_models/ObservationErrorModels/NegativeBinomialError.jl")
+include("observation_models/modifiers/LatentDelay.jl")
+include("observation_models/modifiers/ascertainment/Ascertainment.jl")
+include("observation_models/modifiers/ascertainment/helpers.jl")
+include("observation_models/modifiers/Aggregate.jl")
+include("observation_models/modifiers/PrefixObservationModel.jl")
+include("observation_models/modifiers/RecordExpectedObs.jl")
+include("observation_models/modifiers/TransformObservationModel.jl")
+include("observation_models/StackObservationModels.jl")
+
+# --- composition ---
 include("compose.jl")
-include("inference/inference.jl")
+
+# --- inference orchestration ---
+include("inference/types.jl")
+include("inference/EpiProblem.jl")
+include("inference/EpiAwareObservables.jl")
+include("inference/apply_method.jl")
+include("inference/NUTSampler.jl")
+include("inference/DirectSample.jl")
+include("inference/get_param_array.jl")
+include("inference/ManyPathfinder.jl")
+include("inference/post-inference.jl")
 
 end
