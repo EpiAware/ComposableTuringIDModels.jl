@@ -52,6 +52,7 @@ function _models()
     ar = as_turing_model(AR(), n)
     arima = as_turing_model(
         DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]), n)
+    hsgp = as_turing_model(HilbertSpaceGP(; m = 8), n)
 
     direct = EpiAwareModel(
         DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
@@ -67,6 +68,7 @@ function _models()
         ("RandomWalk latent logjoint", rw),
         ("AR latent logjoint", ar),
         ("ARIMA latent logjoint", arima),
+        ("HilbertSpaceGP latent logjoint", hsgp),
         ("DirectInfections+Poisson posterior",
             as_turing_model(direct, y_direct, n)),
         ("Renewal+NegativeBinomial posterior",
@@ -153,24 +155,27 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (5 scenarios × 4 backends), Julia 1.12:
+Result matrix (6 scenarios × 4 backends), Julia 1.12:
 
 | scenario                            | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
 |-------------------------------------|:-----------:|:-----------:|:--------:|:------:|
 | RandomWalk latent logjoint          |      ✓      |      ✓      |    ✓    |   ✓   |
 | AR latent logjoint                  |      ✓      |      ✓      |    ✓    |   ✗   |
 | ARIMA latent logjoint               |      ✓      |      ✓      |    ✓    |   ✗   |
+| HilbertSpaceGP latent logjoint      |      ✓      |      ✓      |    ✓    |   ✓   |
 | DirectInfections+Poisson posterior  |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+NegativeBinomial posterior  |      ✓      |      ✓      |    ✓    |   ✓   |
 
 ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
-scenario correctly. Enzyme works on three of the five once configured with
+scenario correctly. Enzyme works on four of the six once configured with
 `function_annotation = Enzyme.Const` (see [`backends`](@ref)), but the two
 AR-based latent log-densities raise `IllegalTypeAnalysisException` inside the
 `accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion — a real
 Enzyme type-analysis limitation, not a defect in the package (the same models
 sample fine under NUTS with ForwardDiff). They are recorded as `@test_broken`
-for Enzyme below rather than hidden.
+for Enzyme below rather than hidden. The Hilbert-space GP latent is a pure
+basis-weight matrix product with no such recursion, so it differentiates cleanly
+under every backend.
 """
 function backend_broken_scenarios()
     return Dict{String, Set{String}}(

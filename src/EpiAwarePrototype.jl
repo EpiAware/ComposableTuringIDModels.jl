@@ -70,7 +70,7 @@ export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial
 
 # --- latent models ---
 export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept, FixedIntercept,
-       Null, DiffLatentModel
+       Null, DiffLatentModel, HilbertSpaceGP
 
 # --- latent modifiers / manipulators / combinations / broadcasting ---
 export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
@@ -135,6 +135,7 @@ include("latent_models/models/HierarchicalNormal.jl")
 include("latent_models/models/RandomWalk.jl")
 include("latent_models/models/AR.jl")
 include("latent_models/models/MA.jl")
+include("latent_models/models/HilbertSpaceGP.jl")
 include("latent_models/models/Intercept.jl")
 include("latent_models/models/Null.jl")
 include("latent_models/modifiers/DiffLatentModel.jl")

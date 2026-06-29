@@ -7,7 +7,8 @@ pages = [
         "Overview" => "case-studies/index.md",
         "Renewal model with negative-binomial reporting" => "case-studies/renewal-negbin.md",
         "Reporting delays and day-of-week effects" => "case-studies/delays-dayofweek.md",
-        "An SIR compartmental model" => "case-studies/sir-ode.md"
+        "An SIR compartmental model" => "case-studies/sir-ode.md",
+        "A Gaussian-process latent process" => "case-studies/gaussian-process.md"
     ],
     "API reference" => [
         "Public API" => "lib/public.md",
