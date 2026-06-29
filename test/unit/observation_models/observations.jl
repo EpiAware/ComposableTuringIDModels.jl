@@ -54,6 +54,63 @@ end
     @test m() == obs
 end
 
+@testitem "BinomialError reads trials from NamedTuple data" begin
+    using EpiAwarePrototype, Distributions, Random
+    Random.seed!(222)
+
+    be = BinomialError()
+    # The struct carries no data.
+    @test isempty(fieldnames(BinomialError))
+    # Role + interface conformance. The expected series is a probability, and the
+    # number of trials is supplied via the NamedTuple data `y_t`.
+    @test be isa AbstractObservationErrorModel
+    @test be isa AbstractObservationModel
+    @test implements_observation_interface(be; y_t = (y = missing, N = 20),
+        Y_t = fill(0.3, 10))
+
+    # Scalar N (in the data) is broadcast across the series; successes lie in 0..N.
+    p = fill(0.3, 12)
+    sim = as_turing_model(be, (y = missing, N = 20), p)()
+    @test length(sim) == length(p)
+    @test all(x -> 0 <= x <= 20, sim)
+    # Conditioning on the data returns it.
+    @test as_turing_model(be, (y = sim, N = 20), p)() == sim
+
+    # A per-time-point trials vector in the data is honoured.
+    Nvec = collect(5:14)            # length 10
+    simv = as_turing_model(be, (y = missing, N = Nvec), fill(0.8, 10))()
+    @test all(i -> 0 <= simv[i] <= Nvec[i], eachindex(simv))
+    @test as_turing_model(be, (y = simv, N = Nvec), fill(0.8, 10))() == simv
+
+    # `y_t` must be a NamedTuple carrying `N`: a plain vector or a NamedTuple
+    # without `N` is rejected.
+    @test_throws Exception as_turing_model(be, fill(3, 10), fill(0.3, 10))()
+    @test_throws Exception as_turing_model(be, (y = missing,), fill(0.3, 10))()
+
+    # A trials vector whose length does not match the series is rejected.
+    @test_throws Exception as_turing_model(be, (y = missing, N = [5, 5, 5]),
+        fill(0.2, 10))()
+
+    # The success probability is clamped away from 0/1 (no degenerate likelihood).
+    edge = as_turing_model(be, (y = missing, N = 8), [0.0, 1.0, 0.5, 0.5])()
+    @test all(x -> 0 <= x <= 8, edge)
+end
+
+@testitem "define_y_t unpacks counts for vector or NamedTuple data" begin
+    using EpiAwarePrototype
+    Y_t = fill(10.0, 5)
+    # Plain vector passes through.
+    @test define_y_t(PoissonError(), [1, 2, 3, 4, 5], Y_t) == [1, 2, 3, 4, 5]
+    # NamedTuple: the `y` field is unpacked.
+    @test define_y_t(PoissonError(), (y = [1, 2, 3, 4, 5],), Y_t) == [1, 2, 3, 4, 5]
+    # `missing` (plain or in the `y` field) becomes a length-Y_t missing vector.
+    @test all(ismissing, define_y_t(PoissonError(), missing, Y_t))
+    @test length(define_y_t(PoissonError(), missing, Y_t)) == 5
+    @test all(ismissing, define_y_t(PoissonError(), (y = missing,), Y_t))
+    # BinomialError shares the default unpacking for its `y` field.
+    @test define_y_t(BinomialError(), (y = [3, 4], N = 10), fill(0.5, 2)) == [3, 4]
+end
+
 @testitem "LatentDelay shortens expectations and wraps an error model" begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(12)
