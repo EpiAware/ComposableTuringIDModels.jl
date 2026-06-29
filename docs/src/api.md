@@ -1,5 +1,16 @@
 # API reference
 
+This page documents the full surface of `EpiAwarePrototype`: the exported public
+components first, then an [Internal types and helpers](@ref) section covering the
+unexported building blocks the public components are built from (and that the
+public docstrings cross-reference).
+
+## Module
+
+```@docs
+EpiAwarePrototype
+```
+
 ## Core architecture
 
 ```@docs
@@ -115,4 +126,56 @@ SafePoisson
 SafeNegativeBinomial
 NegativeBinomialMeanClust
 condition_model
+```
+
+## Internal types and helpers
+
+These are unexported. They are documented here because the public docstrings
+cross-reference them and they describe how the public components are built; they
+are not part of the stable public API.
+
+### Accumulation and scan steps
+
+```@docs
+EpiAwarePrototype.AbstractAccumulationStep
+EpiAwarePrototype.RWStep
+EpiAwarePrototype.ARStep
+EpiAwarePrototype.MAStep
+```
+
+### Renewal steps
+
+```@docs
+EpiAwarePrototype.AbstractConstantRenewalStep
+EpiAwarePrototype.ConstantRenewalStep
+EpiAwarePrototype.ConstantRenewalWithPopulationStep
+EpiAwarePrototype.neg_MGF
+```
+
+### Broadcasting
+
+```@docs
+EpiAwarePrototype.AbstractBroadcastRule
+```
+
+### Observation internals
+
+```@docs
+EpiAwarePrototype.AbstractObservationErrorModel
+EpiAwarePrototype.LDStep
+```
+
+### Inference method supertypes
+
+```@docs
+EpiAwarePrototype.AbstractEpiMethod
+EpiAwarePrototype.AbstractEpiSamplingMethod
+EpiAwarePrototype.AbstractEpiOptMethod
+```
+
+### Distribution and utility helpers
+
+```@docs
+EpiAwarePrototype.SafeIntValued
+EpiAwarePrototype._expand_dist
 ```

@@ -10,9 +10,9 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     reviewers:
-      - "EpiAware"
+      - "seabbs"
     assignees:
-      - "EpiAware"
+      - "seabbs"
     commit-message:
       prefix: "ci"
       include: "scope"
@@ -25,9 +25,9 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     reviewers:
-      - "EpiAware"
+      - "seabbs"
     assignees:
-      - "EpiAware"
+      - "seabbs"
     commit-message:
       prefix: "chore"
       include: "scope"
