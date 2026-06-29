@@ -63,24 +63,31 @@ mdl = as_turing_model(gp, 30)
 rand(mdl)
 ```
 "
-@kwdef struct HilbertSpaceGP{L <: Sampleable, S <: Sampleable, M <: Int, C <: Real} <:
-              AbstractLatentModel
+struct HilbertSpaceGP{L <: Sampleable, S <: Sampleable} <: AbstractLatentModel
     "Prior distribution for the length scale ``\\ell``."
-    length_scale_prior::L = truncated(Normal(0.0, 0.4), 0, Inf)
+    length_scale_prior::L
     "Prior distribution for the marginal standard deviation ``\\sigma``."
-    marginal_std_prior::S = truncated(Normal(0.0, 1.0), 0, Inf)
+    marginal_std_prior::S
     "Number of basis functions."
-    m::M = 20
+    m::Int
     "Boundary factor: the GP is approximated on ``[-L, L]`` with ``L = c S``."
-    c::C = 1.5
+    c::Float64
 
     function HilbertSpaceGP(length_scale_prior::Sampleable,
             marginal_std_prior::Sampleable, m::Int, c::Real)
         @assert m>0 "m (the number of basis functions) must be greater than 0"
         @assert c>1 "c (the boundary factor) must be greater than 1"
-        new{typeof(length_scale_prior), typeof(marginal_std_prior), typeof(m),
-            typeof(c)}(length_scale_prior, marginal_std_prior, m, c)
+        new{typeof(length_scale_prior), typeof(marginal_std_prior)}(
+            length_scale_prior, marginal_std_prior, m, Float64(c))
     end
+end
+
+function HilbertSpaceGP(;
+        length_scale_prior::Sampleable = truncated(
+            Normal(0.0, 0.4), 0, Inf),
+        marginal_std_prior::Sampleable = truncated(Normal(0.0, 1.0), 0, Inf),
+        m::Int = 20, c::Real = 1.5)
+    return HilbertSpaceGP(length_scale_prior, marginal_std_prior, m, c)
 end
 
 @doc raw"
