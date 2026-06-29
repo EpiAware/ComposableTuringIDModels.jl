@@ -48,9 +48,9 @@ Two properties make this fast and sampler-friendly:
   - **The basis is fixed.** ``\phi_j`` and ``\lambda_j`` depend only on the series
     length ``n``, the number of basis functions ``m``, and the boundary factor
     ``c`` (the domain is extended to ``L = c\,S`` beyond the half-range ``S`` of
-    the inputs). None of them depend on the sampled parameters, so they are built
-    once and never differentiated. Each evaluation of the latent path is then a
-    single ``n \times m`` matrix–vector product.
+    the inputs). They depend on none of the sampled parameters, so the basis lies
+    entirely outside the differentiated path. Each evaluation of the latent path is
+    then a single ``n \times m`` matrix–vector product.
   - **It is non-centred.** The only sampled quantities are ``\ell``, ``\sigma``,
     and the ``m`` standard-normal weights ``\beta``. A non-centred parameterisation
     like this is exactly what NUTS handles well, and the gradient is cheap, so the
