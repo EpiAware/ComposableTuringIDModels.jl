@@ -82,12 +82,13 @@ nothing # hide
 ```
 
 A compartmental model needs no time-varying latent ``R_t`` process — the
-dynamics are fully determined by the ODE parameters — so the latent slot is
-[`Null`](@ref). [`EpiAwareModel`](@ref) assembles the three parts exactly as in
-the renewal examples.
+dynamics are fully determined by the ODE parameters — so the [`ODEProcess`](@ref)
+carries no latent process at all (its `Z_t` generated quantity is `nothing`).
+[`EpiAwareModel`](@ref) assembles the infection and observation parts exactly as
+in the renewal examples.
 
 ```@example sir
-model = EpiAwareModel(Null(), sir_process, observation)
+model = EpiAwareModel(sir_process, observation)
 nothing # hide
 ```
 
@@ -157,7 +158,7 @@ stochastic_obs = TransformObservationModel(
     Ascertainment(model = PoissonError(), latent_model = ascertainment),
     x -> softplus.(N .* x))
 
-stochastic_model = EpiAwareModel(Null(), sir_process, stochastic_obs)
+stochastic_model = EpiAwareModel(sir_process, stochastic_obs)
 nothing # hide
 ```
 

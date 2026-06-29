@@ -1,22 +1,42 @@
-@testitem "ExpGrowthRate maps a growth-rate path to infections" begin
+@testitem "ExpGrowthRate generates a growth-rate path and maps it to infections" begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(41)
-    data = EpiData([0.2, 0.3, 0.5], exp)
-    egr = ExpGrowthRate(; data = data, initialisation_prior = Normal())
-    I_t = as_turing_model(egr, randn(20) * 0.05)()
-    @test length(I_t) == 20
-    @test all(>(0), I_t)
+    egr = ExpGrowthRate(; rt = RandomWalk(), initialisation_prior = Normal())
+    out = as_turing_model(egr, 20)()
+    @test length(out.I_t) == 20
+    @test length(out.Z_t) == 20
+    @test all(>(0), out.I_t)
 end
 
-@testitem "Renewal maps an Rt path to infections" begin
+@testitem "Renewal generates an Rt path and maps it to infections" begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(42)
     data = EpiData([0.2, 0.3, 0.5], exp)
-    renewal = Renewal(data; initialisation_prior = Normal())
-    I_t = as_turing_model(renewal, randn(20) * 0.05)()
-    @test length(I_t) == 20
-    @test all(isfinite, I_t)
-    @test all(>=(0), I_t)
+    renewal = Renewal(data; rt = RandomWalk(), initialisation_prior = Normal())
+    out = as_turing_model(renewal, 20)()
+    @test length(out.I_t) == 20
+    @test length(out.Z_t) == 20
+    @test all(isfinite, out.I_t)
+    @test all(>=(0), out.I_t)
+end
+
+@testitem "infection models fix their latent to a deterministic path" begin
+    using EpiAwarePrototype, Distributions, Random
+    using DynamicPPL: fix
+    Random.seed!(421)
+    data = EpiData([0.2, 0.3, 0.5], exp)
+    # Pinning the latent to a known (log) Rt trajectory via a FixedIntercept
+    # latent makes the renewal infection path deterministic given I₀ — the
+    # standalone-style illustration under the folded interface.
+    logR = log(1.5)
+    renewal = Renewal(data; rt = FixedIntercept(logR),
+        initialisation_prior = Normal())
+    mdl = fix(as_turing_model(renewal, 30), (init_incidence = 0.0,))
+    out = mdl()
+    @test all(≈(logR), out.Z_t)
+    @test all(>(0), out.I_t)
+    # A constant Rt > 1 grows incidence.
+    @test out.I_t[end] > out.I_t[1]
 end
 
 @testitem "growth-rate / reproduction-number conversions round-trip" begin
@@ -32,8 +52,8 @@ end
     using EpiAwarePrototype, Distributions, Turing, Random
     Random.seed!(43)
     data = EpiData([0.2, 0.3, 0.5], exp)
-    model = EpiAwareModel(RandomWalk(),
-        Renewal(data; initialisation_prior = Normal()),
+    model = EpiAwareModel(
+        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
     y = as_turing_model(model, missing, 20)().generated_y_t
     chn = sample(as_turing_model(model, y, 20), NUTS(), 30; progress = false)

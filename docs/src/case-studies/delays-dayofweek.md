@@ -62,11 +62,14 @@ nothing # hide
 ## The infection process
 
 As before, a [`Renewal`](@ref) process driven by a discretised generation
-interval. Here we use a ``\mathrm{Gamma}(1.4, 1/0.38)`` generation time.
+interval. Here we use a ``\mathrm{Gamma}(1.4, 1/0.38)`` generation time. The
+weekly ``\log R_t`` process built above is folded into the renewal model's `rt`
+slot.
 
 ```@example delays
 data = EpiData(gen_distribution = Gamma(1.4, 1 / 0.38))
-renewal = Renewal(data; initialisation_prior = Normal(log(1.0), 1.0))
+renewal = Renewal(data;
+    rt = weekly_latent, initialisation_prior = Normal(log(1.0), 1.0))
 nothing # hide
 ```
 
@@ -111,7 +114,6 @@ a `y_t` field; `missing` values simulate.
 ```@example delays
 n = 42
 problem = EpiProblem(
-    latent_model = weekly_latent,
     epi_model = renewal,
     observation_model = observation,
     tspan = (1, n))

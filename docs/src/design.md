@@ -1,12 +1,19 @@
 # Composable design
 
 `EpiAwarePrototype` treats an epidemiological model as a composition of
-independent parts. Each part answers one question:
+independent parts. A full model has two top-level parts:
 
-  - a **latent model** describes an unobserved process ``Z_t`` over time;
-  - an **infection model** maps that latent process to unobserved infections
-    ``I_t``;
+  - an **infection model** generates unobserved infections ``I_t``. It *owns* a
+    **latent model** internally — an unobserved process ``Z_t`` (e.g. a log
+    reproduction number or growth rate) that the infection model maps to ``I_t``;
   - an **observation model** maps infections to the observed data ``y_t``.
+
+A **latent model** describes an unobserved process ``Z_t`` over time. It is no
+longer a mandatory top-level component: the latent (e.g. ``\log R_t``) is not
+always the estimand, so it is folded into the infection model that consumes it.
+This gives more flexibility — you choose an infection model and hand it whatever
+latent process you want to drive it — and decouples the generation interval so
+that only the [`Renewal`](@ref) model carries one.
 
 Every part is a plain struct that implements a single method of the generic
 constructor [`as_turing_model`](@ref). There is no deep type hierarchy: a part
@@ -29,8 +36,20 @@ The trailing `false` disables automatic variable prefixing, so parameter names
 stay flat. Because every component speaks the same `as_turing_model` protocol,
 components nest freely: an [`AR`](@ref) process can carry a
 [`HierarchicalNormal`](@ref) error model, a [`DiffLatentModel`](@ref) can wrap
-that `AR` to produce an ARIMA-style process, and the whole thing can drive a
-[`DirectInfections`](@ref) process observed with a [`NegativeBinomialError`](@ref).
+that `AR` to produce an ARIMA-style process, and that whole latent process can be
+folded into a [`DirectInfections`](@ref) model observed with a
+[`NegativeBinomialError`](@ref).
+
+## The latent is folded into the infection model
+
+The latent process is supplied to the infection model rather than to the
+composer. An infection model takes a latent slot — `Z` for [`DirectInfections`](@ref),
+`rt` for [`ExpGrowthRate`](@ref) and [`Renewal`](@ref) — and generates that
+process internally before mapping it to infections. So `as_turing_model` for an
+infection model takes only a series length and returns `(; I_t, Z_t)`: the
+infection path and the internal latent draw, kept accessible as a generated
+quantity. Only [`Renewal`](@ref) needs a generation interval, so it alone carries
+an [`EpiData`](@ref); the others take a `transformation` directly.
 
 ## Swap-in, swap-out
 
@@ -39,18 +58,18 @@ swapping one struct for another, leaving the rest untouched:
 
 ```@example design
 using EpiAwarePrototype, Distributions
-data = EpiData([0.2, 0.3, 0.5], exp)
 
 # An ARIMA-style latent process: a differenced AR.
 latent = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()])
 
-# Swap the observation model without touching the rest.
-poisson_model = EpiAwareModel(latent,
-    DirectInfections(; data = data, initialisation_prior = Normal()),
+# Fold the latent into a direct-infections process, then swap the observation
+# model without touching the rest.
+poisson_model = EpiAwareModel(
+    DirectInfections(; Z = latent, initialisation_prior = Normal()),
     PoissonError())
 
-negbin_model = EpiAwareModel(latent,
-    DirectInfections(; data = data, initialisation_prior = Normal()),
+negbin_model = EpiAwareModel(
+    DirectInfections(; Z = latent, initialisation_prior = Normal()),
     NegativeBinomialError())
 nothing # hide
 ```

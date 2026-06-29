@@ -7,14 +7,17 @@ An infection process defined by solving an ODE.
 `ODEProcess` combines a parameter struct (`params`, e.g. [`SIRParams`](@ref) or
 [`SEIRParams`](@ref), whose `as_turing_model` samples `(u0, p)`) with a `solver`,
 extra `solver_options`, and a `sol2infs` link mapping the ODE solution to a
-latent-infection series. Its `as_turing_model` samples the parameters, solves the
-ODE, and returns the mapped infections.
+latent-infection series. The compartmental dynamics are fully determined by the
+sampled ODE parameters, so the model carries no separate latent ``R_t`` process:
+its `as_turing_model` samples the parameters, solves the ODE, and returns
+`(; I_t, Z_t)` with `Z_t = nothing` (no exposable latent path).
 
 # Arguments
 
   - `epi_model`: the [`ODEProcess`](@ref).
-  - `Z_t`: an optional latent path (may be `nothing` for self-contained ODE
-    models); only its length is used.
+  - `n`: the requested series length; passed through to the parameter model
+    (the ODE dimension is fixed, so `n` is otherwise unused — `nothing` is also
+    accepted).
 
 # Examples
 ```@example ODEProcess
@@ -65,8 +68,9 @@ end
     return sol
 end
 
-@model function as_turing_model(epi_model::ODEProcess, Z_t)
-    n = isnothing(Z_t) ? 0 : size(Z_t, 1)
-    sol ~ to_submodel(_generate_ode_solution(epi_model, n), false)
-    return epi_model.sol2infs(sol)
+@model function as_turing_model(epi_model::ODEProcess, n)
+    n_steps = isnothing(n) ? 0 : n
+    sol ~ to_submodel(_generate_ode_solution(epi_model, n_steps), false)
+    I_t = epi_model.sol2infs(sol)
+    return (; I_t, Z_t = nothing)
 end

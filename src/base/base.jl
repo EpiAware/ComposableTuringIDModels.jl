@@ -67,7 +67,7 @@ function as_turing_model(model, args...; kwargs...)
     hint = if model isa AbstractLatentModel
         " expected the latent interface `as_turing_model(m, n)`"
     elseif model isa AbstractInfectionModel
-        " expected the infection interface `as_turing_model(m, Z_t)`"
+        " expected the infection interface `as_turing_model(m, n)`"
     elseif model isa AbstractObservationModel
         " expected the observation interface `as_turing_model(m, y_t, Y_t)`"
     else

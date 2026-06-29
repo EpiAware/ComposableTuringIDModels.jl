@@ -42,8 +42,8 @@ end
 @testitem "infection models are AbstractInfectionModel; ODE params are latent" begin
     using EpiAwarePrototype, Distributions, OrdinaryDiffEq
     data = EpiData([0.2, 0.3, 0.5], exp)
-    for m in (DirectInfections(; data = data), ExpGrowthRate(; data = data),
-        Renewal(; data = data))
+    for m in (DirectInfections(; Z = RandomWalk()), ExpGrowthRate(; rt = RandomWalk()),
+        Renewal(; data = data, rt = RandomWalk()))
         @test m isa AbstractInfectionModel
     end
     # ODE parameter structs play the latent role (they feed an ODEProcess slot).
@@ -75,22 +75,21 @@ end
 
 @testitem "role slots reject wrong-role components at construction" begin
     using EpiAwarePrototype, Distributions
-    data = EpiData([0.2, 0.3, 0.5], exp)
     latent = RandomWalk()
-    infection = DirectInfections(; data = data)
+    infection = DirectInfections(; Z = RandomWalk())
     obs = PoissonError()
-    # Correct order constructs.
-    @test EpiAwareModel(latent, infection, obs) isa EpiAwareModel
+    # Correct order constructs (infection then observation).
+    @test EpiAwareModel(infection, obs) isa EpiAwareModel
     # Wrong order (the classic foot-gun) fails at construction, not at sampling.
-    # Positional constructors fail dispatch (MethodError); a typed keyword
-    # constructor fails the field-type conversion (TypeError). Either way the
-    # wrong-role component is rejected before any sampling happens.
-    @test_throws MethodError EpiAwareModel(obs, infection, latent)
-    @test_throws MethodError EpiAwareModel(latent, obs, infection)
+    # Positional constructors fail dispatch (MethodError). The wrong-role
+    # component is rejected before any sampling happens.
+    @test_throws MethodError EpiAwareModel(obs, infection)
+    # A latent model is not an infection model, so it cannot fill the infection
+    # slot either.
+    @test_throws MethodError EpiAwareModel(latent, obs)
     # EpiProblem enforces the same role slots (keyword struct → TypeError).
     @test_throws Union{MethodError, TypeError} EpiProblem(
-        epi_model = latent, latent_model = infection,
-        observation_model = obs, tspan = (1, 10))
+        epi_model = obs, observation_model = obs, tspan = (1, 10))
     # A latent manipulator cannot wrap an observation model (slot is latent;
     # keyword constructor → TypeError).
     @test_throws Union{MethodError, TypeError} DiffLatentModel(; model = obs,
@@ -106,8 +105,8 @@ end
     # Each checker is true for an in-role model implementing its as_turing_model.
     @test implements_latent_interface(RandomWalk())
     @test implements_latent_interface(AR(); n = 12)
-    @test implements_infection_interface(DirectInfections(; data = data))
-    @test implements_infection_interface(Renewal(; data = data); Z_t = zeros(20))
+    @test implements_infection_interface(DirectInfections(; Z = RandomWalk()))
+    @test implements_infection_interface(Renewal(; data = data, rt = RandomWalk()); n = 20)
     @test implements_observation_interface(PoissonError())
     @test implements_observation_interface(NegativeBinomialError())
     # A model is NOT in a role it does not belong to.
@@ -133,9 +132,10 @@ end
     @test custom isa AbstractLatentModel
     @test implements_latent_interface(custom)
 
-    # It slots into the composer's latent position and the composed model runs.
-    data = EpiData([0.2, 0.3, 0.5], exp)
-    model = EpiAwareModel(custom, DirectInfections(; data = data), PoissonError())
+    # It slots into an infection model's latent position (the latent is now
+    # folded into the infection model) and the composed model runs.
+    infection = DirectInfections(; Z = custom, initialisation_prior = Normal())
+    model = EpiAwareModel(infection, PoissonError())
     @test model isa EpiAwareModel
     out = as_turing_model(model, missing, 10)()
     @test length(out.Z_t) == 10
@@ -150,11 +150,12 @@ end
     z = as_turing_model(RandomWalk(), n)()
     @test length(z) == n
     @test eltype(z) <: Real
-    # Infection: maps a latent path to an infection path.
-    data = EpiData([0.2, 0.3, 0.5], exp)
-    I_t = as_turing_model(DirectInfections(; data = data), randn(n))()
-    @test length(I_t) == n
-    @test all(>=(0), I_t)
+    # Infection: generates its own latent and maps it to an infection path,
+    # returning (; I_t, Z_t).
+    inf = as_turing_model(DirectInfections(; Z = RandomWalk()), n)()
+    @test length(inf.I_t) == n
+    @test length(inf.Z_t) == n
+    @test all(>=(0), inf.I_t)
     # Observation: maps an expected series to observed counts.
     y = as_turing_model(PoissonError(), missing, fill(10.0, n))()
     @test length(y) == n

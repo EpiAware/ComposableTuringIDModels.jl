@@ -19,10 +19,8 @@ an inference `method`.
 # Examples
 ```@example apply_method
 using EpiAwarePrototype, Distributions
-data = EpiData([0.2, 0.3, 0.5], exp)
 problem = EpiProblem(
-    epi_model = DirectInfections(; data = data, initialisation_prior = Normal()),
-    latent_model = RandomWalk(),
+    epi_model = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
     observation_model = PoissonError(),
     tspan = (1, 20))
 y = rand(as_turing_model(problem, (; y_t = missing)))

@@ -32,9 +32,11 @@ end
     proc = ODEProcess(params = sir,
         sol2infs = sol -> softplus.(N .* sol[2, :]),
         solver_options = Dict(:saveat => 1.0))
-    I_t = as_turing_model(proc, nothing)()
-    @test length(I_t) == 101
-    @test all(>=(0), I_t)
+    out = as_turing_model(proc, nothing)()
+    @test length(out.I_t) == 101
+    @test all(>=(0), out.I_t)
+    # An ODE process exposes no separate latent path.
+    @test isnothing(out.Z_t)
 end
 
 @testitem "ODEProcess samples its parameters from the prior" begin

@@ -1,10 +1,8 @@
 @testitem "composed model: prior simulation and generated quantities" begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(21)
-    data = EpiData([0.2, 0.3, 0.5], exp)
     model = EpiAwareModel(
-        RandomWalk(),
-        DirectInfections(; data = data, initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
     n = 20
     mdl = as_turing_model(model, missing, n)
@@ -23,9 +21,8 @@ end
     using EpiAwarePrototype, Distributions, Random
     using DynamicPPL: fix, condition
     Random.seed!(22)
-    data = EpiData([0.2, 0.3, 0.5], exp)
-    model = EpiAwareModel(RandomWalk(),
-        DirectInfections(; data = data, initialisation_prior = Normal()),
+    model = EpiAwareModel(
+        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
     n = 20
     mdl = as_turing_model(model, missing, n)
@@ -44,9 +41,8 @@ end
 @testitem "composed model: short NUTS sample runs" tags=[:sample] begin
     using EpiAwarePrototype, Distributions, Turing, Random
     Random.seed!(23)
-    data = EpiData([0.2, 0.3, 0.5], exp)
-    model = EpiAwareModel(RandomWalk(),
-        DirectInfections(; data = data, initialisation_prior = Normal()),
+    model = EpiAwareModel(
+        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         NegativeBinomialError())
     n = 20
     y = as_turing_model(model, missing, n)()

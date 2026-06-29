@@ -6,24 +6,23 @@
     subject to change.
 
 `EpiAwarePrototype` builds epidemiological models from small, reusable
-components — latent processes, infection processes, and observation models — and
-turns each one into a [Turing](https://turinglang.org) / `DynamicPPL` model
-through the single generic constructor [`as_turing_model`](@ref). Components
-compose by sampling one another as submodels, so a full model is *assembled*
-from parts rather than written by hand.
+components — infection processes (each owning its own latent process) and
+observation models — and turns each one into a
+[Turing](https://turinglang.org) / `DynamicPPL` model through the single generic
+constructor [`as_turing_model`](@ref). Components compose by sampling one another
+as submodels, so a full model is *assembled* from parts rather than written by
+hand.
 
 ## Getting started
 
 ```@example index
 using EpiAwarePrototype, Distributions
 
-# A discrete generation interval and its data container.
-data = EpiData([0.2, 0.3, 0.5], exp)
-
-# Compose latent -> infections -> observations.
+# Compose infections -> observations. The infection model owns its latent
+# process (here a random walk in its `Z` slot); the latent is folded in rather
+# than threaded as a separate top-level component.
 model = EpiAwareModel(
-    RandomWalk(),
-    DirectInfections(; data = data, initialisation_prior = Normal()),
+    DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
     PoissonError())
 
 # Build a Turing model; `missing` observations simulate from the prior.

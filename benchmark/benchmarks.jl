@@ -38,11 +38,11 @@ _data() = EpiData(GEN_INT, exp)
 # models are conditioned on data simulated from the prior with a fixed seed.
 function _eval_models()
     data = _data()
-    direct = EpiAwareModel(RandomWalk(),
-        DirectInfections(; data = data, initialisation_prior = Normal()),
+    direct = EpiAwareModel(
+        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
-    renewal = EpiAwareModel(RandomWalk(),
-        Renewal(data; initialisation_prior = Normal()),
+    renewal = EpiAwareModel(
+        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         NegativeBinomialError())
     y_direct = as_turing_model(direct, missing, N)().generated_y_t
     y_renewal = as_turing_model(renewal, missing, N)().generated_y_t
@@ -69,9 +69,8 @@ end
 # --- Sampling ---------------------------------------------------------------
 
 let samp_grp = SUITE["Sampling"] = BenchmarkGroup()
-    data = _data()
-    model = EpiAwareModel(RandomWalk(),
-        DirectInfections(; data = data, initialisation_prior = Normal()),
+    model = EpiAwareModel(
+        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
     y = as_turing_model(model, missing, N)().generated_y_t
     cond = as_turing_model(model, y, N)
@@ -107,9 +106,8 @@ const _AD_BACKENDS = [
 
 # (scenario name, model, is_AR_based?)
 function _ad_scenarios()
-    data = _data()
-    direct = EpiAwareModel(RandomWalk(),
-        DirectInfections(; data = data, initialisation_prior = Normal()),
+    direct = EpiAwareModel(
+        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
     y = as_turing_model(direct, missing, N)().generated_y_t
     return [
