@@ -124,6 +124,65 @@ end
         a = RecordExpectedObs(PoissonError()), b = PoissonError()))
 end
 
+@testitem "SequentialObservationModels: return-consuming modifiers (Aggregate) are rejected" begin
+    using EpiAwarePrototype, Distributions
+
+    # `Aggregate` re-consumes its inner model's return value (it scatters the
+    # predictions into a fresh length-`n` vector) instead of re-returning it, so the
+    # leaf recorder's expected series cannot propagate up to thread into the next
+    # stream — and splicing the recorder under it would crash. It must be rejected
+    # at construction with a clear error in BOTH the bare-nested and explicit
+    # `transform_chain => error_leaf` forms, and in any stream position.
+    agg = Aggregate(PoissonError(), [0, 0, 0, 0, 7])
+
+    # Bare-nested form (Aggregate as the whole stream).
+    err1 = try
+        SequentialObservationModels((a = agg, b = PoissonError()))
+        nothing
+    catch e
+        sprint(showerror, e)
+    end
+    @test err1 !== nothing
+    @test occursin("Aggregate", err1)
+    @test occursin("cascade", err1)
+
+    # Explicit `transform_chain => error_leaf` form (Aggregate as the transform).
+    err2 = try
+        SequentialObservationModels((
+            a = (inner -> Aggregate(inner, [0, 0, 0, 0, 7])) => PoissonError(),
+            b = PoissonError()))
+        nothing
+    catch e
+        sprint(showerror, e)
+    end
+    @test err2 !== nothing
+    @test occursin("Aggregate", err2)
+    @test occursin("cascade", err2)
+
+    # Even as the LAST stream (whose `.expected` is never read) Aggregate is
+    # rejected: the recorder is still spliced at its leaf and would crash.
+    @test_throws Exception SequentialObservationModels((
+        a = PoissonError(), b = agg))
+end
+
+@testitem "SequentialObservationModels: TransformObservationModel threads as a stream" begin
+    using EpiAwarePrototype, Distributions, Random
+    Random.seed!(641)
+
+    # `TransformObservationModel` re-returns its inner submodel's value, so it is a
+    # supported (return-passing) stream transform: its `.expected` is the
+    # transformed leaf input, which threads to the next stream. Stream 1 doubles
+    # `I_t = 10`, so the bare-leaf second stream is fed ≈20.
+    for stream in (TransformObservationModel(PoissonError(), x -> x .* 2.0),
+        (inner -> TransformObservationModel(inner, x -> x .* 2.0)) => PoissonError())
+        seq = SequentialObservationModels((a = stream, b = PoissonError()))
+        out = as_turing_model(seq, (a = missing, b = missing), fill(10.0, 8))()
+        @test length(out) == 2
+        sink = collect(skipmissing(out[2]))
+        @test sum(sink) / length(sink) > 12   # fed ≈20 (doubled), not ≈10
+    end
+end
+
 @testitem "SequentialObservationModels: simulate then condition" begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(64)

@@ -87,10 +87,13 @@ This lets a stream be written as a plain nested observation model (e.g.
 `LatentDelay(Ascertainment(PoissonError(), eff), pmf)`) yet still have the
 internal recorder placed at its error leaf, so the threaded expected series is the
 leaf input (the post-transform per-time mean) rather than the raw stream input.
-Dissection is restricted to the package's own standard observation modifiers
-(`LatentDelay`, `Ascertainment`, `TransformObservationModel`, `Aggregate`); an
-unrecognised wrapper raises so the explicit `transform_chain => error_leaf` form
-is used instead of guessing.
+Dissection is restricted to the package's **return-passing** observation modifiers
+(`LatentDelay`, `Ascertainment`, `TransformObservationModel`) — those whose
+`as_turing_model` re-returns their inner submodel's value, so the leaf recorder's
+expected series propagates back up. A modifier that re-consumes its inner's return
+(e.g. `Aggregate`) cannot thread `.expected` and is rejected with a clear error;
+any other unrecognised wrapper also raises, so the explicit
+`transform_chain => error_leaf` form is used instead of guessing.
 "
 _peel_leaf(m::AbstractObservationErrorModel) = SequentialStream(identity, m)
 function _peel_leaf(m::AbstractObservationModel)
@@ -103,6 +106,16 @@ end
 # Functional re-wrappers for the standard observation modifiers: each returns a
 # closure that rebuilds the wrapper around a fresh inner model, preserving the
 # wrapper's own configuration (delay PMF, ascertainment latent + transform, ...).
+#
+# Only **return-passing** modifiers may be re-wrapped here: the recorder spliced at
+# the leaf returns a `(; obs, expected)` NamedTuple, and that return value must
+# propagate back up the wrapper chain unchanged so the stack can read `.expected`.
+# `LatentDelay`, `Ascertainment`, and `TransformObservationModel` all end their
+# `as_turing_model` with `y_t ~ to_submodel(inner...); return y_t`, i.e. they
+# re-RETURN their inner submodel's value, so the recorder's NamedTuple flows
+# through. A modifier that re-CONSUMES its inner's return as a plain value (e.g.
+# `Aggregate`, which scatters `pred_obs` into a length-`n` vector and returns THAT)
+# cannot be leaf-spliced — see the `_returns_inner_value` guard below.
 _rewrap(m::LatentDelay) = inner -> LatentDelay(inner, reverse(m.rev_pmf))
 function _rewrap(m::Ascertainment)
     # `m.latent_model` is already the (possibly prefix-wrapped) latent model the
@@ -113,8 +126,38 @@ end
 function _rewrap(m::TransformObservationModel)
     inner -> TransformObservationModel(inner, m.transform)
 end
-_rewrap(m::Aggregate) = inner -> Aggregate(inner, m.aggregation)
+
+# Whether a wrapper's `as_turing_model` re-RETURNS its inner submodel's value (so a
+# leaf recorder's `(; obs, expected)` propagates up) rather than re-consuming it.
+# Only the return-passing modifiers are leaf-spliceable; the default is `false` so
+# an unaudited modifier is rejected rather than silently mis-threaded.
+_returns_inner_value(::AbstractObservationModel) = false
+_returns_inner_value(::LatentDelay) = true
+_returns_inner_value(::Ascertainment) = true
+_returns_inner_value(::TransformObservationModel) = true
+
+# `Aggregate` re-consumes its inner's return (it scatters the predictions into a
+# new length-`n` vector via `_return_aggregate` and returns that), so `.expected`
+# cannot propagate through it — splicing the recorder underneath would also crash
+# (`_return_aggregate` calls `zero` on the recorder's NamedTuple). Reject it (and
+# any other return-consuming modifier) with a clear, actionable error.
+#
+# Future enhancement: a side-channel (e.g. threading the expected series through a
+# tracked `:=` quantity or a dedicated return field on every modifier) could let
+# `.expected` flow through return-consuming wrappers. That is option B territory
+# (a broader return-contract change) and is deliberately out of scope here; keep
+# aggregation outside the cascade for now.
 function _rewrap(m::AbstractObservationModel)
+    if !_returns_inner_value(m)
+        return error("`$(nameof(typeof(m)))` cannot be used as a " *
+                     "`SequentialObservationModels` stream transform: it re-consumes " *
+                     "its inner observation model's return value rather than " *
+                     "re-returning it, so the leaf recorder's expected series cannot " *
+                     "propagate up the chain to thread into the next stream. Keep " *
+                     "return-consuming modifiers (e.g. `Aggregate`) OUTSIDE the " *
+                     "sequential cascade — for example apply aggregation to the final " *
+                     "stream's output, or to a single non-sequential observation model.")
+    end
     return error("Cannot peel `$(typeof(m))` into a (transform-chain, error-leaf) " *
                  "stream for `SequentialObservationModels`. Write this stream " *
                  "explicitly as `transform_chain => error_leaf` (e.g. " *
@@ -133,7 +176,37 @@ end
 # `StackObservationModels`, where every stream forks off the same `I_t`.
 function _instrument_stream(s)
     str = _to_stream(s)
-    return str.transform_chain(_SeqExpectedRecorder(str.error_leaf))
+    instrumented = str.transform_chain(_SeqExpectedRecorder(str.error_leaf))
+    # Validate the assembled transform chain end-to-end. This catches the explicit
+    # `transform_chain => error_leaf` form too (the bare-nested form is already
+    # checked in `_rewrap`): every modifier layer between the top of the stream and
+    # the leaf recorder must re-RETURN its inner value, or the recorder's
+    # `(; obs, expected)` cannot reach the stack.
+    _validate_threading(instrumented)
+    return instrumented
+end
+
+# Walk the assembled stream from the outside in, confirming every wrapper layer
+# down to the `_SeqExpectedRecorder` is return-passing. A return-consuming layer
+# (e.g. `Aggregate`) both breaks `.expected` propagation and crashes on the
+# recorder's NamedTuple, so reject it with the same clear error.
+_validate_threading(::_SeqExpectedRecorder) = nothing
+function _validate_threading(m::AbstractObservationModel)
+    if !_returns_inner_value(m)
+        error("`$(nameof(typeof(m)))` cannot be used as a " *
+              "`SequentialObservationModels` stream transform layer: it is not a " *
+              "known return-passing modifier, so the leaf recorder's expected series " *
+              "cannot be guaranteed to propagate up the chain to thread into the " *
+              "next stream. Modifiers that re-consume their inner model's return " *
+              "value rather than re-returning it (e.g. `Aggregate`) break this and " *
+              "must stay OUTSIDE the sequential cascade — apply aggregation to the " *
+              "final stream's output, or to a single non-sequential observation " *
+              "model. Stream transforms must be built from return-passing modifiers " *
+              "(`LatentDelay`, `Ascertainment`, `TransformObservationModel`).")
+    end
+    # Every return-passing modifier stores its inner observation model in `.model`;
+    # recurse toward the recorder at the leaf.
+    return _validate_threading(m.model)
 end
 
 @doc raw"
@@ -181,6 +254,14 @@ The first stream's observations are scored on the incoming `I_t`, but its
 stream — so the cascade threads genuinely from stream 1, not only between later
 streams. Use the parallel [`StackObservationModels`](@ref) instead if every stream
 should fork off the same `I_t`.
+
+Stream transforms must be **return-passing** modifiers — `LatentDelay`,
+`Ascertainment`, and `TransformObservationModel`, which re-return their inner
+submodel's value so the leaf recorder's expected series propagates up to thread
+into the next stream. A modifier that re-consumes its inner's return rather than
+re-returning it (e.g. [`Aggregate`](@ref)) breaks that propagation and is rejected
+with a clear error; keep such modifiers outside the cascade (e.g. aggregate the
+final stream's output, or a single non-sequential observation model).
 
 # Arguments
 
