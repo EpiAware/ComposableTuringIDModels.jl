@@ -59,9 +59,16 @@ function _models()
     renewal = EpiAwareModel(
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         NegativeBinomialError())
+    # Renewal feeding the 2D reporting-triangle nowcasting observation model: the
+    # gradient of the per-cell Poisson log-likelihood over the masked triangle
+    # (`t + d ≤ now`) is what nowcasting under NUTS depends on.
+    triangle = EpiAwareModel(
+        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        TriangleObs(PoissonError(), [0.6, 0.25, 0.15]))
 
     y_direct = as_turing_model(direct, missing, n)().generated_y_t
     y_renewal = as_turing_model(renewal, missing, n)().generated_y_t
+    y_triangle = as_turing_model(triangle, missing, n)().generated_y_t
 
     return [
         ("RandomWalk latent logjoint", rw),
@@ -70,7 +77,9 @@ function _models()
         ("DirectInfections+Poisson posterior",
             as_turing_model(direct, y_direct, n)),
         ("Renewal+NegativeBinomial posterior",
-            as_turing_model(renewal, y_renewal, n))
+            as_turing_model(renewal, y_renewal, n)),
+        ("Renewal+TriangleObs posterior",
+            as_turing_model(triangle, y_triangle, n))
     ]
 end
 
