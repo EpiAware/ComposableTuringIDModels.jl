@@ -86,7 +86,7 @@ export EpiData, DirectInfections, ExpGrowthRate, Renewal,
 export SIRParams, SEIRParams, ODEProcess
 
 # --- observation models ---
-export PoissonError, NegativeBinomialError, LatentDelay,
+export PoissonError, NegativeBinomialError, NormalError, LatentDelay,
        observation_error, generate_observation_error_priors
 
 # --- observation modifiers / manipulators ---
@@ -156,6 +156,7 @@ include("ode/ODEProcess.jl")
 include("observation_models/ObservationErrorModels/methods.jl")
 include("observation_models/ObservationErrorModels/PoissonError.jl")
 include("observation_models/ObservationErrorModels/NegativeBinomialError.jl")
+include("observation_models/ObservationErrorModels/NormalError.jl")
 include("observation_models/modifiers/LatentDelay.jl")
 include("observation_models/modifiers/ascertainment/Ascertainment.jl")
 include("observation_models/modifiers/ascertainment/helpers.jl")
