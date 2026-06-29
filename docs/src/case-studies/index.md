@@ -17,6 +17,11 @@ then to a mechanistic compartmental model:
     same renewal core wrapped in an observation model that convolves infections
     through reporting delays and modulates them with a day-of-week reporting
     pattern, in the style of real-time estimation tools [abbott2020estimating](@citep).
+  - [Joint cases and deaths from shared infections](@ref case-study-cases-deaths) —
+    one renewal infection process observed through two parallel streams at once,
+    each with its own delay, ascertainment, and overdispersion, composed with
+    [`StackObservationModels`](@ref) and fit jointly to use the signal in both
+    [abbott2020estimating](@citep).
   - [An SIR compartmental model](@ref case-study-sir) — an alternative infection
     process where dynamics come from an ordinary differential equation solved by
     the SciML stack [rackauckas2017differentialequations](@citep), following the
