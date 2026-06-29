@@ -2,7 +2,7 @@
 # `as_turing_model` signature fixed by its supertype:
 #
 #   latent       as_turing_model(m, n)        ⇒ a DynamicPPL.Model
-#   infection    as_turing_model(m, Z_t)      ⇒ a DynamicPPL.Model
+#   infection    as_turing_model(m, n)        ⇒ a DynamicPPL.Model ⇒ (; I_t, Z_t)
 #   observation  as_turing_model(m, y_t, Y_t) ⇒ a DynamicPPL.Model
 #
 # The helpers below encode those contracts in a form usable from tests: each
@@ -35,7 +35,10 @@ end
 
 @doc raw"
 Check that `model` satisfies the [`AbstractInfectionModel`](@ref) interface: it is
-an infection model and `as_turing_model(model, Z_t)` returns a `DynamicPPL.Model`.
+an infection model and `as_turing_model(model, n)` returns a `DynamicPPL.Model`.
+
+The infection model owns its latent process internally, so the construction check
+passes only a series length `n` (no external latent path).
 
 # Arguments
 
@@ -43,19 +46,19 @@ an infection model and `as_turing_model(model, Z_t)` returns a `DynamicPPL.Model
 
 # Keyword Arguments
 
-  - `Z_t`: the latent path used for the construction check (default `zeros(10)`).
+  - `n`: the infection series length used for the construction check (default
+    `10`).
 
 # Examples
 ```@example
 using EpiAwarePrototype, Distributions
-data = EpiData([0.2, 0.3, 0.5], exp)
 implements_infection_interface(
-    DirectInfections(; data = data, initialisation_prior = Normal()))
+    DirectInfections(; rt = RandomWalk(), initialisation_prior = Normal()))
 ```
 "
-function implements_infection_interface(model; Z_t = zeros(10))
+function implements_infection_interface(model; n::Int = 10)
     model isa AbstractInfectionModel || return false
-    return as_turing_model(model, Z_t) isa DynamicPPL.Model
+    return as_turing_model(model, n) isa DynamicPPL.Model
 end
 
 @doc raw"

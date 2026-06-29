@@ -8,10 +8,12 @@ construction follows from an age-dependent branching process and pairs naturally
 with a negative-binomial observation model to give a Bayesian hierarchical model
 for reported case counts.
 
-This case study builds that model from three components — an autoregressive
-latent process for ``\log R_t``, a [`Renewal`](@ref) infection process, and a
-[`NegativeBinomialError`](@ref) observation model — simulates a synthetic
-outbreak from it, and fits it back.
+This case study builds that model from two composed parts — a [`Renewal`](@ref)
+infection process that carries an autoregressive latent process for ``\log R_t``,
+and a [`NegativeBinomialError`](@ref) observation model — simulates a synthetic
+outbreak from it, and fits it back. The latent ``\log R_t`` process is *folded
+into* the renewal model rather than supplied as a separate top-level component:
+the reproduction number is the renewal model's own parameter process.
 
 ## The model
 
@@ -32,7 +34,9 @@ observation overdispersion.
 
 The latent process is a first-order autoregressive model on ``\log R_t`` with a
 [`HierarchicalNormal`](@ref) innovation term. Strong autocorrelation in the
-reproduction number is encoded by a damping prior concentrated near one.
+reproduction number is encoded by a damping prior concentrated near one. This
+process is the renewal model's reproduction-number process — it is folded into
+the infection model below rather than composed separately.
 
 ```@example renewal
 using EpiAwarePrototype, Distributions, Random, Turing
@@ -67,34 +71,44 @@ shifts and spreads the mass relative to the underlying ``\mathrm{Gamma}``
 sum(data.gen_int), length(data.gen_int)
 ```
 
-The [`Renewal`](@ref) process couples that generation interval to a prior for
-the initial infections.
+The [`Renewal`](@ref) process couples that generation interval to the latent
+``\log R_t`` process (its `rt` slot) and a prior for the initial infections.
+[`Renewal`](@ref) is the only infection model that carries an [`EpiData`](@ref),
+because it is the only one that uses a generation interval.
 
 ```@example renewal
-renewal = Renewal(data; initialisation_prior = Normal(log(1.0), 0.25))
+renewal = Renewal(data; rt = latent, initialisation_prior = Normal(log(1.0), 0.25))
 nothing # hide
 ```
 
 ## The infection process in isolation
 
-Because each component is a model in its own right, the renewal process can be
-exercised on its own — without a latent ``R_t`` model or an observation model —
-by handing it a fixed ``\log R_t`` trajectory. This is the clearest way to see
-what the infection process contributes. Feeding in a reproduction number that
-starts above one and declines through it produces the textbook epidemic curve:
-incidence grows, decelerates as ``R_t \to 1``, and turns over once ``R_t < 1``.
+Because the renewal model is a model in its own right, it can be exercised on its
+own — without an observation model — and we can isolate the contribution of the
+renewal equation by *pinning* its reproduction-number process to a known
+trajectory. With the latent folded in, the way to do that is to build a renewal
+model whose `rt` slot is a deterministic [`FixedIntercept`](@ref) latent, giving
+a constant ``\log R_t``, and to fix the initial-infections parameter. The same
+[`as_turing_model`](@ref) call that composes into the full model then runs the
+infection process standalone, returning its infections `I_t` and the internal
+latent draw `Z_t`.
 
 ```@example renewal
-Rt_demo = [0.5 + 2.5 / (1 + exp(t - 30)) for t in 1:60]
-infections_only = as_turing_model(renewal, log.(Rt_demo))()
-(peak_incidence = round(maximum(infections_only), digits = 1),
-    peak_day = argmax(infections_only))
+fixed_logR = log(1.4)
+renewal_fixed = Renewal(data;
+    rt = FixedIntercept(fixed_logR), initialisation_prior = Normal())
+demo = fix(as_turing_model(renewal_fixed, 60), (init_incidence = 0.0,))()
+(constant_Rt = round(exp(first(demo.Z_t)), digits = 2),
+    grows = demo.I_t[end] > demo.I_t[1])
 ```
 
-Nothing here is conditioned on data or sampled over priors: the same
-[`as_turing_model`](@ref) call that composes into the full model also runs the
-infection process standalone, so a component can be inspected in isolation
-before it is assembled.
+A constant ``R_t > 1`` grows incidence; a ``\log R_t`` path that declined through
+zero would instead produce the textbook turn-over (incidence growing,
+decelerating as ``R_t \to 1``, and falling once ``R_t < 1``). Driving the renewal
+model with a richer fixed path is just a matter of swapping the
+[`FixedIntercept`](@ref) latent for a deterministic latent of the desired shape.
+Nothing here is conditioned on data; the component is inspected in isolation
+before it is assembled into the full model with its sampled ``R_t`` process.
 
 Reported cases are overdispersed counts of the latent infections. The prior is
 placed on the cluster factor ``\sqrt{1/\phi}``, which is roughly the coefficient
@@ -105,10 +119,12 @@ obs = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1))
 nothing # hide
 ```
 
-[`EpiAwareModel`](@ref) assembles the three parts into one composed model.
+[`EpiAwareModel`](@ref) assembles the two parts — the renewal infection process
+(which already carries the latent ``R_t`` process) and the observation model —
+into one composed model.
 
 ```@example renewal
-model = EpiAwareModel(latent, renewal, obs)
+model = EpiAwareModel(renewal, obs)
 ```
 
 ## Simulate
@@ -184,10 +200,11 @@ trajectories are all present in `post` for a reader who wants them.
 
 Because the parts share one interface, an alternative observation assumption is
 a one-line change. Swapping the negative-binomial reporting for a
-[`PoissonError`](@ref) leaves the latent and infection processes untouched:
+[`PoissonError`](@ref) leaves the renewal infection process — and its latent
+``R_t`` process — untouched:
 
 ```@example renewal
-poisson_model = EpiAwareModel(latent, renewal, PoissonError())
+poisson_model = EpiAwareModel(renewal, PoissonError())
 length(rand(as_turing_model(poisson_model, fill(missing, n), n)))
 ```
 

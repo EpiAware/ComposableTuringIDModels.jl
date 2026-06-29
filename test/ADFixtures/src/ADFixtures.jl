@@ -53,11 +53,11 @@ function _models()
     arima = as_turing_model(
         DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]), n)
 
-    direct = EpiAwareModel(RandomWalk(),
-        DirectInfections(; data = data, initialisation_prior = Normal()),
+    direct = EpiAwareModel(
+        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
-    renewal = EpiAwareModel(RandomWalk(),
-        Renewal(data; initialisation_prior = Normal()),
+    renewal = EpiAwareModel(
+        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         NegativeBinomialError())
 
     y_direct = as_turing_model(direct, missing, n)().generated_y_t

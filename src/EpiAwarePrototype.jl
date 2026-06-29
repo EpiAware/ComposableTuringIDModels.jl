@@ -3,10 +3,11 @@ A **prototype** for composable probabilistic infectious disease modelling in
 Julia.
 
 `EpiAwarePrototype` builds epidemiological models from small, reusable
-components — latent processes, infection processes, and observation models —
-each turned into a `Turing`/`DynamicPPL` model by the single generic constructor
-[`as_turing_model`](@ref). Components compose by sampling one another as
-submodels, so a full model is assembled rather than hand-written.
+components — infection processes (each owning its own latent parameter process)
+and observation models — each turned into a `Turing`/`DynamicPPL` model by the
+single generic constructor [`as_turing_model`](@ref). Components compose by
+sampling one another as submodels, so a full model is assembled rather than
+hand-written.
 
 This package is **ported and adapted** from the open-source, Apache-2.0 licensed
 `EpiAware` package; see the `NOTICE` file for attribution. It is exploratory and
@@ -16,8 +17,8 @@ clearly labelled as a prototype.
 ```@example
 using EpiAwarePrototype, Distributions
 data = EpiData([0.2, 0.3, 0.5], exp)
-model = EpiAwareModel(RandomWalk(),
-    DirectInfections(; data = data, initialisation_prior = Normal()),
+model = EpiAwareModel(
+    DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
     PoissonError())
 rand(as_turing_model(model, missing, 20))
 ```

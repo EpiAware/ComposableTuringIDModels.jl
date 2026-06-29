@@ -1,10 +1,8 @@
 @testitem "EpiProblem assembles and simulates a composed model" begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(71)
-    data = EpiData([0.2, 0.3, 0.5], exp)
     problem = EpiProblem(
-        epi_model = DirectInfections(; data = data, initialisation_prior = Normal()),
-        latent_model = RandomWalk(),
+        epi_model = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         observation_model = PoissonError(),
         tspan = (1, 20))
     m = as_turing_model(problem, (; y_t = missing))
@@ -16,10 +14,8 @@ end
 @testitem "apply_method runs a NUTSampler over an EpiProblem" tags=[:sample] begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(72)
-    data = EpiData([0.2, 0.3, 0.5], exp)
     problem = EpiProblem(
-        epi_model = DirectInfections(; data = data, initialisation_prior = Normal()),
-        latent_model = RandomWalk(),
+        epi_model = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         observation_model = PoissonError(),
         tspan = (1, 20))
     ydata = as_turing_model(problem, (; y_t = missing))().generated_y_t
@@ -31,10 +27,8 @@ end
 @testitem "EpiMethod threads a Pathfinder pre-step into NUTS" tags=[:sample] begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(73)
-    data = EpiData([0.2, 0.3, 0.5], exp)
     problem = EpiProblem(
-        epi_model = DirectInfections(; data = data, initialisation_prior = Normal()),
-        latent_model = RandomWalk(),
+        epi_model = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         observation_model = PoissonError(),
         tspan = (1, 20))
     ydata = as_turing_model(problem, (; y_t = missing))().generated_y_t
@@ -59,10 +53,9 @@ end
 @testitem "generated_observables wraps model, data, and solution" begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(75)
-    data = EpiData([0.2, 0.3, 0.5], exp)
     m = as_turing_model(
-        EpiAwareModel(RandomWalk(),
-            DirectInfections(; data = data, initialisation_prior = Normal()),
+        EpiAwareModel(
+            DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
             PoissonError()), missing, 10)
     obs = generated_observables(m, (; y_t = missing), rand(m))
     @test obs isa EpiAwareObservables

@@ -26,15 +26,24 @@ abstract type AbstractLatentModel <: AbstractEpiAwareModel end
 @doc raw"
 Supertype for **infection process** models.
 
-An infection model maps a latent path `Z_t` to a path of unobserved infections
-`I_t`. Its role interface is
+An infection model maps a series length `n` to a path of unobserved infections
+`I_t`. It owns its own latent (parameter) process internally — generating, e.g.,
+a (log) reproduction number or growth-rate path — and maps that to infections, so
+no external latent path is threaded in. Its role interface is
 
 ```julia
-as_turing_model(model::AbstractInfectionModel, Z_t)  # ⇒ an infection path I_t
+as_turing_model(model::AbstractInfectionModel, n)  # ⇒ (; I_t, Z_t)
 ```
 
+where the returned named tuple carries the infection path `I_t` and the model's
+internal latent draw `Z_t` (the (log) ``R_t`` / growth-rate path, or `nothing`
+for models with no exposable latent such as [`ODEProcess`](@ref)). Exposing
+`Z_t` keeps the latent recoverable as a generated quantity downstream.
+
 Members include [`DirectInfections`](@ref), [`ExpGrowthRate`](@ref),
-[`Renewal`](@ref) and [`ODEProcess`](@ref).
+[`Renewal`](@ref) and [`ODEProcess`](@ref). Only [`Renewal`](@ref) carries a
+generation interval ([`EpiData`](@ref)); the others take a `transformation`
+directly.
 "
 abstract type AbstractInfectionModel <: AbstractEpiAwareModel end
 

@@ -11,8 +11,9 @@
 
 ## Why EpiAwarePrototype?
 
-- **Composable models**: Build a model from interchangeable latent-process,
-  infection, and observation components rather than writing one monolithic model.
+- **Composable models**: Build a model from interchangeable infection and
+  observation components — each infection model owning its own latent process —
+  rather than writing one monolithic model.
 - **Swap parts to compare assumptions**: Change the latent process, infection
   process, or observation model independently to test how each assumption shapes
   your conclusions.
@@ -44,14 +45,12 @@ itself a model, joined together with the generic `as_turing_model` constructor.
 ```julia
 using EpiAwarePrototype, Distributions, Turing
 
-# Generation interval and an EpiData container.
-data = EpiData([0.2, 0.3, 0.5], exp)
-
-# Compose a model: an ARIMA-style latent process (differenced AR) feeds a
-# direct-infections process, observed with Poisson error.
+# Compose a model: an ARIMA-style latent process (differenced AR) is folded into
+# a direct-infections process, observed with Poisson error.
 model = EpiAwareModel(
-    DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]),
-    DirectInfections(; data = data, initialisation_prior = Normal()),
+    DirectInfections(;
+        Z = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]),
+        initialisation_prior = Normal()),
     PoissonError())
 
 # Build a Turing model. `missing` observations simulate from the prior.

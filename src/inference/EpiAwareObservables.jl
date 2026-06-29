@@ -34,10 +34,9 @@ Wrap a model, data, and inference solution into an [`EpiAwareObservables`](@ref)
 # Examples
 ```@example generated_observables
 using EpiAwarePrototype, Distributions
-data = EpiData([0.2, 0.3, 0.5], exp)
 m = as_turing_model(
-    EpiAwareModel(RandomWalk(),
-        DirectInfections(; data = data, initialisation_prior = Normal()),
+    EpiAwareModel(
+        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError()), missing, 10)
 generated_observables(m, (; y_t = missing), rand(m))
 ```

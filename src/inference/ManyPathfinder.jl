@@ -54,10 +54,9 @@ Run Pathfinder several times and return the run with the largest ELBO estimate.
 # Examples
 ```@example manypathfinder
 using EpiAwarePrototype, Distributions
-data = EpiData([0.2, 0.3, 0.5], exp)
 m = as_turing_model(
-    EpiAwareModel(RandomWalk(),
-        DirectInfections(; data = data, initialisation_prior = Normal()),
+    EpiAwareModel(
+        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError()), fill(10, 10), 10)
 nothing
 ```
