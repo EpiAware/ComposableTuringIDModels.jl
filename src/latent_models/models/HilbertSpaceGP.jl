@@ -33,9 +33,9 @@ S(\omega) = \sigma^2 \sqrt{2\pi}\, \ell \, \exp\!\Big(-\tfrac{1}{2}\ell^2\omega^
 
 Only ``\ell``, ``\sigma`` and the ``m`` weights ``\beta`` are sampled; the basis
 ``\phi_j`` and eigenvalues ``\lambda_j`` depend only on `n`, `m` and the boundary
-factor `c`, so they are built **once at construction** and never differentiated.
-The latent path is therefore a cheap matrix–vector product of fixed basis
-functions against a small set of standard-normal weights — a non-centred
+factor `c`, **not** on any sampled parameter, so they fall entirely outside the
+differentiated path. The latent path is therefore a cheap matrix–vector product
+of a fixed basis against a small set of standard-normal weights — a non-centred
 parameterisation that is fast and samples well under NUTS, including with
 [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) reverse-mode AD.
 
@@ -91,10 +91,12 @@ Returns `(Φ, sqrt_λ)` where `Φ` is the ``n \times m`` matrix of eigenfunction
 of ``\sqrt{\lambda_j}``. The inputs ``t = 1, \ldots, n`` are centred and rescaled
 to unit spacing about their midpoint, so the half-range is ``S = (n-1)/2`` and the
 GP is approximated on ``[-L, L]`` with ``L = c S``. Both outputs depend only on
-`n`, `m` and `c`, so they are computed once and reused across sampler steps —
-nothing here is differentiated.
+`n`, `m` and `c` — none of the sampled parameters — so this computation lies
+entirely outside the differentiated path of the [`HilbertSpaceGP`](@ref) model.
+Requires `n > 1` so the half-range ``S`` is positive.
 "
 function hsgp_basis(n::Int, m::Int, c::Real)
+    @assert n>1 "n must be greater than 1 for a well-defined basis (S = (n-1)/2 > 0)"
     x = collect(1:n) .- (n + 1) / 2          # centre the integer index about 0
     S = (n - 1) / 2                           # half-range of the rescaled inputs
     L = c * S
