@@ -60,8 +60,17 @@ function _models()
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         NegativeBinomialError())
 
+    # Nowcasting (CDF-scaling) posterior: a renewal model whose observation error
+    # is wrapped in `CDFScaledObs` (fixed reporting-delay CDF). This exercises the
+    # `reverse`/broadcast scaling the modifier adds on top of the inner error.
+    nowcast = EpiAwareModel(
+        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        CDFScaledObs(NegativeBinomialError(),
+            truncated(Normal(4.0, 1.5), 0.0, Inf)))
+
     y_direct = as_turing_model(direct, missing, n)().generated_y_t
     y_renewal = as_turing_model(renewal, missing, n)().generated_y_t
+    y_nowcast = as_turing_model(nowcast, missing, n)().generated_y_t
 
     return [
         ("RandomWalk latent logjoint", rw),
@@ -70,7 +79,9 @@ function _models()
         ("DirectInfections+Poisson posterior",
             as_turing_model(direct, y_direct, n)),
         ("Renewal+NegativeBinomial posterior",
-            as_turing_model(renewal, y_renewal, n))
+            as_turing_model(renewal, y_renewal, n)),
+        ("Renewal+CDFScaledObs nowcast posterior",
+            as_turing_model(nowcast, y_nowcast, n))
     ]
 end
 
