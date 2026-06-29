@@ -39,8 +39,9 @@ The composed model exposes its generated quantities directly:
 length(generated_y_t), length(I_t), length(Z_t)
 ```
 
-See [Composable design](@ref) for how the pieces fit together, and the
-[API reference](@ref) for the full surface.
+See [Composable design](@ref) for how the pieces fit together, the
+[case studies](@ref case-studies-overview) for worked end-to-end examples, and the
+[Public API](@ref public-api) for the full surface.
 
 ## Adapted from
 
