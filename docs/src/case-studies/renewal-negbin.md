@@ -56,6 +56,17 @@ data = EpiData(gen_distribution = Gamma(6.5, 0.62))
 data.gen_int
 ```
 
+The stored `gen_int` is a probability vector — the continuous serial interval
+binned into daily weights that sum to one. Double interval censoring is not the
+same as evaluating the continuous density at integer days: it accounts for both
+the primary and secondary events falling anywhere within their days, which
+shifts and spreads the mass relative to the underlying ``\mathrm{Gamma}``
+[charniga2024best](@citep).
+
+```@example renewal
+sum(data.gen_int), length(data.gen_int)
+```
+
 The [`Renewal`](@ref) process couples that generation interval to a prior for
 the initial infections.
 
@@ -63,6 +74,27 @@ the initial infections.
 renewal = Renewal(data; initialisation_prior = Normal(log(1.0), 0.25))
 nothing # hide
 ```
+
+## The infection process in isolation
+
+Because each component is a model in its own right, the renewal process can be
+exercised on its own — without a latent ``R_t`` model or an observation model —
+by handing it a fixed ``\log R_t`` trajectory. This is the clearest way to see
+what the infection process contributes. Feeding in a reproduction number that
+starts above one and declines through it produces the textbook epidemic curve:
+incidence grows, decelerates as ``R_t \to 1``, and turns over once ``R_t < 1``.
+
+```@example renewal
+Rt_demo = [0.5 + 2.5 / (1 + exp(t - 30)) for t in 1:60]
+infections_only = as_turing_model(renewal, log.(Rt_demo))()
+(peak_incidence = round(maximum(infections_only), digits = 1),
+    peak_day = argmax(infections_only))
+```
+
+Nothing here is conditioned on data or sampled over priors: the same
+[`as_turing_model`](@ref) call that composes into the full model also runs the
+infection process standalone, so a component can be inspected in isolation
+before it is assembled.
 
 Reported cases are overdispersed counts of the latent infections. The prior is
 placed on the cluster factor ``\sqrt{1/\phi}``, which is roughly the coefficient
@@ -108,26 +140,45 @@ sum(y_obs)
 ## Fit
 
 Conditioning on the observed counts and sampling with NUTS recovers the
-posterior. We use a short run here so the page builds quickly.
+posterior. A short run keeps the page quick to build; the slightly raised target
+acceptance rate keeps the sampler stable on the hierarchical innovation scale.
 
 ```@example renewal
 posterior = as_turing_model(model, y_obs, n)
-chain = sample(posterior, NUTS(), 100; progress = false)
+chain = sample(posterior, NUTS(0.9), 100; progress = false)
 nothing # hide
 ```
 
 Sampling returns a chain whose parameters keep their flat component names
 (prefixing is disabled throughout the package). Converting to an
-[`MCMCChains.Chains`](https://turinglang.org/MCMCChains.jl/) makes them easy to
-summarise — the autoregressive damping ``\rho`` and the observation cluster
-factor ``\sqrt{1/\phi}`` are both identified from the data:
+[`MCMCChains.Chains`](https://turinglang.org/MCMCChains.jl/) gives the usual
+posterior summary — point estimates *and* their uncertainty, alongside the
+effective sample size and ``\hat{R}`` convergence diagnostic. The autoregressive
+damping ``\rho`` (`damp_AR[1]`), the innovation scale ``\sigma`` (`std`), and the
+observation cluster factor ``\sqrt{1/\phi}`` (`cluster_factor`) are all
+identified from the single simulated series:
 
 ```@example renewal
 using MCMCChains, Statistics
 mc = MCMCChains.Chains(chain)
-(damp = mean(vec(mc[Symbol("damp_AR[1]")])),
-    cluster_factor = mean(vec(mc[:cluster_factor])))
+summarystats(mc[[Symbol("damp_AR[1]"), :std, :cluster_factor]])
 ```
+
+The reproduction number ``R_t = \exp(Z_t)`` is a *generated quantity* rather than
+a sampled parameter. [`generated_observables`](@ref) re-runs the fitted model
+over the chain to recover the latent and infection trajectories per draw, from
+which a posterior ``R_t`` band can be summarised:
+
+```@example renewal
+post = generated_observables(model, y_obs, chain)
+typeof(post)
+```
+
+This page stops at the parameter summary rather than plotting the posterior
+``R_t`` and posterior-predictive ``y_t`` ribbons: the docs build runs no plotting
+stack, and turning the per-draw generated quantities into dated credible-interval
+bands needs quantile-reduction helpers that would not earn their length here. The
+trajectories are all present in `post` for a reader who wants them.
 
 ## Swap a component
 
