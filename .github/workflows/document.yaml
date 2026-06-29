@@ -10,9 +10,17 @@ on:
     types: [published]
   workflow_dispatch:
 
+# Concurrency is keyed on the ref so a main build and a PR build never share a
+# group. For PR/preview builds we cancel superseded runs (cancel-in-progress:
+# true) to save runner time. For the `main` build we must NOT cancel in progress:
+# the build that deploys the versioned (`dev`) docs to gh-pages has to run to
+# completion, otherwise no clean deploy ever lands. Because main builds queue on
+# the shared org runner, an in-flight main deploy was being cancelled by the next
+# push before it finished, leaving gh-pages with only PR previews and an empty
+# versions list. Setting cancel-in-progress false for main lets the deploy finish.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   Documenter:
