@@ -122,11 +122,30 @@ R0 = β ./ γ
 
 ## Adding a stochastic ascertainment process
 
-[chatzilena2019contemporary](@citet) also consider a stochastic variant where an
-autoregressive process absorbs noise from model mis-specification. That is again
-a composition: wrap the Poisson link in an [`Ascertainment`](@ref) modifier
-carrying an [`AR`](@ref) latent process on the log scale, then re-apply the
-population transform. No part of the infection model changes.
+The deterministic model assumes the SIR equations describe the data exactly up to
+Poisson counting noise. Real outbreaks rarely oblige: the compartmental model is
+an approximation, and reporting intensity drifts over time. [chatzilena2019contemporary](@citet)
+therefore also consider a stochastic variant in which a latent autoregressive
+process on the log scale modulates the expected counts, absorbing variation the
+mechanistic part cannot explain:
+
+```math
+\begin{aligned}
+\kappa_t &= \rho\, \kappa_{t-1} + \epsilon_t, & \epsilon_t &\sim \mathrm{Normal}(0, \sigma), \\
+\lambda_t &= \mathrm{softplus}\!\big(N\, I(t)\big)\,\exp(\kappa_t), &
+y_t &\sim \mathrm{Poisson}(\lambda_t).
+\end{aligned}
+```
+
+Setting ``\kappa_t = 0`` for all ``t`` recovers the deterministic model, so the
+two are nested. In this package the ``\kappa_t`` process is exactly the [`AR`](@ref)
+latent model already used for ``\log R_t`` in the renewal examples — here it
+modulates the observation process rather than infections. An [`Ascertainment`](@ref)
+modifier wraps the Poisson link and carries that latent process; the population
+[`TransformObservationModel`](@ref) is re-applied on the outside. No part of the
+infection model changes. The priors are weakly informative: damping near zero
+(highly autocorrelated increments), an initial state near zero (no baseline
+adjustment), and a small innovation standard deviation.
 
 ```@example sir
 ascertainment = AR(
@@ -139,12 +158,50 @@ stochastic_obs = TransformObservationModel(
     x -> softplus.(N .* x))
 
 stochastic_model = EpiAwareModel(Null(), sir_process, stochastic_obs)
-length(rand(as_turing_model(stochastic_model, fill(missing, n_days + 1), n_days + 1)))
+nothing # hide
 ```
 
-Swapping the deterministic observation model for the stochastic one is, once
-more, a single structural change — the SIR infection process is reused
-untouched.
+Swapping the deterministic observation model for the stochastic one is a single
+structural change — the SIR infection process is reused untouched — and the
+composed model is fit exactly as before. The ascertainment process adds latent
+parameters, so we raise the NUTS target acceptance rate a little to keep the
+sampler stable through the ODE solve.
+
+```@example sir
+stochastic_chain = sample(
+    as_turing_model(stochastic_model, y_obs, n_days + 1),
+    NUTS(0.9), 100; progress = false)
+nothing # hide
+```
+
+The SIR parameters keep their flat names (`β`, `γ`, `I₀`); the ascertainment
+process contributes its own block, prefixed `Ascertainment.` because modifiers
+that introduce a named sub-process prefix their variables to keep them distinct.
+The basic reproduction number is recovered as before, and the posterior for the
+ascertainment innovation scale ``\sigma`` quantifies how much observation-level
+noise the latent process absorbed:
+
+```@example sir
+stochastic_mc = MCMCChains.Chains(stochastic_chain)
+βs = vec(stochastic_mc[:β])
+γs = vec(stochastic_mc[:γ])
+(R0 = mean(βs ./ γs),
+    ascertainment_sigma = mean(vec(stochastic_mc[Symbol("Ascertainment.std")])))
+```
+
+Because the deterministic model is the ``\kappa_t = 0`` special case, the two
+fits are directly comparable. Here the data were simulated from the deterministic
+model, so the stochastic variant should recover a similar ``R_0`` while shrinking
+its extra latent process towards zero — which is what the small fitted
+``\sigma`` above and the close agreement below show:
+
+```@example sir
+(deterministic_R0 = mean(R0), stochastic_R0 = mean(βs ./ γs))
+```
+
+On a real, mis-specified outbreak the stochastic process would instead soak up
+systematic departures from the SIR dynamics, guarding the mechanistic parameters
+against that bias — the reason [chatzilena2019contemporary](@citet) introduce it.
 
 ## References
 
