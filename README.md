@@ -1,16 +1,30 @@
 # EpiAwarePrototype.jl
 
-> **Prototype.** This package is an exploratory prototype for composable
-> probabilistic infectious disease modelling in Julia. Expect rough edges and
+| **Documentation** | **Build Status** | **Code Quality** | **License** |
+|:-----------------:|:----------------:|:----------------:|:-----------:|
+| [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://epiaware.github.io/EpiAwarePrototype.jl/dev/) | [![Test](https://github.com/EpiAware/EpiAwarePrototype.jl/actions/workflows/test.yaml/badge.svg?branch=main)](https://github.com/EpiAware/EpiAwarePrototype.jl/actions/workflows/test.yaml) [![codecov](https://codecov.io/gh/EpiAware/EpiAwarePrototype.jl/graph/badge.svg)](https://codecov.io/gh/EpiAware/EpiAwarePrototype.jl) | [![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle) [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl) [![JET](https://img.shields.io/badge/%E2%9C%88%EF%B8%8F%20tested%20with%20-%20JET.jl%20-%20red)](https://github.com/aviatesk/JET.jl) | [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) |
+
+*A toolkit for composable probabilistic infectious disease modelling in Julia.*
+
+> **Prototype.** This package is an exploratory prototype. Expect rough edges and
 > breaking changes.
 
-`EpiAwarePrototype` builds epidemiological models from small, reusable
-components — latent processes, infection processes, and observation models —
-and turns each one into a [Turing](https://turinglang.org) /
-[DynamicPPL](https://github.com/TuringLang/DynamicPPL.jl) model through a single
-generic constructor, `as_turing_model`. Components compose by sampling one
-another as submodels, so a full model is *assembled* from parts rather than
-hand-written.
+## Why EpiAwarePrototype?
+
+- **Composable models**: Build a model from interchangeable latent-process,
+  infection, and observation components rather than writing one monolithic model.
+- **Swap parts to compare assumptions**: Change the latent process, infection
+  process, or observation model independently to test how each assumption shapes
+  your conclusions.
+- **Simulate and infer**: Generate synthetic data from any model, then run
+  Bayesian inference on the same model with real data.
+- **A library of components**: Random walks, AR/MA/ARIMA latent processes,
+  renewal and exponential-growth infection models, ODE (SIR/SEIR) processes,
+  Poisson and negative-binomial observations, reporting delays, ascertainment,
+  and aggregation — all interchangeable.
+- **Turing-native**: Every component becomes a [Turing](https://turinglang.org) /
+  [DynamicPPL](https://github.com/TuringLang/DynamicPPL.jl) model, so the full
+  Turing inference toolbox (NUTS, Pathfinder, prior simulation) is available.
 
 ## Installation
 
@@ -22,6 +36,10 @@ Pkg.add(url = "https://github.com/EpiAware/EpiAwarePrototype.jl")
 ```
 
 ## A composable example
+
+You assemble a model from components and `EpiAwarePrototype` turns the assembly
+into a single Turing model you can simulate from and fit. Each component is
+itself a model, joined together with the generic `as_turing_model` constructor.
 
 ```julia
 using EpiAwarePrototype, Distributions, Turing
@@ -50,10 +68,11 @@ posterior_model = as_turing_model(model, y, n)
 chain = sample(posterior_model, NUTS(), 1_000)
 ```
 
-Every component is itself an `as_turing_model`, so the same swap-in/swap-out
-pattern applies throughout: replace `PoissonError()` with
-`NegativeBinomialError()`, wrap it in a `LatentDelay`, or change the latent
-process, without touching the rest of the model.
+Because every component is interchangeable, the same swap-in/swap-out pattern
+applies throughout: replace `PoissonError()` with `NegativeBinomialError()`,
+wrap it in a `LatentDelay`, or change the latent process — without touching the
+rest of the model. That is the point: you compare modelling assumptions by
+swapping parts, not by rewriting models.
 
 ## Adapted from
 
