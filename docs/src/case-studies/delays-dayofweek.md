@@ -131,12 +131,29 @@ nothing # hide
 ```@example delays
 using MCMCChains, Statistics
 mc = MCMCChains.Chains(chain)
-round(mean(vec(mc[:cluster_factor])), digits = 3)
+summarystats(mc[[:cluster_factor, Symbol("DayofWeek.std")]])
 ```
 
-The day-of-week effect, the two delay kernels, and the weekly reproduction
-number were all estimated jointly — and any of them can be swapped or removed by
+`DayofWeek.std` is the scale of the partially pooled weekday multipliers (its
+own block, prefixed because the ascertainment modifier introduces a named
+sub-process); `cluster_factor` is the negative-binomial overdispersion. The
+day-of-week effect, the two delay kernels, and the weekly reproduction number
+were all estimated jointly — and any of them can be swapped or removed by
 editing one line of the composition above.
+
+## A time-varying reporting pattern
+
+The day-of-week multiplier above is *static*: one weekly profile held fixed
+across the series. Reporting behaviour can itself drift — testing capacity
+changes, weekend effects strengthen or weaken — and the same composition
+expresses that. Because the ascertainment modifier takes any latent model,
+replacing the pooled [`HierarchicalNormal`](@ref) weekday effect with a
+[`BroadcastLatentModel`](@ref) over a process that evolves week to week turns the
+fixed profile into a time-varying one, at the cost of more latent parameters. The
+structural change is again local to the observation model; the infection and
+latent ``R_t`` parts are untouched. We keep the static pattern here — it is
+identifiable from six weeks of data, where a fully time-varying weekday process
+would not be — and flag the richer variant rather than fit it.
 
 ## References
 
