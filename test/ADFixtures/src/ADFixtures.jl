@@ -60,8 +60,22 @@ function _models()
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         NegativeBinomialError())
 
+    # A renewal process feeding a sequential observation cascade: a delayed
+    # negative-binomial first stream on infections, then a Poisson second stream
+    # ascertained off the first stream's expected (pre-error) output. This
+    # exercises the `SequentialObservationModels` threading (the error-leaf
+    # recorder feeding the next stream) through a real differentiable log-density.
+    seq = EpiAwareModel(
+        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        SequentialObservationModels((
+            cases = LatentDelay(NegativeBinomialError(), [0.4, 0.3, 0.2, 0.1]),
+            deaths = (inner -> Ascertainment(inner, FixedIntercept(log(0.1)))) =>
+                PoissonError())))
+
     y_direct = as_turing_model(direct, missing, n)().generated_y_t
     y_renewal = as_turing_model(renewal, missing, n)().generated_y_t
+    y_seq = as_turing_model(
+        seq, (cases = missing, deaths = missing), n)().generated_y_t
 
     return [
         ("RandomWalk latent logjoint", rw),
@@ -70,7 +84,9 @@ function _models()
         ("DirectInfections+Poisson posterior",
             as_turing_model(direct, y_direct, n)),
         ("Renewal+NegativeBinomial posterior",
-            as_turing_model(renewal, y_renewal, n))
+            as_turing_model(renewal, y_renewal, n)),
+        ("Renewal+Sequential(cases,deaths) posterior",
+            as_turing_model(seq, (cases = y_seq[1], deaths = y_seq[2]), n))
     ]
 end
 
@@ -153,18 +169,19 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (5 scenarios × 4 backends), Julia 1.12:
+Result matrix (6 scenarios × 4 backends), Julia 1.12:
 
-| scenario                            | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
-|-------------------------------------|:-----------:|:-----------:|:--------:|:------:|
-| RandomWalk latent logjoint          |      ✓      |      ✓      |    ✓    |   ✓   |
-| AR latent logjoint                  |      ✓      |      ✓      |    ✓    |   ✗   |
-| ARIMA latent logjoint               |      ✓      |      ✓      |    ✓    |   ✗   |
-| DirectInfections+Poisson posterior  |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+NegativeBinomial posterior  |      ✓      |      ✓      |    ✓    |   ✓   |
+| scenario                                   | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
+|--------------------------------------------|:-----------:|:-----------:|:--------:|:------:|
+| RandomWalk latent logjoint                 |      ✓      |      ✓      |    ✓    |   ✓   |
+| AR latent logjoint                         |      ✓      |      ✓      |    ✓    |   ✗   |
+| ARIMA latent logjoint                      |      ✓      |      ✓      |    ✓    |   ✗   |
+| DirectInfections+Poisson posterior         |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+NegativeBinomial posterior         |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+Sequential(cases,deaths) posterior |      ✓      |      ✓      |    ✓    |   ✓   |
 
 ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
-scenario correctly. Enzyme works on three of the five once configured with
+scenario correctly. Enzyme works on four of the six once configured with
 `function_annotation = Enzyme.Const` (see [`backends`](@ref)), but the two
 AR-based latent log-densities raise `IllegalTypeAnalysisException` inside the
 `accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion — a real

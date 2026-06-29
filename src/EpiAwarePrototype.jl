@@ -91,7 +91,8 @@ export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDe
 
 # --- observation modifiers / manipulators ---
 export Ascertainment, ascertainment_dayofweek, Aggregate, PrefixObservationModel,
-       RecordExpectedObs, TransformObservationModel, StackObservationModels
+       RecordExpectedObs, TransformObservationModel, StackObservationModels,
+       SequentialObservationModels, SequentialStream
 
 # --- composition ---
 export EpiAwareModel
@@ -176,6 +177,7 @@ include("observation_models/modifiers/PrefixObservationModel.jl")
 include("observation_models/modifiers/RecordExpectedObs.jl")
 include("observation_models/modifiers/TransformObservationModel.jl")
 include("observation_models/StackObservationModels.jl")
+include("observation_models/SequentialObservationModels.jl")
 
 # --- composition ---
 include("compose.jl")
