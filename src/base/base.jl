@@ -1,3 +1,6 @@
+# Core architecture: the single light supertype for every model component and
+# the generic `as_turing_model` constructor.
+
 @doc raw"
 A single light supertype for every model component in `EpiAwarePrototype`.
 
@@ -56,33 +59,4 @@ function as_turing_model(model, args...; kwargs...)
     throw(ArgumentError(
         "no `as_turing_model` method is defined for $(typeof(model)); each " *
         "model struct must implement `@model function as_turing_model(m::T, ...)`"))
-end
-
-@doc raw"
-Abstract supertype for accumulation step structs used with
-[`accumulate_scan`](@ref).
-
-A concrete `AbstractAccumulationStep` is a callable `(step)(state, ϵ)` returning
-the next state. It is backend-agnostic: it contains no `Turing`/`DynamicPPL`
-machinery and is reused unchanged across model components (`RandomWalk`, `AR`,
-`MA`, `LatentDelay`).
-"
-abstract type AbstractAccumulationStep end
-
-# Pretty-printing shared by every model component. The original package leant on
-# PrettyPrinting.jl; here we keep a dependency-free `show` that lists the public
-# fields of a component, which is enough for interactive inspection and doctests.
-function Base.show(io::IO, ::MIME"text/plain", model::AbstractEpiAwareModel)
-    print(io, nameof(typeof(model)))
-    fields = fieldnames(typeof(model))
-    if isempty(fields)
-        print(io, "()")
-        return nothing
-    end
-    println(io, ":")
-    for (i, f) in enumerate(fields)
-        sep = i == length(fields) ? "└─ " : "├─ "
-        println(io, "  ", sep, f, " = ", repr(getfield(model, f)))
-    end
-    return nothing
 end

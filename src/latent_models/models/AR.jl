@@ -1,0 +1,76 @@
+# Autoregressive (AR) latent process model (and its accumulation step).
+
+@doc raw"
+An autoregressive AR(`p`) latent process.
+
+```math
+Z_t = \sum_{i=1}^{p} \rho_i Z_{t-i} + \epsilon_t
+```
+
+with damping coefficients ``\rho`` from `damp_prior`, initial conditions from
+`init_prior`, and innovations from the error model `ϵ_t`. The order `p` is the
+length of the damping/initial priors.
+
+# Examples
+```@example AR
+using EpiAwarePrototype, Distributions
+ar = AR()
+mdl = as_turing_model(ar, 10)
+rand(mdl)
+```
+"
+struct AR{D <: Sampleable, I <: Sampleable, P <: Int, E <: AbstractEpiAwareModel} <:
+       AbstractEpiAwareModel
+    "Prior distribution for the damping coefficients."
+    damp_prior::D
+    "Prior distribution for the initial conditions."
+    init_prior::I
+    "Order of the AR model."
+    p::P
+    "Error model for the innovations."
+    ϵ_t::E
+
+    function AR(damp_prior::Sampleable, init_prior::Sampleable, p::Int,
+            ϵ_t::AbstractEpiAwareModel)
+        @assert p>0 "p must be greater than 0"
+        @assert p==length(damp_prior)==length(init_prior) "p must equal the length of damp_prior and init_prior"
+        new{typeof(damp_prior), typeof(init_prior), typeof(p), typeof(ϵ_t)}(
+            damp_prior, init_prior, p, ϵ_t)
+    end
+end
+
+function AR(damp_prior::Sampleable, init_prior::Sampleable; p::Int = 1,
+        ϵ_t::AbstractEpiAwareModel = HierarchicalNormal())
+    return AR(; damp_priors = fill(damp_prior, p), init_priors = fill(init_prior, p),
+        ϵ_t = ϵ_t)
+end
+
+function AR(; damp_priors::Vector{D} = [truncated(Normal(0.0, 0.05), 0, 1)],
+        init_priors::Vector{I} = [Normal()],
+        ϵ_t::AbstractEpiAwareModel = HierarchicalNormal()) where {
+        D <: Sampleable, I <: Sampleable}
+    p = length(damp_priors)
+    return AR(_expand_dist(damp_priors), _expand_dist(init_priors), p, ϵ_t)
+end
+
+@model function as_turing_model(model::AR, n)
+    p = model.p
+    @assert n>p "n must be longer than the order of the autoregressive process"
+    ar_init ~ model.init_prior
+    damp_AR ~ model.damp_prior
+    ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n - p), false)
+    ar = accumulate_scan(ARStep(damp_AR), ar_init, ϵ_t)
+    return ar
+end
+
+@doc raw"
+Autoregressive step for use with [`accumulate_scan`](@ref).
+"
+struct ARStep{D <: AbstractVector{<:Real}} <: AbstractAccumulationStep
+    damp_AR::D
+end
+
+function (ar::ARStep)(state, ϵ)
+    new_val = dot(ar.damp_AR, state) + ϵ
+    return vcat(state[2:end], new_val)
+end
