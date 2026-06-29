@@ -2,6 +2,31 @@
 # to a latent-infection series.
 
 @doc raw"
+Rebuild an `ODEProcess`'s `ODEProblem` with freshly sampled state `u0` and
+parameters `p`.
+
+This is the single seam through which `ODEProcess` re-instantiates its problem on
+every sample. The default applies the plain-vector `remake(prob; u0, p)` that the
+hand-coded [`SIRParams`](@ref) / [`SEIRParams`](@ref) problems expect.
+
+Parameter models whose problem stores parameters differently — e.g. a
+`ModelingToolkit`/`Catalyst`-built problem carrying a structured `MTKParameters`
+object plus an initialization system — specialise this on their own type to inject
+the remake form they need. The Catalyst extension uses the plain-vector
+`build_initializeprob = false` path to bypass the init system (and stay reverse-mode
+differentiable). Dispatching on the parameter model keeps `ODEProcess` itself
+backend-agnostic.
+
+# Arguments
+
+  - `params`: the ODE parameter model (the `ODEProcess`'s `params` field).
+  - `prob`: the template `ODEProblem` to rebuild.
+  - `u0`: the sampled initial state vector.
+  - `p`: the sampled parameter vector.
+"
+remake_ode_problem(params::AbstractLatentModel, prob, u0, p) = remake(prob; u0 = u0, p = p)
+
+@doc raw"
 An infection process defined by solving an ODE.
 
 `ODEProcess` combines a parameter struct (`params`, e.g. [`SIRParams`](@ref) or
@@ -63,7 +88,7 @@ end
     solver_options = epi_model.solver_options
     params ~ to_submodel(as_turing_model(epi_model.params, n), false)
     u0, p = params
-    _prob = remake(prob; u0 = u0, p = p)
+    _prob = remake_ode_problem(epi_model.params, prob, u0, p)
     sol = solve(_prob, solver; solver_options...)
     return sol
 end
