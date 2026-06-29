@@ -16,7 +16,7 @@ mdl = as_turing_model(model, 10)
 rand(mdl)
 ```
 "
-@kwdef struct IID{D <: Sampleable} <: AbstractEpiAwareModel
+@kwdef struct IID{D <: Sampleable} <: AbstractLatentModel
     ϵ_t::D = Normal(0, 1)
 end
 

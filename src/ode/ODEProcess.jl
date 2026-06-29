@@ -34,13 +34,15 @@ as_turing_model(sir_process, nothing)()
 
 ## Fields
 
-  - `params`: the ODE parameter model (an `AbstractEpiAwareModel`).
+  - `params`: the ODE parameter model (an [`AbstractLatentModel`](@ref), e.g.
+    [`SIRParams`](@ref) / [`SEIRParams`](@ref), whose `as_turing_model` samples
+    `(u0, p)`).
   - `solver`: the ODE solver (default `AutoVern7(Rodas5P())`).
   - `sol2infs`: link mapping the ODE solution to an infection series.
   - `solver_options`: extra options passed to `solve` (a `Dict` or `NamedTuple`).
 "
-@kwdef struct ODEProcess{P <: AbstractEpiAwareModel, S, F <: Function,
-    D <: Union{Dict, NamedTuple}} <: AbstractEpiAwareModel
+@kwdef struct ODEProcess{P <: AbstractLatentModel, S, F <: Function,
+    D <: Union{Dict, NamedTuple}} <: AbstractInfectionModel
     "The ODE parameter model."
     params::P
     "The ODE solver."

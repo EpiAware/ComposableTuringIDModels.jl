@@ -24,7 +24,7 @@ rand(mdl)
 ```
 "
 @kwdef struct HierarchicalNormal{R <: Real, D <: Sampleable, M <: Bool} <:
-              AbstractEpiAwareModel
+              AbstractLatentModel
     "Mean of the normal distribution."
     mean::R = 0.0
     "Prior distribution for the standard deviation."

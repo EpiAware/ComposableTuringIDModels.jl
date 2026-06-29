@@ -14,7 +14,7 @@ mdl = as_turing_model(int, 10)
 rand(mdl)
 ```
 "
-@kwdef struct Intercept{D <: Sampleable} <: AbstractEpiAwareModel
+@kwdef struct Intercept{D <: Sampleable} <: AbstractLatentModel
     "Prior distribution for the intercept."
     intercept_prior::D
 end
@@ -27,7 +27,7 @@ end
 @doc raw"
 A fixed (non-sampled) intercept broadcast to a length-`n` latent process.
 "
-@kwdef struct FixedIntercept{F <: Real} <: AbstractEpiAwareModel
+@kwdef struct FixedIntercept{F <: Real} <: AbstractLatentModel
     intercept::F
 end
 

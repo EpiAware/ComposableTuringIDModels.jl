@@ -16,7 +16,7 @@ using EpiAwarePrototype
 broadcast_dayofweek(RandomWalk())
 ```
 "
-function broadcast_dayofweek(model::AbstractEpiAwareModel; link = x -> 7 * softmax(x))
+function broadcast_dayofweek(model::AbstractLatentModel; link = x -> 7 * softmax(x))
     return BroadcastLatentModel(TransformLatentModel(model, link), 7, RepeatEach())
 end
 
@@ -33,6 +33,6 @@ using EpiAwarePrototype
 broadcast_weekly(RandomWalk())
 ```
 "
-function broadcast_weekly(model::AbstractEpiAwareModel)
+function broadcast_weekly(model::AbstractLatentModel)
     return BroadcastLatentModel(model, 7, RepeatBlock())
 end

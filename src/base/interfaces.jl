@@ -1,0 +1,85 @@
+# Per-role interface contracts. Each role's members must implement the
+# `as_turing_model` signature fixed by its supertype:
+#
+#   latent       as_turing_model(m, n)        ⇒ a DynamicPPL.Model
+#   infection    as_turing_model(m, Z_t)      ⇒ a DynamicPPL.Model
+#   observation  as_turing_model(m, y_t, Y_t) ⇒ a DynamicPPL.Model
+#
+# The helpers below encode those contracts in a form usable from tests: each
+# returns `true` when `model` is in the given role *and* its role-specific
+# `as_turing_model` call returns a `DynamicPPL.Model`. They construct the model
+# but do not sample it, so they are cheap conformance checks.
+
+@doc raw"
+Check that `model` satisfies the [`AbstractLatentModel`](@ref) interface: it is a
+latent model and `as_turing_model(model, n)` returns a `DynamicPPL.Model`.
+
+# Arguments
+
+  - `model`: the component to check.
+
+# Keyword Arguments
+
+  - `n`: the latent series length used for the construction check (default `10`).
+
+# Examples
+```@example
+using EpiAwarePrototype
+implements_latent_interface(RandomWalk())
+```
+"
+function implements_latent_interface(model; n::Int = 10)
+    model isa AbstractLatentModel || return false
+    return as_turing_model(model, n) isa DynamicPPL.Model
+end
+
+@doc raw"
+Check that `model` satisfies the [`AbstractInfectionModel`](@ref) interface: it is
+an infection model and `as_turing_model(model, Z_t)` returns a `DynamicPPL.Model`.
+
+# Arguments
+
+  - `model`: the component to check.
+
+# Keyword Arguments
+
+  - `Z_t`: the latent path used for the construction check (default `zeros(10)`).
+
+# Examples
+```@example
+using EpiAwarePrototype, Distributions
+data = EpiData([0.2, 0.3, 0.5], exp)
+implements_infection_interface(
+    DirectInfections(; data = data, initialisation_prior = Normal()))
+```
+"
+function implements_infection_interface(model; Z_t = zeros(10))
+    model isa AbstractInfectionModel || return false
+    return as_turing_model(model, Z_t) isa DynamicPPL.Model
+end
+
+@doc raw"
+Check that `model` satisfies the [`AbstractObservationModel`](@ref) interface: it
+is an observation model and `as_turing_model(model, y_t, Y_t)` returns a
+`DynamicPPL.Model`.
+
+# Arguments
+
+  - `model`: the component to check.
+
+# Keyword Arguments
+
+  - `y_t`: the observed series for the construction check (default `missing`,
+    i.e. predictive simulation).
+  - `Y_t`: the expected-observation series (default `fill(10.0, 10)`).
+
+# Examples
+```@example
+using EpiAwarePrototype
+implements_observation_interface(PoissonError())
+```
+"
+function implements_observation_interface(model; y_t = missing, Y_t = fill(10.0, 10))
+    model isa AbstractObservationModel || return false
+    return as_turing_model(model, y_t, Y_t) isa DynamicPPL.Model
+end

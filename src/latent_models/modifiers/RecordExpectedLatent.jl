@@ -19,7 +19,7 @@ rand(as_turing_model(rm, 1))
 
   - `model`: the latent model whose expected latent vector is recorded.
 "
-struct RecordExpectedLatent{M <: AbstractEpiAwareModel} <: AbstractEpiAwareModel
+struct RecordExpectedLatent{M <: AbstractLatentModel} <: AbstractLatentModel
     "The latent model whose expected latent vector is recorded."
     model::M
 end

@@ -38,8 +38,8 @@ rand(mdl)
   - `latent_prefix`: the prefix applied to the latent model's variables.
 "
 struct Ascertainment{
-    M <: AbstractEpiAwareModel, L <: AbstractEpiAwareModel, F <: Function,
-    P <: String} <: AbstractEpiAwareModel
+    M <: AbstractObservationModel, L <: AbstractLatentModel, F <: Function,
+    P <: String} <: AbstractObservationModel
     "The underlying observation model."
     model::M
     "The latent model generating the ascertainment effect."
@@ -50,8 +50,8 @@ struct Ascertainment{
     latent_prefix::P
 
     function Ascertainment(model::M, latent_model::L, transform::F,
-            latent_prefix::P) where {M <: AbstractEpiAwareModel,
-            L <: AbstractEpiAwareModel, F <: Function, P <: String}
+            latent_prefix::P) where {M <: AbstractObservationModel,
+            L <: AbstractLatentModel, F <: Function, P <: String}
         @assert hasmethod(transform, Tuple{Vector, Vector}) "transform must have a method for (Vector, Vector)"
         wrapped_latent_model = latent_prefix == "" ? latent_model :
                                PrefixLatentModel(latent_model, latent_prefix)
@@ -63,14 +63,14 @@ end
 function Ascertainment(model::M, latent_model::L;
         transform = (Y_t, x) -> xexpy.(Y_t, x),
         latent_prefix::String = "Ascertainment") where {
-        M <: AbstractEpiAwareModel, L <: AbstractEpiAwareModel}
+        M <: AbstractObservationModel, L <: AbstractLatentModel}
     return Ascertainment(model, latent_model, transform, latent_prefix)
 end
 
 function Ascertainment(; model::M, latent_model::L,
         transform = (Y_t, x) -> xexpy.(Y_t, x),
         latent_prefix::String = "Ascertainment") where {
-        M <: AbstractEpiAwareModel, L <: AbstractEpiAwareModel}
+        M <: AbstractObservationModel, L <: AbstractLatentModel}
     return Ascertainment(model, latent_model, transform, latent_prefix)
 end
 

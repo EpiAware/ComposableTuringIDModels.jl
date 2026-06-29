@@ -32,7 +32,7 @@ rand(mdl)
 "
 struct StackObservationModels{
     M <: AbstractVector, N <: AbstractVector{<:AbstractString}} <:
-       AbstractEpiAwareModel
+       AbstractObservationModel
     "The vector of observation models (each prefix-wrapped by its name)."
     models::M
     "The names identifying each stacked model."

@@ -2,14 +2,22 @@
 # the generic `as_turing_model` constructor.
 
 @doc raw"
-A single light supertype for every model component in `EpiAwarePrototype`.
+The single light supertype for every model component in `EpiAwarePrototype`.
 
 Unlike the deep abstract hierarchy used by the original `EpiAware` package, the
-prototype collapses every latent, infection, and observation model under one
-supertype. The role a struct plays (latent process, infection process,
-observation model, or composed model) is documented and tested behaviourally
-rather than encoded in the type tree; dispatch happens on the concrete struct
-inside [`as_turing_model`](@ref).
+prototype keeps a **shallow** tree: one root supertype, and directly beneath it a
+small set of *role* supertypes — [`AbstractLatentModel`](@ref),
+[`AbstractInfectionModel`](@ref), [`AbstractObservationModel`](@ref) (and
+[`AbstractObservationErrorModel`](@ref) under the last) — that encode the role a
+component plays. There is no deeper `AbstractTuring*` tree and there are no
+per-concept `generate_*` functions; dispatch happens on the concrete struct
+inside the single generic [`as_turing_model`](@ref).
+
+Encoding the role in the type lets the composer and manipulators constrain their
+component slots, so passing a wrong-role component (e.g. an observation model
+where a latent model is expected) fails at **construction** rather than at
+sampling. See [`AbstractLatentModel`](@ref) and its siblings for the interface
+each role's `as_turing_model` must satisfy.
 "
 abstract type AbstractEpiAwareModel end
 
@@ -56,7 +64,17 @@ rand(turing_model)
 ```
 "
 function as_turing_model(model, args...; kwargs...)
+    hint = if model isa AbstractLatentModel
+        " expected the latent interface `as_turing_model(m, n)`"
+    elseif model isa AbstractInfectionModel
+        " expected the infection interface `as_turing_model(m, Z_t)`"
+    elseif model isa AbstractObservationModel
+        " expected the observation interface `as_turing_model(m, y_t, Y_t)`"
+    else
+        ""
+    end
     throw(ArgumentError(
-        "no `as_turing_model` method is defined for $(typeof(model)); each " *
-        "model struct must implement `@model function as_turing_model(m::T, ...)`"))
+        "no `as_turing_model` method is defined for $(typeof(model)) with " *
+        "$(length(args)) positional argument(s);$hint. Each model struct must " *
+        "implement `@model function as_turing_model(m::T, ...)`"))
 end

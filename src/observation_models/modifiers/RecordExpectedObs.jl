@@ -25,7 +25,7 @@ rand(mdl)
 
   - `model`: the inner observation model whose expected observations are recorded.
 "
-struct RecordExpectedObs{M <: AbstractEpiAwareModel} <: AbstractEpiAwareModel
+struct RecordExpectedObs{M <: AbstractObservationModel} <: AbstractObservationModel
     "The inner observation model whose expected observations are recorded."
     model::M
 end

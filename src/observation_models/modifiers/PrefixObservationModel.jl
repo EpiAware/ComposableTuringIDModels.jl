@@ -28,8 +28,8 @@ rand(mdl)
   - `model`: the inner observation model to prefix.
   - `prefix`: the string prefix applied to the inner model's variables.
 "
-@kwdef struct PrefixObservationModel{M <: AbstractEpiAwareModel, P <: String} <:
-              AbstractEpiAwareModel
+@kwdef struct PrefixObservationModel{M <: AbstractObservationModel, P <: String} <:
+              AbstractObservationModel
     "The observation model."
     model::M
     "The prefix for the observation model."

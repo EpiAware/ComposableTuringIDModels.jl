@@ -35,8 +35,8 @@ rand(mdl)
 ```
 "
 struct EpiAwareModel{
-    L <: AbstractEpiAwareModel, I <: AbstractEpiAwareModel, O <: AbstractEpiAwareModel} <:
-       AbstractEpiAwareModel
+    L <: AbstractLatentModel, I <: AbstractInfectionModel,
+    O <: AbstractObservationModel} <: AbstractEpiAwareModel
     "Latent process model generating ``Z_t``."
     latent_model::L
     "Infection process model mapping ``Z_t`` to ``I_t``."

@@ -23,8 +23,8 @@ mdl = as_turing_model(diff, 10)
 rand(mdl)
 ```
 "
-struct DiffLatentModel{M <: AbstractEpiAwareModel, P <: Distribution} <:
-       AbstractEpiAwareModel
+struct DiffLatentModel{M <: AbstractLatentModel, P <: Distribution} <:
+       AbstractLatentModel
     "Underlying (undifferenced) latent model."
     model::M
     "Prior distribution for the initial latent variables."
@@ -32,18 +32,18 @@ struct DiffLatentModel{M <: AbstractEpiAwareModel, P <: Distribution} <:
     "Number of times differenced."
     d::Int
 
-    function DiffLatentModel(model::AbstractEpiAwareModel, init_prior::Distribution, d::Int)
+    function DiffLatentModel(model::AbstractLatentModel, init_prior::Distribution, d::Int)
         @assert d>0 "d must be greater than 0"
         @assert d==length(init_prior) "d must equal the length of init_prior"
         new{typeof(model), typeof(init_prior)}(model, init_prior, d)
     end
 end
 
-function DiffLatentModel(model::AbstractEpiAwareModel, init_prior::Distribution; d::Int)
+function DiffLatentModel(model::AbstractLatentModel, init_prior::Distribution; d::Int)
     return DiffLatentModel(; model = model, init_priors = fill(init_prior, d))
 end
 
-function DiffLatentModel(; model::AbstractEpiAwareModel,
+function DiffLatentModel(; model::AbstractLatentModel,
         init_priors::Vector{D} where {D <: Distribution} = [Normal()])
     d = length(init_priors)
     return DiffLatentModel(model, _expand_dist(init_priors), d)
