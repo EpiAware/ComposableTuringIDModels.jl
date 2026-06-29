@@ -17,6 +17,11 @@ then to a mechanistic compartmental model:
     same renewal core wrapped in an observation model that convolves infections
     through reporting delays and modulates them with a day-of-week reporting
     pattern, in the style of real-time estimation tools [abbott2020estimating](@citep).
+  - [Real-time nowcasting: correcting right-truncation](@ref case-study-nowcast) —
+    the same renewal core fit to a right-truncated real-time snapshot, contrasting
+    a naive fit (which shows the artefactual recent-``R_t`` down-turn) with a
+    [`RightTruncate`](@ref)-corrected fit that removes it, again following
+    real-time estimation practice [abbott2020estimating](@citep).
   - [An SIR compartmental model](@ref case-study-sir) — an alternative infection
     process where dynamics come from an ordinary differential equation solved by
     the SciML stack [rackauckas2017differentialequations](@citep), following the
