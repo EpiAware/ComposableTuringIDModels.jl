@@ -1,4 +1,5 @@
-# Random walk latent process model (and its accumulation step).
+# Random walk latent process model. Its accumulation step (`RWStep`) lives in
+# `src/steps/`.
 
 @doc raw"
 Model the latent process ``Z_t`` as a random walk.
@@ -32,9 +33,3 @@ end
     rw = accumulate_scan(RWStep(), rw_init, ϵ_t)
     return rw
 end
-
-@doc raw"
-Random walk step for use with [`accumulate_scan`](@ref).
-"
-struct RWStep <: AbstractAccumulationStep end
-(::RWStep)(state, ϵ) = state + ϵ

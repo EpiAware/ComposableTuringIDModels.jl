@@ -1,4 +1,5 @@
-# Moving-average (MA) latent process model (and its accumulation step).
+# Moving-average (MA) latent process model. Its accumulation step (`MAStep`)
+# lives in `src/steps/`.
 
 @doc raw"
 A moving-average MA(`q`) latent process.
@@ -51,23 +52,4 @@ end
     ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n), false)
     ma = accumulate_scan(MAStep(θ), (; val = 0, state = ϵ_t[1:q]), ϵ_t[(q + 1):end])
     return ma
-end
-
-@doc raw"
-Moving-average step for use with [`accumulate_scan`](@ref).
-"
-struct MAStep{C <: AbstractVector{<:Real}} <: AbstractAccumulationStep
-    θ::C
-end
-
-function (ma::MAStep)(state, ϵ)
-    new_val = ϵ + dot(ma.θ, state.state)
-    new_state = vcat(ϵ, state.state[1:(end - 1)])
-    return (; val = new_val, state = new_state)
-end
-
-function get_state(acc_step::MAStep, initial_state, state)
-    init_vals = initial_state.state
-    new_vals = state .|> x -> x.val
-    return vcat(init_vals, new_vals)
 end
