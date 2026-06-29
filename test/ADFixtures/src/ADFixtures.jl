@@ -162,7 +162,7 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (5 scenarios × 4 backends), Julia 1.12:
+Result matrix (6 scenarios × 4 backends), Julia 1.12:
 
 | scenario                            | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
 |-------------------------------------|:-----------:|:-----------:|:--------:|:------:|
@@ -171,9 +171,10 @@ Result matrix (5 scenarios × 4 backends), Julia 1.12:
 | ARIMA latent logjoint               |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Poisson posterior  |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+NegativeBinomial posterior  |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+TriangleObs posterior       |      ✓      |      ✓      |    ✓    |   ✓   |
 
 ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
-scenario correctly. Enzyme works on three of the five once configured with
+scenario correctly. Enzyme works on four of the six once configured with
 `function_annotation = Enzyme.Const` (see [`backends`](@ref)), but the two
 AR-based latent log-densities raise `IllegalTypeAnalysisException` inside the
 `accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion — a real
