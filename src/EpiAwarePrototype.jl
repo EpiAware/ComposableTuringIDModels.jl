@@ -50,7 +50,7 @@ using Tables: rowtable
 # explicitly (not reexported).
 using Distributions: Distributions, Distribution, Sampleable,
                      ContinuousUnivariateDistribution, ContinuousDistribution,
-                     Normal, Poisson, NegativeBinomial, Gamma, truncated,
+                     Normal, Poisson, NegativeBinomial, Binomial, Gamma, truncated,
                      cdf, ccdf, logcdf, logccdf, invlogcdf, pdf, logpdf, quantile,
                      params, mean, var, std, mode, skewness, kurtosis
 using Statistics: Statistics
@@ -86,8 +86,8 @@ export EpiData, DirectInfections, ExpGrowthRate, Renewal,
 export SIRParams, SEIRParams, ODEProcess
 
 # --- observation models ---
-export PoissonError, NegativeBinomialError, NormalError, LatentDelay,
-       observation_error, generate_observation_error_priors
+export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDelay,
+       observation_error, generate_observation_error_priors, define_y_t
 
 # --- observation modifiers / manipulators ---
 export Ascertainment, ascertainment_dayofweek, Aggregate, PrefixObservationModel,
@@ -157,6 +157,7 @@ include("observation_models/ObservationErrorModels/methods.jl")
 include("observation_models/ObservationErrorModels/PoissonError.jl")
 include("observation_models/ObservationErrorModels/NegativeBinomialError.jl")
 include("observation_models/ObservationErrorModels/NormalError.jl")
+include("observation_models/ObservationErrorModels/BinomialError.jl")
 include("observation_models/modifiers/LatentDelay.jl")
 include("observation_models/modifiers/ascertainment/Ascertainment.jl")
 include("observation_models/modifiers/ascertainment/helpers.jl")

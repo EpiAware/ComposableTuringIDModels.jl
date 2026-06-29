@@ -30,9 +30,13 @@ as a submodel) and [`observation_error`](@ref) (the per-time-point distribution)
     priors ~ to_submodel(
         generate_observation_error_priors(obs_model, y_t, Y_t), false)
 
-    if ismissing(y_t)
-        y_t = Vector{Missing}(missing, length(Y_t))
-    end
+    # Unpack the observed count series from `y_t`. `y_t` may be a plain vector
+    # (the simple single-stream case), `missing` (predictive simulation), or a
+    # `NamedTuple` carrying extra per-time-point data alongside the counts; each
+    # model's `define_y_t` extracts the count series it scores. We rebind `y_t`
+    # itself (rather than a fresh name) so DynamicPPL still treats the entries as
+    # conditioned observations when concrete data is supplied.
+    y_t = define_y_t(obs_model, y_t, Y_t)
 
     diff_t = length(y_t) - length(Y_t)
     @assert diff_t>=0 "The observation vector must be at least as long as the expected observation vector"
@@ -42,6 +46,41 @@ as a submodel) and [`observation_error`](@ref) (the per-time-point distribution)
         y_t[i + diff_t] ~ observation_error(obs_model, pad_Y_t[i], priors...)
     end
     return y_t
+end
+
+@doc raw"
+Unpack the observed count series an observation-error model scores from the data
+`y_t`, dispatching on the model type.
+
+The default method covers every count family (Poisson, negative binomial) and the
+Gaussian family: it accepts a plain observation vector, a `missing` (replaced by a
+length-`Y_t` vector of `missing` for predictive simulation), or a `NamedTuple`
+carrying the counts in a `y` field alongside any extra per-time-point data (a
+model that needs more than the counts — e.g. [`BinomialError`](@ref), which also
+needs the number of trials — reads those extra fields itself). This keeps the
+simple case ergonomic (a plain vector just works) while letting a model opt into a
+richer `NamedTuple` data contract.
+
+# Arguments
+
+  - `obs_model`: the observation-error model.
+  - `y_t`: the observed data — a vector, `missing`, or a `NamedTuple`.
+  - `Y_t`: the expected-observation series (used to size a `missing` series).
+
+# Examples
+```@example define_y_t
+using EpiAwarePrototype
+# A plain vector passes through; a NamedTuple's `y` field is unpacked.
+define_y_t(PoissonError(), [1, 2, 3], fill(10.0, 3)),
+define_y_t(PoissonError(), (y = [1, 2, 3],), fill(10.0, 3))
+```
+"
+function define_y_t(::AbstractObservationErrorModel, y_t, Y_t)
+    # A NamedTuple carries the counts in its `y` field; a plain value is the
+    # counts directly. Either way, a `missing` count series becomes a length-`Y_t`
+    # vector of `missing` for predictive simulation.
+    y = y_t isa NamedTuple ? y_t.y : y_t
+    return ismissing(y) ? Vector{Missing}(missing, length(Y_t)) : y
 end
 
 @doc raw"
