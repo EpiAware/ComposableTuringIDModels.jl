@@ -26,8 +26,8 @@ This model carries no generation interval — it never uses one — so it takes 
   - `rt`: the latent process model (an [`AbstractLatentModel`](@ref)) generating
     the growth-rate path.
   - `transformation`: the link mapping the unconstrained cumulative sum to
-    non-negative infections (default `exp`, evaluated via `LogExpFunctions.xexpy`
-    for numerical stability).
+    non-negative infections (default: numerically equivalent to `exp`,
+    implemented via `LogExpFunctions.xexpy` for numerical stability).
   - `initialisation_prior`: prior for the unconstrained initial infections.
 
 # Examples

@@ -53,7 +53,7 @@ passes only a series length `n` (no external latent path).
 ```@example
 using EpiAwarePrototype, Distributions
 implements_infection_interface(
-    DirectInfections(; rt = RandomWalk(), initialisation_prior = Normal()))
+    DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()))
 ```
 "
 function implements_infection_interface(model; n::Int = 10)

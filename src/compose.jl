@@ -34,7 +34,6 @@ vector to condition.
 # Examples
 ```@example EpiAwareModel
 using EpiAwarePrototype, Distributions
-data = EpiData([0.2, 0.3, 0.5], exp)
 model = EpiAwareModel(
     DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
     PoissonError())
