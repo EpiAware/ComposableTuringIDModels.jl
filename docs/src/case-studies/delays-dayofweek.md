@@ -36,7 +36,8 @@ Differencing makes the level a random walk rather than mean-reverting, which
 suits a reproduction number that can drift.
 
 ```@example delays
-using EpiAwarePrototype, Distributions, Random, Turing
+using EpiAwarePrototype, Distributions, Random, Turing, Mooncake
+using ADTypes: AutoMooncake
 Random.seed!(20240601)
 
 arma21 = arma(
@@ -123,10 +124,14 @@ y_obs = sim.generated_y_t
 first(y_obs, 14)
 ```
 
-Fitting conditions on the simulated reports (short run for the docs build):
+Fitting conditions on the simulated reports (short run for the docs build),
+differentiating with the recommended [Mooncake](https://chalk-lab.github.io/Mooncake.jl/)
+backend (see [Automatic differentiation backend](@ref ad-backend)):
 
 ```@example delays
-chain = sample(as_turing_model(problem, (y_t = y_obs,)), NUTS(), 50; progress = false)
+chain = sample(
+    as_turing_model(problem, (y_t = y_obs,)),
+    NUTS(; adtype = AutoMooncake(; config = nothing)), 50; progress = false)
 nothing # hide
 ```
 

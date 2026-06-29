@@ -39,7 +39,8 @@ process is the renewal model's reproduction-number process — it is folded into
 the infection model below rather than composed separately.
 
 ```@example renewal
-using EpiAwarePrototype, Distributions, Random, Turing
+using EpiAwarePrototype, Distributions, Random, Turing, Mooncake
+using ADTypes: AutoMooncake
 Random.seed!(1234)
 
 latent = AR(
@@ -158,10 +159,15 @@ sum(y_obs)
 Conditioning on the observed counts and sampling with NUTS recovers the
 posterior. A short run keeps the page quick to build; the slightly raised target
 acceptance rate keeps the sampler stable on the hierarchical innovation scale.
+We differentiate with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the
+recommended backend for this package (see
+[Automatic differentiation backend](@ref ad-backend)).
 
 ```@example renewal
 posterior = as_turing_model(model, y_obs, n)
-chain = sample(posterior, NUTS(0.9), 100; progress = false)
+chain = sample(
+    posterior, NUTS(0.9; adtype = AutoMooncake(; config = nothing)), 100;
+    progress = false)
 nothing # hide
 ```
 
