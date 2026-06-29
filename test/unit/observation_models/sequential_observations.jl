@@ -52,11 +52,32 @@ end
     @test out.obs != out.expected   # sampled counts differ from the expected mean
 end
 
-@testitem "SequentialObservationModels: downstream consumes upstream .expected" begin
+@testitem "SequentialObservationModels: cascade threads genuinely from stream 1" begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(63)
 
-    # cases  : delayed Poisson on I_t = 100  (a full first stream on I_t)
+    # The FIRST hop must thread: stream 2 is fed stream 1's expected (post-its-own
+    # transform) output, not the raw `I_t`. With a length-shortening delay on
+    # stream 1, that shows up as a length difference — if the raw `I_t` were
+    # threaded (as the parallel stack does), stream 2 would see the full length.
+    pmf = [0.4, 0.3, 0.2, 0.1]
+    ramp = collect(1.0:12.0)
+    seq = SequentialObservationModels((
+        cases = LatentDelay(PoissonError(), pmf),     # shortens by length(pmf)-1
+        sink = PoissonError()))                       # pure leaf on the threaded series
+    out = as_turing_model(seq, (cases = missing, sink = missing), ramp)()
+    @test length(out) == 2
+    # Stream 2 sees stream 1's delay-SHORTENED expected (12 - 3 = 9), proving the
+    # first hop threads rather than forking off the raw 12-length `I_t`.
+    @test length(out[2]) == length(ramp) - (length(pmf) - 1)
+    @test length(out[2]) == 9
+end
+
+@testitem "SequentialObservationModels: downstream consumes upstream .expected" begin
+    using EpiAwarePrototype, Distributions, Random
+    Random.seed!(631)
+
+    # cases  : delayed Poisson on I_t = 100
     # deaths : ascertained (×0.1) Poisson leaf -> its error-leaf input ≈ 10
     # tert   : a pure Poisson leaf -> the stack feeds it the DEATHS stream's
     #          expected (≈ 10), not the original 100. So its sampled counts must
@@ -75,6 +96,32 @@ end
     # Fed ≈10 (the deaths post-ascertainment mean), the tertiary counts are far
     # below 100 — if the raw input had been threaded they would sit near 100.
     @test sum(tert) / length(tert) < 40
+end
+
+@testitem "SequentialObservationModels: a bare nested stream is peeled at its leaf" begin
+    using EpiAwarePrototype, Distributions, Random
+    Random.seed!(632)
+
+    # A stream written as a plain nested observation model (no explicit
+    # `transform_chain => error_leaf`) is peeled so the recorder lands at the error
+    # leaf: the threaded expected series is then the post-transform leaf input.
+    # Here stream 1 = LatentDelay(Ascertainment(×0.1, Poisson), pmf): its expected
+    # output is BOTH ascertained (≈10) AND delay-shortened, so the bare-leaf second
+    # stream sees ≈10 over the shortened length (not 100 over 12).
+    pmf = [0.4, 0.3, 0.2, 0.1]
+    nested = LatentDelay(
+        Ascertainment(PoissonError(), FixedIntercept(log(0.1))), pmf)
+    seq = SequentialObservationModels((cases = nested, sink = PoissonError()))
+    out = as_turing_model(seq, (cases = missing, sink = missing), fill(100.0, 12))()
+    @test length(out[2]) == 12 - (length(pmf) - 1)        # shortened by the delay
+    sink = collect(skipmissing(out[2]))
+    @test !isempty(sink)
+    @test sum(sink) / length(sink) < 40                   # ascertained ≈10, not 100
+
+    # An un-peelable wrapper (no registered transform-chain rule) errors clearly,
+    # steering the user to the explicit `transform_chain => error_leaf` form.
+    @test_throws Exception SequentialObservationModels((
+        a = RecordExpectedObs(PoissonError()), b = PoissonError()))
 end
 
 @testitem "SequentialObservationModels: simulate then condition" begin
@@ -114,6 +161,13 @@ end
     out = as_turing_model(seq, yt, Yt)()
     @test length(out) == 2
     @test length(out[1]) == 8
+
+    # The whole key set is validated (names AND order), so a misnamed or
+    # misordered `Y_t` errors loudly rather than silently using the wrong column.
+    @test_throws Exception as_turing_model(
+        seq, yt, (cases = fill(30.0, 8), WRONG = fill(1.0, 8)))()
+    @test_throws Exception as_turing_model(
+        seq, yt, (deaths = fill(1.0, 8), cases = fill(30.0, 8)))()
 end
 
 @testitem "SequentialObservationModels: end-to-end renewal compose, simulate, NUTS" tags=[:sample] begin

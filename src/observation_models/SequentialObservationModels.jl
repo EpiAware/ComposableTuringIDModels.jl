@@ -64,27 +64,73 @@ struct SequentialStream{F, L <: AbstractObservationModel} <: AbstractObservation
     error_leaf::L
 end
 
-# Normalise the many ways a later stream can be written into a `SequentialStream`.
+# Normalise the many ways a stream can be written into a `SequentialStream`
+# (a `transform_chain`, `error_leaf` split) so the recorder can be placed at the
+# error leaf and the leaf's input (the post-transform expected series) threaded on.
 _to_stream(s::SequentialStream) = s
 _to_stream(p::Pair) = SequentialStream(first(p), last(p))
-# A bare observation model later in the chain is a pure error leaf (identity
-# transform chain) — it scores the threaded expected series directly.
-_to_stream(m::AbstractObservationModel) = SequentialStream(identity, m)
+# A bare error leaf is itself the leaf, with an identity transform chain.
+_to_stream(m::AbstractObservationErrorModel) = SequentialStream(identity, m)
+# A bare *wrapped* observation model (e.g. `LatentDelay(PoissonError(), pmf)`) is
+# peeled into its transform chain + error leaf via `_peel_leaf`, so the recorder
+# lands at the leaf rather than wrapping the whole stream — the expected series
+# that threads is then the leaf input (post-delay/ascertainment), not the raw
+# stream input.
+_to_stream(m::AbstractObservationModel) = _peel_leaf(m)
 
-# Stream 1 observes `I_t` directly, so it stays a full observation model. A
-# `SequentialStream`/`Pair` written for slot 1 is still honoured by realising the
-# concrete observation model around its leaf (no recorder — the first stream's
-# observations are scored on `I_t`; the cascade threads the post-transform mean of
-# the LATER streams).
-_as_first_stream(m::AbstractObservationModel) = m
-function _as_first_stream(s::Union{SequentialStream, Pair})
-    str = _to_stream(s)
-    return str.transform_chain(str.error_leaf)
+@doc raw"
+Peel a wrapped observation model into a [`SequentialStream`](@ref): a
+`(transform_chain, error_leaf)` split with the error leaf at the bottom and the
+delay/ascertainment/transform wrappers as the chain.
+
+This lets a stream be written as a plain nested observation model (e.g.
+`LatentDelay(Ascertainment(PoissonError(), eff), pmf)`) yet still have the
+internal recorder placed at its error leaf, so the threaded expected series is the
+leaf input (the post-transform per-time mean) rather than the raw stream input.
+Dissection is restricted to the package's own standard observation modifiers
+(`LatentDelay`, `Ascertainment`, `TransformObservationModel`, `Aggregate`); an
+unrecognised wrapper raises so the explicit `transform_chain => error_leaf` form
+is used instead of guessing.
+"
+_peel_leaf(m::AbstractObservationErrorModel) = SequentialStream(identity, m)
+function _peel_leaf(m::AbstractObservationModel)
+    rebuild = _rewrap(m)
+    inner = _peel_leaf(m.model)
+    return SequentialStream(leaf -> rebuild(inner.transform_chain(leaf)),
+        inner.error_leaf)
 end
 
-# Build a later stream with the internal recorder spliced at its error leaf, so
+# Functional re-wrappers for the standard observation modifiers: each returns a
+# closure that rebuilds the wrapper around a fresh inner model, preserving the
+# wrapper's own configuration (delay PMF, ascertainment latent + transform, ...).
+_rewrap(m::LatentDelay) = inner -> LatentDelay(inner, reverse(m.rev_pmf))
+function _rewrap(m::Ascertainment)
+    # `m.latent_model` is already the (possibly prefix-wrapped) latent model the
+    # original was built with; pass `latent_prefix = ""` so it is reused verbatim
+    # rather than wrapped a second time.
+    return inner -> Ascertainment(inner, m.latent_model, m.transform, "")
+end
+function _rewrap(m::TransformObservationModel)
+    inner -> TransformObservationModel(inner, m.transform)
+end
+_rewrap(m::Aggregate) = inner -> Aggregate(inner, m.aggregation)
+function _rewrap(m::AbstractObservationModel)
+    return error("Cannot peel `$(typeof(m))` into a (transform-chain, error-leaf) " *
+                 "stream for `SequentialObservationModels`. Write this stream " *
+                 "explicitly as `transform_chain => error_leaf` (e.g. " *
+                 "`(inner -> $(nameof(typeof(m)))(inner, ...)) => PoissonError()`).")
+end
+
+# Build a stream with the internal recorder spliced at its error leaf, so
 # `as_turing_model` returns `(; obs, expected)` with `expected` the post-transform
-# (error-leaf input) series the stack threads onward.
+# (error-leaf input) series the stack threads onward to the next stream.
+#
+# EVERY stream — including the first — is instrumented this way so the cascade
+# threads genuinely from stream 1: stream 1's observations are still scored on the
+# incoming `I_t`, but its `.expected` (the per-time mean AFTER its own transform
+# chain) is what seeds stream 2. This is what distinguishes a sequential
+# `cases → deaths` cascade (deaths arise from the expected cases) from the parallel
+# `StackObservationModels`, where every stream forks off the same `I_t`.
 function _instrument_stream(s)
     str = _to_stream(s)
     return str.transform_chain(_SeqExpectedRecorder(str.error_leaf))
@@ -114,41 +160,54 @@ input in both scale and length — exactly the series the next stream should see
 
 ## Stream contract
 
-  - **The first stream** is a full [`AbstractObservationModel`](@ref) observing
-    the incoming expected series `I_t` (unchanged observation-model semantics).
-  - **Each later stream** is a `(transform_chain, error_leaf)` pair (a
-    [`SequentialStream`](@ref), or the `transform_chain => error_leaf` shorthand):
-    `transform_chain` maps an inner observation model to a wrapped one (e.g.
-    `inner -> LatentDelay(Ascertainment(inner, eff), pmf)`), and `error_leaf` is
-    the observation-error model applied at the leaf. The stack inserts a small
-    internal recorder at the leaf, so the stream exposes its expected output, and
-    threads that `.expected` series into the next stream. A bare
-    [`AbstractObservationModel`](@ref) given as a later stream is treated as a
-    pure error leaf (an identity transform chain).
+Each stream — including the first — is a `(transform_chain, error_leaf)` split:
+`transform_chain` maps an inner observation model to a wrapped one (e.g.
+`inner -> LatentDelay(Ascertainment(inner, eff), pmf)`) and `error_leaf` is the
+observation-error model at the leaf. The stack splices a small internal recorder
+at each leaf, so every stream exposes its expected (post-transform) output, and
+threads that `.expected` series forward as the next stream's expected input.
+
+A stream may be written as:
+
+  - a **bare error model** (e.g. `PoissonError()`) — a pure leaf, identity chain;
+  - a **bare wrapped observation model** (e.g.
+    `LatentDelay(Ascertainment(PoissonError(), eff), pmf)`) — automatically peeled
+    into its transform chain + error leaf so the recorder lands at the leaf; or
+  - an explicit `transform_chain => error_leaf` pair (or a
+    [`SequentialStream`](@ref)).
+
+The first stream's observations are scored on the incoming `I_t`, but its
+`.expected` (the series after its own transform chain) is what seeds the second
+stream — so the cascade threads genuinely from stream 1, not only between later
+streams. Use the parallel [`StackObservationModels`](@ref) instead if every stream
+should fork off the same `I_t`.
 
 # Arguments
 
   - `obs_model`: the [`SequentialObservationModels`](@ref) model.
   - `y_t`: a `NamedTuple` of observed series, one per stream, in stream order.
   - `Y_t`: the expected-observation series fed to the first stream (a vector), or
-    a per-stream `NamedTuple` whose first entry seeds the first stream (the later
-    entries are ignored — later streams are fed by the cascade).
+    a per-stream `NamedTuple` (same names/order as `y_t`) whose first entry seeds
+    the first stream — the later entries are ignored, since later streams are fed
+    by the cascade.
 
 # Examples
 ```@example SequentialObservationModels
 using EpiAwarePrototype, Distributions
-# infections → cases (delayed) → deaths (ascertained off the delayed-case mean)
+# infections → cases (delayed) → deaths (ascertained off the delayed-case mean).
+# `FixedIntercept(log(0.1))` gives a 0.1× effect: Ascertainment's default
+# transform is multiplicative on the exponential scale, so it applies `exp(log 0.1)`.
 obs = SequentialObservationModels((
     cases = LatentDelay(PoissonError(), [0.4, 0.3, 0.2, 0.1]),
-    deaths = (inner -> Ascertainment(inner, FixedIntercept(0.1))) => PoissonError()))
+    deaths = (inner -> Ascertainment(inner, FixedIntercept(log(0.1)))) => PoissonError()))
 mdl = as_turing_model(obs, (cases = missing, deaths = missing), fill(100.0, 12))
 rand(mdl)
 ```
 
 ## Fields
 
-  - `models`: the vector of streams (each prefix-wrapped by its name); stream 1 is
-    a full observation model, later streams are recorder-instrumented streams.
+  - `models`: the vector of streams (each prefix-wrapped by its name and
+    recorder-instrumented at its error leaf so it exposes its expected output).
   - `model_names`: the names identifying each stream, in cascade order.
 "
 struct SequentialObservationModels{
@@ -166,13 +225,14 @@ struct SequentialObservationModels{
         @assert length(models)>=1 "A sequential cascade needs at least one stream"
         wrapped = Vector{AbstractObservationModel}(undef, length(models))
         for i in eachindex(models)
-            # Stream 1 is observed directly on `I_t`, so it is a full observation
-            # model used as-is. Each later stream is reduced to a
+            # EVERY stream — including the first — is reduced to a
             # (transform-chain, error-leaf) form with the internal recorder placed
-            # at the leaf, so it exposes its expected output for threading.
-            inner = i == 1 ? _as_first_stream(models[i]) :
-                    _instrument_stream(models[i])
-            wrapped[i] = PrefixObservationModel(inner, model_names[i])
+            # at the leaf, so it exposes its expected (pre-error) output. That is
+            # what makes the cascade thread genuinely from stream 1: stream 1's
+            # observations are still scored on the incoming `I_t`, but its
+            # post-transform expected series seeds stream 2.
+            wrapped[i] = PrefixObservationModel(
+                _instrument_stream(models[i]), model_names[i])
         end
         return new{typeof(wrapped), N}(wrapped, model_names)
     end
@@ -190,21 +250,14 @@ end
 
     obs = Vector{Any}(undef, length(obs_model.models))
 
-    # Stream 1: a full observation model on the incoming expected series `I_t`.
-    name1 = obs_model.model_names[1]
-    obs_1 ~ to_submodel(
-        as_turing_model(obs_model.models[1], y_t[Symbol(name1)], Y_t), false)
-    obs[1] = obs_1
-
-    # The first stream is a plain observation model returning its sampled `y_t`,
-    # so it does not itself expose an expected series. The cascade is seeded with
-    # the same expected input the first stream saw; the transform chain inside each
-    # later stream (delay, ascertainment, ...) re-shapes it from there.
+    # The cascade is seeded with the incoming expected series `I_t`. Each stream
+    # (starting with the first) is fed the previous stream's expected (pre-error)
+    # output and, via its recorder, exposes its own expected output for the next
+    # stream. Stream 1's observations are scored on `I_t`; its `.expected` (the
+    # series after stream 1's own transform chain, e.g. a delay) is what seeds
+    # stream 2 — a genuine `I_t → stream 1 → stream 2 → …` chain.
     expected = Y_t
-
-    # Each later stream is fed the previous stream's expected (pre-error) output
-    # and, via its recorder, exposes its own expected output for the next stream.
-    for i in 2:length(obs_model.models)
+    for i in eachindex(obs_model.models)
         name = obs_model.model_names[i]
         stream_i ~ to_submodel(
             as_turing_model(obs_model.models[i], y_t[Symbol(name)], expected),
@@ -218,9 +271,11 @@ end
 
 @model function as_turing_model(
         obs_model::SequentialObservationModels, y_t::NamedTuple, Y_t::NamedTuple)
-    # Only the first stream is seeded externally; later streams are fed by the
-    # cascade, so just the leading expected series is used.
-    @assert keys(y_t)[1]==keys(Y_t)[1] "The first key of the observed and expected series must match"
+    # A per-stream `NamedTuple` `Y_t` is accepted for symmetry with the parallel
+    # stack, but only the FIRST stream is seeded externally — later streams are fed
+    # by the cascade. Validate the whole key set (order included) so a misnamed or
+    # misordered `Y_t` errors loudly rather than silently using the wrong column.
+    @assert keys(Y_t)==keys(y_t) "The keys of the expected series `Y_t` must match the observed series `y_t` (same names, same order); later streams are still fed by the cascade, only the first seeds it"
     seed = Y_t[keys(Y_t)[1]]
     obs ~ to_submodel(as_turing_model(obs_model, y_t, seed), false)
     return obs
