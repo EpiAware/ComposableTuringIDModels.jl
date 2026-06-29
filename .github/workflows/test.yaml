@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   test:
-    uses: EpiAware/.github/.github/workflows/tests.yml@42a0501ccacefbfc2f2eeca640714a19c50bfe58
+    uses: EpiAware/.github/.github/workflows/tests.yml@6d4e35e2515f947acbf7d2a683cbf02b341005c7
     # The package floor is Julia 1.11 (the Turing 0.45 / DynamicPPL 0.41 stack
     # needs >= 1.11 at its compat lower bounds, and `Pkg.test` only honours the
     # test env's `[sources]` entry for the unregistered EpiAwarePackageTools on
