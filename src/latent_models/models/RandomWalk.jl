@@ -19,8 +19,8 @@ mdl = as_turing_model(rw, 10)
 rand(mdl)
 ```
 "
-@kwdef struct RandomWalk{D <: Sampleable, E <: AbstractEpiAwareModel} <:
-              AbstractEpiAwareModel
+@kwdef struct RandomWalk{D <: Sampleable, E <: AbstractLatentModel} <:
+              AbstractLatentModel
     init_prior::D = Normal()
     ϵ_t::E = HierarchicalNormal()
 end

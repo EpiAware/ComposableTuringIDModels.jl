@@ -18,8 +18,8 @@ mdl = as_turing_model(ma, 10)
 rand(mdl)
 ```
 "
-struct MA{C <: Sampleable, Q <: Int, E <: AbstractEpiAwareModel} <:
-       AbstractEpiAwareModel
+struct MA{C <: Sampleable, Q <: Int, E <: AbstractLatentModel} <:
+       AbstractLatentModel
     "Prior distribution for the MA coefficients."
     θ::C
     "Order of the MA model."
@@ -27,19 +27,19 @@ struct MA{C <: Sampleable, Q <: Int, E <: AbstractEpiAwareModel} <:
     "Error model for the innovations."
     ϵ_t::E
 
-    function MA(θ::Sampleable, q::Int, ϵ_t::AbstractEpiAwareModel)
+    function MA(θ::Sampleable, q::Int, ϵ_t::AbstractLatentModel)
         @assert q>0 "q must be greater than 0"
         @assert q==length(θ) "q must equal the length of θ"
         new{typeof(θ), typeof(q), typeof(ϵ_t)}(θ, q, ϵ_t)
     end
 end
 
-function MA(θ::Distribution; q::Int = 1, ϵ_t::AbstractEpiAwareModel = HierarchicalNormal())
+function MA(θ::Distribution; q::Int = 1, ϵ_t::AbstractLatentModel = HierarchicalNormal())
     return MA(; θ_priors = fill(θ, q), ϵ_t = ϵ_t)
 end
 
 function MA(; θ_priors::Vector{C} = [truncated(Normal(0.0, 0.05), -1, 1)],
-        ϵ_t::AbstractEpiAwareModel = HierarchicalNormal()) where {C <: Distribution}
+        ϵ_t::AbstractLatentModel = HierarchicalNormal()) where {C <: Distribution}
     q = length(θ_priors)
     return MA(_expand_dist(θ_priors), q, ϵ_t)
 end

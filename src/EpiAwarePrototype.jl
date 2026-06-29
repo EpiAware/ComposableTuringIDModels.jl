@@ -57,6 +57,10 @@ using Statistics: Statistics
 
 # --- core architecture ---
 export AbstractEpiAwareModel, as_turing_model
+export AbstractLatentModel, AbstractInfectionModel, AbstractObservationModel,
+       AbstractObservationErrorModel
+export implements_latent_interface, implements_infection_interface,
+       implements_observation_interface
 
 # --- utilities and distributions ---
 # (double-interval censoring is provided by CensoredDistributions.jl, used
@@ -99,6 +103,8 @@ export EpiProblem, EpiMethod, NUTSampler, ManyPathfinder, DirectSample,
 
 # --- core architecture ---
 include("base/base.jl")
+include("base/roles.jl")
+include("base/interfaces.jl")
 include("base/accumulation.jl")
 include("base/prettyprinting.jl")
 
@@ -134,11 +140,12 @@ include("latent_models/combinations/arima.jl")
 
 # --- infection models ---
 include("infection_models/EpiData.jl")
-include("infection_models/utils.jl")
 include("infection_models/DirectInfections.jl")
 include("infection_models/ExpGrowthRate.jl")
 include("infection_models/RenewalSteps.jl")
 include("infection_models/Renewal.jl")
+# `utils.jl` defines the `R_to_r(::Renewal)` method, so it follows `Renewal`.
+include("infection_models/utils.jl")
 
 # --- ODE compartmental models ---
 include("ode/SIRParams.jl")

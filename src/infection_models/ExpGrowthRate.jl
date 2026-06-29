@@ -33,7 +33,7 @@ rand(as_turing_model(egr, randn(10) * 0.05))
   - `data`: the [`EpiData`](@ref) object.
   - `initialisation_prior`: prior for the unconstrained initial infections.
 "
-@kwdef struct ExpGrowthRate{S <: Sampleable} <: AbstractEpiAwareModel
+@kwdef struct ExpGrowthRate{S <: Sampleable} <: AbstractInfectionModel
     "`EpiData` object."
     data::EpiData
     "Prior for the unconstrained initial infections."

@@ -66,7 +66,7 @@ rand(as_turing_model(sirparams, nothing))
   - `initial_prop_infected`: prior for the initial infected proportion.
 "
 struct SIRParams{P <: ODEProblem, D <: Sampleable, E <: Sampleable, F <: Sampleable} <:
-       AbstractEpiAwareModel
+       AbstractLatentModel
     "The `ODEProblem` instance for the SIR model."
     prob::P
     "Prior for the infectiousness parameter."

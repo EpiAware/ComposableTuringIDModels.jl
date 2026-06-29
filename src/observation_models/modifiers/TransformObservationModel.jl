@@ -28,16 +28,17 @@ rand(mdl)
     passed to.
   - `transform`: the transformation applied to the expected observations.
 "
-@kwdef struct TransformObservationModel{M <: AbstractEpiAwareModel, F <: Function} <:
-              AbstractEpiAwareModel
+@kwdef struct TransformObservationModel{M <: AbstractObservationModel, F <: Function} <:
+              AbstractObservationModel
     "The inner observation model."
     model::M
     "The transformation applied to the expected observations."
     transform::F = x -> log1pexp.(x)
 end
 
-function TransformObservationModel(model::M; transform = x -> log1pexp.(x)) where {
-        M <: AbstractEpiAwareModel}
+function TransformObservationModel(
+        model::M; transform = x -> log1pexp.(x)) where {
+        M <: AbstractObservationModel}
     return TransformObservationModel(model, transform)
 end
 

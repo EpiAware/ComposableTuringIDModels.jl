@@ -9,11 +9,11 @@ binomial).
 It exists only so that the generic observation-error `as_turing_model` loop —
 which is identical across error families — can be written once and dispatch the
 family-specific pieces ([`observation_error`](@ref) and
-[`generate_observation_error_priors`](@ref)) on the concrete type. It is a
-subtype of [`AbstractEpiAwareModel`](@ref); the prototype keeps no deeper
-hierarchy than this.
+[`generate_observation_error_priors`](@ref)) on the concrete type. It is the
+error sub-role of [`AbstractObservationModel`](@ref); the prototype keeps no
+deeper hierarchy than this.
 "
-abstract type AbstractObservationErrorModel <: AbstractEpiAwareModel end
+abstract type AbstractObservationErrorModel <: AbstractObservationModel end
 
 @doc raw"
 Generate observations from an observation-error model.

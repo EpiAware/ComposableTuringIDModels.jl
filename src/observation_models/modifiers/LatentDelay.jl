@@ -27,13 +27,13 @@ mdl = as_turing_model(obs, missing, fill(10, 30))
 mdl()
 ```
 "
-struct LatentDelay{M <: AbstractEpiAwareModel, T <: AbstractVector{<:Real}} <:
-       AbstractEpiAwareModel
+struct LatentDelay{M <: AbstractObservationModel, T <: AbstractVector{<:Real}} <:
+       AbstractObservationModel
     model::M
     rev_pmf::T
 
     function LatentDelay(model::M, pmf::T) where {
-            M <: AbstractEpiAwareModel, T <: AbstractVector{<:Real}}
+            M <: AbstractObservationModel, T <: AbstractVector{<:Real}}
         @assert all(pmf .>= 0) "Delay PMF must be non-negative"
         @assert isapprox(sum(pmf), 1) "Delay PMF must sum to 1"
         rev_pmf = reverse(pmf)
@@ -43,7 +43,7 @@ end
 
 function LatentDelay(model::M, distribution::C; D = nothing,
         Δd = 1.0) where {
-        M <: AbstractEpiAwareModel, C <: ContinuousDistribution}
+        M <: AbstractObservationModel, C <: ContinuousDistribution}
     pmf = _discretised_pmf(distribution; Δd = Δd, D = D)
     return LatentDelay(model, pmf)
 end

@@ -35,8 +35,9 @@ Solves ``R_0 \sum_i w_i e^{-r i} = 1`` by a small-`r` initial guess refined with
 
 # Arguments
 
-  - `R₀`: the reproduction number (or an [`EpiData`](@ref)-bearing model).
-  - `w`: the discrete generation interval weights.
+  - `R₀`: the reproduction number.
+  - `w`: the discrete generation interval weights (or a [`Renewal`](@ref) model,
+    whose generation interval is used).
 
 # Keyword Arguments
 
@@ -59,7 +60,9 @@ function R_to_r(R₀, w::Vector{T}; newton_steps = 2, Δd = 1.0) where {T <: Abs
     return r_approx
 end
 
-function R_to_r(R₀, epi_model::AbstractEpiAwareModel; newton_steps = 2, Δd = 1.0)
+# Only `Renewal` carries a generation interval, so the model-typed method
+# dispatches on it specifically (the other infection models have no `gen_int`).
+function R_to_r(R₀, epi_model::Renewal; newton_steps = 2, Δd = 1.0)
     return R_to_r(R₀, epi_model.data.gen_int; newton_steps = newton_steps, Δd = Δd)
 end
 

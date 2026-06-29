@@ -31,8 +31,8 @@ rand(as_turing_model(problem, (; y_t = missing)))
   - `observation_model`: the observation model.
   - `tspan`: the `(first, last)` time span of the series.
 "
-@kwdef struct EpiProblem{L <: AbstractEpiAwareModel, I <: AbstractEpiAwareModel,
-    O <: AbstractEpiAwareModel}
+@kwdef struct EpiProblem{L <: AbstractLatentModel, I <: AbstractInfectionModel,
+    O <: AbstractObservationModel}
     "The infection process model."
     epi_model::I
     "The latent process model."

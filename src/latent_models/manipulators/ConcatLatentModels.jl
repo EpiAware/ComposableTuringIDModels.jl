@@ -27,8 +27,8 @@ rand(as_turing_model(combined, 10))
   - `prefixes`: the vector of prefixes, one per model.
 "
 struct ConcatLatentModels{
-    M <: AbstractVector{<:AbstractEpiAwareModel}, N <: Int, F <: Function,
-    P <: AbstractVector{<:String}} <: AbstractEpiAwareModel
+    M <: AbstractVector{<:AbstractLatentModel}, N <: Int, F <: Function,
+    P <: AbstractVector{<:String}} <: AbstractLatentModel
     "A vector of latent models."
     models::M
     "The number of models in the collection."
@@ -39,7 +39,7 @@ struct ConcatLatentModels{
     prefixes::P
 
     function ConcatLatentModels(models::M, no_models::I, dimension_adaptor::F,
-            prefixes::P) where {M <: AbstractVector{<:AbstractEpiAwareModel},
+            prefixes::P) where {M <: AbstractVector{<:AbstractLatentModel},
             I <: Int, F <: Function, P <: AbstractVector{<:String}}
         @assert length(models)>1 "At least two models are required"
         @assert length(models)==no_models "no_models must be equal to the number of models"
@@ -50,14 +50,14 @@ struct ConcatLatentModels{
         prefix_models = [prefixes[i] == "" ? models[i] :
                          PrefixLatentModel(models[i], prefixes[i])
                          for i in eachindex(models)]
-        return new{AbstractVector{<:AbstractEpiAwareModel}, Int, Function,
+        return new{AbstractVector{<:AbstractLatentModel}, Int, Function,
             AbstractVector{<:String}}(
             prefix_models, no_models, dimension_adaptor, prefixes)
     end
 end
 
 function ConcatLatentModels(models::M, dimension_adaptor::Function;
-        prefixes = nothing) where {M <: AbstractVector{<:AbstractEpiAwareModel}}
+        prefixes = nothing) where {M <: AbstractVector{<:AbstractLatentModel}}
     no_models = length(models)
     if isnothing(prefixes)
         prefixes = "Concat." .* string.(1:no_models)
@@ -67,13 +67,13 @@ end
 
 function ConcatLatentModels(models::M;
         dimension_adaptor::Function = equal_dimensions, prefixes = nothing) where {
-        M <: AbstractVector{<:AbstractEpiAwareModel}}
+        M <: AbstractVector{<:AbstractLatentModel}}
     return ConcatLatentModels(models, dimension_adaptor; prefixes = prefixes)
 end
 
 function ConcatLatentModels(; models::M,
         dimension_adaptor::Function = equal_dimensions, prefixes = nothing) where {
-        M <: AbstractVector{<:AbstractEpiAwareModel}}
+        M <: AbstractVector{<:AbstractLatentModel}}
     return ConcatLatentModels(models, dimension_adaptor; prefixes = prefixes)
 end
 

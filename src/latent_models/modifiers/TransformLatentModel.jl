@@ -20,8 +20,8 @@ rand(as_turing_model(trans, 5))
   - `model`: the latent model to transform.
   - `transform`: the transformation function applied to the latent vector.
 "
-@kwdef struct TransformLatentModel{M <: AbstractEpiAwareModel, F <: Function} <:
-              AbstractEpiAwareModel
+@kwdef struct TransformLatentModel{M <: AbstractLatentModel, F <: Function} <:
+              AbstractLatentModel
     "The latent model to transform."
     model::M
     "The transformation function."

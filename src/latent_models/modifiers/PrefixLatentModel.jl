@@ -25,8 +25,8 @@ rand(as_turing_model(pm, 10))
   - `model`: the latent model to prefix.
   - `prefix`: the string prefix applied to the inner model's variables.
 "
-@kwdef struct PrefixLatentModel{M <: AbstractEpiAwareModel, P <: String} <:
-              AbstractEpiAwareModel
+@kwdef struct PrefixLatentModel{M <: AbstractLatentModel, P <: String} <:
+              AbstractLatentModel
     "The latent model."
     model::M
     "The prefix for the latent model."

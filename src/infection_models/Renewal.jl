@@ -33,7 +33,7 @@ rand(as_turing_model(renewal, randn(20) * 0.05))
     [`AbstractConstantRenewalStep`](@ref)).
 "
 struct Renewal{E <: EpiData, S <: Sampleable, A <: AbstractConstantRenewalStep} <:
-       AbstractEpiAwareModel
+       AbstractInfectionModel
     "`EpiData` object."
     data::E
     "Prior for the unconstrained initial infections."

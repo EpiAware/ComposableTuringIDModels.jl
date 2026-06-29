@@ -25,7 +25,7 @@ mdl = as_turing_model(inf, randn(10))
 rand(mdl)
 ```
 "
-@kwdef struct DirectInfections{S <: Sampleable} <: AbstractEpiAwareModel
+@kwdef struct DirectInfections{S <: Sampleable} <: AbstractInfectionModel
     "`EpiData` object."
     data::EpiData
     "Prior for the unconstrained initial infections."

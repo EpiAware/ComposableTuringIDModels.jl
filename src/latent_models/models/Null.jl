@@ -15,7 +15,7 @@ isnothing(mdl())
 true
 ```
 "
-struct Null <: AbstractEpiAwareModel end
+struct Null <: AbstractLatentModel end
 
 @model function as_turing_model(model::Null, n)
     return nothing

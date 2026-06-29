@@ -25,8 +25,8 @@ rand(as_turing_model(combined, 10))
   - `prefixes`: the vector of prefixes, one per model.
 "
 struct CombineLatentModels{
-    M <: AbstractVector{<:AbstractEpiAwareModel}, P <: AbstractVector{<:String}} <:
-       AbstractEpiAwareModel
+    M <: AbstractVector{<:AbstractLatentModel}, P <: AbstractVector{<:String}} <:
+       AbstractLatentModel
     "A vector of latent models."
     models::M
     "A vector of prefixes for the latent models."
@@ -34,20 +34,20 @@ struct CombineLatentModels{
 
     function CombineLatentModels(models::M,
             prefixes::P) where {
-            M <: AbstractVector{<:AbstractEpiAwareModel},
+            M <: AbstractVector{<:AbstractLatentModel},
             P <: AbstractVector{<:String}}
         @assert length(models)>1 "At least two models are required"
         @assert length(models)==length(prefixes) "The number of models and prefixes must be equal"
         prefix_models = [prefixes[i] == "" ? models[i] :
                          PrefixLatentModel(models[i], prefixes[i])
                          for i in eachindex(models)]
-        return new{AbstractVector{<:AbstractEpiAwareModel},
+        return new{AbstractVector{<:AbstractLatentModel},
             AbstractVector{<:String}}(prefix_models, prefixes)
     end
 end
 
 function CombineLatentModels(models::M) where {
-        M <: AbstractVector{<:AbstractEpiAwareModel}}
+        M <: AbstractVector{<:AbstractLatentModel}}
     prefixes = "Combine." .* string.(1:length(models))
     return CombineLatentModels(models, prefixes)
 end

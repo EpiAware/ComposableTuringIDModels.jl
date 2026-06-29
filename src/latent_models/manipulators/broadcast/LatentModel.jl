@@ -71,8 +71,8 @@ rand(as_turing_model(each, 10))
   - `broadcast_rule`: the [`AbstractBroadcastRule`](@ref) applied.
 "
 struct BroadcastLatentModel{
-    M <: AbstractEpiAwareModel, P <: Integer, B <: AbstractBroadcastRule} <:
-       AbstractEpiAwareModel
+    M <: AbstractLatentModel, P <: Integer, B <: AbstractBroadcastRule} <:
+       AbstractLatentModel
     "The underlying latent model."
     model::M
     "The period of the broadcast."
@@ -83,7 +83,7 @@ struct BroadcastLatentModel{
     function BroadcastLatentModel(model::M,
             period::Integer,
             broadcast_rule::B) where {
-            M <: AbstractEpiAwareModel, B <: AbstractBroadcastRule}
+            M <: AbstractLatentModel, B <: AbstractBroadcastRule}
         @assert period>0 "period must be greater than 0"
         new{typeof(model), typeof(period), typeof(broadcast_rule)}(
             model, period, broadcast_rule)
@@ -92,7 +92,7 @@ end
 
 function BroadcastLatentModel(model::M; period::Integer,
         broadcast_rule::B) where {
-        M <: AbstractEpiAwareModel, B <: AbstractBroadcastRule}
+        M <: AbstractLatentModel, B <: AbstractBroadcastRule}
     return BroadcastLatentModel(model, period, broadcast_rule)
 end
 
