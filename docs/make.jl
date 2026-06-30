@@ -91,7 +91,8 @@ makedocs(;
     format = DocumenterVitepress.MarkdownVitepress(;
         repo = "github.com/EpiAware/EpiAwarePrototype.jl",
         devbranch = "main",
-        devurl = "dev"))
+        devurl = "dev",
+        deploy_url = "epiawareprototype.epiaware.org"))
 
 DocumenterVitepress.deploydocs(;
     repo = "github.com/EpiAware/EpiAwarePrototype.jl",
