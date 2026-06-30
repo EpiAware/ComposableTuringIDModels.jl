@@ -16,8 +16,14 @@ import ForwardDiff
 using EpiAwarePrototype
 using Distributions
 using Random: Random, MersenneTwister
-using DynamicPPL: DynamicPPL, LogDensityFunction, VarInfo, link, getlogjoint
+using DynamicPPL: DynamicPPL, @model, to_submodel, LogDensityFunction, VarInfo,
+                  link, getlogjoint
 import LogDensityProblems as LDP
+
+# Accessors is in EpiAwarePrototype's dependency closure (and re-imported here via
+# the package); the `PropertyLens` constructor is used to build a `Hierarchy` lens
+# without taking a direct `@optic` dependency in this fixture environment.
+const _Accessors = EpiAwarePrototype.Accessors
 
 export scenarios, backends, broken_scenario_names,
        backend_broken_scenarios, backend_skip_scenarios
@@ -42,6 +48,19 @@ end
 # A representative generation interval shared by the infection-model scenarios.
 const _GEN_INT = [0.2, 0.3, 0.5]
 
+# A minimal partially-pooled model exercising `Hierarchy`: each group's level is a
+# `FixedIntercept` whose value is written by the cross-group latent (a RandomWalk
+# here, so neighbouring groups are correlated and the `accumulate_scan` recursion
+# is on the gradient path), then mapped to Poisson counts. Conditioning on data
+# makes the log-density a real, smooth target for the AD backends.
+@model function _pooled_counts(h, y, n_groups)
+    levels ~ to_submodel(as_turing_model(h, n_groups), false)
+    for g in 1:n_groups
+        y[g] ~ Poisson(exp(levels[g].intercept))
+    end
+    return y
+end
+
 # Build the registry's models once. Conditioned (posterior) scenarios use data
 # simulated from the prior with a fixed seed so the target is deterministic.
 function _models()
@@ -63,6 +82,15 @@ function _models()
     y_direct = as_turing_model(direct, missing, n)().generated_y_t
     y_renewal = as_turing_model(renewal, missing, n)().generated_y_t
 
+    # Partially-pooled (Hierarchy) posterior: a RandomWalk cross-group latent
+    # writes each group's intercept via an Accessors lens; data simulated from the
+    # prior with a fixed seed makes the target deterministic.
+    n_groups = 5
+    hier = Hierarchy(FixedIntercept(0.0),
+        _Accessors.PropertyLens{:intercept}(), RandomWalk())
+    y_hier = Int.(_pooled_counts(
+        hier, fill(missing, n_groups), n_groups)(MersenneTwister(99)))
+
     return [
         ("RandomWalk latent logjoint", rw),
         ("AR latent logjoint", ar),
@@ -70,7 +98,9 @@ function _models()
         ("DirectInfections+Poisson posterior",
             as_turing_model(direct, y_direct, n)),
         ("Renewal+NegativeBinomial posterior",
-            as_turing_model(renewal, y_renewal, n))
+            as_turing_model(renewal, y_renewal, n)),
+        ("Hierarchy partial-pooling posterior",
+            _pooled_counts(hier, y_hier, n_groups))
     ]
 end
 
@@ -153,7 +183,7 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (5 scenarios × 4 backends), Julia 1.12:
+Result matrix (6 scenarios × 4 backends), Julia 1.12:
 
 | scenario                            | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
 |-------------------------------------|:-----------:|:-----------:|:--------:|:------:|
@@ -162,9 +192,10 @@ Result matrix (5 scenarios × 4 backends), Julia 1.12:
 | ARIMA latent logjoint               |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Poisson posterior  |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+NegativeBinomial posterior  |      ✓      |      ✓      |    ✓    |   ✓   |
+| Hierarchy partial-pooling posterior |      ✓      |      ✓      |    ✓    |   ✓   |
 
 ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
-scenario correctly. Enzyme works on three of the five once configured with
+scenario correctly. Enzyme works on four of the six once configured with
 `function_annotation = Enzyme.Const` (see [`backends`](@ref)), but the two
 AR-based latent log-densities raise `IllegalTypeAnalysisException` inside the
 `accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion — a real

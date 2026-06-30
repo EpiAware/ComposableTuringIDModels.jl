@@ -29,6 +29,7 @@ module EpiAwarePrototype
 # Only the names the prototype itself uses or extends are imported below, which
 # keeps the public surface to the package's own exports.
 
+using Accessors: Accessors
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix
 using Turing: Turing, filldist, arraydist, sample, MCMCSerial
 using CensoredDistributions: double_interval_censored
@@ -76,7 +77,7 @@ export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept, FixedIntercept,
 export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
        CombineLatentModels, ConcatLatentModels, BroadcastLatentModel,
        RepeatEach, RepeatBlock, broadcast_rule, broadcast_n, broadcast_dayofweek,
-       broadcast_weekly, equal_dimensions, arma, arima
+       broadcast_weekly, equal_dimensions, arma, arima, Hierarchy
 
 # --- infection models ---
 export EpiData, DirectInfections, ExpGrowthRate, Renewal,
@@ -143,6 +144,7 @@ include("latent_models/modifiers/PrefixLatentModel.jl")
 include("latent_models/modifiers/RecordExpectedLatent.jl")
 include("latent_models/manipulators/CombineLatentModels.jl")
 include("latent_models/manipulators/ConcatLatentModels.jl")
+include("latent_models/manipulators/Hierarchy.jl")
 include("latent_models/manipulators/broadcast/LatentModel.jl")
 include("latent_models/manipulators/broadcast/rules.jl")
 include("latent_models/manipulators/broadcast/helpers.jl")

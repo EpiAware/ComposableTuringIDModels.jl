@@ -19,7 +19,7 @@
 end
 
 @testitem "latent models and latent manipulators are AbstractLatentModel" begin
-    using EpiAwarePrototype, Distributions
+    using EpiAwarePrototype, Distributions, Accessors
     # Concrete latent models.
     for m in (IID(Normal()), HierarchicalNormal(), RandomWalk(), AR(), MA(),
         Intercept(Normal()), FixedIntercept(0.1), Null())
@@ -37,6 +37,9 @@ end
     @test BroadcastLatentModel(RandomWalk(), 7, RepeatEach()) isa AbstractLatentModel
     @test arma() isa AbstractLatentModel
     @test arima() isa AbstractLatentModel
+    # Hierarchy is a latent process over the grouping dimension.
+    @test Hierarchy(FixedIntercept(0.0), (@optic _.intercept), AR()) isa
+          AbstractLatentModel
 end
 
 @testitem "infection models are AbstractInfectionModel; ODE params are latent" begin
