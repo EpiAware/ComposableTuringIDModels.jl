@@ -177,22 +177,16 @@ summarystats(mc[[:ℓ, :σ, :cluster_factor]])
 ## Recover the latent process
 
 The reproduction number ``R_t = \exp(Z_t)`` is a generated quantity rather than a
-sampled parameter, but because the GP latent is a deterministic function of the
-sampled weights we can reconstruct it directly from the posterior draws of
-``\ell``, ``\sigma`` and ``\beta`` using the same fixed basis. This is the whole
-point of the basis-function form: the posterior over functions is just the
-posterior over a handful of weights, pushed back through ``\Phi``.
+sampled parameter. We do not need to rebuild it by hand from the basis weights:
+the composed model already *returns* `Z_t` (alongside `I_t` and `generated_y_t`),
+so [`Turing.returned`](https://turinglang.org/) re-runs the fitted model over the
+chain and hands back the generated quantities for every posterior draw. This is
+the basis-function form paying off — the posterior over the latent function is
+just the model pushed forward over the posterior over its weights.
 
 ```@example gp
-Φ_post, sqrt_λ_post = EpiAwarePrototype.hsgp_basis(n, gp.m, gp.c)
-ℓ_draws = vec(mc[:ℓ].data)
-σ_draws = vec(mc[:σ].data)
-β_draws = reduce(hcat, [vec(mc[Symbol("β[$j]")].data) for j in 1:gp.m])
-
-Z_draws = map(1:length(ℓ_draws)) do d
-    w = sqrt.(EpiAwarePrototype.se_spectral_density(sqrt_λ_post, σ_draws[d], ℓ_draws[d]))
-    Φ_post * (w .* β_draws[d, :])
-end
+gen = returned(posterior, chain)
+Z_draws = [g.Z_t for g in vec(gen)]
 Z_post_mean = mean(Z_draws)
 
 (correlation = round(cor(Z_post_mean, Z_true), digits = 2),
