@@ -106,6 +106,7 @@ end
     @test implements_latent_interface(RandomWalk())
     @test implements_latent_interface(AR(); n = 12)
     @test implements_latent_interface(HilbertSpaceGP(); n = 25)
+    @test implements_latent_interface(HilbertSpaceGP(; kernel = Matern52Kernel()); n = 25)
     @test implements_infection_interface(DirectInfections(; Z = RandomWalk()))
     @test implements_infection_interface(Renewal(; data = data, rt = RandomWalk()); n = 20)
     @test implements_observation_interface(PoissonError())

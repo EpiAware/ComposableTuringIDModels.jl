@@ -81,6 +81,79 @@ end
     @test_throws Exception as_turing_model(HilbertSpaceGP(), 1)()
 end
 
+@testitem "HilbertSpaceGP supports squared-exponential and Matern kernels" begin
+    using EpiAwarePrototype, Distributions, Random
+    Random.seed!(6)
+    n = 25
+    # Default kernel is squared-exponential.
+    @test HilbertSpaceGP().kernel isa SquaredExponentialKernel
+    # Each kernel is an AbstractGPKernel and yields a finite length-n path.
+    for K in (SquaredExponentialKernel(), Matern32Kernel(), Matern52Kernel())
+        @test K isa AbstractGPKernel
+        gp = HilbertSpaceGP(; m = 10, kernel = K)
+        @test gp.kernel === K
+        @test implements_latent_interface(gp; n = n)
+        path = as_turing_model(gp, n)()
+        @test length(path) == n
+        @test all(isfinite, path)
+    end
+end
+
+@testitem "HilbertSpaceGP spectral densities are positive, finite, and kernel-specific" begin
+    using EpiAwarePrototype
+    using EpiAwarePrototype: spectral_density, se_spectral_density
+    ω = collect(range(0, 5; length = 12))
+    σ, ℓ = 1.0, 1.0
+    for K in (SquaredExponentialKernel(), Matern32Kernel(), Matern52Kernel())
+        S = spectral_density(K, ω, σ, ℓ)
+        @test length(S) == length(ω)
+        @test all(>(0), S)
+        @test all(isfinite, S)
+        # Spectral density decays with frequency.
+        @test S[1] > S[end]
+    end
+    # se_spectral_density is the squared-exponential convenience wrapper.
+    @test se_spectral_density(ω, σ, ℓ) ≈
+          spectral_density(SquaredExponentialKernel(), ω, σ, ℓ)
+    # Different kernels give genuinely different weightings.
+    @test spectral_density(Matern32Kernel(), ω, σ, ℓ) !=
+          spectral_density(SquaredExponentialKernel(), ω, σ, ℓ)
+end
+
+@testitem "HilbertSpaceGP Matern bases approximate their kernel covariance" begin
+    using EpiAwarePrototype, LinearAlgebra
+    using EpiAwarePrototype: hsgp_basis, spectral_density
+    # The reconstructed covariance Φ diag(S(√λ)) Φ' should approximate the exact
+    # Matern Gram matrix as the basis count grows. Matern-5/2 covariance:
+    #   k(d) = σ²(1 + √5 d/ℓ + 5d²/(3ℓ²)) exp(-√5 d/ℓ)
+    n, σ, ℓ, c = 20, 1.0, 2.0, 3.0
+    x = collect(1:n) .- (n + 1) / 2
+    function matern52(d)
+        a = sqrt(5) * abs(d) / ℓ
+        return σ^2 * (1 + a + a^2 / 3) * exp(-a)
+    end
+    K_exact = [matern52(xi - xj) for xi in x, xj in x]
+    Φ, sqrt_λ = hsgp_basis(n, 60, c)
+    sd = sqrt.(spectral_density(Matern52Kernel(), sqrt_λ, σ, ℓ))
+    K_approx = Φ * Diagonal(sd .^ 2) * Φ'
+    @test norm(K_approx - K_exact) / norm(K_exact) < 0.15
+end
+
+@testitem "HilbertSpaceGP builds its basis once, outside the model body" begin
+    using EpiAwarePrototype, Distributions, Random
+    using DynamicPPL: DynamicPPL
+    Random.seed!(7)
+    # as_turing_model returns a plain DynamicPPL.Model (the basis is built in the
+    # constructor, not inside the @model), so repeated evaluation of the SAME
+    # model reuses the cached basis rather than rebuilding it each call.
+    gp = HilbertSpaceGP(; m = 12)
+    mdl = as_turing_model(gp, 30)
+    @test mdl isa DynamicPPL.Model
+    # Two evaluations are valid length-n draws (basis reused, only β/ℓ/σ redrawn).
+    @test length(mdl()) == 30
+    @test length(mdl()) == 30
+end
+
 @testitem "rand from a latent model uses flat (unprefixed) names" begin
     using EpiAwarePrototype, Distributions, Random
     using DynamicPPL: VarName

@@ -71,6 +71,7 @@ export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial
 # --- latent models ---
 export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept, FixedIntercept,
        Null, DiffLatentModel, HilbertSpaceGP
+export AbstractGPKernel, SquaredExponentialKernel, Matern32Kernel, Matern52Kernel
 
 # --- latent modifiers / manipulators / combinations / broadcasting ---
 export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,

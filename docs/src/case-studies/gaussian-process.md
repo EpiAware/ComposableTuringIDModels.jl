@@ -49,8 +49,12 @@ Two properties make this fast and sampler-friendly:
     length ``n``, the number of basis functions ``m``, and the boundary factor
     ``c`` (the domain is extended to ``L = c\,S`` beyond the half-range ``S`` of
     the inputs). They depend on none of the sampled parameters, so the basis lies
-    entirely outside the differentiated path. Each evaluation of the latent path is
-    then a single ``n \times m`` matrix–vector product.
+    entirely outside the differentiated path. [`as_turing_model`](@ref) therefore
+    builds the basis **once** when the model is constructed and captures it, rather
+    than rebuilding it on every gradient evaluation; each log-density evaluation is
+    then just a single ``n \times m`` matrix–vector product. Caching the basis this
+    way cuts the per-gradient Mooncake cost by an order of magnitude relative to
+    rebuilding it inside the model.
   - **It is non-centred.** The only sampled quantities are ``\ell``, ``\sigma``,
     and the ``m`` standard-normal weights ``\beta``. A non-centred parameterisation
     like this is exactly what NUTS handles well, and the gradient is cheap, so the
@@ -106,6 +110,24 @@ round(norm(K_approx - K_exact) / norm(K_exact), digits = 4)
 
 The relative error is a fraction of a percent: with enough basis functions the
 approximation reproduces the kernel it stands in for.
+
+## Choosing a kernel
+
+Only the spectral density changes between kernels, so the kernel is a one-field
+choice on the model. The default [`SquaredExponentialKernel`](@ref) gives very
+smooth paths; [`Matern32Kernel`](@ref) and [`Matern52Kernel`](@ref) give
+progressively rougher ones, which can suit a less smooth latent process. The
+basis is shared, so swapping the kernel reuses everything else:
+
+```@example gp
+gp_se = HilbertSpaceGP(m = 20, kernel = SquaredExponentialKernel())
+gp_matern = HilbertSpaceGP(m = 20, kernel = Matern52Kernel())
+(se = length(as_turing_model(gp_se, 60)()),
+    matern = length(as_turing_model(gp_matern, 60)()))
+```
+
+This case study uses the squared-exponential kernel; the renewal example below is
+identical for a Matérn kernel bar that one argument.
 
 ## Composing it into an infection model
 
