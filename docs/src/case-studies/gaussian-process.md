@@ -165,13 +165,19 @@ nothing # hide
 
 The sampled parameters are the GP hyperparameters — the length scale ``\ell`` and
 marginal standard deviation ``\sigma`` — the ``m`` basis weights ``\beta``, and
-the observation cluster factor. The hyperparameters and the cluster factor are
-identified from the single simulated series:
+the observation cluster factor. `sample` returns a
+[FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which we index
+by variable name directly — no conversion step. The hyperparameters and the
+cluster factor are identified from the single simulated series:
 
 ```@example gp
-using MCMCChains, Statistics
-mc = MCMCChains.Chains(chain)
-summarystats(mc[[:ℓ, :σ, :cluster_factor]])
+using Statistics
+ℓ_draws = vec(chain[@varname(ℓ)])
+σ_draws = vec(chain[@varname(σ)])
+cluster_draws = vec(chain[@varname(cluster_factor)])
+(ℓ = round(mean(ℓ_draws), digits = 2),
+    σ = round(mean(σ_draws), digits = 2),
+    cluster_factor = round(mean(cluster_draws), digits = 2))
 ```
 
 ## Recover the latent process
