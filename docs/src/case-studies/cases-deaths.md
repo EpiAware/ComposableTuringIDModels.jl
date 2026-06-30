@@ -6,9 +6,10 @@ hospital admissions, deaths. Each stream reports a different *fraction* of
 infections, after a different *delay*, with a different *noise* characteristic —
 cases are plentiful but ascertainment-dependent, deaths are rarer and lag much
 further behind but are comparatively reliably recorded. Estimating the
-reproduction number from both streams jointly uses more of the available signal
-and stabilises the estimate when any one stream is sparse or biased, an idea
-central to multi-stream real-time estimation [abbott2020estimating](@citep).
+reproduction number from several streams together uses more of the available
+signal and guards against the biases of any single stream — different surveillance
+streams can imply materially different reproduction numbers, so reconciling them
+is part of the modelling task [sherratt2021exploring](@citep).
 
 This case study fits one [`Renewal`](@ref) infection process to **two**
 observation streams at once. Both streams watch the *same* latent infections
@@ -98,8 +99,12 @@ cases_obs = LatentDelay(
         NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
         FixedIntercept(log(0.6)); latent_prefix = ""),
     LogNormal(1.6, 0.5))
-nothing # hide
 ```
+
+Every component has a `show` method, so the constructed object prints its
+structure: the outer [`LatentDelay`](@ref) tree, the wrapped
+[`Ascertainment`](@ref)/[`NegativeBinomialError`](@ref) it carries, and the
+discretised delay kernel (`rev_pmf`) that the convolution will use.
 
 ### Deaths
 
@@ -115,8 +120,10 @@ deaths_obs = LatentDelay(
         NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
         FixedIntercept(log(0.015)); latent_prefix = ""),
     LogNormal(2.8, 0.4))
-nothing # hide
 ```
+
+The same tree prints for the death stream — note its longer, more spread-out
+delay kernel and the smaller fixed ascertainment intercept (``\log 0.015``).
 
 Fixing the two ascertainment fractions rather than inferring them is a deliberate
 identifiability choice. A single shared infection trajectory observed through two
@@ -136,8 +143,10 @@ series out.
 
 ```@example casesdeaths
 stacked = StackObservationModels((cases = cases_obs, deaths = deaths_obs))
-nothing # hide
 ```
+
+The printed `model_names` (`["cases", "deaths"]`) are the keys that prefix each
+stream's parameters and key its data.
 
 [`EpiAwareModel`](@ref) then assembles the whole model from exactly two parts, as
 in every other case study — the infection process and *an* observation model. The
@@ -146,7 +155,6 @@ one; the composition does not change.
 
 ```@example casesdeaths
 model = EpiAwareModel(renewal, stacked)
-nothing # hide
 ```
 
 ## Simulate
@@ -266,27 +274,35 @@ length(rand(as_turing_model(three_model,
         deaths = fill(missing, n)), n)))
 ```
 
-## A sequential alternative
+## Parallel versus sequential composition
 
-[`StackObservationModels`](@ref) is **parallel**: every stream observes the same
-expected-infection series independently. That suits cases and deaths when both are
-read as fractions of *infections*. A different, equally common assumption is
-**sequential** structure, where one stream arises *downstream of* another — for
-example deaths modelled as a delayed fraction of *reported cases* rather than of
-infections, so that whatever is reflected in the case series (a reporting
-artefact, an ascertainment dip) propagates into the death series.
+[`StackObservationModels`](@ref) composes streams **in parallel**: every stream
+observes the same expected-infection series independently, and the streams never
+interact. That is the right structure for cases and deaths when both are read as
+fractions of *infections*, which is the model fitted above.
 
-Expressing that needs a stream's *expected output* to feed the next stream's
-*expected input*, which is not what the parallel stack does: the stack broadcasts
-one shared expected series to all streams and never threads one stream's
-expectation into another. Building it would mean a new ordered-observation
-construct (an observation model that consumes another stream's expected series as
-its own latent input), which is more than a small adapter over the existing
-parts. Rather than invent that abstraction inside a case study, we demonstrate the
-parallel stack fully here and have filed a follow-up issue
-([#51](https://github.com/EpiAware/EpiAwarePrototype.jl/issues/51)) describing the
-missing sequential construct; the parallel model above already covers the common
-cases-and-deaths-from-infections setting.
+A different, equally common assumption is **sequential** structure, where one
+stream arises *downstream of* another — for example deaths modelled as a delayed
+fraction of *reported cases* rather than of infections, so that whatever is
+reflected in the case series (a reporting artefact, an ascertainment dip)
+propagates into the death series. Expressing that needs a stream's *expected
+output* to feed the next stream's *expected input*, which the parallel stack does
+not do — it broadcasts one shared expected series to all streams and never threads
+one stream's expectation into another.
+
+That ordered cascade is a genuinely different construct rather than a parameter of
+the stack, so the two are provided as a matched pair: the parallel
+[`StackObservationModels`](@ref) demonstrated here, and a sequential
+`SequentialObservationModels` (the cascade `infections → stream 1 → stream 2 → …`)
+added separately in
+[#58](https://github.com/EpiAware/EpiAwarePrototype.jl/pull/58), which resolves the
+follow-up issue [#51](https://github.com/EpiAware/EpiAwarePrototype.jl/issues/51)
+this page originally filed. Both share the per-stream pipelines built above — each
+stream is the same delay/ascertainment/error object either way; only how the
+streams are wired to the shared infection signal differs. The parallel model here
+covers the common cases-and-deaths-from-infections setting; reach for the
+sequential construct when a downstream stream should inherit an upstream stream's
+reporting structure.
 
 ## References
 
