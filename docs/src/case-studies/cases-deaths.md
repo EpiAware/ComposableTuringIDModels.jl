@@ -212,30 +212,40 @@ chain = sample(
 nothing # hide
 ```
 
-The stack prefixes each stream's own parameters with the stream name, so the two
-overdispersions arrive as `cases.cluster_factor` and `deaths.cluster_factor` and
-stay distinct. The shared infection parameters — the autoregressive damping
-``\rho`` (`damp_AR[1]`), the innovation scale ``\sigma`` (`std`), and the initial
-infections (`init_incidence`) — keep their flat names, because they belong to the
-single shared infection process rather than to either stream:
+`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
+chain, which we index by variable name directly — no conversion step. The stack
+prefixes each stream's own parameters with the stream name, so the two
+overdispersions are reached as `@varname(cases.cluster_factor)` and
+`@varname(deaths.cluster_factor)` and stay distinct. The shared infection
+parameters — the autoregressive damping ``\rho`` (`damp_AR[1]`), the innovation
+scale ``\sigma`` (`std`), and the initial infections (`init_incidence`) — keep
+their flat names, because they belong to the single shared infection process
+rather than to either stream:
 
 ```@example casesdeaths
-using MCMCChains, Statistics
-mc = MCMCChains.Chains(chain)
-summarystats(mc[[
-    Symbol("damp_AR[1]"), :std, :init_incidence,
-    Symbol("cases.cluster_factor"), Symbol("deaths.cluster_factor")]])
+using Turing: @varname
+using Statistics
+
+posterior_draws(vn) = vec(chain[vn])
+posterior_summary(vn) = (mean = mean(posterior_draws(vn)),
+    std = std(posterior_draws(vn)))
+
+(init_incidence = posterior_summary(@varname(init_incidence)),
+    damp = posterior_summary(@varname(damp_AR[1])),
+    sigma = posterior_summary(@varname(std)),
+    cases_cluster = posterior_summary(@varname(cases.cluster_factor)),
+    deaths_cluster = posterior_summary(@varname(deaths.cluster_factor)))
 ```
 
 The shared parameters are recovered from the two streams jointly: `init_incidence`
 sits close to its simulated ``\log 1000 \approx 6.9``, and the damping and
 innovation scale match the priors that generated the data. The two cluster factors
 are estimated *separately* and tell the two-stream story directly — the
-case-stream overdispersion is pinned down tightly by thousands of counts, while
-the death-stream overdispersion has a visibly wider posterior because the sparse
-death counts carry less information. This is the payoff of the stack: each stream
-contributes what it can to the shared infection process while keeping its own
-noise model.
+case-stream overdispersion is pinned down tightly by thousands of counts (a small
+posterior `std`), while the death-stream overdispersion has a visibly wider
+posterior because the sparse death counts carry less information. This is the
+payoff of the stack: each stream contributes what it can to the shared infection
+process while keeping its own noise model.
 
 The reproduction number ``R_t = \exp(Z_t)`` remains a *generated quantity* of the
 shared infection process, exactly as in the single-stream case.
