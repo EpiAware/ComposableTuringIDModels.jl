@@ -1,0 +1,43 @@
+# MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
+name: "Try this PR!"
+
+on:
+  pull_request_target:
+    types: [opened]
+
+jobs:
+  write-comment:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `
+              ## Try this Pull Request!
+
+              ### Option 1: Julia Package Manager
+              Open Julia and type:
+              \`\`\`julia
+              import Pkg
+              Pkg.activate(temp=true)
+              Pkg.add(url="https://github.com/EpiAware/EpiAwarePrototype.jl", rev="${context.payload.pull_request.head.ref}")
+              using EpiAwarePrototype
+              \`\`\`
+
+              ### Option 2: Local Checkout
+              If you have the repo locally:
+              \`\`\`bash
+              git checkout ${context.payload.pull_request.head.ref}
+              julia --project=. -e "using Pkg; Pkg.instantiate()"
+              \`\`\`
+              `
+            })
