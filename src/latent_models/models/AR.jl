@@ -1,4 +1,5 @@
-# Autoregressive (AR) latent process model (and its accumulation step).
+# Autoregressive (AR) latent process model. Its accumulation step (`ARStep`)
+# lives in `src/steps/`.
 
 @doc raw"
 An autoregressive AR(`p`) latent process.
@@ -61,16 +62,4 @@ end
     ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n - p), false)
     ar = accumulate_scan(ARStep(damp_AR), ar_init, ϵ_t)
     return ar
-end
-
-@doc raw"
-Autoregressive step for use with [`accumulate_scan`](@ref).
-"
-struct ARStep{D <: AbstractVector{<:Real}} <: AbstractAccumulationStep
-    damp_AR::D
-end
-
-function (ar::ARStep)(state, ϵ)
-    new_val = dot(ar.damp_AR, state) + ϵ
-    return vcat(state[2:end], new_val)
 end

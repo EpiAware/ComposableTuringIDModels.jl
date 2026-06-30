@@ -105,11 +105,22 @@ export EpiProblem, EpiMethod, NUTSampler, ManyPathfinder, DirectSample,
 include("base/base.jl")
 include("base/roles.jl")
 include("base/interfaces.jl")
-include("base/accumulation.jl")
 include("base/prettyprinting.jl")
 
+# --- accumulation steps ---
+# The backend-agnostic `accumulate_scan` machinery and the concrete step structs
+# it scans over, regrouped from `base/`, `utils/`, and the individual model
+# files into one location (see issue #48, Phase 1). Included early so every step
+# type is defined before the model components that construct them.
+include("steps/AbstractAccumulationStep.jl")
+include("steps/accumulate_scan.jl")
+include("steps/RWStep.jl")
+include("steps/ARStep.jl")
+include("steps/MAStep.jl")
+include("steps/LDStep.jl")
+include("steps/RenewalSteps.jl")
+
 # --- utilities and distributions ---
-include("utils/accumulate_scan.jl")
 include("utils/HalfNormal.jl")
 include("utils/SafeInt.jl")
 include("utils/SafePoisson.jl")
@@ -142,7 +153,6 @@ include("latent_models/combinations/arima.jl")
 include("infection_models/EpiData.jl")
 include("infection_models/DirectInfections.jl")
 include("infection_models/ExpGrowthRate.jl")
-include("infection_models/RenewalSteps.jl")
 include("infection_models/Renewal.jl")
 # `utils.jl` defines the `R_to_r(::Renewal)` method, so it follows `Renewal`.
 include("infection_models/utils.jl")
