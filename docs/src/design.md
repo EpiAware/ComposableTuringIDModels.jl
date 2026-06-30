@@ -77,13 +77,17 @@ nothing # hide
 ## Inference
 
 A composed model is an ordinary Turing model. Pass observed data instead of
-`missing` to condition it, then sample:
+`missing` to condition it, then sample. We set the automatic-differentiation
+backend explicitly with `NUTS(; adtype = ...)`:
+[Mooncake](https://chalk-lab.github.io/Mooncake.jl/) is the recommended default
+for this package (see [Automatic differentiation backend](@ref ad-backend)).
 
 ```julia
-using Turing
-y = rand(as_turing_model(poisson_model, missing, 30)).generated_y_t
+using Turing, Mooncake
+using ADTypes: AutoMooncake
+y = as_turing_model(poisson_model, fill(missing, 30), 30)().generated_y_t
 posterior = as_turing_model(poisson_model, y, 30)
-chain = sample(posterior, NUTS(), 1_000)
+chain = sample(posterior, NUTS(; adtype = AutoMooncake(; config = nothing)), 1_000)
 ```
 
 The standard Turing tools — `rand` for prior draws, `fix` to pin parameters,

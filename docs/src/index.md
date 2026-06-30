@@ -42,6 +42,28 @@ See [Composable design](@ref) for how the pieces fit together, the
 [case studies](@ref case-studies-overview) for worked end-to-end examples, and the
 [Public API](@ref public-api) for the full surface.
 
+## [Automatic differentiation backend](@id ad-backend)
+
+Hamiltonian samplers such as NUTS need gradients of the log density, computed by
+automatic differentiation (AD). The recommended default for this package is
+[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), a reverse-mode backend that
+handles the `DynamicPPL` `@model` + `to_submodel` composition used throughout
+well. Select it by passing an `adtype` to the sampler:
+
+```julia
+using Turing, Mooncake
+using ADTypes: AutoMooncake
+chain = sample(model, NUTS(; adtype = AutoMooncake(; config = nothing)), 1_000)
+```
+
+The examples in [Composable design](@ref) and the renewal/delay
+[case studies](@ref case-studies-overview) all use Mooncake. Other backends —
+`ForwardDiff`, `ReverseDiff`, and `Enzyme` — are supported and exercised by the
+package's AD test suite; swap them in with `AutoForwardDiff()`, `AutoReverseDiff()`,
+or `AutoEnzyme()`. ForwardDiff is the right choice for the ODE models in the
+[SIR case study](@ref case-study-sir): Mooncake-driven NUTS through an ODE solver
+is not available yet (see that page).
+
 ## Adapted from
 
 The modelling code in this package is **ported and adapted** from the

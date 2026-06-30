@@ -41,6 +41,7 @@ in a plausible range for influenza and bounded away from the ``\gamma \to 0``
 
 ```@example sir
 using EpiAwarePrototype, Distributions, Random, Turing, LogExpFunctions
+using ADTypes: AutoForwardDiff
 Random.seed!(1978)
 
 N = 763          # children in the school
@@ -95,8 +96,13 @@ nothing # hide
 ## Simulate and fit
 
 Simulating from the prior produces an outbreak curve; fitting recovers the SIR
-parameters. Differentiating through the ODE solution works with the default
-(forward-mode) autodiff for a system this small.
+parameters. This page differentiates with **ForwardDiff**, not the package's
+recommended [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) default: reverse-mode
+(Mooncake-driven) NUTS through the ODE solver is not available yet — a pre-existing
+Turing + Mooncake + `SciMLSensitivity` integration gap that affects every ODE
+infection model (tracked in
+[issue #46](https://github.com/EpiAware/EpiAwarePrototype.jl/issues/46)).
+Forward-mode autodiff is a good fit here anyway, for a system this small.
 
 ```@example sir
 sim = as_turing_model(model, fill(missing, n_days + 1), n_days + 1)()
@@ -105,7 +111,9 @@ y_obs
 ```
 
 ```@example sir
-chain = sample(as_turing_model(model, y_obs, n_days + 1), NUTS(), 100; progress = false)
+chain = sample(
+    as_turing_model(model, y_obs, n_days + 1),
+    NUTS(; adtype = AutoForwardDiff()), 100; progress = false)
 nothing # hide
 ```
 
@@ -171,7 +179,7 @@ sampler stable through the ODE solve.
 ```@example sir
 stochastic_chain = sample(
     as_turing_model(stochastic_model, y_obs, n_days + 1),
-    NUTS(0.9), 100; progress = false)
+    NUTS(0.9; adtype = AutoForwardDiff()), 100; progress = false)
 nothing # hide
 ```
 
