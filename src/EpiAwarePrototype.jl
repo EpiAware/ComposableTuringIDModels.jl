@@ -91,8 +91,9 @@ export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDe
 
 # --- observation modifiers / manipulators ---
 export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
-       ReportingCDF, ReportTriangle, ReportingTriangle, PrefixObservationModel,
-       RecordExpectedObs, TransformObservationModel, StackObservationModels
+       ReportingCDF, ReportTriangle, ReportingTriangle, ReportingPMF,
+       PrefixObservationModel, RecordExpectedObs, TransformObservationModel,
+       StackObservationModels
 
 # --- composition ---
 export EpiAwareModel

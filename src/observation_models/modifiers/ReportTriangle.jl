@@ -59,37 +59,101 @@ function _triangle_mask(n::Int, Dmax::Int, now::Int)
 end
 
 @doc raw"
+A composable reporting-delay PMF component: a `Distribution` (or a precomputed
+vector) turned into the reporting-delay PMF `p` (delays `0 … Dmax`), for use as
+the delay submodel of [`ReportTriangle`](@ref).
+
+Sampling `as_turing_model(c::ReportingPMF, n)` returns the length-`(Dmax + 1)` PMF
+(the argument `n` is the role-interface series length and is ignored — the PMF is
+indexed by delay, not reference day). The PMF is non-negative and sums to one;
+`Dmax = length(pmf) - 1`.
+
+It is the **fixed-delay** default used by [`ReportTriangle`](@ref): the PMF is
+precomputed once and held constant. Because the delay is supplied to
+`ReportTriangle` as a submodel — mirroring how [`RightTruncate`](@ref) takes a
+[`ReportingCDF`](@ref) — a user can instead pass any latent component producing the
+delay PMF, the seam an estimated / time-varying delay grows from.
+
+## Constructors
+
+  - `ReportingPMF(distribution; D, Δd)` — discretise a continuous reporting-delay
+    distribution via double-interval censoring (CensoredDistributions.jl), exactly
+    the released-CD path [`LatentDelay`](@ref) / [`EpiData`](@ref) use.
+  - `ReportingPMF(pmf)` — from a precomputed delay PMF (non-negative, sums to 1).
+
+# Examples
+```@example ReportingPMF
+using EpiAwarePrototype, Distributions
+c = ReportingPMF(truncated(Normal(2.0, 1.0), 0.0, Inf))
+as_turing_model(c, 10)()
+```
+
+## Fields
+
+  - `pmf`: the reporting-delay PMF `p` (delays `0 … Dmax`, non-negative, sums to
+    1); `Dmax = length(pmf) - 1`.
+"
+struct ReportingPMF{T <: AbstractVector{<:Real}} <: AbstractLatentModel
+    "The reporting-delay PMF (delays `0 … Dmax`)."
+    pmf::T
+
+    function ReportingPMF(pmf::T) where {T <: AbstractVector{<:Real}}
+        @assert all(>=(0), pmf) "Delay PMF must be non-negative"
+        @assert isapprox(sum(pmf), 1) "Delay PMF must sum to 1"
+        return new{T}(pmf)
+    end
+end
+
+function ReportingPMF(distribution::C; D = nothing, Δd = 1.0) where {
+        C <: ContinuousDistribution}
+    return ReportingPMF(_discretised_pmf(distribution; Δd = Δd, D = D))
+end
+
+# The maximum reporting delay carried by the PMF component (delays `0 … Dmax`).
+_pmf_Dmax(c::ReportingPMF) = length(c.pmf) - 1
+
+@model function as_turing_model(c::ReportingPMF, n)
+    return c.pmf
+end
+
+@doc raw"
 A **2D reporting-triangle** observation model (epinowcast-style nowcasting), the
 *joint* counterpart to the [`RightTruncate`](@ref) marginal.
 
 `ReportTriangle` consumes the expected eventual totals `Y_t = μ_t` (per reference
-day, the same quantity the infection pipeline produces) together with a fixed
-reporting-delay PMF `p`, expands them to per-cell expected means
-`μ_{t,d} = μ_t · p[d + 1]`, and scores **only the observed cells** of a
-[`ReportingTriangle`](@ref) (`t + d ≤ now`) under a per-cell count error model.
-The not-yet-reported cells are never sampled. Because the model's `Y_t` stays the
-eventual total, the nowcast of the eventual total is just `Y_t` read out as a
-generated quantity (and the completed triangle is `μ_{t,d}` over *all* `d`).
+day, the same quantity the infection pipeline produces) together with a
+reporting-delay PMF `p` drawn from a **submodel**, expands them to per-cell
+expected means `μ_{t,d} = μ_t · p[d + 1]`, and scores **only the observed cells**
+of a [`ReportingTriangle`](@ref) (`t + d ≤ now`) under a per-cell count error
+model. The not-yet-reported cells are never sampled. Because the model's `Y_t`
+stays the eventual total, the nowcast of the eventual total is just `Y_t` read out
+as a generated quantity (and the completed triangle is `μ_{t,d}` over *all* `d`).
 
-This is the **fixed-delay, independent-cell** variant: the delay PMF is
-precomputed once and held constant, and each observed cell is an independent
-Poisson / negative-binomial draw about its mean (the per-cell
-[`AbstractObservationErrorModel`](@ref) supplied as `error_model`). An estimated
-/ time-varying delay and the multinomial-split parameterisation are planned
-follow-ups (a later phase of the nowcasting design).
+The delay PMF is supplied as a **composable submodel** `delay_model` — mirroring
+how [`RightTruncate`](@ref) takes a [`ReportingCDF`](@ref) — sampled with
+`to_submodel(..., false)` inside the model. The default [`ReportingPMF`](@ref)
+wraps a fixed PMF (the fixed-delay, independent-cell variant: each observed cell is
+an independent Poisson / negative-binomial draw about its mean, via the per-cell
+[`AbstractObservationErrorModel`](@ref) supplied as `error_model`). Because the
+delay is a submodel, an estimated / time-varying delay — and the multinomial-split
+parameterisation — are the seams this grows from (a later phase of the nowcasting
+design).
 
-The PMF is built with the same released-CD `double_interval_censored` + `pdf`
-discretisation path that [`LatentDelay`](@ref) / [`EpiData`](@ref) use, so the
-triangle's per-cell means and the right-truncation nowcast share one delay
+The default PMF is built with the same released-CD `double_interval_censored` +
+`pdf` discretisation path that [`LatentDelay`](@ref) / [`EpiData`](@ref) use, so
+the triangle's per-cell means and the right-truncation nowcast share one delay
 kernel.
 
 ## Constructors
 
-  - `ReportTriangle(error_model, pmf)` — from a delay PMF (non-negative, sums to
-    1); `Dmax = length(pmf) - 1`.
+  - `ReportTriangle(error_model, delay_model)` — from a delay submodel producing
+    the PMF (e.g. a [`ReportingPMF`](@ref)); `Dmax` is read from it.
+  - `ReportTriangle(error_model, pmf::AbstractVector)` — wrap a precomputed delay
+    PMF (non-negative, sums to 1) in the default [`ReportingPMF`](@ref).
   - `ReportTriangle(error_model, distribution; D, Δd)` — discretise a continuous
     reporting-delay distribution via double-interval censoring
-    (CensoredDistributions.jl), exactly as [`LatentDelay`](@ref).
+    (CensoredDistributions.jl) into a [`ReportingPMF`](@ref), exactly as
+    [`LatentDelay`](@ref).
 
 ## The `y_t` data contract
 
@@ -108,9 +172,9 @@ triangle (`now = n + Dmax`) of `missing` cells and fills them predictively.
 
   - `error_model`: the per-cell count-error model (e.g. [`PoissonError`](@ref),
     [`NegativeBinomialError`](@ref)).
-  - `pmf`: the reporting-delay PMF `p` (delays `0 … Dmax`, non-negative, sums to
-    1); cell `(t, d)` has expected mean `Y_t[t] · pmf[d + 1]` and
-    `Dmax = length(pmf) - 1`.
+  - `delay_model`: the delay submodel producing the reporting-delay PMF `p`
+    (delays `0 … Dmax`); cell `(t, d)` has expected mean `Y_t[t] · p[d + 1]`. The
+    default [`ReportingPMF`](@ref) holds a fixed PMF.
 
 # Examples
 ```@example ReportTriangle
@@ -121,31 +185,30 @@ sim = as_turing_model(obs, missing, fill(50.0, 15))()
 sim.observed
 ```
 "
-struct ReportTriangle{E <: AbstractObservationErrorModel, T <: AbstractVector{<:Real}} <:
-       AbstractObservationModel
+@kwdef struct ReportTriangle{E <: AbstractObservationErrorModel,
+    D <: AbstractLatentModel} <: AbstractObservationModel
     "The per-cell count-error model."
     error_model::E
-    "The reporting-delay PMF (delays `0 … Dmax`)."
-    pmf::T
+    "The delay submodel producing the reporting-delay PMF (delays `0 … Dmax`)."
+    delay_model::D
+end
 
-    function ReportTriangle(error_model::E,
-            pmf::T) where {
-            E <: AbstractObservationErrorModel, T <: AbstractVector{<:Real}}
-        @assert all(>=(0), pmf) "Delay PMF must be non-negative"
-        @assert isapprox(sum(pmf), 1) "Delay PMF must sum to 1"
-        return new{E, T}(error_model, pmf)
-    end
+function ReportTriangle(error_model::E,
+        pmf::T) where {
+        E <: AbstractObservationErrorModel, T <: AbstractVector{<:Real}}
+    return ReportTriangle(error_model, ReportingPMF(pmf))
 end
 
 function ReportTriangle(error_model::E, distribution::C; D = nothing,
         Δd = 1.0) where {
         E <: AbstractObservationErrorModel, C <: ContinuousDistribution}
-    pmf = _discretised_pmf(distribution; Δd = Δd, D = D)
-    return ReportTriangle(error_model, pmf)
+    return ReportTriangle(error_model, ReportingPMF(distribution; D = D, Δd = Δd))
 end
 
-# The maximum reporting delay carried by the model (delays `0 … Dmax`).
-_triangle_Dmax(o::ReportTriangle) = length(o.pmf) - 1
+# The maximum reporting delay carried by the model (delays `0 … Dmax`). Read
+# statically from the delay submodel so `define_y_t` can size the triangle before
+# the PMF is sampled.
+_triangle_Dmax(o::ReportTriangle) = _pmf_Dmax(o.delay_model)
 
 @doc raw"
 Build the [`ReportingTriangle`](@ref) data a [`ReportTriangle`](@ref) scores.
@@ -231,6 +294,12 @@ function define_y_t(obs_model::ReportTriangle, reports, Y_t; now::Int,
 end
 
 @model function as_turing_model(obs_model::ReportTriangle, y_t, Y_t)
+    n = length(Y_t)
+
+    # Draw the reporting-delay PMF from the delay submodel (the default
+    # `ReportingPMF` returns a fixed PMF; a richer component could sample it).
+    pmf ~ to_submodel(as_turing_model(obs_model.delay_model, n), false)
+
     # Per-cell error priors (e.g. the NegBin cluster factor) are shared across all
     # observed cells, sampled once from the inner error family.
     priors ~ to_submodel(
@@ -244,11 +313,9 @@ end
     tri = define_y_t(obs_model, y_t, Y_t)
     observed = tri.observed
     Dmax = tri.Dmax
-    n = length(Y_t)
     @assert size(observed, 1)==n "The triangle has $(size(observed, 1)) reference days; Y_t has $n"
     y_t = tri.counts
 
-    pmf = obs_model.pmf
     for t in 1:n, d in 0:Dmax
 
         observed[t, d + 1] || continue

@@ -8,10 +8,12 @@ correction submodel of [`RightTruncate`](@ref).
 
 Given a series length `n`, sampling `as_turing_model(c::ReportingCDF, n)` returns a
 length-`n` vector `F` where `F[a + 1]` is the fraction of a reference day's
-eventual total reported within `a` days (`a = 0, 1, …, n - 1`); `F` is
-non-decreasing and in `[0, 1]`. Reference days older than the reporting delay's
-support are fully reported (`F = 1`), so the vector is padded with ones to length
-`n`.
+eventual total reported within `a` days (`a = 0, 1, …, n - 1`), in `[0, 1]`.
+Reference days older than the reporting delay's support are fully reported
+(`F = 1`), so the vector is padded with ones to length `n`. The CDF built from a
+delay distribution is non-decreasing, but `ReportingCDF` does **not** require
+monotonicity — a precomputed curve may be non-monotonic, so an over-/under-reporting
+correction that recovers can be expressed.
 
 It is the **fixed-delay** default used by [`RightTruncate`](@ref): the completeness
 is precomputed once and held constant. Because the correction is supplied to
@@ -25,8 +27,8 @@ a non-monotonic correction — without changing `RightTruncate`.
     distribution via double-interval censoring (CensoredDistributions.jl) and take
     the cumulative sum of the resulting PMF, exactly the released-CD path
     [`LatentDelay`](@ref) / [`EpiData`](@ref) use.
-  - `ReportingCDF(cdf)` — from a precomputed completeness vector by age
-    (non-decreasing, in `[0, 1]`).
+  - `ReportingCDF(cdf)` — from a precomputed completeness vector by age (in
+    `[0, 1]`; need not be monotonic).
 
 # Examples
 ```@example ReportingCDF
@@ -37,17 +39,20 @@ as_turing_model(c, 10)()
 
 ## Fields
 
-  - `cdf`: the reporting-completeness CDF by age (`cdf[a + 1]`); non-decreasing, in
-    `[0, 1]`. Padded with ones up to the requested length when shorter.
+  - `cdf`: the reporting-completeness curve by age (`cdf[a + 1]`), in `[0, 1]`
+    (need not be monotonic). Padded with ones up to the requested length when
+    shorter.
 "
 struct ReportingCDF{T <: AbstractVector{<:Real}} <: AbstractLatentModel
     "The reporting-completeness CDF by age."
     cdf::T
 
     function ReportingCDF(cdf::T) where {T <: AbstractVector{<:Real}}
-        @assert all(>=(0), cdf) "The reporting CDF must be non-negative"
-        @assert all(<=(1 + 1e-8), cdf) "The reporting CDF must not exceed 1"
-        @assert issorted(cdf) "The reporting CDF must be non-decreasing"
+        @assert all(>=(0), cdf) "The reporting completeness must be non-negative"
+        @assert all(<=(1 + 1e-8), cdf) "The reporting completeness must not exceed 1"
+        # No monotonicity check: a reporting-delay CDF is non-decreasing, but the
+        # correction is deliberately a free completeness curve so a user can supply
+        # a non-monotonic correction (e.g. over-/under-reporting that recovers).
         return new{T}(cdf)
     end
 end

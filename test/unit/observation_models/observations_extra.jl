@@ -36,10 +36,13 @@ end
     @test as_turing_model(ReportingCDF(collect(range(0.05, 1.0; length = 20))),
         5)() == collect(range(0.05, 1.0; length = 20))[1:5]
 
-    # An invalid CDF (decreasing / out of [0, 1]) is rejected at construction.
-    @test_throws Exception ReportingCDF([0.6, 0.2, 1.0])
+    # A curve out of [0, 1] is rejected at construction.
     @test_throws Exception ReportingCDF([0.2, 0.6, 1.5])
     @test_throws Exception ReportingCDF([-0.1, 0.6, 1.0])
+    # A NON-monotonic curve is allowed: the correction is a free completeness
+    # curve, not necessarily a CDF, so over-/under-reporting that recovers works.
+    nonmono = ReportingCDF([0.6, 0.2, 0.9])
+    @test as_turing_model(nonmono, 3)() == [0.6, 0.2, 0.9]
 
     # The distribution constructor builds the CDF from the released-CD
     # double-interval-censored PMF (the LatentDelay / EpiData path): cumulative,
@@ -228,6 +231,37 @@ end
         ReportingTriangle(zeros(Int, 4, 5), trues(4, 5), 4), fill(20.0, 4))
     # A count matrix with the wrong number of delay columns is rejected.
     @test_throws Exception define_y_t(obs, zeros(Int, 4, 5), fill(20.0, 4))
+end
+
+@testitem "ReportTriangle takes the delay as a composable PMF submodel" begin
+    using EpiAwarePrototype, Distributions, Random
+    Random.seed!(76)
+
+    # ReportingPMF is the delay submodel (a latent-role component), mirroring how
+    # ReportingCDF is RightTruncate's correction submodel.
+    pm = ReportingPMF([0.5, 0.3, 0.2])
+    @test pm isa AbstractLatentModel
+    @test implements_latent_interface(pm)
+    @test as_turing_model(pm, 10)() == [0.5, 0.3, 0.2]   # n is ignored (PMF by delay)
+    # The distribution constructor builds the PMF via the released-CD path.
+    pmd = ReportingPMF(truncated(Normal(2.0, 1.0), 0.0, Inf))
+    @test isapprox(sum(as_turing_model(pmd, 5)()), 1.0)
+    # A PMF that does not sum to 1 / is negative is rejected.
+    @test_throws Exception ReportingPMF([0.5, 0.3])
+    @test_throws Exception ReportingPMF([-0.1, 0.6, 0.5])
+
+    # The three ReportTriangle constructors all wrap a delay submodel.
+    @test ReportTriangle(PoissonError(), [0.5, 0.3, 0.2]).delay_model isa ReportingPMF
+    @test ReportTriangle(PoissonError(),
+        truncated(Normal(2.0, 1.0), 0.0, Inf)).delay_model isa ReportingPMF
+    obs = ReportTriangle(PoissonError(), ReportingPMF([0.6, 0.25, 0.15]))
+    @test obs.delay_model isa ReportingPMF
+
+    # Dmax is read statically from the delay submodel (before the PMF is sampled),
+    # so the triangle sizes correctly and the model simulates.
+    tri = define_y_t(obs, fill(0, 5, 3), fill(20.0, 5); now = 5)
+    @test tri.Dmax == 2
+    @test as_turing_model(obs, missing, fill(20.0, 6))() isa ReportingTriangle
 end
 
 @testitem "define_y_t builds a triangle from a matrix and a long-form table" begin
