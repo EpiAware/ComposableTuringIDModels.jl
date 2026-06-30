@@ -171,6 +171,29 @@ same way from the per-draw generated quantities; this page stops at the ``R_t``
 summary, consistent with the other case studies (the docs build runs no plotting
 stack).
 
+## Reading the shared parameters
+
+`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
+chain, which we index by variable name directly — no conversion step. Wrapping the
+error model in [`RightTruncate`](@ref) does not touch the renewal process, so the
+corrected fit recovers the *same* shared parameters: the autoregressive damping
+``\rho`` (`damp_AR[1]`), the innovation scale ``\sigma`` (`std`), the observation
+overdispersion (`cluster_factor`), and the initial infections (`init_incidence`).
+They keep their flat names (prefixing is disabled throughout the package).
+
+```@example nowcast
+using Turing: @varname
+
+posterior_draws(chain, vn) = vec(chain[vn])
+posterior_summary(chain, vn) = (mean = mean(posterior_draws(chain, vn)),
+    std = std(posterior_draws(chain, vn)))
+
+(damp = posterior_summary(corrected_chain, @varname(damp_AR[1])),
+    sigma = posterior_summary(corrected_chain, @varname(std)),
+    cluster_factor = posterior_summary(corrected_chain, @varname(cluster_factor)),
+    init_incidence = posterior_summary(corrected_chain, @varname(init_incidence)))
+```
+
 ## From the marginal to the joint
 
 [`RightTruncate`](@ref) corrects right-truncation by conditioning on each
