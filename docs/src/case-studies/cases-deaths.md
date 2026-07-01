@@ -213,28 +213,19 @@ nothing # hide
 ```
 
 `sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
-chain, which we index by variable name directly — no conversion step. The stack
-prefixes each stream's own parameters with the stream name, so the two
-overdispersions are reached as `@varname(cases.cluster_factor)` and
-`@varname(deaths.cluster_factor)` and stay distinct. The shared infection
-parameters — the autoregressive damping ``\rho`` (`damp_AR[1]`), the innovation
-scale ``\sigma`` (`std`), and the initial infections (`init_incidence`) — keep
-their flat names, because they belong to the single shared infection process
-rather than to either stream:
+chain, which `summarystats` summarises directly — no conversion step — giving
+point estimates *and* their uncertainty alongside the effective sample size and
+``\hat{R}`` convergence diagnostic. The stack prefixes each stream's own
+parameters with the stream name, so the two overdispersions appear as
+`cases.cluster_factor` and `deaths.cluster_factor` and stay distinct. The shared
+infection parameters — the autoregressive damping ``\rho`` (`damp_AR[1]`), the
+innovation scale ``\sigma`` (`std`), and the initial infections
+(`init_incidence`) — keep their flat names, because they belong to the single
+shared infection process rather than to either stream:
 
 ```@example casesdeaths
-using Turing: @varname
-using Statistics
-
-posterior_draws(vn) = vec(chain[vn])
-posterior_summary(vn) = (mean = mean(posterior_draws(vn)),
-    std = std(posterior_draws(vn)))
-
-(init_incidence = posterior_summary(@varname(init_incidence)),
-    damp = posterior_summary(@varname(damp_AR[1])),
-    sigma = posterior_summary(@varname(std)),
-    cases_cluster = posterior_summary(@varname(cases.cluster_factor)),
-    deaths_cluster = posterior_summary(@varname(deaths.cluster_factor)))
+using MCMCChains
+summarystats(chain)
 ```
 
 The shared parameters are recovered from the two streams jointly: `init_incidence`
