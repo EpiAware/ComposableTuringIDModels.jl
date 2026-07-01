@@ -173,25 +173,21 @@ stack).
 
 ## Reading the shared parameters
 
+Wrapping the error model in [`RightTruncate`](@ref) does not touch the renewal
+process, so the corrected fit recovers the *same* shared parameters: the
+autoregressive damping ``\rho`` (`damp_AR[1]`), the innovation scale ``\sigma``
+(`std`), the observation overdispersion (`cluster_factor`), and the initial
+infections (`init_incidence`). They keep their flat names (prefixing is disabled
+throughout the package).
+
 `sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
-chain, which we index by variable name directly — no conversion step. Wrapping the
-error model in [`RightTruncate`](@ref) does not touch the renewal process, so the
-corrected fit recovers the *same* shared parameters: the autoregressive damping
-``\rho`` (`damp_AR[1]`), the innovation scale ``\sigma`` (`std`), the observation
-overdispersion (`cluster_factor`), and the initial infections (`init_incidence`).
-They keep their flat names (prefixing is disabled throughout the package).
+chain, which `summarystats` summarises directly — no conversion step — giving
+point estimates *and* their uncertainty alongside the effective sample size and
+``\hat{R}`` convergence diagnostic:
 
 ```@example nowcast
-using Turing: @varname
-
-posterior_draws(chain, vn) = vec(chain[vn])
-posterior_summary(chain, vn) = (mean = mean(posterior_draws(chain, vn)),
-    std = std(posterior_draws(chain, vn)))
-
-(damp = posterior_summary(corrected_chain, @varname(damp_AR[1])),
-    sigma = posterior_summary(corrected_chain, @varname(std)),
-    cluster_factor = posterior_summary(corrected_chain, @varname(cluster_factor)),
-    init_incidence = posterior_summary(corrected_chain, @varname(init_incidence)))
+using MCMCChains
+summarystats(corrected_chain)
 ```
 
 ## From the marginal to the joint
