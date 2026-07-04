@@ -64,7 +64,21 @@ end
     obs = generated_observables(m, (; y_t = missing), rand(m))
     @test obs isa EpiAwareObservables
     @test obs.model === m
-    # A non-chain solution (here a prior draw) carries no per-draw generated
+    # `returned` recovers the model's generated quantities for any draw it can
+    # consume (a chain or, as here, a single draw); only solutions it cannot
+    # consume (e.g. an optimiser result) leave `generated` as `missing`.
+    @test obs.generated !== missing
+end
+
+@testitem "generated_observables leaves non-chain solutions missing" begin
+    using EpiAwarePrototype, Distributions, Random
+    Random.seed!(76)
+    m = as_turing_model(
+        EpiAwareModel(
+            DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+            PoissonError()), missing, 10)
+    # A solution `returned` cannot consume (here a bare marker) has no generated
     # quantities, so the field stays `missing`.
+    obs = generated_observables(m, (; y_t = missing), :no_solution)
     @test obs.generated === missing
 end

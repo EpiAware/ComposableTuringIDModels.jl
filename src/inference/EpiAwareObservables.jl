@@ -57,10 +57,6 @@ end
 # concrete chain type — we ask `returned` to consume it and treat anything it
 # cannot (an optimiser result, a prior draw, …) as "no generated quantities".
 _generated_quantities(model, solution) = missing
-# A single prior/predictive draw (a `NamedTuple` of parameter values, e.g. from
-# `rand(model)`) is not a chain of posterior draws, so there are no per-draw
-# generated quantities to collect.
-_generated_quantities(model::DynamicPPL.Model, solution::NamedTuple) = missing
 function _generated_quantities(model::DynamicPPL.Model, solution)
     return try
         returned(model, solution)
