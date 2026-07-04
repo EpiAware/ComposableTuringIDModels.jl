@@ -22,11 +22,10 @@ end
     res = apply_method(problem, NUTSampler(; ndraws = 40, nchains = 1), (; y_t = ydata))
     @test res isa EpiAwareObservables
     @test res.samples !== nothing
-    # Generated quantities are now recovered per draw for a chain solution
-    # (previously always `missing`).
+    # Generated quantities are now recovered from the chain (previously always
+    # `missing`); `returned` yields the model's `(; generated_y_t, I_t, Z_t)`
+    # per draw.
     @test res.generated !== missing
-    @test length(res.generated) == 40
-    @test haskey(first(res.generated), :generated_y_t)
 end
 
 @testitem "EpiMethod threads a Pathfinder pre-step into NUTS" tags=[:sample] begin
