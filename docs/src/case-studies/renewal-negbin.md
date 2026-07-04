@@ -172,18 +172,18 @@ nothing # hide
 ```
 
 Sampling returns a chain whose parameters keep their flat component names
-(prefixing is disabled throughout the package). Converting to an
-[`MCMCChains.Chains`](https://turinglang.org/MCMCChains.jl/) gives the usual
-posterior summary — point estimates *and* their uncertainty, alongside the
-effective sample size and ``\hat{R}`` convergence diagnostic. The autoregressive
-damping ``\rho`` (`damp_AR[1]`), the innovation scale ``\sigma`` (`std`), and the
-observation cluster factor ``\sqrt{1/\phi}`` (`cluster_factor`) are all
-identified from the single simulated series:
+(prefixing is disabled throughout the package). `sample` returns a
+[FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which
+`summarystats` summarises directly — no conversion step — giving point estimates
+*and* their uncertainty alongside the effective sample size and ``\hat{R}``
+convergence diagnostic. The autoregressive damping ``\rho`` (`damp_AR[1]`), the
+innovation scale ``\sigma`` (`std`), and the observation cluster factor
+``\sqrt{1/\phi}`` (`cluster_factor`) are all identified from the single simulated
+series:
 
 ```@example renewal
-using MCMCChains, Statistics
-mc = MCMCChains.Chains(chain)
-summarystats(mc[[Symbol("damp_AR[1]"), :std, :cluster_factor]])
+using MCMCChains
+summarystats(chain)
 ```
 
 The reproduction number ``R_t = \exp(Z_t)`` is a *generated quantity* rather than

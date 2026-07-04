@@ -117,14 +117,24 @@ chain = sample(
 nothing # hide
 ```
 
-The posterior gives the transmission and recovery rates directly, and the basic
-reproduction number is a deterministic function of them:
+`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
+chain, which `summarystats` summarises directly — no conversion step:
 
 ```@example sir
-using MCMCChains, Statistics
-mc = MCMCChains.Chains(chain)
-β = vec(mc[:β])
-γ = vec(mc[:γ])
+using MCMCChains
+summarystats(chain)
+```
+
+The posterior gives the transmission and recovery rates directly, and the basic
+reproduction number ``R_0 = \beta / \gamma`` is a deterministic function of them.
+Individual parameter draws are read by name with `vec(chain[@varname(...)])`, from
+which the derived ``R_0`` is formed per draw:
+
+```@example sir
+using Turing: @varname
+using Statistics
+β = vec(chain[@varname(β)])
+γ = vec(chain[@varname(γ)])
 R0 = β ./ γ
 (β = mean(β), γ = mean(γ), R0 = mean(R0))
 ```
@@ -186,16 +196,23 @@ nothing # hide
 The SIR parameters keep their flat names (`β`, `γ`, `I₀`); the ascertainment
 process contributes its own block, prefixed `Ascertainment.` because modifiers
 that introduce a named sub-process prefix their variables to keep them distinct.
-The basic reproduction number is recovered as before, and the posterior for the
-ascertainment innovation scale ``\sigma`` quantifies how much observation-level
+`summarystats` shows both blocks, including the ascertainment innovation scale
+``\sigma`` (`Ascertainment.std`), which quantifies how much observation-level
 noise the latent process absorbed:
 
 ```@example sir
-stochastic_mc = MCMCChains.Chains(stochastic_chain)
-βs = vec(stochastic_mc[:β])
-γs = vec(stochastic_mc[:γ])
+summarystats(stochastic_chain)
+```
+
+The basic reproduction number is recovered as before — a derived quantity formed
+per draw from the sampled ``\beta`` and ``\gamma`` — and the fitted ascertainment
+scale is small:
+
+```@example sir
+βs = vec(stochastic_chain[@varname(β)])
+γs = vec(stochastic_chain[@varname(γ)])
 (R0 = mean(βs ./ γs),
-    ascertainment_sigma = mean(vec(stochastic_mc[Symbol("Ascertainment.std")])))
+    ascertainment_sigma = mean(vec(stochastic_chain[@varname(Ascertainment.std)])))
 ```
 
 Because the deterministic model is the ``\kappa_t = 0`` special case, the two
