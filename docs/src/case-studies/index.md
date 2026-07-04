@@ -35,11 +35,6 @@ observed data and sampling. Because the components share one interface, you swap
 a modelling assumption by swapping a struct — the
 [Composable design](@ref) page explains the mechanism.
 
-!!! note "Prototype"
-    These examples are written to be didactic and fast to build. They use short
-    sampler runs on real surveillance data; for a production analysis you would
-    use more iterations and check convergence diagnostics carefully.
-
 ## References
 
 The methods these case studies recreate and adapt are described in the following

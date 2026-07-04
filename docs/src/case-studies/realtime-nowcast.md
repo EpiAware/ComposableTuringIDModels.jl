@@ -19,10 +19,6 @@ fraction of its eventual total reported so far. The correction is the
 EpiNow2-style CDF-scaling nowcast [abbott2020estimating](@citep), expressed here
 as a one-line observation modifier.
 
-!!! note "Prototype"
-    Short sampler runs keep this page fast to build. For real analyses use more
-    iterations and check convergence.
-
 ## The idea
 
 The infection pipeline produces ``Y_t = \mu_t``, the expected *eventual* total
@@ -109,7 +105,7 @@ complete.
 ```@example nowcast
 naive_model = EpiAwareModel(renewal, error)
 naive_post = as_turing_model(naive_model, observed_so_far, n)
-naive_chain = sample(naive_post, NUTS(0.9), 100; progress = false)
+naive_chain = sample(naive_post, NUTS(0.9), 1000; progress = false)
 nothing # hide
 ```
 
@@ -123,7 +119,7 @@ untouched; only how the expected counts are compared to the truncated data.
 corrected_obs = RightTruncate(error, reporting_delay)
 corrected_model = EpiAwareModel(renewal, corrected_obs)
 corrected_post = as_turing_model(corrected_model, observed_so_far, n)
-corrected_chain = sample(corrected_post, NUTS(0.9), 100; progress = false)
+corrected_chain = sample(corrected_post, NUTS(0.9), 1000; progress = false)
 nothing # hide
 ```
 
@@ -150,7 +146,7 @@ function recent_Rt(posterior, chain; window = 7)
 end
 
 complete_post = as_turing_model(naive_model, eventual, n)
-complete_chain = sample(complete_post, NUTS(0.9), 100; progress = false)
+complete_chain = sample(complete_post, NUTS(0.9), 1000; progress = false)
 
 R_complete_recent = recent_Rt(complete_post, complete_chain)
 R_naive_recent = recent_Rt(naive_post, naive_chain)
@@ -165,8 +161,8 @@ The naive recent-``R_t`` sits **below** the complete-data estimate — the
 artefactual late down-turn produced by treating the not-yet-reported tail as
 complete — whereas the [`RightTruncate`](@ref) fit, which knows the recent days
 are incomplete, pulls the recent ``R_t`` back **up** off that spurious decline
-towards the complete-data value. (These are short, illustrative runs, so the exact
-values are noisy; the robust, repeatable signal is the *direction* — the naive fit
+towards the complete-data value. (There is still Monte Carlo noise in the exact
+values, but the robust, repeatable signal is the *direction* — the naive fit
 under-estimates recent ``R_t``, and the correction removes that downward pull.)
 The nowcast of the eventual totals is the corrected model's ``Y_t``, recovered the
 same way from the per-draw generated quantities; this page stops at the ``R_t``

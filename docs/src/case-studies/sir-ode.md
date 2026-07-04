@@ -119,7 +119,7 @@ Forward-mode autodiff is a good fit here anyway, for a system this small.
 ```@example sir
 chain = sample(
     as_turing_model(model, y_obs, n),
-    NUTS(; adtype = AutoForwardDiff()), 100; progress = false)
+    NUTS(0.9; adtype = AutoForwardDiff()), 1000; progress = false)
 nothing # hide
 ```
 
@@ -195,7 +195,7 @@ sampler stable through the ODE solve.
 ```@example sir
 stochastic_chain = sample(
     as_turing_model(stochastic_model, y_obs, n),
-    NUTS(0.9; adtype = AutoForwardDiff()), 100; progress = false)
+    NUTS(0.9; adtype = AutoForwardDiff()), 1000; progress = false)
 nothing # hide
 ```
 

@@ -138,14 +138,14 @@ problem = EpiProblem(
 nothing # hide
 ```
 
-Fitting conditions on the observed reports (short run for the docs build),
-differentiating with the recommended [Mooncake](https://chalk-lab.github.io/Mooncake.jl/)
-backend (see [Automatic differentiation backend](@ref ad-backend)):
+Fitting conditions on the observed reports, differentiating with the recommended
+[Mooncake](https://chalk-lab.github.io/Mooncake.jl/) backend (see
+[Automatic differentiation backend](@ref ad-backend)):
 
 ```@example delays
 chain = sample(
     as_turing_model(problem, (y_t = y_obs,)),
-    NUTS(; adtype = AutoMooncake(; config = nothing)), 50; progress = false)
+    NUTS(0.9; adtype = AutoMooncake(; config = nothing)), 1000; progress = false)
 nothing # hide
 ```
 
