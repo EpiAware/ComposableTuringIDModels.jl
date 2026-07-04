@@ -83,7 +83,7 @@ export EpiData, DirectInfections, ExpGrowthRate, Renewal,
        R_to_r, r_to_R, expected_Rt
 
 # --- ODE compartmental models ---
-export SIRParams, SEIRParams, ODEProcess
+export SIRParams, SEIRParams, ODEProcess, CatalystODEParams
 
 # --- observation models ---
 export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDelay,
@@ -163,6 +163,7 @@ include("infection_models/utils.jl")
 include("ode/SIRParams.jl")
 include("ode/SEIRParams.jl")
 include("ode/ODEProcess.jl")
+include("ode/CatalystODEParams.jl")
 
 # --- observation models ---
 include("observation_models/ObservationErrorModels/methods.jl")

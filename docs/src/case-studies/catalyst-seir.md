@@ -64,18 +64,16 @@ nothing # hide
 
 ## The infection process
 
-Loading `Catalyst` activates the extension and brings `CatalystODEParams` into
-scope. We hand it the network, a solver time span, and priors for the initial
-conditions and rates. A prior can be a `Distribution` (sampled, and named after
-its symbol in the chain — `β`, `α`, `γ`) or a plain number (a fixed value, not
-sampled — here the fully-susceptible start `S(0)` and the empty recovered class
-`R(0)`). The `(u0, p)` sampling contract is the same as the hand-coded parameter
-models, so it drops straight into an [`ODEProcess`](@ref).
+Loading `Catalyst` activates the extension that backs `CatalystODEParams` (the
+type itself is a normal, exported `EpiAwarePrototype` component). We hand it the
+network, a solver time span, and priors for the initial conditions and rates. A
+prior can be a `Distribution` (sampled, and named after its symbol in the chain —
+`β`, `α`, `γ`) or a plain number (a fixed value, not sampled — here the
+fully-susceptible start `S(0)` and the empty recovered class `R(0)`). The
+`(u0, p)` sampling contract is the same as the hand-coded parameter models, so it
+drops straight into an [`ODEProcess`](@ref).
 
 ```@example catalyst
-CatalystODEParams = Base.get_extension(
-    EpiAwarePrototype, :EpiAwarePrototypeCatalystExt).CatalystODEParams
-
 N = 763          # children in the boarding school
 n_days = 14
 
@@ -93,18 +91,15 @@ nothing # hide
 Catalyst **sorts** the species and parameters when it builds the problem, so the
 internal layout is generally not the order you wrote the network in (here the
 state vector is `[S, I, E, R]` — the infectious compartment `I` is at index 2,
-not 3). `CatalystODEParams` resolves every symbol's stored position by symbolic
-lookup and exposes a `species_index` map, so the `sol2infs` link can pull a
-compartment out of the solution by name without hard-coding Catalyst's ordering:
-
-```@example catalyst
-seir_params.species_index
-```
+not 3). We never rely on that order: `CatalystODEParams` samples into **symbolic**
+`symbol => value` maps that `remake` places by name, and the `sol2infs` link
+indexes the solution **symbolically** with the network's own handle, so it pulls
+the infectious compartment out by identity rather than by a hard-coded position:
 
 ```@example catalyst
 seir_process = ODEProcess(
     params = seir_params,
-    sol2infs = sol -> sol[seir_params.species_index[:I], :],
+    sol2infs = sol -> sol[seir.I, :],
     solver_options = Dict(:saveat => 1.0))
 nothing # hide
 ```

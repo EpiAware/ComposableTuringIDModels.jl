@@ -1,21 +1,32 @@
 # Tests for the optional Catalyst extension (`EpiAwarePrototypeCatalystExt`).
 # `Catalyst` + `ModelingToolkit` are test-only deps (see test/Project.toml);
-# loading them triggers the extension and brings `CatalystODEParams` into scope
-# via `Base.get_extension`. `CatalystODEParams` is model-agnostic, so the tests
-# exercise it on more than one reaction network (SIR and SEIR).
+# loading them triggers the extension, which supplies the `ReactionSystem`
+# constructor / sampling for the public, exported `CatalystODEParams` type.
+# `CatalystODEParams` is model-agnostic, so the tests exercise it on more than one
+# reaction network (SIR and SEIR), and sampling / solution indexing are symbolic
+# (no positional-index bookkeeping).
 
-@testitem "Catalyst extension loads and exposes CatalystODEParams" begin
+@testitem "Catalyst extension loads and CatalystODEParams is public" begin
     using EpiAwarePrototype, Catalyst, ModelingToolkit
     ext = Base.get_extension(EpiAwarePrototype, :EpiAwarePrototypeCatalystExt)
     @test ext !== nothing
-    @test isdefined(ext, :CatalystODEParams)
+    # The type is a first-class exported public component (defined in `src/`),
+    # not something dug out of the extension module.
+    @test CatalystODEParams isa Type
+    @test isdefined(EpiAwarePrototype, :CatalystODEParams)
+end
+
+@testitem "CatalystODEParams errors helpfully before Catalyst is loaded" begin
+    # The fallback constructor lives in `src/`; without a `ReactionSystem` it
+    # raises an informative error rather than a bare MethodError.
+    using EpiAwarePrototype
+    @test_throws ArgumentError CatalystODEParams(:not_a_reaction_system;
+        tspan = (0.0, 1.0), u0_priors = [], p_priors = [])
 end
 
 @testitem "CatalystODEParams samples (u0, p) for an arbitrary (SIR) network" begin
     using EpiAwarePrototype, Catalyst, ModelingToolkit, OrdinaryDiffEq,
           Distributions, Random
-    ext = Base.get_extension(EpiAwarePrototype, :EpiAwarePrototypeCatalystExt)
-    CatalystODEParams = ext.CatalystODEParams
     Random.seed!(101)
 
     sir = @reaction_network begin
@@ -28,15 +39,15 @@ end
         p_priors = [sir.β => LogNormal(log(0.3), 0.05),
             sir.γ => LogNormal(log(0.1), 0.05)])
 
-    # Index map resolves each species' stored (Catalyst-sorted) position.
-    @test params.species_index[:S] == 1
-    @test params.species_index[:I] == 2
-    @test params.species_index[:R] == 3
-
+    # Sampling returns symbolic `symbol => value` maps, one per species / rate.
     u0, p = as_turing_model(params, nothing)()
     @test length(u0) == 3
     @test length(p) == 2
-    @test u0[params.species_index[:R]] == 0.0
+    @test all(x -> x isa Pair, u0)
+    @test all(x -> x isa Pair, p)
+    # The fixed (Real) R initial condition rides through as a constant value
+    # (compare on the values, not the symbolic keys, to avoid symbolic `==`).
+    @test 0.0 in [pr.second for pr in u0]
 
     # Distribution-valued specs are sampled with flat, symbol-named keys; the
     # fixed (Real) R initial condition is NOT sampled, so it is absent.
@@ -48,8 +59,6 @@ end
 
 @testitem "CatalystODEParams enforces a prior for every species and parameter" begin
     using EpiAwarePrototype, Catalyst, ModelingToolkit, OrdinaryDiffEq, Distributions
-    ext = Base.get_extension(EpiAwarePrototype, :EpiAwarePrototypeCatalystExt)
-    CatalystODEParams = ext.CatalystODEParams
     sir = @reaction_network begin
         β, S + I --> 2I
         γ, I --> R
@@ -64,8 +73,6 @@ end
 
 @testitem "Catalyst SEIR trajectory matches the hand-coded SEIR" begin
     using EpiAwarePrototype, Catalyst, ModelingToolkit, OrdinaryDiffEq, Distributions
-    ext = Base.get_extension(EpiAwarePrototype, :EpiAwarePrototypeCatalystExt)
-    CatalystODEParams = ext.CatalystODEParams
 
     tspan = (0.0, 60.0)
     seir = @reaction_network begin
@@ -90,8 +97,9 @@ end
         infectiousness = Dirac(fixed.β), incubation_rate = Dirac(fixed.α),
         recovery_rate = Dirac(fixed.γ), initial_prop_infected = Dirac(fixed.initial_infs))
 
-    Iidx = catalyst.species_index[:I]
-    cat_proc = ODEProcess(params = catalyst, sol2infs = sol -> sol[Iidx, :],
+    # Symbolic solution indexing: pull the infectious compartment by its handle,
+    # no stored-index lookup.
+    cat_proc = ODEProcess(params = catalyst, sol2infs = sol -> sol[seir.I, :],
         solver_options = Dict(:saveat => 1.0))
     hand_proc = ODEProcess(params = handcoded, sol2infs = sol -> sol[3, :],
         solver_options = Dict(:saveat => 1.0))
@@ -108,8 +116,6 @@ end
 @testitem "CatalystODEParams composes into an ODEProcess and exposes no latent" begin
     using EpiAwarePrototype, Catalyst, ModelingToolkit, OrdinaryDiffEq,
           Distributions, LogExpFunctions, Random
-    ext = Base.get_extension(EpiAwarePrototype, :EpiAwarePrototypeCatalystExt)
-    CatalystODEParams = ext.CatalystODEParams
     Random.seed!(102)
 
     seir = @reaction_network begin
@@ -126,7 +132,7 @@ end
             seir.γ => LogNormal(log(0.1), 0.05)])
     N = 1000.0
     proc = ODEProcess(params = params,
-        sol2infs = sol -> softplus.(N .* sol[params.species_index[:I], :]),
+        sol2infs = sol -> softplus.(N .* sol[seir.I, :]),
         solver_options = Dict(:saveat => 1.0))
 
     out = as_turing_model(proc, nothing)()
@@ -143,8 +149,6 @@ end
     using EpiAwarePrototype, Catalyst, ModelingToolkit, OrdinaryDiffEq,
           Distributions, LogExpFunctions, Turing, ADTypes, Random
     using DynamicPPL: @varname
-    ext = Base.get_extension(EpiAwarePrototype, :EpiAwarePrototypeCatalystExt)
-    CatalystODEParams = ext.CatalystODEParams
     Random.seed!(103)
 
     N = 763
@@ -162,7 +166,7 @@ end
             seir.α => Gamma(8, 0.05), seir.γ => Gamma(8, 0.03125)])
     obs = TransformObservationModel(PoissonError(), x -> softplus.(N .* x))
     process = ODEProcess(params = params,
-        sol2infs = sol -> sol[params.species_index[:I], :],
+        sol2infs = sol -> sol[seir.I, :],
         solver_options = Dict(:saveat => 1.0))
     model = EpiAwareModel(process, obs)
 
@@ -173,6 +177,7 @@ end
     # ForwardDiff is the supported AD path for ODE infection models (#46);
     # Mooncake-driven NUTS through the solver is a separate, pre-existing gap.
     # `sample` returns a FlexiChains chain, indexed by variable name directly.
+    # This exercises symbolic-map remake carrying ForwardDiff `Dual`s.
     chain = sample(as_turing_model(model, y_obs, n_days + 1),
         NUTS(; adtype = AutoForwardDiff()), 20; progress = false)
     βs = vec(chain[@varname(β)])
