@@ -81,4 +81,7 @@ end
     # quantities, so the field stays `missing`.
     obs = generated_observables(m, (; y_t = missing), :no_solution)
     @test obs.generated === missing
+    # And the untyped fallback: a non-model `model` also yields `missing`.
+    @test generated_observables(:not_a_model, (; y_t = missing), :no_solution).generated ===
+          missing
 end
