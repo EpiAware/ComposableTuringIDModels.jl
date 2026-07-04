@@ -57,10 +57,11 @@ using Statistics: Statistics
 
 # --- core architecture ---
 export AbstractEpiAwareModel, as_turing_model
-export AbstractLatentModel, AbstractInfectionModel, AbstractObservationModel,
-       AbstractObservationErrorModel
-export implements_latent_interface, implements_infection_interface,
-       implements_observation_interface
+export AbstractPriorModel, AbstractLatentModel, AbstractInfectionModel,
+       AbstractObservationModel, AbstractObservationErrorModel
+export implements_prior_interface, implements_latent_interface,
+       implements_infection_interface, implements_observation_interface
+export BroadcastPrior, as_prior
 
 # --- utilities and distributions ---
 # (double-interval censoring is provided by CensoredDistributions.jl, used
@@ -107,6 +108,7 @@ export EpiProblem, EpiMethod, NUTSampler, ManyPathfinder, DirectSample,
 include("base/base.jl")
 include("base/roles.jl")
 include("base/interfaces.jl")
+include("base/priors.jl")
 include("base/prettyprinting.jl")
 
 # --- accumulation steps ---
