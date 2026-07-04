@@ -80,7 +80,10 @@ end
 @doc raw"
 Partition `n` elements into `m` segments of as-equal-as-possible length.
 
-The first segment gets `ceil(n / m)` and the rest `floor(n / m)`. This is the
+Each segment gets `floor(n / m)`, and the `n mod m` leftover elements are handed
+out one apiece to the leading segments. The segment lengths therefore always sum
+to exactly `n` (differing by at most one), which is required by
+[`ConcatLatentModels`](@ref)'s `@assert sum(dims) == n` check. This is the
 default `dimension_adaptor` for [`ConcatLatentModels`](@ref).
 
 # Arguments
@@ -94,8 +97,9 @@ using EpiAwarePrototype
 EpiAwarePrototype.equal_dimensions(10, 3)
 ```
 "
-function equal_dimensions(n::Int, m::Int)::AbstractVector{Int}
-    return vcat(ceil(n / m), fill(floor(n / m), m - 1))
+function equal_dimensions(n::Int, m::Int)::Vector{Int}
+    base, r = divrem(n, m)
+    return [base + (i <= r ? 1 : 0) for i in 1:m]
 end
 
 @model function as_turing_model(latent_models::ConcatLatentModels, n)
