@@ -60,8 +60,27 @@ function _models()
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         NegativeBinomialError())
 
+    # Nowcasting MARGINAL (right-truncation correction): a renewal model whose
+    # observation error is wrapped in `RightTruncate` (fixed reporting-delay CDF
+    # supplied as a `ReportingCDF` submodel). This exercises the `reverse`/
+    # broadcast scaling the modifier adds on top of the inner error.
+    nowcast = EpiAwareModel(
+        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        RightTruncate(NegativeBinomialError(),
+            truncated(Normal(4.0, 1.5), 0.0, Inf)))
+
+    # Nowcasting JOINT (2D reporting triangle): a renewal model feeding the
+    # per-cell `ReportTriangle` observation model. The gradient of the per-cell
+    # Poisson log-likelihood over the masked triangle (`t + d ≤ now`) is what
+    # nowcasting under NUTS depends on.
+    triangle = EpiAwareModel(
+        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        ReportTriangle(PoissonError(), [0.6, 0.25, 0.15]))
+
     y_direct = as_turing_model(direct, missing, n)().generated_y_t
     y_renewal = as_turing_model(renewal, missing, n)().generated_y_t
+    y_nowcast = as_turing_model(nowcast, missing, n)().generated_y_t
+    y_triangle = as_turing_model(triangle, missing, n)().generated_y_t
 
     return [
         ("RandomWalk latent logjoint", rw),
@@ -70,7 +89,11 @@ function _models()
         ("DirectInfections+Poisson posterior",
             as_turing_model(direct, y_direct, n)),
         ("Renewal+NegativeBinomial posterior",
-            as_turing_model(renewal, y_renewal, n))
+            as_turing_model(renewal, y_renewal, n)),
+        ("Renewal+RightTruncate nowcast posterior",
+            as_turing_model(nowcast, y_nowcast, n)),
+        ("Renewal+ReportTriangle posterior",
+            as_turing_model(triangle, y_triangle, n))
     ]
 end
 
@@ -153,20 +176,24 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (5 scenarios × 4 backends), Julia 1.12:
+Result matrix (7 scenarios × 4 backends), Julia 1.12:
 
-| scenario                            | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
-|-------------------------------------|:-----------:|:-----------:|:--------:|:------:|
-| RandomWalk latent logjoint          |      ✓      |      ✓      |    ✓    |   ✓   |
-| AR latent logjoint                  |      ✓      |      ✓      |    ✓    |   ✗   |
-| ARIMA latent logjoint               |      ✓      |      ✓      |    ✓    |   ✗   |
-| DirectInfections+Poisson posterior  |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+NegativeBinomial posterior  |      ✓      |      ✓      |    ✓    |   ✓   |
+| scenario                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
+|---------------------------------------|:-----------:|:-----------:|:--------:|:------:|
+| RandomWalk latent logjoint            |      ✓      |      ✓      |    ✓    |   ✓   |
+| AR latent logjoint                    |      ✓      |      ✓      |    ✓    |   ✗   |
+| ARIMA latent logjoint                 |      ✓      |      ✓      |    ✓    |   ✗   |
+| DirectInfections+Poisson posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+NegativeBinomial posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+RightTruncate nowcast posterior |    ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+ReportTriangle posterior      |      ✓      |      ✓      |    ✓    |   ✓   |
 
 ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
-scenario correctly. Enzyme works on three of the five once configured with
-`function_annotation = Enzyme.Const` (see [`backends`](@ref)), but the two
-AR-based latent log-densities raise `IllegalTypeAnalysisException` inside the
+scenario correctly — including both nowcasting models (the `RightTruncate`
+marginal and the `ReportTriangle` joint triangle). Enzyme works on five of the
+seven once configured with `function_annotation = Enzyme.Const` (see
+[`backends`](@ref)), but the two AR-based latent log-densities raise
+`IllegalTypeAnalysisException` inside the
 `accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion — a real
 Enzyme type-analysis limitation, not a defect in the package (the same models
 sample fine under NUTS with ForwardDiff). They are recorded as `@test_broken`

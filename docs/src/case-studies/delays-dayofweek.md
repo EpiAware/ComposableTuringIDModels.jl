@@ -135,10 +135,14 @@ chain = sample(
 nothing # hide
 ```
 
+`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
+chain, which `summarystats` summarises directly — no conversion step. The
+day-of-week scale (`DayofWeek.std`) and the negative-binomial overdispersion
+(`cluster_factor`) appear alongside the latent-process parameters:
+
 ```@example delays
-using MCMCChains, Statistics
-mc = MCMCChains.Chains(chain)
-summarystats(mc[[:cluster_factor, Symbol("DayofWeek.std")]])
+using MCMCChains
+summarystats(chain)
 ```
 
 `DayofWeek.std` is the scale of the partially pooled weekday multipliers (its
