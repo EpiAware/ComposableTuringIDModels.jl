@@ -6,8 +6,7 @@
 
 *A toolkit for composable probabilistic infectious disease modelling in Julia.*
 
-> **Prototype.** This package is an exploratory prototype. Expect rough edges and
-> breaking changes.
+> This package is in early development. Expect rough edges and breaking changes.
 
 ## Why EpiAwarePrototype?
 
