@@ -22,6 +22,11 @@ end
     res = apply_method(problem, NUTSampler(; ndraws = 40, nchains = 1), (; y_t = ydata))
     @test res isa EpiAwareObservables
     @test res.samples !== nothing
+    # Generated quantities are now recovered per draw for a chain solution
+    # (previously always `missing`).
+    @test res.generated !== missing
+    @test length(res.generated) == 40
+    @test haskey(first(res.generated), :generated_y_t)
 end
 
 @testitem "EpiMethod threads a Pathfinder pre-step into NUTS" tags=[:sample] begin
@@ -60,4 +65,7 @@ end
     obs = generated_observables(m, (; y_t = missing), rand(m))
     @test obs isa EpiAwareObservables
     @test obs.model === m
+    # A non-chain solution (here a prior draw) carries no per-draw generated
+    # quantities, so the field stays `missing`.
+    @test obs.generated === missing
 end

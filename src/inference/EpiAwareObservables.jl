@@ -25,9 +25,15 @@ end
 @doc raw"
 Wrap a model, data, and inference solution into an [`EpiAwareObservables`](@ref).
 
+When `solution` is an MCMC `Chains`, the model is re-run over the draws with
+`DynamicPPL.returned` to recover the model's returned generated quantities (e.g.
+`(; generated_y_t, I_t, Z_t)`) per sample, stored in the `generated` field. For
+any other solution (an optimiser result, a prior draw, …) there are no per-draw
+generated quantities, so `generated` is `missing`.
+
 # Arguments
 
-  - `model`: the model that was sampled.
+  - `model`: the model that was sampled (a conditioned `DynamicPPL.Model`).
   - `data`: the data the model was conditioned on.
   - `solution`: the inference solution (samples or optimiser result).
 
@@ -42,5 +48,13 @@ generated_observables(m, (; y_t = missing), rand(m))
 ```
 "
 function generated_observables(model, data, solution)
-    return EpiAwareObservables(model, data, solution, missing)
+    return EpiAwareObservables(model, data, solution, _generated_quantities(model, solution))
+end
+
+# Re-run the (conditioned) model over an MCMC chain to recover its returned
+# generated quantities per draw. Any non-chain solution (optimiser result, prior
+# draw, …) carries no per-draw generated quantities.
+_generated_quantities(model, solution) = missing
+function _generated_quantities(model::DynamicPPL.Model, chain::Chains)
+    return returned(model, chain)
 end
