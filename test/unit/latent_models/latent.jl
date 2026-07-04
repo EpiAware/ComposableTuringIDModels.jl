@@ -60,11 +60,13 @@ end
 
 @testitem "HilbertSpaceGP basis approximates the squared-exponential kernel" begin
     using EpiAwarePrototype, Distributions, LinearAlgebra
-    using EpiAwarePrototype: hsgp_basis, se_spectral_density
+    using EpiAwarePrototype: hsgp_basis, se_spectral_density,
+                             _hsgp_standardised_index
     # With enough basis functions the reconstructed covariance
-    # Φ diag(S(√λ)) Φ' converges to the exact SE-kernel Gram matrix.
-    n, σ, ℓ, c = 20, 1.0, 1.0, 2.0
-    x = collect(1:n) .- (n + 1) / 2
+    # Φ diag(S(√λ)) Φ' converges to the exact SE-kernel Gram matrix, built on the
+    # same standardised inputs the basis uses (so ℓ is on the standardised scale).
+    n, σ, ℓ, c = 20, 1.0, 0.5, 2.0
+    x = _hsgp_standardised_index(n)
     K_exact = [σ^2 * exp(-(xi - xj)^2 / (2ℓ^2)) for xi in x, xj in x]
     Φ, sqrt_λ = hsgp_basis(n, 40, c)
     sd = sqrt.(se_spectral_density(sqrt_λ, σ, ℓ))
@@ -122,12 +124,14 @@ end
 
 @testitem "HilbertSpaceGP Matern bases approximate their kernel covariance" begin
     using EpiAwarePrototype, LinearAlgebra
-    using EpiAwarePrototype: hsgp_basis, spectral_density
+    using EpiAwarePrototype: hsgp_basis, spectral_density,
+                             _hsgp_standardised_index
     # The reconstructed covariance Φ diag(S(√λ)) Φ' should approximate the exact
-    # Matern Gram matrix as the basis count grows. Matern-5/2 covariance:
+    # Matern Gram matrix as the basis count grows, built on the same standardised
+    # inputs the basis uses. Matern-5/2 covariance:
     #   k(d) = σ²(1 + √5 d/ℓ + 5d²/(3ℓ²)) exp(-√5 d/ℓ)
-    n, σ, ℓ, c = 20, 1.0, 2.0, 3.0
-    x = collect(1:n) .- (n + 1) / 2
+    n, σ, ℓ, c = 20, 1.0, 0.8, 3.0
+    x = _hsgp_standardised_index(n)
     function matern52(d)
         a = sqrt(5) * abs(d) / ℓ
         return σ^2 * (1 + a + a^2 / 3) * exp(-a)
@@ -152,6 +156,28 @@ end
     # Two evaluations are valid length-n draws (basis reused, only β/ℓ/σ redrawn).
     @test length(mdl()) == 30
     @test length(mdl()) == 30
+end
+
+@testitem "HilbertSpaceGP samples in the DEFAULT ℓ/m regime" tags=[:sample] begin
+    using EpiAwarePrototype, Distributions, Turing, Random
+    Random.seed!(8)
+    # The reconstruction tests use large m; this exercises the *sampled* regime at
+    # the DEFAULT settings (m = 20) where ℓ is a free parameter pushed through the
+    # spectral density and basis product by NUTS. A short prior sample must stay
+    # finite (no gradient blow-up at the short end of the length-scale prior).
+    gp = HilbertSpaceGP()
+    @test gp.m == 20
+    @test minimum(gp.length_scale_prior) > 0   # positive floor on ℓ
+    n = 30
+    chn = sample(as_turing_model(gp, n), NUTS(), 40; progress = false)
+    @test size(chn, 1) == 40
+    @test all(isfinite, Array(chn))
+    ℓ = vec(chn[:ℓ])
+    @test all(>(0), ℓ)
+    # A latent path at the default m is still finite.
+    path = as_turing_model(gp, n)()
+    @test length(path) == n
+    @test all(isfinite, path)
 end
 
 @testitem "rand from a latent model uses flat (unprefixed) names" begin

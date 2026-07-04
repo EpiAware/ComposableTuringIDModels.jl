@@ -153,9 +153,12 @@ The accuracy/speed trade-off is controlled by two numbers
 [riutortmayol2023practical](@citep): the number of basis functions `m` (more
 basis functions resolve shorter length scales, at linear cost) and the boundary
 factor `c` (the domain is extended to ``L = c\,S`` beyond the half-range ``S`` of
-the rescaled inputs, so that boundary effects do not distort the fit). The
+the standardised inputs, so that boundary effects do not distort the fit). Because
+the inputs are standardised to unit standard deviation (see [`hsgp_basis`](@ref)),
+``\ell`` is scale-free — measured in standard deviations of the inputs, not raw
+time steps — so a fixed `m` stays adequate as the series length changes. The
 defaults (`m = 20`, `c = 1.5`) are a reasonable starting point for a smooth
-latent process of moderate length; short length scales relative to the series may
+latent process; short length scales relative to the standardised range may still
 need a larger `m`.
 
 ## Fields
@@ -203,31 +206,53 @@ struct HilbertSpaceGP{L <: Sampleable, S <: Sampleable, K <: AbstractGPKernel} <
     end
 end
 
+# Small positive floor on the default length scale. The prior is truncated at
+# `ℓ_floor` rather than 0 because the Matérn spectral density stiffens as ℓ→0
+# (ν = √(2p+1)/ℓ → ∞): a hard floor keeps ν finite and the sampler well-behaved.
+# In standardised input units 0.05 is short (well below the ~√3 half-range) yet
+# safely above the singular limit.
+const _DEFAULT_LENGTH_SCALE_FLOOR = 0.05
+
 function HilbertSpaceGP(;
         length_scale_prior::Sampleable = truncated(
-            Normal(0.0, 0.4), 0, Inf),
+            Normal(0.0, 0.4), _DEFAULT_LENGTH_SCALE_FLOOR, Inf),
         marginal_std_prior::Sampleable = truncated(Normal(0.0, 1.0), 0, Inf),
         m::Int = 20, c::Real = 1.5,
         kernel::AbstractGPKernel = SquaredExponentialKernel())
     return HilbertSpaceGP(length_scale_prior, marginal_std_prior, m, c, kernel)
 end
 
+# Standardise the integer index 1:n to zero mean and unit standard deviation so
+# the length scale ℓ is scale-free: the half-range then approaches √3 as n grows
+# rather than scaling like (n-1)/2, keeping a short ℓ representable by a fixed
+# number of basis functions m regardless of series length. Internal, but shared
+# with the reconstruction tests so they build the exact kernel on the same
+# coordinates the basis uses.
+function _hsgp_standardised_index(n::Int)
+    (collect(1:n) .- Statistics.mean(1:n)) ./ Statistics.std(1:n)
+end
+
 @doc raw"
 Build the Hilbert-space GP basis for `n` evenly spaced inputs.
 
 Returns `(Φ, sqrt_λ)` where `Φ` is the ``n \times m`` matrix of eigenfunctions
-``\phi_j`` evaluated at the rescaled inputs and `sqrt_λ` is the length-`m` vector
-of ``\sqrt{\lambda_j}``. The inputs ``t = 1, \ldots, n`` are centred and rescaled
-to unit spacing about their midpoint, so the half-range is ``S = (n-1)/2`` and the
-GP is approximated on ``[-L, L]`` with ``L = c S``. Both outputs depend only on
-`n`, `m` and `c` — none of the sampled parameters — so [`HilbertSpaceGP`](@ref)
-calls this once per model construction, outside the differentiated per-evaluation
-path. Requires `n > 1` so the half-range ``S`` is positive.
+``\phi_j`` evaluated at the standardised inputs and `sqrt_λ` is the length-`m`
+vector of ``\sqrt{\lambda_j}``. The integer indices ``t = 1, \ldots, n`` are
+**standardised** to zero mean and unit standard deviation, so the length scale
+``\ell`` is scale-free: the half-range ``S = \max_i |x_i|`` approaches
+``\sqrt 3`` as ``n`` grows rather than scaling like ``(n-1)/2``, and the GP is
+approximated on ``[-L, L]`` with ``L = c S``. Standardising keeps a fixed
+``\ell`` prior (and a fixed `m`) meaningful across series lengths: ``\ell`` is
+measured in standard deviations of the inputs, not raw time steps. Both outputs
+depend only on `n`, `m` and `c` — none of the sampled parameters — so
+[`HilbertSpaceGP`](@ref) calls this once per model construction, outside the
+differentiated per-evaluation path. Requires `n > 1` so the standard deviation
+(and hence ``S``) is positive.
 "
 function hsgp_basis(n::Int, m::Int, c::Real)
-    @assert n>1 "n must be greater than 1 for a well-defined basis (S = (n-1)/2 > 0)"
-    x = collect(1:n) .- (n + 1) / 2          # centre the integer index about 0
-    S = (n - 1) / 2                           # half-range of the rescaled inputs
+    @assert n>1 "n must be greater than 1 for a well-defined basis (S > 0)"
+    x = _hsgp_standardised_index(n)
+    S = maximum(abs, x)          # half-range of the standardised inputs
     L = c * S
     j = collect(1:m)'
     sqrt_λ = (π .* j) ./ (2L)                  # √eigenvalues, 1×m
@@ -249,6 +274,13 @@ end
     return gp
 end
 
+# Architecture note: CLAUDE.md's directive is "one `@model function
+# as_turing_model(m::MyModel, ...)` per struct". Here `as_turing_model` is
+# deliberately a *plain* function that builds the fixed basis once and then
+# delegates to the inner `@model _hsgp_model`. This keeps the basis construction
+# out of the differentiated per-evaluation path while preserving the single
+# `as_turing_model(model, n)` entry point; the `@model` is an implementation
+# detail of that one method, not a second public model per struct.
 function as_turing_model(model::HilbertSpaceGP, n)
     @assert n>1 "n must be greater than 1"
     Φ, sqrt_λ = hsgp_basis(n, model.m, model.c)
