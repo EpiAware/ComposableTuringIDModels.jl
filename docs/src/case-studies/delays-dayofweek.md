@@ -12,7 +12,10 @@ This case study keeps the renewal infection core of the
 model with a layered one: infections are convolved through two delay
 distributions and then modulated by a day-of-week reporting pattern. It also
 shows the latent process as an ARIMA-style differenced process broadcast to a
-weekly timescale, and assembles everything with [`EpiProblem`](@ref).
+weekly timescale, and assembles everything with [`EpiProblem`](@ref). The model
+follows the configuration of the [EpiNow2](https://epiforecasts.io/EpiNow2/)
+package [abbott2020estimating](@citep) and is fit to daily confirmed COVID-19
+cases from Italy's first wave in 2020.
 
 ## The model
 
@@ -106,25 +109,36 @@ binomial link, a day-of-week ascertainment modifier, an incubation-delay
 convolution, and a reporting-delay convolution — assembled entirely by
 composition.
 
-## Assemble, simulate, fit
+## The data
+
+We fit the model to the daily confirmed COVID-19 cases from Italy's first wave
+(the example series shipped with the EpiNow2 package), stored with the docs.
+
+```@example delays
+using CSV, DataFrames
+datapath = joinpath(pkgdir(EpiAwarePrototype),
+    "docs", "src", "case-studies", "data", "italy_data.csv")
+italy = CSV.read(datapath, DataFrame)
+n = 42
+y_obs = italy.confirm[1:n]
+(n = n, total_cases = sum(y_obs), from = italy.date[1], to = italy.date[n])
+```
+
+## Assemble and fit
 
 [`EpiProblem`](@ref) ties the latent, infection, and observation models to a
 time span. Its [`as_turing_model`](@ref) method takes data as a named tuple with
-a `y_t` field; `missing` values simulate.
+a `y_t` field (passing `missing` values would instead simulate from the prior).
 
 ```@example delays
-n = 42
 problem = EpiProblem(
     epi_model = renewal,
     observation_model = observation,
     tspan = (1, n))
-
-sim = as_turing_model(problem, (y_t = fill(missing, n),))()
-y_obs = sim.generated_y_t
-first(y_obs, 14)
+nothing # hide
 ```
 
-Fitting conditions on the simulated reports (short run for the docs build),
+Fitting conditions on the observed reports (short run for the docs build),
 differentiating with the recommended [Mooncake](https://chalk-lab.github.io/Mooncake.jl/)
 backend (see [Automatic differentiation backend](@ref ad-backend)):
 

@@ -10,10 +10,11 @@ for reported case counts.
 
 This case study builds that model from two composed parts — a [`Renewal`](@ref)
 infection process that carries an autoregressive latent process for ``\log R_t``,
-and a [`NegativeBinomialError`](@ref) observation model — simulates a synthetic
-outbreak from it, and fits it back. The latent ``\log R_t`` process is *folded
-into* the renewal model rather than supplied as a separate top-level component:
-the reproduction number is the renewal model's own parameter process.
+and a [`NegativeBinomialError`](@ref) observation model — and fits it to the
+test-confirmed COVID-19 cases from South Korea that [mishra2020derivation](@citet)
+analysed. The latent ``\log R_t`` process is *folded into* the renewal model
+rather than supplied as a separate top-level component: the reproduction number
+is the renewal model's own parameter process.
 
 ## The model
 
@@ -32,11 +33,13 @@ observation overdispersion.
 
 ## Components
 
-The latent process is a first-order autoregressive model on ``\log R_t`` with a
-[`HierarchicalNormal`](@ref) innovation term. Strong autocorrelation in the
-reproduction number is encoded by a damping prior concentrated near one. This
-process is the renewal model's reproduction-number process — it is folded into
-the infection model below rather than composed separately.
+The latent process is a second-order autoregressive model on ``\log R_t`` with a
+[`HierarchicalNormal`](@ref) innovation term, matching [mishra2020derivation](@citet).
+Strong autocorrelation in the reproduction number is encoded by a first damping
+prior concentrated near one (``\rho_1 \sim \mathrm{Normal}(0.8, 0.05)`` on
+``[0,1]``) with a weaker second lag. This process is the renewal model's
+reproduction-number process — it is folded into the infection model below rather
+than composed separately.
 
 ```@example renewal
 using EpiAwarePrototype, Distributions, Random, Turing, Mooncake
@@ -44,8 +47,9 @@ using ADTypes: AutoMooncake
 Random.seed!(1234)
 
 latent = AR(
-    damp_priors = [truncated(Normal(0.8, 0.05), 0, 1)],
-    init_priors = [Normal(0.0, 0.25)],
+    damp_priors = [truncated(Normal(0.8, 0.05), 0, 1),
+        truncated(Normal(0.1, 0.05), 0, 1)],
+    init_priors = [Normal(0.0, 0.2), Normal(0.0, 0.2)],
     ϵ_t = HierarchicalNormal(std_prior = HalfNormal(0.1)))
 ```
 
@@ -78,7 +82,7 @@ The [`Renewal`](@ref) process couples that generation interval to the latent
 because it is the only one that uses a generation interval.
 
 ```@example renewal
-renewal = Renewal(data; rt = latent, initialisation_prior = Normal(log(1.0), 0.25))
+renewal = Renewal(data; rt = latent, initialisation_prior = Normal(log(1.0), 0.1))
 nothing # hide
 ```
 
@@ -128,30 +132,36 @@ into one composed model.
 model = EpiAwareModel(renewal, obs)
 ```
 
-## Simulate
+Before fitting, the composed model is also a prior simulator: passing `missing`
+observations makes [`as_turing_model`](@ref) return generated quantities — the
+reported cases `generated_y_t`, the latent infections `I_t`, and the latent
+process `Z_t` — instead of conditioning on data. That is the mechanism used for
+the prior checks above; here we go straight to real data.
 
-Passing `missing` observations turns the model into a prior simulator. The
-composed model returns its generated quantities — the reported cases
-`generated_y_t`, the latent infections `I_t`, and the latent process `Z_t`.
+## The data
+
+[mishra2020derivation](@citet) fit this model to daily test-confirmed COVID-19
+cases in South Korea over the first wave of 2020. The series is stored with the
+docs and read with [CSV](https://csv.juliadata.org)/[DataFrames](https://dataframes.juliadata.org).
 
 ```@example renewal
-n = 60
-sim = as_turing_model(model, fill(missing, n), n)()
-(; generated_y_t, I_t, Z_t) = sim
-first(generated_y_t, 10)
+using CSV, DataFrames
+datapath = joinpath(pkgdir(EpiAwarePrototype),
+    "docs", "src", "case-studies", "data", "south_korea_data.csv")
+south_korea = CSV.read(datapath, DataFrame)
+first(south_korea, 5)
 ```
 
-The implied reproduction number is ``\exp(Z_t)``:
+We fit the growth-and-decline window of the first wave, matching the span used by
+[mishra2020derivation](@citet), and take the reported cases over it as the
+observed series.
 
 ```@example renewal
-extrema(exp.(Z_t))
-```
-
-We treat one simulated path as our observed data.
-
-```@example renewal
-y_obs = generated_y_t
-sum(y_obs)
+tspan = (45, 80)
+y_obs = south_korea.cases_new[first(tspan):last(tspan)]
+n = length(y_obs)
+(n = n, total_cases = sum(y_obs),
+    from = south_korea.date[first(tspan)], to = south_korea.date[last(tspan)])
 ```
 
 ## Fit
@@ -178,8 +188,8 @@ Sampling returns a chain whose parameters keep their flat component names
 *and* their uncertainty alongside the effective sample size and ``\hat{R}``
 convergence diagnostic. The autoregressive damping ``\rho`` (`damp_AR[1]`), the
 innovation scale ``\sigma`` (`std`), and the observation cluster factor
-``\sqrt{1/\phi}`` (`cluster_factor`) are all identified from the single simulated
-series:
+``\sqrt{1/\phi}`` (`cluster_factor`) are all identified from the observed South
+Korean series:
 
 ```@example renewal
 using MCMCChains
