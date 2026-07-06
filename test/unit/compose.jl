@@ -2,7 +2,7 @@
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(21)
     model = EpiAwareModel(
-        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
     n = 20
     mdl = as_turing_model(model, missing, n)
@@ -22,7 +22,7 @@ end
     using DynamicPPL: fix, condition
     Random.seed!(22)
     model = EpiAwareModel(
-        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
     n = 20
     mdl = as_turing_model(model, missing, n)
@@ -42,7 +42,7 @@ end
     using EpiAwarePrototype, Distributions, Turing, Random
     Random.seed!(23)
     model = EpiAwareModel(
-        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
     n = 20
     y = as_turing_model(model, missing, n)()

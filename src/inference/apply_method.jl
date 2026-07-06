@@ -20,7 +20,7 @@ an inference `method`.
 ```@example apply_method
 using EpiAwarePrototype, Distributions
 problem = EpiProblem(
-    epi_model = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+    epi_model = DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
     observation_model = PoissonError(),
     tspan = (1, 20))
 y = rand(as_turing_model(problem, (; y_t = missing)))

@@ -47,10 +47,10 @@ using ADTypes: AutoMooncake
 Random.seed!(1234)
 
 latent = AR(
-    damp_priors = [truncated(Normal(0.8, 0.05), 0, 1),
+    damp = [truncated(Normal(0.8, 0.05), 0, 1),
         truncated(Normal(0.1, 0.05), 0, 1)],
-    init_priors = [Normal(0.0, 0.2), Normal(0.0, 0.2)],
-    ϵ_t = HierarchicalNormal(std_prior = HalfNormal(0.1)))
+    init = [Normal(0.0, 0.2), Normal(0.0, 0.2)],
+    ϵ_t = HierarchicalNormal(std = HalfNormal(0.1)))
 ```
 
 The infection process needs a discrete generation interval. [`EpiData`](@ref)
@@ -82,7 +82,7 @@ The [`Renewal`](@ref) process couples that generation interval to the latent
 because it is the only one that uses a generation interval.
 
 ```@example renewal
-renewal = Renewal(data; rt = latent, initialisation_prior = Normal(log(1.0), 0.1))
+renewal = Renewal(data; rt = latent, initialisation = Normal(log(1.0), 0.1))
 nothing # hide
 ```
 
@@ -101,7 +101,7 @@ latent draw `Z_t`.
 ```@example renewal
 fixed_logR = log(1.4)
 renewal_fixed = Renewal(data;
-    rt = FixedIntercept(fixed_logR), initialisation_prior = Normal())
+    rt = FixedIntercept(fixed_logR), initialisation = Normal())
 demo = fix(as_turing_model(renewal_fixed, 60), (init_incidence = 0.0,))()
 (constant_Rt = round(exp(first(demo.Z_t)), digits = 2),
     grows = demo.I_t[end] > demo.I_t[1])
@@ -120,7 +120,7 @@ placed on the cluster factor ``\sqrt{1/\phi}``, which is roughly the coefficient
 of variation of the observation noise and so easier to reason about a priori.
 
 ```@example renewal
-obs = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1))
+obs = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 nothing # hide
 ```
 

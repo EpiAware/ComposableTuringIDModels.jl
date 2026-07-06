@@ -8,9 +8,12 @@ Model the latent process ``Z_t`` as a random walk.
 Z_t = Z_0 + \sum_{i=1}^{t} \epsilon_i
 ```
 
-where ``Z_0`` is drawn from `init_prior` and the increments ``\epsilon_i`` come
-from the error model `ϵ_t` (a `HierarchicalNormal` by default, giving an
-inferred step standard deviation).
+where ``Z_0`` is drawn from the prior in `init` and the increments
+``\epsilon_i`` come from the error model `ϵ_t` (a `HierarchicalNormal` by
+default, giving an inferred step standard deviation).
+
+The `init` slot is an [`AbstractPriorModel`](@ref): pass a bare `Distribution`
+(coerced via [`as_prior`](@ref)) as before, or a richer prior model.
 
 # Examples
 ```@example RandomWalk
@@ -20,16 +23,22 @@ mdl = as_turing_model(rw, 10)
 rand(mdl)
 ```
 "
-@kwdef struct RandomWalk{D <: Sampleable, E <: AbstractLatentModel} <:
-              AbstractLatentModel
-    init_prior::D = Normal()
-    ϵ_t::E = HierarchicalNormal()
+struct RandomWalk{D <: AbstractPriorModel, E <: AbstractLatentModel} <:
+       AbstractLatentModel
+    "Prior for the initial value ``Z_0``."
+    init::D
+    "Error model for the increments."
+    ϵ_t::E
+end
+
+function RandomWalk(; init = Normal(), ϵ_t::AbstractLatentModel = HierarchicalNormal())
+    return RandomWalk(as_prior(init, :rw_init), ϵ_t)
 end
 
 @model function as_turing_model(model::RandomWalk, n)
     @assert n>0 "n must be greater than 0"
-    rw_init ~ model.init_prior
+    rw_init ~ to_submodel(as_turing_model(model.init, 1), false)
     ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n - 1), false)
-    rw = accumulate_scan(RWStep(), rw_init, ϵ_t)
+    rw = accumulate_scan(RWStep(), only(rw_init), ϵ_t)
     return rw
 end

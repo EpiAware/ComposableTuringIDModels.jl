@@ -11,48 +11,53 @@ then
 ```
 
 and ``Z_t`` is recovered by applying `cumsum` `d` times. The `d` initial terms
-are inferred from `init_prior`; `d` equals the length of `init_priors`.
+are inferred from the prior in `init`; `d` equals the length of that prior.
+
+The `init` slot is an [`AbstractPriorModel`](@ref): pass a vector of
+`Distribution`s (coerced via [`as_prior`](@ref)) as before, or a richer prior
+model.
 
 Composing `DiffLatentModel` over an `AR` gives an ARIMA-style latent process.
 
 # Examples
 ```@example DiffLatentModel
 using EpiAwarePrototype, Distributions
-diff = DiffLatentModel(; model = RandomWalk(), init_priors = [Normal(), Normal()])
+diff = DiffLatentModel(; model = RandomWalk(), init = [Normal(), Normal()])
 mdl = as_turing_model(diff, 10)
 rand(mdl)
 ```
 "
-struct DiffLatentModel{M <: AbstractLatentModel, P <: Distribution} <:
+struct DiffLatentModel{M <: AbstractLatentModel, P <: AbstractPriorModel} <:
        AbstractLatentModel
     "Underlying (undifferenced) latent model."
     model::M
-    "Prior distribution for the initial latent variables."
-    init_prior::P
+    "Prior for the initial latent variables."
+    init::P
     "Number of times differenced."
     d::Int
 
-    function DiffLatentModel(model::AbstractLatentModel, init_prior::Distribution, d::Int)
+    function DiffLatentModel(
+            model::AbstractLatentModel, init::AbstractPriorModel, d::Int)
         @assert d>0 "d must be greater than 0"
-        @assert d==length(init_prior) "d must equal the length of init_prior"
-        new{typeof(model), typeof(init_prior)}(model, init_prior, d)
+        _assert_prior_length(init, d, "init")
+        new{typeof(model), typeof(init)}(model, init, d)
     end
 end
 
-function DiffLatentModel(model::AbstractLatentModel, init_prior::Distribution; d::Int)
-    return DiffLatentModel(; model = model, init_priors = fill(init_prior, d))
+function DiffLatentModel(model::AbstractLatentModel, init::Distribution; d::Int)
+    return DiffLatentModel(; model = model, init = fill(init, d))
 end
 
-function DiffLatentModel(; model::AbstractLatentModel,
-        init_priors::Vector{D} where {D <: Distribution} = [Normal()])
-    d = length(init_priors)
-    return DiffLatentModel(model, _expand_dist(init_priors), d)
+function DiffLatentModel(; model::AbstractLatentModel, init = [Normal()])
+    init_prior = as_prior(init, :latent_init)
+    d = _prior_order(init_prior)
+    return DiffLatentModel(model, init_prior, d)
 end
 
 @model function as_turing_model(model::DiffLatentModel, n)
     d = model.d
     @assert n>d "n must be longer than d"
-    latent_init ~ model.init_prior
+    latent_init ~ to_submodel(as_turing_model(model.init, d), false)
     diff_latent ~ to_submodel(as_turing_model(model.model, n - d), false)
     return _combine_diff(latent_init, diff_latent, d)
 end

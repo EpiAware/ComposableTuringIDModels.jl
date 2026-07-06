@@ -27,7 +27,7 @@ end
     end
     # A wrapped/combined latent is still a latent (the key compositional contract).
     ar = AR()
-    @test DiffLatentModel(; model = ar, init_priors = [Normal(), Normal()]) isa
+    @test DiffLatentModel(; model = ar, init = [Normal(), Normal()]) isa
           AbstractLatentModel
     @test TransformLatentModel(ar, x -> exp.(x)) isa AbstractLatentModel
     @test PrefixLatentModel(; model = ar, prefix = "P") isa AbstractLatentModel
@@ -93,7 +93,7 @@ end
     # A latent manipulator cannot wrap an observation model (slot is latent;
     # keyword constructor → TypeError).
     @test_throws Union{MethodError, TypeError} DiffLatentModel(; model = obs,
-        init_priors = [Normal(), Normal()])
+        init = [Normal(), Normal()])
     # An observation modifier cannot wrap a latent model (slot is observation;
     # positional constructor → MethodError).
     @test_throws MethodError LatentDelay(latent, [0.5, 0.5])
@@ -134,7 +134,7 @@ end
 
     # It slots into an infection model's latent position (the latent is now
     # folded into the infection model) and the composed model runs.
-    infection = DirectInfections(; Z = custom, initialisation_prior = Normal())
+    infection = DirectInfections(; Z = custom, initialisation = Normal())
     model = EpiAwareModel(infection, PoissonError())
     @test model isa EpiAwareModel
     out = as_turing_model(model, missing, 10)()

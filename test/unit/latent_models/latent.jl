@@ -15,14 +15,14 @@ end
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(2)
     ar2 = AR(;
-        damp_priors = [truncated(Normal(0, 0.05), 0, 1),
+        damp = [truncated(Normal(0, 0.05), 0, 1),
             truncated(Normal(0, 0.05), 0, 1)],
-        init_priors = [Normal(), Normal()])
+        init = [Normal(), Normal()])
     @test ar2.p == 2
     @test length(as_turing_model(ar2, 10)()) == 10
 
     ma2 = MA(;
-        θ_priors = [truncated(Normal(0, 0.05), -1, 1),
+        θ = [truncated(Normal(0, 0.05), -1, 1),
         truncated(Normal(0, 0.05), -1, 1)])
     @test ma2.q == 2
     @test length(as_turing_model(ma2, 10)()) == 10
@@ -31,7 +31,7 @@ end
 @testitem "DiffLatentModel composes an ARIMA-style latent process" begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(3)
-    arima = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()])
+    arima = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
     @test arima.d == 2
     path = as_turing_model(arima, 20)()
     @test length(path) == 20

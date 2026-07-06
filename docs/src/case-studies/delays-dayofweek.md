@@ -47,9 +47,9 @@ arma21 = arma(
     init = [Normal(0, 0.2), Normal(0, 0.2)],
     damp = [truncated(Normal(0.1, 0.2), 0, 1), truncated(Normal(0.1, 0.05), 0, 1)],
     θ = [truncated(Normal(0.0, 0.2), -1, 1)],
-    ϵ_t = HierarchicalNormal(std_prior = HalfNormal(0.1)))
+    ϵ_t = HierarchicalNormal(std = HalfNormal(0.1)))
 
-arima211 = DiffLatentModel(; model = arma21, init_priors = [Normal(0.3, 0.3)])
+arima211 = DiffLatentModel(; model = arma21, init = [Normal(0.3, 0.3)])
 nothing # hide
 ```
 
@@ -73,7 +73,7 @@ slot.
 ```@example delays
 data = EpiData(gen_distribution = Gamma(1.4, 1 / 0.38))
 renewal = Renewal(data;
-    rt = weekly_latent, initialisation_prior = Normal(log(1.0), 1.0))
+    rt = weekly_latent, initialisation = Normal(log(1.0), 1.0))
 nothing # hide
 ```
 
@@ -85,9 +85,9 @@ multiplier, so reporting can be systematically higher or lower on particular
 weekdays.
 
 ```@example delays
-negbin = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1))
+negbin = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 dayofweek_negbin = ascertainment_dayofweek(
-    negbin; latent_model = HierarchicalNormal(std_prior = HalfNormal(1.0)))
+    negbin; latent_model = HierarchicalNormal(std = HalfNormal(1.0)))
 nothing # hide
 ```
 

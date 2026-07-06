@@ -25,9 +25,19 @@ Because `BroadcastPrior` is itself an [`AbstractPriorModel`](@ref), anything ric
 a user writes (a partially-pooled prior, a time-varying prior wrapping a
 [`RandomWalk`](@ref)) drops into the same prior slot with no struct changes.
 
+An optional `name` fixes the sampled variable's name in the chain. When a
+component samples a prior as a submodel via `to_submodel(..., false)`, the
+component sets `name` to its own parameter name (e.g. `:damp_AR`, `:std`,
+`:init_incidence`) so the flat chain names are unchanged when the default wrapper
+replaces a bare `~ dist`. It also keeps two broadcast priors in one model from
+colliding on a shared internal name. When `name === nothing` (the default) the
+variable is sampled under the generic name `θ`.
+
 ## Fields
 
   - `dist`: a `Distribution`, or a `Vector{<:Distribution}`.
+  - `name`: the sampled variable name (a `Symbol`), or `nothing` for the generic
+    `θ`.
 
 # Examples
 ```@example BroadcastPrior
@@ -36,16 +46,26 @@ using EpiAwarePrototype, Distributions
 only(as_turing_model(BroadcastPrior(Normal()), 1)())
 ```
 "
-struct BroadcastPrior{D} <: AbstractPriorModel
+struct BroadcastPrior{D, N <: Union{Symbol, Nothing}} <: AbstractPriorModel
     "A `Distribution`, or a `Vector{<:Distribution}`."
     dist::D
+    "The sampled variable name, or `nothing` for the generic `θ`."
+    name::N
 end
+
+BroadcastPrior(dist) = BroadcastPrior(dist, nothing)
+
+# Sample from `dist` under the wrapper's fixed name, or the generic `θ` when no
+# name is set. `NamedDist` fixes the chain variable name regardless of the
+# tilde's left-hand side.
+_named(dist, ::Nothing) = dist
+_named(dist, name::Symbol) = NamedDist(dist, name)
 
 @model function as_turing_model(prior::BroadcastPrior{<:Distribution}, n)
     @assert n>0 "n must be greater than 0"
     # Repeat-one: a single random variable repeated to length `n`, so a global
     # parameter is not expanded into `n` i.i.d. draws.
-    θ ~ prior.dist
+    θ ~ _named(prior.dist, prior.name)
     return fill(θ, n)
 end
 
@@ -55,7 +75,7 @@ end
     # `_expand_dist` did), `arraydist` otherwise.
     product_dist = all(first(prior.dist) .== prior.dist) ?
                    filldist(first(prior.dist), n) : arraydist(prior.dist)
-    θ ~ product_dist
+    θ ~ _named(product_dist, prior.name)
     return θ
 end
 
@@ -83,3 +103,27 @@ as_prior(RandomWalk())    # a latent model is already a prior model
 as_prior(p::AbstractPriorModel) = p
 as_prior(d::Distribution) = BroadcastPrior(d)
 as_prior(v::AbstractVector{<:Distribution}) = BroadcastPrior(v)
+
+# Name-carrying coercion used by component constructors: a bare `Distribution`
+# (or vector) is wrapped in a `BroadcastPrior` that samples under the component's
+# own parameter `name`, so the flat chain names are unchanged. A richer prior /
+# latent model is passed through and keeps its own internal names.
+as_prior(p::AbstractPriorModel, ::Symbol) = p
+as_prior(d::Distribution, name::Symbol) = BroadcastPrior(d, name)
+function as_prior(v::AbstractVector{<:Distribution}, name::Symbol)
+    return BroadcastPrior(v, name)
+end
+
+# Order (p / q / d) implied by a prior: a vector wrapper fixes it to the vector
+# length; a single-distribution (repeat-one) or richer prior defaults to order 1.
+_prior_order(p::BroadcastPrior{<:AbstractVector}) = length(p.dist)
+_prior_order(::AbstractPriorModel) = 1
+
+# Assert a vector wrapper's length matches the required order `k`. A
+# single-distribution or richer prior broadcasts to `k` and imposes no
+# constraint.
+function _assert_prior_length(p::BroadcastPrior{<:AbstractVector}, k, what)
+    @assert length(p.dist)==k "$what prior length $(length(p.dist)) must equal $k"
+    return nothing
+end
+_assert_prior_length(::AbstractPriorModel, k, what) = nothing

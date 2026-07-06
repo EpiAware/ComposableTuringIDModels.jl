@@ -11,7 +11,9 @@ A non-centred hierarchical normal latent process.
 ## Fields
 
   - `mean`: the mean of the normal process.
-  - `std_prior`: the prior distribution for the standard deviation ``\sigma``.
+  - `std`: the prior for the standard deviation ``\sigma`` (an
+    [`AbstractPriorModel`](@ref); a bare `Distribution` is coerced via
+    [`as_prior`](@ref)).
   - `add_mean`: flag controlling whether `mean` is added (false when
     `mean == 0`).
 
@@ -23,24 +25,28 @@ mdl = as_turing_model(hn, 10)
 rand(mdl)
 ```
 "
-@kwdef struct HierarchicalNormal{R <: Real, D <: Sampleable, M <: Bool} <:
-              AbstractLatentModel
+struct HierarchicalNormal{R <: Real, D <: AbstractPriorModel, M <: Bool} <:
+       AbstractLatentModel
     "Mean of the normal distribution."
-    mean::R = 0.0
-    "Prior distribution for the standard deviation."
-    std_prior::D = truncated(Normal(0, 0.1), 0, Inf)
+    mean::R
+    "Prior for the standard deviation."
+    std::D
     "Flag controlling whether `mean` is added (false when `mean == 0`)."
-    add_mean::M = mean != 0
+    add_mean::M
 end
 
-HierarchicalNormal(std_prior::Distribution) = HierarchicalNormal(; std_prior = std_prior)
-function HierarchicalNormal(mean::Real, std_prior::Distribution)
-    return HierarchicalNormal(mean, std_prior, mean != 0)
+function HierarchicalNormal(; mean::Real = 0.0,
+        std = truncated(Normal(0, 0.1), 0, Inf), add_mean::Bool = mean != 0)
+    return HierarchicalNormal(mean, as_prior(std, :std), add_mean)
+end
+HierarchicalNormal(std::Distribution) = HierarchicalNormal(; std = std)
+function HierarchicalNormal(mean::Real, std::Distribution)
+    return HierarchicalNormal(; mean = mean, std = std)
 end
 
 @model function as_turing_model(model::HierarchicalNormal, n)
-    std ~ model.std_prior
+    std ~ to_submodel(as_turing_model(model.std, 1), false)
     ϵ_t ~ to_submodel(as_turing_model(IID(Normal()), n), false)
-    η_t = model.add_mean ? model.mean .+ std * ϵ_t : std * ϵ_t
+    η_t = model.add_mean ? model.mean .+ only(std) * ϵ_t : only(std) * ϵ_t
     return η_t
 end

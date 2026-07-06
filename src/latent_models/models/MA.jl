@@ -19,36 +19,37 @@ mdl = as_turing_model(ma, 10)
 rand(mdl)
 ```
 "
-struct MA{C <: Sampleable, Q <: Int, E <: AbstractLatentModel} <:
+struct MA{C <: AbstractPriorModel, Q <: Int, E <: AbstractLatentModel} <:
        AbstractLatentModel
-    "Prior distribution for the MA coefficients."
+    "Prior for the MA coefficients."
     θ::C
     "Order of the MA model."
     q::Q
     "Error model for the innovations."
     ϵ_t::E
 
-    function MA(θ::Sampleable, q::Int, ϵ_t::AbstractLatentModel)
+    function MA(θ::AbstractPriorModel, q::Int, ϵ_t::AbstractLatentModel)
         @assert q>0 "q must be greater than 0"
-        @assert q==length(θ) "q must equal the length of θ"
+        _assert_prior_length(θ, q, "θ")
         new{typeof(θ), typeof(q), typeof(ϵ_t)}(θ, q, ϵ_t)
     end
 end
 
 function MA(θ::Distribution; q::Int = 1, ϵ_t::AbstractLatentModel = HierarchicalNormal())
-    return MA(; θ_priors = fill(θ, q), ϵ_t = ϵ_t)
+    return MA(; θ = fill(θ, q), ϵ_t = ϵ_t)
 end
 
-function MA(; θ_priors::Vector{C} = [truncated(Normal(0.0, 0.05), -1, 1)],
-        ϵ_t::AbstractLatentModel = HierarchicalNormal()) where {C <: Distribution}
-    q = length(θ_priors)
-    return MA(_expand_dist(θ_priors), q, ϵ_t)
+function MA(; θ = [truncated(Normal(0.0, 0.05), -1, 1)],
+        ϵ_t::AbstractLatentModel = HierarchicalNormal())
+    θ_prior = as_prior(θ, :θ)
+    q = _prior_order(θ_prior)
+    return MA(θ_prior, q, ϵ_t)
 end
 
 @model function as_turing_model(model::MA, n)
     q = model.q
     @assert n>q "n must be longer than the order of the moving average process"
-    θ ~ model.θ
+    θ ~ to_submodel(as_turing_model(model.θ, q), false)
     ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n), false)
     # `MAStep` keeps its innovation buffer newest-first (see `MAStep.jl`), so the
     # warm-up seed must be reversed: `reverse(ϵ_t[1:q]) = [ϵ_q, …, ϵ_1]` puts the

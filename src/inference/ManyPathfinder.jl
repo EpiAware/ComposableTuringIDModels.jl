@@ -57,7 +57,7 @@ Run Pathfinder several times and return the run with the largest ELBO estimate.
 using EpiAwarePrototype, Distributions
 m = as_turing_model(
     EpiAwareModel(
-        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError()), fill(10, 10), 10)
 nothing
 ```

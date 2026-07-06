@@ -21,7 +21,7 @@ using EpiAwarePrototype, Distributions
 # process (here a random walk in its `Z` slot); the latent is folded in rather
 # than threaded as a separate top-level component.
 model = EpiAwareModel(
-    DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+    DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
     PoissonError())
 
 # Build a Turing model; `missing` observations simulate from the prior.

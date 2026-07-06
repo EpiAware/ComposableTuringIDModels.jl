@@ -60,16 +60,16 @@ swapping one struct for another, leaving the rest untouched:
 using EpiAwarePrototype, Distributions
 
 # An ARIMA-style latent process: a differenced AR.
-latent = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()])
+latent = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
 
 # Fold the latent into a direct-infections process, then swap the observation
 # model without touching the rest.
 poisson_model = EpiAwareModel(
-    DirectInfections(; Z = latent, initialisation_prior = Normal()),
+    DirectInfections(; Z = latent, initialisation = Normal()),
     PoissonError())
 
 negbin_model = EpiAwareModel(
-    DirectInfections(; Z = latent, initialisation_prior = Normal()),
+    DirectInfections(; Z = latent, initialisation = Normal()),
     NegativeBinomialError())
 nothing # hide
 ```

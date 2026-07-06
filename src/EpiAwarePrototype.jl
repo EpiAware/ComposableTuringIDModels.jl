@@ -17,7 +17,7 @@ clearly labelled as a prototype.
 ```@example
 using EpiAwarePrototype, Distributions
 model = EpiAwareModel(
-    DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+    DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
     PoissonError())
 rand(as_turing_model(model, missing, 20))
 ```
@@ -29,7 +29,8 @@ module EpiAwarePrototype
 # Only the names the prototype itself uses or extends are imported below, which
 # keeps the public surface to the package's own exports.
 
-using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix, returned
+using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
+                  NamedDist, returned
 using Turing: Turing, filldist, arraydist, sample, MCMCSerial
 using CensoredDistributions: double_interval_censored
 using LinearAlgebra: dot

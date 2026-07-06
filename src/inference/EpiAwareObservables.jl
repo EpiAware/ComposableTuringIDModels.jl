@@ -42,7 +42,7 @@ generated quantities, so `generated` is `missing`.
 using EpiAwarePrototype, Distributions
 m = as_turing_model(
     EpiAwareModel(
-        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError()), missing, 10)
 generated_observables(m, (; y_t = missing), rand(m))
 ```

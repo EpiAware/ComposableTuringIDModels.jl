@@ -35,7 +35,7 @@ vector to condition.
 ```@example EpiAwareModel
 using EpiAwarePrototype, Distributions
 model = EpiAwareModel(
-    DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+    DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
     PoissonError())
 mdl = as_turing_model(model, missing, 20)
 rand(mdl)

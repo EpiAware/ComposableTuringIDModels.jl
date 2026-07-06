@@ -11,12 +11,13 @@ observed value is normally distributed about its expected value,
 y_t \sim \mathrm{Normal}(Y_t, \sigma),
 ```
 
-with the standard deviation ``\sigma`` drawn from `std_prior`. It is the minimal
-non-count observation error, useful for already-aggregated or transformed
+with the standard deviation ``\sigma`` drawn from the prior in `std`. It is the
+minimal non-count observation error, useful for already-aggregated or transformed
 quantities (e.g. log-incidence, prevalence proportions, wastewater
 concentrations) where a Gaussian likelihood is appropriate.
 
-The field `std_prior` sets the prior distribution for ``\sigma``.
+The field `std` sets the prior for ``\sigma`` (an [`AbstractPriorModel`](@ref); a
+bare `Distribution` is coerced via [`as_prior`](@ref)).
 
 # Examples
 ```@example NormalError
@@ -26,14 +27,18 @@ mdl = as_turing_model(ne, missing, fill(10.0, 10))
 rand(mdl)
 ```
 "
-@kwdef struct NormalError{S <: Sampleable} <: AbstractObservationErrorModel
-    "Prior distribution for the observation standard deviation."
-    std_prior::S = HalfNormal(0.1)
+struct NormalError{S <: AbstractPriorModel} <: AbstractObservationErrorModel
+    "Prior for the observation standard deviation."
+    std::S
+    NormalError(std::AbstractPriorModel) = new{typeof(std)}(std)
 end
 
+NormalError(std) = NormalError(as_prior(std, :σ))
+NormalError(; std = HalfNormal(0.1)) = NormalError(as_prior(std, :σ))
+
 @model function generate_observation_error_priors(obs_model::NormalError, y_t, Y_t)
-    σ ~ obs_model.std_prior
-    return (; σ)
+    σ ~ to_submodel(as_turing_model(obs_model.std, 1), false)
+    return (; σ = only(σ))
 end
 
 observation_error(::NormalError, Y_t, σ) = Normal(Y_t, σ)

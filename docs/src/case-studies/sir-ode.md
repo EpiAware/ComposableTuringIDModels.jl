@@ -174,9 +174,9 @@ adjustment), and a small innovation standard deviation.
 
 ```@example sir
 ascertainment = AR(
-    damp_priors = [HalfNormal(0.005)],
-    init_priors = [Normal(0, 0.001)],
-    ϵ_t = HierarchicalNormal(std_prior = HalfNormal(0.02)))
+    damp = [HalfNormal(0.005)],
+    init = [Normal(0, 0.001)],
+    ϵ_t = HierarchicalNormal(std = HalfNormal(0.02)))
 
 stochastic_obs = TransformObservationModel(
     Ascertainment(model = PoissonError(), latent_model = ascertainment),

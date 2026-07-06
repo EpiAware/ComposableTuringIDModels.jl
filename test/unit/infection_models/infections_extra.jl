@@ -1,7 +1,7 @@
 @testitem "ExpGrowthRate generates a growth-rate path and maps it to infections" begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(41)
-    egr = ExpGrowthRate(; rt = RandomWalk(), initialisation_prior = Normal())
+    egr = ExpGrowthRate(; rt = RandomWalk(), initialisation = Normal())
     out = as_turing_model(egr, 20)()
     @test length(out.I_t) == 20
     @test length(out.Z_t) == 20
@@ -12,7 +12,7 @@ end
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(42)
     data = EpiData([0.2, 0.3, 0.5], exp)
-    renewal = Renewal(data; rt = RandomWalk(), initialisation_prior = Normal())
+    renewal = Renewal(data; rt = RandomWalk(), initialisation = Normal())
     out = as_turing_model(renewal, 20)()
     @test length(out.I_t) == 20
     @test length(out.Z_t) == 20
@@ -30,7 +30,7 @@ end
     # standalone-style illustration under the folded interface.
     logR = log(1.5)
     renewal = Renewal(data; rt = FixedIntercept(logR),
-        initialisation_prior = Normal())
+        initialisation = Normal())
     mdl = fix(as_turing_model(renewal, 30), (init_incidence = 0.0,))
     out = mdl()
     @test all(≈(logR), out.Z_t)
@@ -53,7 +53,7 @@ end
     Random.seed!(43)
     data = EpiData([0.2, 0.3, 0.5], exp)
     model = EpiAwareModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(data; rt = RandomWalk(), initialisation = Normal()),
         PoissonError())
     y = as_turing_model(model, missing, 20)().generated_y_t
     chn = sample(as_turing_model(model, y, 20), NUTS(), 30; progress = false)

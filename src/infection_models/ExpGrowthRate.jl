@@ -14,9 +14,9 @@ r_t \sim \text{latent}, \qquad I_t = g\!\left(\hat I_0 + \sum_{s \le t} r_s\righ
 
 where the latent model `rt` supplies the (log) growth rates ``r_s``, ``g`` is
 `transformation`, and the unconstrained initial infections ``\hat I_0`` come from
-`initialisation_prior`. The growth-rate process is generated *inside* the model,
-so `as_turing_model` takes only the series length `n` and returns the named tuple
-`(; I_t, Z_t)` with `Z_t` the growth-rate path.
+the prior in `initialisation`. The growth-rate process is generated *inside* the
+model, so `as_turing_model` takes only the series length `n` and returns the
+named tuple `(; I_t, Z_t)` with `Z_t` the growth-rate path.
 
 This model carries no generation interval — it never uses one — so it takes a
 `transformation` directly instead of an [`EpiData`](@ref) object.
@@ -28,28 +28,37 @@ This model carries no generation interval — it never uses one — so it takes 
   - `transformation`: the link mapping the unconstrained cumulative sum to
     non-negative infections (default: numerically equivalent to `exp`,
     implemented via `LogExpFunctions.xexpy` for numerical stability).
-  - `initialisation_prior`: prior for the unconstrained initial infections.
+  - `initialisation`: prior for the unconstrained initial infections (an
+    [`AbstractPriorModel`](@ref); a bare `Distribution` is coerced via
+    [`as_prior`](@ref)).
 
 # Examples
 ```@example ExpGrowthRate
 using EpiAwarePrototype, Distributions
-egr = ExpGrowthRate(; rt = RandomWalk(), initialisation_prior = Normal())
+egr = ExpGrowthRate(; rt = RandomWalk(), initialisation = Normal())
 rand(as_turing_model(egr, 10))
 ```
 "
-@kwdef struct ExpGrowthRate{L <: AbstractLatentModel, F <: Function, S <: Sampleable} <:
-              AbstractInfectionModel
+struct ExpGrowthRate{L <: AbstractLatentModel, F <: Function,
+    S <: AbstractPriorModel} <: AbstractInfectionModel
     "Latent process model generating the growth-rate path."
-    rt::L = RandomWalk()
+    rt::L
     "Link mapping the unconstrained cumulative sum to non-negative infections."
-    transformation::F = _oneexpy
+    transformation::F
     "Prior for the unconstrained initial infections."
-    initialisation_prior::S = Normal()
+    initialisation::S
+end
+
+function ExpGrowthRate(; rt::AbstractLatentModel = RandomWalk(),
+        transformation::Function = _oneexpy, initialisation = Normal())
+    return ExpGrowthRate(
+        rt, transformation, as_prior(initialisation, :init_incidence))
 end
 
 @model function as_turing_model(model::ExpGrowthRate, n)
     Z_t ~ to_submodel(as_turing_model(model.rt, n), false)
-    init_incidence ~ model.initialisation_prior
-    I_t = model.transformation.(init_incidence .+ cumsum(Z_t))
+    init_incidence ~ to_submodel(
+        as_turing_model(model.initialisation, 1), false)
+    I_t = model.transformation.(only(init_incidence) .+ cumsum(Z_t))
     return (; I_t, Z_t)
 end

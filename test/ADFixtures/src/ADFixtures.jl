@@ -51,13 +51,13 @@ function _models()
     rw = as_turing_model(RandomWalk(), n)
     ar = as_turing_model(AR(), n)
     arima = as_turing_model(
-        DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]), n)
+        DiffLatentModel(; model = AR(), init = [Normal(), Normal()]), n)
 
     direct = EpiAwareModel(
-        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
     renewal = EpiAwareModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(data; rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
 
     # Nowcasting MARGINAL (right-truncation correction): a renewal model whose
@@ -65,7 +65,7 @@ function _models()
     # supplied as a `ReportingCDF` submodel). This exercises the `reverse`/
     # broadcast scaling the modifier adds on top of the inner error.
     nowcast = EpiAwareModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(data; rt = RandomWalk(), initialisation = Normal()),
         RightTruncate(NegativeBinomialError(),
             truncated(Normal(4.0, 1.5), 0.0, Inf)))
 
@@ -74,7 +74,7 @@ function _models()
     # Poisson log-likelihood over the masked triangle (`t + d ≤ now`) is what
     # nowcasting under NUTS depends on.
     triangle = EpiAwareModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(data; rt = RandomWalk(), initialisation = Normal()),
         ReportTriangle(PoissonError(), [0.6, 0.25, 0.15]))
 
     y_direct = as_turing_model(direct, missing, n)().generated_y_t

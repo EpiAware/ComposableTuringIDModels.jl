@@ -2,7 +2,7 @@
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(71)
     problem = EpiProblem(
-        epi_model = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        epi_model = DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         observation_model = PoissonError(),
         tspan = (1, 20))
     m = as_turing_model(problem, (; y_t = missing))
@@ -15,7 +15,7 @@ end
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(72)
     problem = EpiProblem(
-        epi_model = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        epi_model = DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         observation_model = PoissonError(),
         tspan = (1, 20))
     ydata = as_turing_model(problem, (; y_t = missing))().generated_y_t
@@ -32,7 +32,7 @@ end
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(73)
     problem = EpiProblem(
-        epi_model = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        epi_model = DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         observation_model = PoissonError(),
         tspan = (1, 20))
     ydata = as_turing_model(problem, (; y_t = missing))().generated_y_t
@@ -59,7 +59,7 @@ end
     Random.seed!(75)
     m = as_turing_model(
         EpiAwareModel(
-            DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+            DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
             PoissonError()), missing, 10)
     obs = generated_observables(m, (; y_t = missing), rand(m))
     @test obs isa EpiAwareObservables
@@ -75,7 +75,7 @@ end
     Random.seed!(76)
     m = as_turing_model(
         EpiAwareModel(
-            DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+            DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
             PoissonError()), missing, 10)
     # A solution `returned` cannot consume (here a bare marker) has no generated
     # quantities, so the field stays `missing`.

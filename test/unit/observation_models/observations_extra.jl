@@ -154,7 +154,7 @@ end
     data = EpiData([0.2, 0.3, 0.5], exp)
     n = 25
     model = EpiAwareModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(data; rt = RandomWalk(), initialisation = Normal()),
         RightTruncate(NegativeBinomialError(),
             truncated(Normal(4.0, 1.5), 0.0, Inf)))
 
@@ -366,7 +366,7 @@ end
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(75)
     data = EpiData([0.2, 0.3, 0.5], exp)
-    renewal = Renewal(data; rt = RandomWalk(), initialisation_prior = Normal())
+    renewal = Renewal(data; rt = RandomWalk(), initialisation = Normal())
 
     # Released-CD discretised-delay constructor (the LatentDelay / EpiData path).
     obs = ReportTriangle(NegativeBinomialError(),
