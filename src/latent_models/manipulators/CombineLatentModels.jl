@@ -14,7 +14,7 @@ When a non-empty prefix is supplied for a component it is wrapped in a
 
 # Examples
 ```@example CombineLatentModels
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 combined = CombineLatentModels([Intercept(Normal(2, 0.2)), AR()])
 rand(as_turing_model(combined, 10))
 ```

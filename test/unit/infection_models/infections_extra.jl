@@ -1,5 +1,5 @@
 @testitem "ExpGrowthRate generates a growth-rate path and maps it to infections" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(41)
     egr = ExpGrowthRate(; rt = RandomWalk(), initialisation_prior = Normal())
     out = as_turing_model(egr, 20)()
@@ -9,9 +9,9 @@
 end
 
 @testitem "Renewal generates an Rt path and maps it to infections" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(42)
-    data = EpiData([0.2, 0.3, 0.5], exp)
+    data = IDData([0.2, 0.3, 0.5], exp)
     renewal = Renewal(data; rt = RandomWalk(), initialisation_prior = Normal())
     out = as_turing_model(renewal, 20)()
     @test length(out.I_t) == 20
@@ -21,10 +21,10 @@ end
 end
 
 @testitem "infection models fix their latent to a deterministic path" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: fix
     Random.seed!(421)
-    data = EpiData([0.2, 0.3, 0.5], exp)
+    data = IDData([0.2, 0.3, 0.5], exp)
     # Pinning the latent to a known (log) Rt trajectory via a FixedIntercept
     # latent makes the renewal infection path deterministic given I₀ — the
     # standalone-style illustration under the folded interface.
@@ -40,7 +40,7 @@ end
 end
 
 @testitem "growth-rate / reproduction-number conversions round-trip" begin
-    using EpiAwarePrototype
+    using ComposableTuringIDModels
     w = [0.2, 0.3, 0.5]
     r = R_to_r(1.5, w)
     @test r_to_R(r, w) ≈ 1.5 rtol=1e-3
@@ -49,10 +49,10 @@ end
 end
 
 @testitem "composed Renewal model runs a short NUTS sample" tags=[:sample] begin
-    using EpiAwarePrototype, Distributions, Turing, Random
+    using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(43)
-    data = EpiData([0.2, 0.3, 0.5], exp)
-    model = EpiAwareModel(
+    data = IDData([0.2, 0.3, 0.5], exp)
+    model = IDModel(
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
     y = as_turing_model(model, missing, 20)().generated_y_t

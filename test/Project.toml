@@ -9,7 +9,7 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DynamicPPL = "366bfd00-2699-11ea-058f-f148b4cae6d8"
 EpiAwarePackageTools = "7aaea248-0d11-4a0d-a7dc-86da30abb951"
-EpiAwarePrototype = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
+ComposableTuringIDModels = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
 ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
@@ -26,4 +26,4 @@ Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [sources]
 EpiAwarePackageTools = {rev = "main", url = "https://github.com/EpiAware/EpiAwarePackageTools.jl"}
-EpiAwarePrototype = {path = ".."}
+ComposableTuringIDModels = {path = ".."}

@@ -14,14 +14,14 @@ its `as_turing_model` samples the parameters, solves the ODE, and returns
 
 # Arguments
 
-  - `epi_model`: the [`ODEProcess`](@ref).
+  - `infection`: the [`ODEProcess`](@ref).
   - `n`: the requested series length; passed through to the parameter model
     (the ODE dimension is fixed, so `n` is otherwise unused — `nothing` is also
     accepted).
 
 # Examples
 ```@example ODEProcess
-using EpiAwarePrototype, OrdinaryDiffEq, Distributions, LogExpFunctions
+using ComposableTuringIDModels, OrdinaryDiffEq, Distributions, LogExpFunctions
 sirparams = SIRParams(
     tspan = (0.0, 100.0),
     infectiousness = LogNormal(log(0.3), 0.05),
@@ -57,20 +57,20 @@ as_turing_model(sir_process, nothing)()
 end
 
 # Sample the ODE parameters and solve, returning the solution object.
-@model function _generate_ode_solution(epi_model::ODEProcess, n)
-    prob = epi_model.params.prob
-    solver = epi_model.solver
-    solver_options = epi_model.solver_options
-    params ~ to_submodel(as_turing_model(epi_model.params, n), false)
+@model function _generate_ode_solution(infection::ODEProcess, n)
+    prob = infection.params.prob
+    solver = infection.solver
+    solver_options = infection.solver_options
+    params ~ to_submodel(as_turing_model(infection.params, n), false)
     u0, p = params
     _prob = remake(prob; u0 = u0, p = p)
     sol = solve(_prob, solver; solver_options...)
     return sol
 end
 
-@model function as_turing_model(epi_model::ODEProcess, n)
+@model function as_turing_model(infection::ODEProcess, n)
     n_steps = isnothing(n) ? 0 : n
-    sol ~ to_submodel(_generate_ode_solution(epi_model, n_steps), false)
-    I_t = epi_model.sol2infs(sol)
+    sol ~ to_submodel(_generate_ode_solution(infection, n_steps), false)
+    I_t = infection.sol2infs(sol)
     return (; I_t, Z_t = nothing)
 end

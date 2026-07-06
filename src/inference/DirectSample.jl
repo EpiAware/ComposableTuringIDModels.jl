@@ -11,7 +11,7 @@ and with `nothing` it draws once with `rand` (returning a `NamedTuple`).
 
   - `n_samples`: number of prior draws, or `nothing` for a single `rand` draw.
 "
-@kwdef struct DirectSample <: AbstractEpiSamplingMethod
+@kwdef struct DirectSample <: AbstractIDSamplingMethod
     "Number of prior draws, or `nothing` for a single `rand` draw."
     n_samples::Union{Int, Nothing} = nothing
 end

@@ -19,7 +19,7 @@ broadcast across all components.
 
 # Examples
 ```@example StackObservationModels
-using EpiAwarePrototype
+using ComposableTuringIDModels
 obs = StackObservationModels((cases = PoissonError(), deaths = PoissonError()))
 mdl = as_turing_model(obs, (cases = missing, deaths = missing), fill(10.0, 5))
 rand(mdl)

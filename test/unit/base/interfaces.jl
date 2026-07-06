@@ -6,20 +6,20 @@
 #   2. behavioural conformance — build the model, draw, check output shape.
 
 @testitem "role supertypes form the intended shallow hierarchy" begin
-    using EpiAwarePrototype
+    using ComposableTuringIDModels
     for R in (AbstractLatentModel, AbstractInfectionModel, AbstractObservationModel)
-        @test R <: AbstractEpiAwareModel
+        @test R <: AbstractComposableModel
     end
     # The error sub-role sits under the observation role.
     @test AbstractObservationErrorModel <: AbstractObservationModel
-    @test AbstractObservationErrorModel <: AbstractEpiAwareModel
+    @test AbstractObservationErrorModel <: AbstractComposableModel
     # Roles are distinct branches (no role is a subtype of another sibling).
     @test !(AbstractLatentModel <: AbstractObservationModel)
     @test !(AbstractInfectionModel <: AbstractLatentModel)
 end
 
 @testitem "latent models and latent manipulators are AbstractLatentModel" begin
-    using EpiAwarePrototype, Distributions
+    using ComposableTuringIDModels, Distributions
     # Concrete latent models.
     for m in (IID(Normal()), HierarchicalNormal(), RandomWalk(), AR(), MA(),
         Intercept(Normal()), FixedIntercept(0.1), Null())
@@ -40,8 +40,8 @@ end
 end
 
 @testitem "infection models are AbstractInfectionModel; ODE params are latent" begin
-    using EpiAwarePrototype, Distributions, OrdinaryDiffEq
-    data = EpiData([0.2, 0.3, 0.5], exp)
+    using ComposableTuringIDModels, Distributions, OrdinaryDiffEq
+    data = IDData([0.2, 0.3, 0.5], exp)
     for m in (DirectInfections(; Z = RandomWalk()), ExpGrowthRate(; rt = RandomWalk()),
         Renewal(; data = data, rt = RandomWalk()))
         @test m isa AbstractInfectionModel
@@ -56,7 +56,7 @@ end
 end
 
 @testitem "observation models and observation modifiers are AbstractObservationModel" begin
-    using EpiAwarePrototype, Distributions
+    using ComposableTuringIDModels, Distributions
     for m in (PoissonError(), NegativeBinomialError())
         @test m isa AbstractObservationModel
         @test m isa AbstractObservationErrorModel
@@ -74,22 +74,22 @@ end
 end
 
 @testitem "role slots reject wrong-role components at construction" begin
-    using EpiAwarePrototype, Distributions
+    using ComposableTuringIDModels, Distributions
     latent = RandomWalk()
     infection = DirectInfections(; Z = RandomWalk())
     obs = PoissonError()
     # Correct order constructs (infection then observation).
-    @test EpiAwareModel(infection, obs) isa EpiAwareModel
+    @test IDModel(infection, obs) isa IDModel
     # Wrong order (the classic foot-gun) fails at construction, not at sampling.
     # Positional constructors fail dispatch (MethodError). The wrong-role
     # component is rejected before any sampling happens.
-    @test_throws MethodError EpiAwareModel(obs, infection)
+    @test_throws MethodError IDModel(obs, infection)
     # A latent model is not an infection model, so it cannot fill the infection
     # slot either.
-    @test_throws MethodError EpiAwareModel(latent, obs)
-    # EpiProblem enforces the same role slots (keyword struct → TypeError).
-    @test_throws Union{MethodError, TypeError} EpiProblem(
-        epi_model = obs, observation_model = obs, tspan = (1, 10))
+    @test_throws MethodError IDModel(latent, obs)
+    # IDProblem enforces the same role slots (keyword struct → TypeError).
+    @test_throws Union{MethodError, TypeError} IDProblem(
+        infection = obs, observation_model = obs, tspan = (1, 10))
     # A latent manipulator cannot wrap an observation model (slot is latent;
     # keyword constructor → TypeError).
     @test_throws Union{MethodError, TypeError} DiffLatentModel(; model = obs,
@@ -100,8 +100,8 @@ end
 end
 
 @testitem "reusable interface checkers confirm role conformance" begin
-    using EpiAwarePrototype, Distributions
-    data = EpiData([0.2, 0.3, 0.5], exp)
+    using ComposableTuringIDModels, Distributions
+    data = IDData([0.2, 0.3, 0.5], exp)
     # Each checker is true for an in-role model implementing its as_turing_model.
     @test implements_latent_interface(RandomWalk())
     @test implements_latent_interface(AR(); n = 12)
@@ -116,7 +116,7 @@ end
 end
 
 @testitem "a user-defined struct in a role composes via its interface" begin
-    using EpiAwarePrototype, Distributions
+    using ComposableTuringIDModels, Distributions
     using DynamicPPL: @model
 
     # In-test extension proof: a tiny custom latent model. Subtyping the role and
@@ -124,7 +124,7 @@ end
     struct ConstantLatent <: AbstractLatentModel
         value::Float64
     end
-    @model function EpiAwarePrototype.as_turing_model(m::ConstantLatent, n)
+    @model function ComposableTuringIDModels.as_turing_model(m::ConstantLatent, n)
         return fill(m.value, n)
     end
 
@@ -135,15 +135,15 @@ end
     # It slots into an infection model's latent position (the latent is now
     # folded into the infection model) and the composed model runs.
     infection = DirectInfections(; Z = custom, initialisation_prior = Normal())
-    model = EpiAwareModel(infection, PoissonError())
-    @test model isa EpiAwareModel
+    model = IDModel(infection, PoissonError())
+    @test model isa IDModel
     out = as_turing_model(model, missing, 10)()
     @test length(out.Z_t) == 10
     @test all(==(0.5), out.Z_t)
 end
 
 @testitem "behavioural conformance: each role's output has the expected shape" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(101)
     n = 12
     # Latent: length-n path.

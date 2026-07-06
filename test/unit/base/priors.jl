@@ -1,5 +1,5 @@
 @testitem "AbstractPriorModel role: wrapper and latent-as-prior" begin
-    using EpiAwarePrototype, Distributions
+    using ComposableTuringIDModels, Distributions
     @test AbstractLatentModel <: AbstractPriorModel
     @test BroadcastPrior(Normal()) isa AbstractPriorModel
     # Latent models satisfy the prior contract, so they are prior models.
@@ -12,7 +12,7 @@
 end
 
 @testitem "as_prior coerces distributions and passes prior models through" begin
-    using EpiAwarePrototype, Distributions
+    using ComposableTuringIDModels, Distributions
     @test as_prior(Normal()) isa BroadcastPrior
     @test as_prior([Normal(), Normal(2, 1)]) isa BroadcastPrior
     rw = RandomWalk()
@@ -20,7 +20,7 @@ end
 end
 
 @testitem "BroadcastPrior scalar (repeat-one) mode" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(101)
     # length-1 scalar parameter: one draw, read back with `only`.
     v1 = as_turing_model(BroadcastPrior(Normal()), 1)()
@@ -34,7 +34,7 @@ end
 end
 
 @testitem "BroadcastPrior vector mode gives one draw per element" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(102)
     # Homogeneous vector: filldist (as _expand_dist did).
     vh = as_turing_model(BroadcastPrior([Normal(), Normal()]), 2)()
@@ -48,7 +48,7 @@ end
 end
 
 @testitem "priors compose as submodels (wrapper and latent)" begin
-    using EpiAwarePrototype, Distributions, Turing, Random
+    using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(103)
     # A RandomWalk used directly as a (time-varying) prior returns a length-n path.
     @test length(as_turing_model(RandomWalk(), 8)()) == 8

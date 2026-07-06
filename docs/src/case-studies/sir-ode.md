@@ -40,14 +40,14 @@ in a plausible range for influenza and bounded away from the ``\gamma \to 0``
 (``R_0 \to \infty``) singularity.
 
 ```@example sir
-using EpiAwarePrototype, Distributions, Random, Turing, LogExpFunctions
+using ComposableTuringIDModels, Distributions, Random, Turing, LogExpFunctions
 using ADTypes: AutoForwardDiff
 using CSV, DataFrames
 Random.seed!(1978)
 
 N = 763          # children in the school
 
-datapath = joinpath(pkgdir(EpiAwarePrototype),
+datapath = joinpath(pkgdir(ComposableTuringIDModels),
     "docs", "src", "case-studies", "data", "influenza_england_1978_school.csv")
 influenza = CSV.read(datapath, DataFrame)
 y_obs = influenza.in_bed            # children confined to bed each day
@@ -97,11 +97,11 @@ nothing # hide
 A compartmental model needs no time-varying latent ``R_t`` process — the
 dynamics are fully determined by the ODE parameters — so the [`ODEProcess`](@ref)
 carries no latent process at all (its `Z_t` generated quantity is `nothing`).
-[`EpiAwareModel`](@ref) assembles the infection and observation parts exactly as
+[`IDModel`](@ref) assembles the infection and observation parts exactly as
 in the renewal examples.
 
 ```@example sir
-model = EpiAwareModel(sir_process, observation)
+model = IDModel(sir_process, observation)
 nothing # hide
 ```
 
@@ -113,7 +113,7 @@ differentiates with **ForwardDiff**, not the package's recommended
 (Mooncake-driven) NUTS through the ODE solver is not available yet — a pre-existing
 Turing + Mooncake + `SciMLSensitivity` integration gap that affects every ODE
 infection model (tracked in
-[issue #46](https://github.com/EpiAware/EpiAwarePrototype.jl/issues/46)).
+[issue #46](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/46)).
 Forward-mode autodiff is a good fit here anyway, for a system this small.
 
 ```@example sir
@@ -182,7 +182,7 @@ stochastic_obs = TransformObservationModel(
     Ascertainment(model = PoissonError(), latent_model = ascertainment),
     x -> softplus.(N .* x))
 
-stochastic_model = EpiAwareModel(sir_process, stochastic_obs)
+stochastic_model = IDModel(sir_process, stochastic_obs)
 nothing # hide
 ```
 

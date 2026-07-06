@@ -14,7 +14,7 @@ length of the damping/initial priors.
 
 # Examples
 ```@example AR
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 ar = AR()
 mdl = as_turing_model(ar, 10)
 rand(mdl)

@@ -20,7 +20,7 @@ The field `std_prior` sets the prior distribution for ``\sigma``.
 
 # Examples
 ```@example NormalError
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 ne = NormalError()
 mdl = as_turing_model(ne, missing, fill(10.0, 10))
 rand(mdl)

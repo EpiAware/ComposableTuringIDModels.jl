@@ -8,7 +8,7 @@ from.
 
 # Examples
 ```@example Intercept
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 int = Intercept(Normal(0, 1))
 mdl = as_turing_model(int, 10)
 rand(mdl)

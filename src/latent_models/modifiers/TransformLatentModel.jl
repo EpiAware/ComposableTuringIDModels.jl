@@ -10,7 +10,7 @@ Apply a transformation function to the output of an inner latent model.
 
 # Examples
 ```@example TransformLatentModel
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 trans = TransformLatentModel(Intercept(Normal(2, 0.2)), x -> exp.(x))
 rand(as_turing_model(trans, 5))
 ```

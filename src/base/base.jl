@@ -2,7 +2,7 @@
 # the generic `as_turing_model` constructor.
 
 @doc raw"
-The single light supertype for every model component in `EpiAwarePrototype`.
+The single light supertype for every model component in `ComposableTuringIDModels`.
 
 Unlike the deep abstract hierarchy used by the original `EpiAware` package, the
 prototype keeps a **shallow** tree: one root supertype, and directly beneath it a
@@ -19,10 +19,10 @@ where a latent model is expected) fails at **construction** rather than at
 sampling. See [`AbstractLatentModel`](@ref) and its siblings for the interface
 each role's `as_turing_model` must satisfy.
 "
-abstract type AbstractEpiAwareModel end
+abstract type AbstractComposableModel end
 
 @doc raw"
-Construct a `DynamicPPL.Model` from an `EpiAwarePrototype` model component.
+Construct a `DynamicPPL.Model` from an `ComposableTuringIDModels` model component.
 
 `as_turing_model` is the single generic entry point of the prototype. Every
 concrete model struct implements exactly one
@@ -48,8 +48,8 @@ prototype grows.
 
 # Arguments
 
-  - `model`: an `EpiAwarePrototype` model component (a subtype of
-    [`AbstractEpiAwareModel`](@ref)).
+  - `model`: an `ComposableTuringIDModels` model component (a subtype of
+    [`AbstractComposableModel`](@ref)).
   - `args...`: positional arguments forwarded to the component's method, such as
     the series length `n` (latent models) or the expected/observed series
     (infection and observation models).
@@ -58,7 +58,7 @@ prototype grows.
 # Examples
 
 ```@example
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 turing_model = as_turing_model(RandomWalk(), 10)
 rand(turing_model)
 ```

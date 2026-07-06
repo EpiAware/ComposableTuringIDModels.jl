@@ -12,8 +12,8 @@ rate `r`: ``\sum_i w_i e^{-r i}``.
 
 # Examples
 ```@example neg_MGF
-using EpiAwarePrototype
-EpiAwarePrototype.neg_MGF(0.1, [0.2, 0.3, 0.5])
+using ComposableTuringIDModels
+ComposableTuringIDModels.neg_MGF(0.1, [0.2, 0.3, 0.5])
 ```
 "
 function neg_MGF(r, w::AbstractVector)
@@ -46,7 +46,7 @@ Solves ``R_0 \sum_i w_i e^{-r i} = 1`` by a small-`r` initial guess refined with
 
 # Examples
 ```@example R_to_r
-using EpiAwarePrototype
+using ComposableTuringIDModels
 R_to_r(1.5, [0.2, 0.3, 0.5])
 ```
 "
@@ -62,12 +62,12 @@ end
 
 # Only `Renewal` carries a generation interval, so the model-typed method
 # dispatches on it specifically (the other infection models have no `gen_int`).
-function R_to_r(R₀, epi_model::Renewal; newton_steps = 2, Δd = 1.0)
-    return R_to_r(R₀, epi_model.data.gen_int; newton_steps = newton_steps, Δd = Δd)
+function R_to_r(R₀, infection::Renewal; newton_steps = 2, Δd = 1.0)
+    return R_to_r(R₀, infection.data.gen_int; newton_steps = newton_steps, Δd = Δd)
 end
 
 @doc raw"
-Expected reproduction number ``R_t`` from an [`EpiData`](@ref) generation
+Expected reproduction number ``R_t`` from an [`IDData`](@ref) generation
 interval and an infection series.
 
 ```math
@@ -76,17 +76,17 @@ R_t = \frac{I_t}{\sum_{i=1}^{n} I_{t-i} g_i}
 
 # Arguments
 
-  - `data`: the [`EpiData`](@ref) holding the generation interval.
+  - `data`: the [`IDData`](@ref) holding the generation interval.
   - `infections`: the infection series (longer than the generation interval).
 
 # Examples
 ```@example expected_Rt
-using EpiAwarePrototype
-data = EpiData([0.2, 0.3, 0.5], exp)
+using ComposableTuringIDModels
+data = IDData([0.2, 0.3, 0.5], exp)
 expected_Rt(data, [100.0, 200, 300, 400, 500])
 ```
 "
-function expected_Rt(data::EpiData, infections::Vector{<:Real})
+function expected_Rt(data::IDData, infections::Vector{<:Real})
     n = data.len_gen_int
     @assert n<length(infections) "Infections vector must be longer than the generation interval"
     denom_Rt = [dot(reverse(data.gen_int), infections[(t - n):(t - 1)])
@@ -105,7 +105,7 @@ generation interval `w`: ``1 / \sum_i w_i e^{-r i}``.
 
 # Examples
 ```@example r_to_R
-using EpiAwarePrototype
+using ComposableTuringIDModels
 r_to_R(0.1, [0.2, 0.3, 0.5])
 ```
 "
