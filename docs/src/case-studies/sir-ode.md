@@ -42,18 +42,30 @@ in a plausible range for influenza and bounded away from the ``\gamma \to 0``
 ```@example sir
 using EpiAwarePrototype, Distributions, Random, Turing, LogExpFunctions
 using ADTypes: AutoForwardDiff
+using CSV, DataFrames
 Random.seed!(1978)
 
 N = 763          # children in the school
-n_days = 14
+
+datapath = joinpath(pkgdir(EpiAwarePrototype),
+    "docs", "src", "case-studies", "data", "influenza_england_1978_school.csv")
+influenza = CSV.read(datapath, DataFrame)
+y_obs = influenza.in_bed            # children confined to bed each day
+ts = collect(1.0:length(y_obs))     # observation times (days)
+n = length(y_obs)
 
 sir_params = SIRParams(
-    tspan = (0.0, Float64(n_days)),
+    tspan = (0.0, ts[end]),
     infectiousness = LogNormal(-0.5, 0.5),
     recovery_rate = Gamma(8, 0.03125),
     initial_prop_infected = Beta(2, 200))
 nothing # hide
 ```
+
+[chatzilena2019contemporary](@citet) fit this to a 1978 influenza outbreak in an
+English boarding school, taking the number of children "in bed" each day as a
+proxy for the infected compartment. Of the 763 children, 512 fell ill over 14
+days.
 
 [`ODEProcess`](@ref) composes those parameters with a solver and a `sol2infs`
 link that pulls the infected compartment out of the ODE solution. This is the
@@ -66,7 +78,7 @@ when the sampler proposes stiff parameter values.
 sir_process = ODEProcess(
     params = sir_params,
     sol2infs = sol -> sol[2, :],
-    solver_options = Dict(:saveat => 1.0))
+    solver_options = Dict(:saveat => ts))
 nothing # hide
 ```
 
@@ -93,11 +105,11 @@ model = EpiAwareModel(sir_process, observation)
 nothing # hide
 ```
 
-## Simulate and fit
+## Fit
 
-Simulating from the prior produces an outbreak curve; fitting recovers the SIR
-parameters. This page differentiates with **ForwardDiff**, not the package's
-recommended [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) default: reverse-mode
+Fitting recovers the SIR parameters from the observed "in bed" counts. This page
+differentiates with **ForwardDiff**, not the package's recommended
+[Mooncake](https://chalk-lab.github.io/Mooncake.jl/) default: reverse-mode
 (Mooncake-driven) NUTS through the ODE solver is not available yet — a pre-existing
 Turing + Mooncake + `SciMLSensitivity` integration gap that affects every ODE
 infection model (tracked in
@@ -105,15 +117,9 @@ infection model (tracked in
 Forward-mode autodiff is a good fit here anyway, for a system this small.
 
 ```@example sir
-sim = as_turing_model(model, fill(missing, n_days + 1), n_days + 1)()
-y_obs = sim.generated_y_t
-y_obs
-```
-
-```@example sir
 chain = sample(
-    as_turing_model(model, y_obs, n_days + 1),
-    NUTS(; adtype = AutoForwardDiff()), 100; progress = false)
+    as_turing_model(model, y_obs, n),
+    NUTS(0.9; adtype = AutoForwardDiff()), 1000; progress = false)
 nothing # hide
 ```
 
@@ -188,8 +194,8 @@ sampler stable through the ODE solve.
 
 ```@example sir
 stochastic_chain = sample(
-    as_turing_model(stochastic_model, y_obs, n_days + 1),
-    NUTS(0.9; adtype = AutoForwardDiff()), 100; progress = false)
+    as_turing_model(stochastic_model, y_obs, n),
+    NUTS(0.9; adtype = AutoForwardDiff()), 1000; progress = false)
 nothing # hide
 ```
 
@@ -216,18 +222,16 @@ scale is small:
 ```
 
 Because the deterministic model is the ``\kappa_t = 0`` special case, the two
-fits are directly comparable. Here the data were simulated from the deterministic
-model, so the stochastic variant should recover a similar ``R_0`` while shrinking
-its extra latent process towards zero — which is what the small fitted
-``\sigma`` above and the close agreement below show:
+fits are directly comparable on this real outbreak:
 
 ```@example sir
 (deterministic_R0 = mean(R0), stochastic_R0 = mean(βs ./ γs))
 ```
 
-On a real, mis-specified outbreak the stochastic process would instead soak up
-systematic departures from the SIR dynamics, guarding the mechanistic parameters
-against that bias — the reason [chatzilena2019contemporary](@citet) introduce it.
+The SIR model is an approximation to the real transmission dynamics, so here the
+stochastic ascertainment process soaks up systematic departures from the SIR
+mean, guarding the mechanistic ``R_0`` against that bias — the reason
+[chatzilena2019contemporary](@citet) introduce it.
 
 ## References
 
