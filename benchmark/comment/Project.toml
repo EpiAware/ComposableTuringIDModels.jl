@@ -7,10 +7,10 @@
 [deps]
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 EpiAwarePackageTools = "7aaea248-0d11-4a0d-a7dc-86da30abb951"
-EpiAwarePrototype = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
+ComposableTuringIDModels = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
 
 [sources]
-EpiAwarePrototype = {path = "../.."}
+ComposableTuringIDModels = {path = "../.."}
 # Until EpiAwarePackageTools is registered, it is pinned by git so
 # the env resolves out of the box. Switch to a local path to
 # develop the kit alongside this package.

@@ -4,14 +4,14 @@ Pkg.instantiate()
 using Documenter
 using DocumenterVitepress
 using DocumenterCitations
-using EpiAwarePrototype
+using ComposableTuringIDModels
 
 include("pages.jl")
 
 # Doctest / example setup shared across docstrings.
 DocMeta.setdocmeta!(
-    EpiAwarePrototype, :DocTestSetup,
-    :(using EpiAwarePrototype, Distributions); recursive = true)
+    ComposableTuringIDModels, :DocTestSetup,
+    :(using ComposableTuringIDModels, Distributions); recursive = true)
 
 # --- generate the API reference pages from the module's documented bindings ---
 # Each binding is listed ONCE in a `@docs` block so a function with several
@@ -58,29 +58,29 @@ function write_api_page(path, title, anchor, page, intro, mod, names)
     end
 end
 
-let (public, private) = api_bindings(EpiAwarePrototype)
+let (public, private) = api_bindings(ComposableTuringIDModels)
     lib_dir = joinpath(@__DIR__, "src", "lib")
     write_api_page(
         joinpath(lib_dir, "public.md"),
         "Public API", "public-api", "public.md",
-        "Documentation for the exported, public interface of `EpiAwarePrototype`.",
-        EpiAwarePrototype, public)
+        "Documentation for the exported, public interface of `ComposableTuringIDModels`.",
+        ComposableTuringIDModels, public)
     write_api_page(
         joinpath(lib_dir, "internals.md"),
         "Internal API", "internal-api", "internals.md",
-        "Documentation for `EpiAwarePrototype`'s unexported internal helpers and " *
+        "Documentation for `ComposableTuringIDModels`'s unexported internal helpers and " *
         "supertypes. These are not part of the stable public API; they are " *
         "documented because the public docstrings cross-reference them.",
-        EpiAwarePrototype, private)
+        ComposableTuringIDModels, private)
     println("Generated API pages: $(length(public)) public, $(length(private)) internal")
 end
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"); style = :numeric)
 
 makedocs(;
-    modules = [EpiAwarePrototype],
+    modules = [ComposableTuringIDModels],
     authors = "Sam Abbott and contributors",
-    sitename = "EpiAwarePrototype.jl",
+    sitename = "ComposableTuringIDModels.jl",
     # A prototype: keep the build resilient rather than strict. Missing/internal
     # docstrings and "see also" @refs to undocumented helpers warn rather than
     # fail the build.
@@ -89,13 +89,13 @@ makedocs(;
     pages = pages,
     plugins = [bib],
     format = DocumenterVitepress.MarkdownVitepress(;
-        repo = "github.com/EpiAware/EpiAwarePrototype.jl",
+        repo = "github.com/EpiAware/ComposableTuringIDModels.jl",
         devbranch = "main",
         devurl = "dev",
-        deploy_url = "epiawareprototype.epiaware.org"))
+        deploy_url = "composableturingidmodels.epiaware.org"))
 
 DocumenterVitepress.deploydocs(;
-    repo = "github.com/EpiAware/EpiAwarePrototype.jl",
+    repo = "github.com/EpiAware/ComposableTuringIDModels.jl",
     target = joinpath(@__DIR__, "build"),
     branch = "gh-pages",
     devbranch = "main",

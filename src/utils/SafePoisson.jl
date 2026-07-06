@@ -6,7 +6,7 @@ for very large means.
 
 # Examples
 ```jldoctest SafePoisson; output = false
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 d = SafePoisson(exp(48.0))
 logpdf(d, 100)
 nothing

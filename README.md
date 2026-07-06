@@ -1,20 +1,20 @@
-# EpiAwarePrototype.jl <img src="docs/src/assets/logo.svg" width="150" alt="EpiAwarePrototype logo" align="right">
+# ComposableTuringIDModels.jl <img src="docs/src/assets/logo.svg" width="150" alt="ComposableTuringIDModels logo" align="right">
 
 <!-- badges:start -->
 | **Documentation** | **Build Status** | **Code Quality** | **License & DOI** | **Downloads** |
 |:-----------------:|:----------------:|:----------------:|:-----------------:|:-------------:|
-| [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://epiawareprototype.epiaware.org/stable/) [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://epiawareprototype.epiaware.org/dev/) | [![Test](https://github.com/EpiAware/EpiAwarePrototype.jl/actions/workflows/test.yaml/badge.svg?branch=main)](https://github.com/EpiAware/EpiAwarePrototype.jl/actions/workflows/test.yaml) [![codecov](https://codecov.io/gh/EpiAware/EpiAwarePrototype.jl/graph/badge.svg)](https://codecov.io/gh/EpiAware/EpiAwarePrototype.jl) [![AD](https://github.com/EpiAware/EpiAwarePrototype.jl/actions/workflows/ad.yaml/badge.svg?branch=main)](https://github.com/EpiAware/EpiAwarePrototype.jl/actions/workflows/ad.yaml) | [![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle) [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl) [![JET](https://img.shields.io/badge/%E2%9C%88%EF%B8%8F%20tested%20with%20-%20JET.jl%20-%20red)](https://github.com/aviatesk/JET.jl) | [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) | [![Downloads](https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Ftotal_downloads%2FEpiAwarePrototype&query=total_requests&label=Downloads)](https://juliapkgstats.com/pkg/EpiAwarePrototype) [![Downloads](https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Fmonthly_downloads%2FEpiAwarePrototype&query=total_requests&suffix=%2Fmonth&label=Downloads)](https://juliapkgstats.com/pkg/EpiAwarePrototype) |
+| [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://composableturingidmodels.epiaware.org/stable/) [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://composableturingidmodels.epiaware.org/dev/) | [![Test](https://github.com/EpiAware/ComposableTuringIDModels.jl/actions/workflows/test.yaml/badge.svg?branch=main)](https://github.com/EpiAware/ComposableTuringIDModels.jl/actions/workflows/test.yaml) [![codecov](https://codecov.io/gh/EpiAware/ComposableTuringIDModels.jl/graph/badge.svg)](https://codecov.io/gh/EpiAware/ComposableTuringIDModels.jl) [![AD](https://github.com/EpiAware/ComposableTuringIDModels.jl/actions/workflows/ad.yaml/badge.svg?branch=main)](https://github.com/EpiAware/ComposableTuringIDModels.jl/actions/workflows/ad.yaml) | [![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle) [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl) [![JET](https://img.shields.io/badge/%E2%9C%88%EF%B8%8F%20tested%20with%20-%20JET.jl%20-%20red)](https://github.com/aviatesk/JET.jl) | [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) | [![Downloads](https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Ftotal_downloads%2FComposableTuringIDModels&query=total_requests&label=Downloads)](https://juliapkgstats.com/pkg/ComposableTuringIDModels) [![Downloads](https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Fmonthly_downloads%2FComposableTuringIDModels&query=total_requests&suffix=%2Fmonth&label=Downloads)](https://juliapkgstats.com/pkg/ComposableTuringIDModels) |
 
 | ForwardDiff | ReverseDiff (tape) | Enzyme forward | Enzyme reverse | Mooncake reverse | Mooncake forward |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| [![cov ForwardDiff](https://codecov.io/gh/EpiAware/EpiAwarePrototype.jl/graph/badge.svg?flag=ad-forwarddiff)](https://app.codecov.io/gh/EpiAware/EpiAwarePrototype.jl?flags%5B0%5D=ad-forwarddiff) | [![cov ReverseDiff](https://codecov.io/gh/EpiAware/EpiAwarePrototype.jl/graph/badge.svg?flag=ad-reversediff)](https://app.codecov.io/gh/EpiAware/EpiAwarePrototype.jl?flags%5B0%5D=ad-reversediff) | [![cov Enzyme forward](https://codecov.io/gh/EpiAware/EpiAwarePrototype.jl/graph/badge.svg?flag=ad-enzyme-forward)](https://app.codecov.io/gh/EpiAware/EpiAwarePrototype.jl?flags%5B0%5D=ad-enzyme-forward) | [![cov Enzyme reverse](https://codecov.io/gh/EpiAware/EpiAwarePrototype.jl/graph/badge.svg?flag=ad-enzyme-reverse)](https://app.codecov.io/gh/EpiAware/EpiAwarePrototype.jl?flags%5B0%5D=ad-enzyme-reverse) | [![cov Mooncake reverse](https://codecov.io/gh/EpiAware/EpiAwarePrototype.jl/graph/badge.svg?flag=ad-mooncake-reverse)](https://app.codecov.io/gh/EpiAware/EpiAwarePrototype.jl?flags%5B0%5D=ad-mooncake-reverse) | [![cov Mooncake forward](https://codecov.io/gh/EpiAware/EpiAwarePrototype.jl/graph/badge.svg?flag=ad-mooncake-forward)](https://app.codecov.io/gh/EpiAware/EpiAwarePrototype.jl?flags%5B0%5D=ad-mooncake-forward) |
+| [![cov ForwardDiff](https://codecov.io/gh/EpiAware/ComposableTuringIDModels.jl/graph/badge.svg?flag=ad-forwarddiff)](https://app.codecov.io/gh/EpiAware/ComposableTuringIDModels.jl?flags%5B0%5D=ad-forwarddiff) | [![cov ReverseDiff](https://codecov.io/gh/EpiAware/ComposableTuringIDModels.jl/graph/badge.svg?flag=ad-reversediff)](https://app.codecov.io/gh/EpiAware/ComposableTuringIDModels.jl?flags%5B0%5D=ad-reversediff) | [![cov Enzyme forward](https://codecov.io/gh/EpiAware/ComposableTuringIDModels.jl/graph/badge.svg?flag=ad-enzyme-forward)](https://app.codecov.io/gh/EpiAware/ComposableTuringIDModels.jl?flags%5B0%5D=ad-enzyme-forward) | [![cov Enzyme reverse](https://codecov.io/gh/EpiAware/ComposableTuringIDModels.jl/graph/badge.svg?flag=ad-enzyme-reverse)](https://app.codecov.io/gh/EpiAware/ComposableTuringIDModels.jl?flags%5B0%5D=ad-enzyme-reverse) | [![cov Mooncake reverse](https://codecov.io/gh/EpiAware/ComposableTuringIDModels.jl/graph/badge.svg?flag=ad-mooncake-reverse)](https://app.codecov.io/gh/EpiAware/ComposableTuringIDModels.jl?flags%5B0%5D=ad-mooncake-reverse) | [![cov Mooncake forward](https://codecov.io/gh/EpiAware/ComposableTuringIDModels.jl/graph/badge.svg?flag=ad-mooncake-forward)](https://app.codecov.io/gh/EpiAware/ComposableTuringIDModels.jl?flags%5B0%5D=ad-mooncake-forward) |
 <!-- badges:end -->
 
 *A toolkit for composable probabilistic infectious disease modelling in Julia.*
 
 > This package is in early development. Expect rough edges and breaking changes.
 
-## Why EpiAwarePrototype?
+## Why ComposableTuringIDModels?
 
 - **Composable models**: Build a model from interchangeable infection and
   observation components — each infection model owning its own latent process —
@@ -38,21 +38,21 @@ This package is not registered. Install it directly from the repository:
 
 ```julia
 using Pkg
-Pkg.add(url = "https://github.com/EpiAware/EpiAwarePrototype.jl")
+Pkg.add(url = "https://github.com/EpiAware/ComposableTuringIDModels.jl")
 ```
 
 ## A composable example
 
-You assemble a model from components and `EpiAwarePrototype` turns the assembly
+You assemble a model from components and `ComposableTuringIDModels` turns the assembly
 into a single Turing model you can simulate from and fit. Each component is
 itself a model, joined together with the generic `as_turing_model` constructor.
 
 ```julia
-using EpiAwarePrototype, Distributions, Turing
+using ComposableTuringIDModels, Distributions, Turing
 
 # Compose a model: an ARIMA-style latent process (differenced AR) is folded into
 # a direct-infections process, observed with Poisson error.
-model = EpiAwareModel(
+model = IDModel(
     DirectInfections(;
         Z = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]),
         initialisation_prior = Normal()),
@@ -84,7 +84,7 @@ The modelling code in this package is **ported and adapted** from the
 open-source, Apache-2.0 licensed `EpiAware` package
 ([CDCgov/Rt-without-renewal](https://github.com/CDCgov/Rt-without-renewal),
 ported from the fork [seabbs/Rt-without-renewal](https://github.com/seabbs/Rt-without-renewal)).
-EpiAwarePrototype is a modified, derived work: it has been renamed, re-architected
+ComposableTuringIDModels is a modified, derived work: it has been renamed, re-architected
 around the generic `as_turing_model` constructor, and upgraded to build against
 the latest Turing.jl. See the [`NOTICE`](NOTICE) file for full attribution and a
 summary of the changes, and [`LICENSE`](LICENSE) for the Apache-2.0 terms.

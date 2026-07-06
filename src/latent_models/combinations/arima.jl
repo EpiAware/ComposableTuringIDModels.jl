@@ -14,7 +14,7 @@ Build an ARIMA(p, d, q) latent process: an [`arma`](@ref) wrapped in a
 
 # Examples
 ```@example arima
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 model = arima()
 rand(as_turing_model(model, 10))
 ```

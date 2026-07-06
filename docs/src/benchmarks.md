@@ -1,6 +1,6 @@
 # [Benchmarks](@id benchmarks)
 
-`EpiAwarePrototype` tracks the performance of representative modelling
+`ComposableTuringIDModels` tracks the performance of representative modelling
 operations over time.
 The suite is a prototype: it covers a small set of representative models rather
 than exhaustively measuring every component, and the numbers are indicative
@@ -22,7 +22,7 @@ The suite is a `BenchmarkTools.BenchmarkGroup` named `SUITE`, defined in
   random variable) and the forward pass (`model()`, which returns the generated
   quantities).
   The models are two latent processes (`AR`, `RandomWalk`) and two composed
-  `EpiAwareModel`s (`DirectInfections` with `PoissonError`, and `Renewal` with
+  `IDModel`s (`DirectInfections` with `PoissonError`, and `Renewal` with
   `NegativeBinomialError`), each turned into a Turing model via
   `as_turing_model`.
 - **Sampling** — a short NUTS run (50 draws) on a composed

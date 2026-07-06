@@ -1,8 +1,8 @@
-# EpiAwarePrototype.jl
+# ComposableTuringIDModels.jl
 
-A **prototype** for composable probabilistic infectious disease modelling in Julia.
-Goal: reach a state external collaborators can install and test. Treat everything
-here as exploratory and clearly labelled as a prototype.
+Composable probabilistic infectious disease modelling in Julia.
+Goal: reach a state external collaborators can install and test. This is
+early-stage software under active development; expect breaking changes.
 
 > **Read this file before starting any work.** It is the standing brief for every
 > agent and contributor on this repo.
@@ -57,7 +57,7 @@ as_turing_model(model, args...; kwargs...)  # returns a DynamicPPL.Model
 - Keep backend-agnostic pieces backend-agnostic (`accumulate_scan`,
   `AbstractAccumulationStep` step structs, distribution/utility helpers).
 - Collapse the deep abstract hierarchy. A single light supertype (e.g.
-  `AbstractEpiAwareModel`) for shared behaviour/printing is fine; the deep
+  `AbstractComposableModel`) for shared behaviour/printing is fine; the deep
   `AbstractTuring*` tree is not needed.
 
 ## Turing / DynamicPPL: target the latest
@@ -81,20 +81,25 @@ as_turing_model(model, args...; kwargs...)  # returns a DynamicPPL.Model
 
 ## Naming
 
-- Package name and top-level module: **`EpiAwarePrototype`** (with its own fresh
-  UUID in `Project.toml`, distinct from the upstream EpiAware package).
+- Package name and top-level module: **`ComposableTuringIDModels`** (with its own
+  fresh UUID in `Project.toml`, distinct from the upstream EpiAware package).
+- User-facing model wrappers use the `ID*` prefix: **`IDModel`** (the composed
+  infection + observation model) and **`IDProblem`** (the inference wrapper that
+  ties latent, infection, and observation models to a dataset).
+- The root supertype for shared behaviour/printing is
+  **`AbstractComposableModel`** (`IDModel <: AbstractComposableModel`).
 
 ## Docs
 
 - Built with **DocumenterVitepress** (the EpiAware org standard).
-- Make it clear throughout that this is a **prototype for composable infectious
-  disease modelling**.
+- Make it clear throughout that this is **composable infectious disease
+  modelling** that is early-stage and under active development.
 - Document the composable-modelling design (the component DSL idea + the
   Turing.jl backend / `as_turing_model` API) with **original, package-specific
   documentation** written for this package.
 - Keep a focused, honest set of pages (getting started, the composable design, a
   worked example / case studies, API reference). Don't add stub/placeholder pages
-  for features we are not shipping in the prototype.
+  for features we are not shipping yet.
 
 ## Workflow
 

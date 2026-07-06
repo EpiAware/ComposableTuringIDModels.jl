@@ -1,4 +1,4 @@
-# Role supertypes: the shallow layer beneath `AbstractEpiAwareModel` that encodes
+# Role supertypes: the shallow layer beneath `AbstractComposableModel` that encodes
 # what role a component plays (latent / infection / observation). Each role fixes
 # the `as_turing_model` signature its members must implement; the composer and the
 # manipulators dispatch and constrain on these so a wrong-role component fails at
@@ -29,7 +29,7 @@ element with `only(...)`, keeping the chain as small as a bare `~ dist`.
 This is the foundation for issue #37 (priors as submodels); the migration of the
 existing components' prior fields to this role is a separate, coordinated change.
 "
-abstract type AbstractPriorModel <: AbstractEpiAwareModel end
+abstract type AbstractPriorModel <: AbstractComposableModel end
 
 @doc raw"
 Supertype for **latent process** models.
@@ -72,10 +72,10 @@ for models with no exposable latent such as [`ODEProcess`](@ref)). Exposing
 
 Members include [`DirectInfections`](@ref), [`ExpGrowthRate`](@ref),
 [`Renewal`](@ref) and [`ODEProcess`](@ref). Only [`Renewal`](@ref) carries a
-generation interval ([`EpiData`](@ref)); the others take a `transformation`
+generation interval ([`IDData`](@ref)); the others take a `transformation`
 directly.
 "
-abstract type AbstractInfectionModel <: AbstractEpiAwareModel end
+abstract type AbstractInfectionModel <: AbstractComposableModel end
 
 @doc raw"
 Supertype for **observation** models.
@@ -97,4 +97,4 @@ so only observation components can be wrapped.
 [`AbstractObservationErrorModel`](@ref) is the sub-role for the simple
 error families (Poisson, negative binomial).
 "
-abstract type AbstractObservationModel <: AbstractEpiAwareModel end
+abstract type AbstractObservationModel <: AbstractComposableModel end

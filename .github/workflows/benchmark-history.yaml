@@ -80,7 +80,7 @@ jobs:
       - name: Run benchmarks
         run: |
           mkdir -p results
-          benchpkg EpiAwarePrototype \
+          benchpkg ComposableTuringIDModels \
             --rev="${{ steps.revs.outputs.revs }}" \
             --bench-on="${{ github.sha }}" \
             --output-dir=results \
@@ -92,11 +92,11 @@ jobs:
       - name: Plot timeline and table
         run: |
           mkdir -p public
-          benchpkgplot EpiAwarePrototype \
+          benchpkgplot ComposableTuringIDModels \
             --rev="${{ steps.revs.outputs.revs }}" \
             --npart=20 --format=png \
             --input-dir=results --output-dir=public
-          benchpkgtable EpiAwarePrototype \
+          benchpkgtable ComposableTuringIDModels \
             --rev="${{ steps.revs.outputs.revs }}" \
             --input-dir=results --ratio --mode time,memory \
             > public/table.md
@@ -105,7 +105,7 @@ jobs:
       - name: Write index page
         run: |
           {
-            echo "# EpiAwarePrototype.jl benchmark history"
+            echo "# ComposableTuringIDModels.jl benchmark history"
             echo
             echo "Revisions: ${{ steps.revs.outputs.revs }}"
             echo

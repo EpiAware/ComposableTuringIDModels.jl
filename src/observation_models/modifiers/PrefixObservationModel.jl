@@ -17,7 +17,7 @@ submodel, so its variables appear as `prefix.varname`.
 
 # Examples
 ```@example PrefixObservationModel
-using EpiAwarePrototype
+using ComposableTuringIDModels
 pm = PrefixObservationModel(; model = PoissonError(), prefix = \"Test\")
 mdl = as_turing_model(pm, missing, fill(10.0, 5))
 rand(mdl)
