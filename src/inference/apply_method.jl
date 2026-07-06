@@ -6,7 +6,7 @@ an inference `method`.
 
 # Arguments
 
-  - `epiproblem`: the [`IDProblem`](@ref) (or a `DynamicPPL.Model`).
+  - `idproblem`: the [`IDProblem`](@ref) (or a `DynamicPPL.Model`).
   - `method`: the inference method (a sampler or an [`IDMethod`](@ref)).
   - `data`: the data to condition on (with a `y_t` field).
 
@@ -27,10 +27,10 @@ y = rand(as_turing_model(problem, (; y_t = missing)))
 nothing
 ```
 "
-function apply_method(epiproblem::IDProblem, method::AbstractIDMethod, data;
+function apply_method(idproblem::IDProblem, method::AbstractIDMethod, data;
         fix_parameters::NamedTuple = NamedTuple(),
         condition_parameters::NamedTuple = NamedTuple(), kwargs...)
-    model = as_turing_model(epiproblem, data)
+    model = as_turing_model(idproblem, data)
     cond_model = condition_model(model, fix_parameters, condition_parameters)
     return apply_method(cond_model, method, data; kwargs...)
 end
