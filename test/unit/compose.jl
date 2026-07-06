@@ -1,7 +1,7 @@
 @testitem "composed model: prior simulation and generated quantities" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(21)
-    model = EpiAwareModel(
+    model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
     n = 20
@@ -18,10 +18,10 @@
 end
 
 @testitem "composed model: fix and condition" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: fix, condition
     Random.seed!(22)
-    model = EpiAwareModel(
+    model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
     n = 20
@@ -39,9 +39,9 @@ end
 end
 
 @testitem "composed model: short NUTS sample runs" tags=[:sample] begin
-    using EpiAwarePrototype, Distributions, Turing, Random
+    using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(23)
-    model = EpiAwareModel(
+    model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
     n = 20

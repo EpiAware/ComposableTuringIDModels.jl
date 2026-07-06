@@ -17,7 +17,7 @@ NUTS sampling method for a `DynamicPPL.Model`.
   - `nadapts`: adaptation steps (`-1` uses the Turing default).
 "
 @kwdef struct NUTSampler{A <: ADTypes.AbstractADType,
-    E <: AbstractMCMC.AbstractMCMCEnsemble, M} <: AbstractEpiSamplingMethod
+    E <: AbstractMCMC.AbstractMCMCEnsemble, M} <: AbstractIDSamplingMethod
     "Target acceptance rate."
     target_acceptance::Float64 = 0.8
     "Automatic-differentiation backend."

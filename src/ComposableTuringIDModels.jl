@@ -2,7 +2,7 @@
 A **prototype** for composable probabilistic infectious disease modelling in
 Julia.
 
-`EpiAwarePrototype` builds epidemiological models from small, reusable
+`ComposableTuringIDModels` builds epidemiological models from small, reusable
 components — infection processes (each owning its own latent parameter process)
 and observation models — each turned into a `Turing`/`DynamicPPL` model by the
 single generic constructor [`as_turing_model`](@ref). Components compose by
@@ -15,17 +15,17 @@ clearly labelled as a prototype.
 
 # Examples
 ```@example
-using EpiAwarePrototype, Distributions
-model = EpiAwareModel(
+using ComposableTuringIDModels, Distributions
+model = IDModel(
     DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
     PoissonError())
 rand(as_turing_model(model, missing, 20))
 ```
 "
-module EpiAwarePrototype
+module ComposableTuringIDModels
 
 # This package does NOT blanket-reexport Distributions/Turing (as the upstream
-# EpiAware also did not): users `using EpiAwarePrototype, Distributions, Turing`.
+# EpiAware also did not): users `using ComposableTuringIDModels, Distributions, Turing`.
 # Only the names the prototype itself uses or extends are imported below, which
 # keeps the public surface to the package's own exports.
 
@@ -57,7 +57,7 @@ using Distributions: Distributions, Distribution, Sampleable,
 using Statistics: Statistics
 
 # --- core architecture ---
-export AbstractEpiAwareModel, as_turing_model
+export AbstractComposableModel, as_turing_model
 export AbstractPriorModel, AbstractLatentModel, AbstractInfectionModel,
        AbstractObservationModel, AbstractObservationErrorModel
 export implements_prior_interface, implements_latent_interface,
@@ -66,7 +66,7 @@ export BroadcastPrior, as_prior
 
 # --- utilities and distributions ---
 # (double-interval censoring is provided by CensoredDistributions.jl, used
-# internally by `EpiData` / `LatentDelay`; it is not re-exported here.)
+# internally by `IDData` / `LatentDelay`; it is not re-exported here.)
 export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial,
        NegativeBinomialMeanClust, condition_model
 
@@ -81,7 +81,7 @@ export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
        broadcast_weekly, equal_dimensions, arma, arima, Hierarchy
 
 # --- infection models ---
-export EpiData, DirectInfections, ExpGrowthRate, Renewal,
+export IDData, DirectInfections, ExpGrowthRate, Renewal,
        R_to_r, r_to_R, expected_Rt
 
 # --- ODE compartmental models ---
@@ -98,11 +98,11 @@ export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
        StackObservationModels
 
 # --- composition ---
-export EpiAwareModel
+export IDModel
 
 # --- inference orchestration ---
-export EpiProblem, EpiMethod, NUTSampler, ManyPathfinder, DirectSample,
-       manypathfinder, apply_method, EpiAwareObservables, generated_observables,
+export IDProblem, IDMethod, NUTSampler, ManyPathfinder, DirectSample,
+       manypathfinder, apply_method, IDObservables, generated_observables,
        spread_draws, get_param_array
 
 # --- core architecture ---
@@ -156,7 +156,7 @@ include("latent_models/combinations/arma.jl")
 include("latent_models/combinations/arima.jl")
 
 # --- infection models ---
-include("infection_models/EpiData.jl")
+include("infection_models/IDData.jl")
 include("infection_models/DirectInfections.jl")
 include("infection_models/ExpGrowthRate.jl")
 include("infection_models/Renewal.jl")
@@ -190,8 +190,8 @@ include("compose.jl")
 
 # --- inference orchestration ---
 include("inference/types.jl")
-include("inference/EpiProblem.jl")
-include("inference/EpiAwareObservables.jl")
+include("inference/IDProblem.jl")
+include("inference/IDObservables.jl")
 include("inference/apply_method.jl")
 include("inference/NUTSampler.jl")
 include("inference/DirectSample.jl")

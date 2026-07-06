@@ -1,6 +1,6 @@
 # Composable design
 
-`EpiAwarePrototype` treats an epidemiological model as a composition of
+`ComposableTuringIDModels` treats an epidemiological model as a composition of
 independent parts. A full model has two top-level parts:
 
   - an **infection model** generates unobserved infections ``I_t``. It *owns* a
@@ -49,7 +49,7 @@ process internally before mapping it to infections. So `as_turing_model` for an
 infection model takes only a series length and returns `(; I_t, Z_t)`: the
 infection path and the internal latent draw, kept accessible as a generated
 quantity. Only [`Renewal`](@ref) needs a generation interval, so it alone carries
-an [`EpiData`](@ref); the others take a `transformation` directly.
+an [`IDData`](@ref); the others take a `transformation` directly.
 
 ## Swap-in, swap-out
 
@@ -57,18 +57,18 @@ Because the parts share an interface, you change a modelling assumption by
 swapping one struct for another, leaving the rest untouched:
 
 ```@example design
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 
 # An ARIMA-style latent process: a differenced AR.
 latent = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
 
 # Fold the latent into a direct-infections process, then swap the observation
 # model without touching the rest.
-poisson_model = EpiAwareModel(
+poisson_model = IDModel(
     DirectInfections(; Z = latent, initialisation = Normal()),
     PoissonError())
 
-negbin_model = EpiAwareModel(
+negbin_model = IDModel(
     DirectInfections(; Z = latent, initialisation = Normal()),
     NegativeBinomialError())
 nothing # hide

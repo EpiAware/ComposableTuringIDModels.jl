@@ -4,7 +4,7 @@
 # (iid-Normal ⇒ classic exchangeable pooling, RandomWalk ⇒ correlated neighbours).
 
 @testitem "Hierarchy constructs and is an AbstractLatentModel" begin
-    using EpiAwarePrototype, Distributions
+    using ComposableTuringIDModels, Distributions
     h = Hierarchy(Normal(), IID(Normal(0.0, 1.0)))
     @test h isa Hierarchy
     @test h isa AbstractLatentModel
@@ -20,7 +20,7 @@
 end
 
 @testitem "Hierarchy returns a numeric length-n_groups path" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(381)
     h = Hierarchy(Normal(), IID(Normal(0.0, 1.0)))
     # n_groups is NOT stored on the struct; it is read at build time.
@@ -33,7 +33,7 @@ end
 end
 
 @testitem "iid-Normal across recovers classic (exchangeable) partial pooling" begin
-    using EpiAwarePrototype, Distributions, Random, Statistics
+    using ComposableTuringIDModels, Distributions, Random, Statistics
     Random.seed!(383)
     # Zero shared mean so the group values are the (exchangeable) deviations.
     h = Hierarchy(Dirac(0.0), IID(Normal(0.0, 1.0)))
@@ -48,7 +48,7 @@ end
 end
 
 @testitem "RandomWalk across gives correlated neighbouring group effects" begin
-    using EpiAwarePrototype, Distributions, Random, Statistics
+    using ComposableTuringIDModels, Distributions, Random, Statistics
     Random.seed!(384)
     h_rw = Hierarchy(Dirac(0.0), RandomWalk())
     h_iid = Hierarchy(Dirac(0.0), IID(Normal(0.0, 1.0)))
@@ -65,7 +65,7 @@ end
 end
 
 @testitem "Hierarchy conforms to the latent interface and composes numerically" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(385)
     h = Hierarchy(Normal(), IID(Normal(0.0, 1.0)))
     @test implements_latent_interface(h; n = 4)
@@ -80,7 +80,7 @@ end
 end
 
 @testitem "a partially-pooled model samples under NUTS (ForwardDiff)" tags=[:sample] begin
-    using EpiAwarePrototype, Distributions, Turing, Random
+    using ComposableTuringIDModels, Distributions, Turing, Random
     using DynamicPPL: to_submodel
     Random.seed!(386)
     # Each group has its own partially-pooled level mapped to Poisson counts.

@@ -11,7 +11,7 @@ distribution from an expected count (see
 
 # Examples
 ```jldoctest SafeNegativeBinomial; output = false
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 bigμ = exp(48.0)
 σ² = bigμ + 0.05 * bigμ^2
 p = bigμ / σ²
@@ -74,7 +74,7 @@ Construct a [`SafeNegativeBinomial`](@ref) from a mean `μ` and cluster factor
 
 # Examples
 ```@example NegativeBinomialMeanClust
-using EpiAwarePrototype
+using ComposableTuringIDModels
 NegativeBinomialMeanClust(10.0, 0.1)
 ```
 "

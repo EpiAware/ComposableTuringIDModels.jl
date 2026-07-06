@@ -12,7 +12,7 @@ This case study keeps the renewal infection core of the
 model with a layered one: infections are convolved through two delay
 distributions and then modulated by a day-of-week reporting pattern. It also
 shows the latent process as an ARIMA-style differenced process broadcast to a
-weekly timescale, and assembles everything with [`EpiProblem`](@ref). The model
+weekly timescale, and assembles everything with [`IDProblem`](@ref). The model
 follows the configuration of the [EpiNow2](https://epiforecasts.io/EpiNow2/)
 package [abbott2020estimating](@citep) and is fit to daily confirmed COVID-19
 cases from Italy's first wave in 2020.
@@ -39,7 +39,7 @@ Differencing makes the level a random walk rather than mean-reverting, which
 suits a reproduction number that can drift.
 
 ```@example delays
-using EpiAwarePrototype, Distributions, Random, Turing, Mooncake
+using ComposableTuringIDModels, Distributions, Random, Turing, Mooncake
 using ADTypes: AutoMooncake
 Random.seed!(20240601)
 
@@ -71,7 +71,7 @@ weekly ``\log R_t`` process built above is folded into the renewal model's `rt`
 slot.
 
 ```@example delays
-data = EpiData(gen_distribution = Gamma(1.4, 1 / 0.38))
+data = IDData(gen_distribution = Gamma(1.4, 1 / 0.38))
 renewal = Renewal(data;
     rt = weekly_latent, initialisation = Normal(log(1.0), 1.0))
 nothing # hide
@@ -116,7 +116,7 @@ We fit the model to the daily confirmed COVID-19 cases from Italy's first wave
 
 ```@example delays
 using CSV, DataFrames
-datapath = joinpath(pkgdir(EpiAwarePrototype),
+datapath = joinpath(pkgdir(ComposableTuringIDModels),
     "docs", "src", "case-studies", "data", "italy_data.csv")
 italy = CSV.read(datapath, DataFrame)
 n = 42
@@ -126,13 +126,13 @@ y_obs = italy.confirm[1:n]
 
 ## Assemble and fit
 
-[`EpiProblem`](@ref) ties the latent, infection, and observation models to a
+[`IDProblem`](@ref) ties the latent, infection, and observation models to a
 time span. Its [`as_turing_model`](@ref) method takes data as a named tuple with
 a `y_t` field (passing `missing` values would instead simulate from the prior).
 
 ```@example delays
-problem = EpiProblem(
-    epi_model = renewal,
+problem = IDProblem(
+    infection = renewal,
     observation_model = observation,
     tspan = (1, n))
 nothing # hide

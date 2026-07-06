@@ -13,7 +13,7 @@ error model `ϵ_t`. The order `q` is the length of the coefficient prior.
 
 # Examples
 ```@example MA
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 ma = MA()
 mdl = as_turing_model(ma, 10)
 rand(mdl)

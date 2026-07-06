@@ -42,7 +42,7 @@ reproduction-number process — it is folded into the infection model below rath
 than composed separately.
 
 ```@example renewal
-using EpiAwarePrototype, Distributions, Random, Turing, Mooncake
+using ComposableTuringIDModels, Distributions, Random, Turing, Mooncake
 using ADTypes: AutoMooncake
 Random.seed!(1234)
 
@@ -53,7 +53,7 @@ latent = AR(
     ϵ_t = HierarchicalNormal(std = HalfNormal(0.1)))
 ```
 
-The infection process needs a discrete generation interval. [`EpiData`](@ref)
+The infection process needs a discrete generation interval. [`IDData`](@ref)
 takes a continuous distribution and discretises it with double interval
 censoring [charniga2024best](@citep), using
 [CensoredDistributions.jl](https://github.com/EpiAware/CensoredDistributions.jl).
@@ -61,7 +61,7 @@ Following [mishra2020derivation](@citet) we use a ``\mathrm{Gamma}(6.5, 0.62)``
 serial interval as a proxy for the generation interval.
 
 ```@example renewal
-data = EpiData(gen_distribution = Gamma(6.5, 0.62))
+data = IDData(gen_distribution = Gamma(6.5, 0.62))
 data.gen_int
 ```
 
@@ -78,7 +78,7 @@ sum(data.gen_int), length(data.gen_int)
 
 The [`Renewal`](@ref) process couples that generation interval to the latent
 ``\log R_t`` process (its `rt` slot) and a prior for the initial infections.
-[`Renewal`](@ref) is the only infection model that carries an [`EpiData`](@ref),
+[`Renewal`](@ref) is the only infection model that carries an [`IDData`](@ref),
 because it is the only one that uses a generation interval.
 
 ```@example renewal
@@ -124,12 +124,12 @@ obs = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 nothing # hide
 ```
 
-[`EpiAwareModel`](@ref) assembles the two parts — the renewal infection process
+[`IDModel`](@ref) assembles the two parts — the renewal infection process
 (which already carries the latent ``R_t`` process) and the observation model —
 into one composed model.
 
 ```@example renewal
-model = EpiAwareModel(renewal, obs)
+model = IDModel(renewal, obs)
 ```
 
 Before fitting, the composed model is also a prior simulator: passing `missing`
@@ -146,7 +146,7 @@ docs and read with [CSV](https://csv.juliadata.org)/[DataFrames](https://datafra
 
 ```@example renewal
 using CSV, DataFrames
-datapath = joinpath(pkgdir(EpiAwarePrototype),
+datapath = joinpath(pkgdir(ComposableTuringIDModels),
     "docs", "src", "case-studies", "data", "south_korea_data.csv")
 south_korea = CSV.read(datapath, DataFrame)
 first(south_korea, 5)
@@ -220,7 +220,7 @@ a one-line change. Swapping the negative-binomial reporting for a
 ``R_t`` process — untouched:
 
 ```@example renewal
-poisson_model = EpiAwareModel(renewal, PoissonError())
+poisson_model = IDModel(renewal, PoissonError())
 length(rand(as_turing_model(poisson_model, fill(missing, n), n)))
 ```
 

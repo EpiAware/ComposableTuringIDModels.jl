@@ -47,7 +47,7 @@ cross-group relationship through the prior interface.
 
 # Examples
 ```@example Hierarchy
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 # Partially pool a per-group level across 3 groups with classic (exchangeable)
 # pooling; n_groups is supplied at build time.
 h = Hierarchy(; across = IID(Normal(0.0, 1.0)))

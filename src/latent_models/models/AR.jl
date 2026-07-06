@@ -18,7 +18,7 @@ prior model (e.g. a latent process for a time-varying coefficient).
 
 # Examples
 ```@example AR
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 ar = AR()
 mdl = as_turing_model(ar, 10)
 rand(mdl)

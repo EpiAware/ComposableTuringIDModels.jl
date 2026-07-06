@@ -1,5 +1,5 @@
 @testitem "SIRParams and SEIRParams sample (u0, p)" begin
-    using EpiAwarePrototype, OrdinaryDiffEq, Distributions, Random
+    using ComposableTuringIDModels, OrdinaryDiffEq, Distributions, Random
     Random.seed!(61)
     sir = SIRParams(tspan = (0.0, 30.0),
         infectiousness = LogNormal(log(0.3), 0.05),
@@ -22,7 +22,7 @@
 end
 
 @testitem "ODEProcess solves the SIR model into an infection series" begin
-    using EpiAwarePrototype, OrdinaryDiffEq, Distributions, LogExpFunctions, Random
+    using ComposableTuringIDModels, OrdinaryDiffEq, Distributions, LogExpFunctions, Random
     Random.seed!(62)
     sir = SIRParams(tspan = (0.0, 100.0),
         infectiousness = LogNormal(log(0.3), 0.05),
@@ -40,7 +40,7 @@ end
 end
 
 @testitem "ODEProcess samples its parameters from the prior" begin
-    using EpiAwarePrototype, OrdinaryDiffEq, Distributions, LogExpFunctions, Random
+    using ComposableTuringIDModels, OrdinaryDiffEq, Distributions, LogExpFunctions, Random
     Random.seed!(63)
     sir = SIRParams(tspan = (0.0, 50.0),
         infectiousness = LogNormal(log(0.3), 0.05),

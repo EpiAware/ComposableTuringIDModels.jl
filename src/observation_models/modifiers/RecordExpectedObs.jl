@@ -15,7 +15,7 @@ returned chain alongside the inner model's variables.
 
 # Examples
 ```@example RecordExpectedObs
-using EpiAwarePrototype
+using ComposableTuringIDModels
 obs = RecordExpectedObs(PoissonError())
 mdl = as_turing_model(obs, missing, fill(10.0, 5))
 rand(mdl)
