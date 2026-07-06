@@ -77,10 +77,26 @@ function _models()
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         ReportTriangle(PoissonError(), [0.6, 0.25, 0.15]))
 
+    # Unified `Split` observation composition (parallel + sequential): a renewal
+    # model observed through two streams — reported `cases` (a delayed fraction of
+    # infections) and `deaths` threaded DOWNSTREAM off the expected cases (a
+    # sequential cascade). Exercises the per-stream prefixing and the
+    # expected-series threading gradient path of the `Split` construct.
+    split = EpiAwareModel(
+        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        Split(
+            (
+                cases = LatentDelay(NegativeBinomialError(), [0.4, 0.3, 0.2, 0.1]),
+                deaths = LatentDelay(
+                    Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.1))),
+                    [0.2, 0.3, 0.5]));
+            sequential = true))
+
     y_direct = as_turing_model(direct, missing, n)().generated_y_t
     y_renewal = as_turing_model(renewal, missing, n)().generated_y_t
     y_nowcast = as_turing_model(nowcast, missing, n)().generated_y_t
     y_triangle = as_turing_model(triangle, missing, n)().generated_y_t
+    y_split = as_turing_model(split, missing, n)().generated_y_t
 
     return [
         ("RandomWalk latent logjoint", rw),
@@ -93,7 +109,9 @@ function _models()
         ("Renewal+RightTruncate nowcast posterior",
             as_turing_model(nowcast, y_nowcast, n)),
         ("Renewal+ReportTriangle posterior",
-            as_turing_model(triangle, y_triangle, n))
+            as_turing_model(triangle, y_triangle, n)),
+        ("Renewal+Split(parallel+sequential) posterior",
+            as_turing_model(split, y_split, n))
     ]
 end
 
@@ -176,7 +194,7 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (7 scenarios × 4 backends), Julia 1.12:
+Result matrix (8 scenarios × 4 backends), Julia 1.12:
 
 | scenario                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
 |---------------------------------------|:-----------:|:-----------:|:--------:|:------:|
@@ -187,12 +205,14 @@ Result matrix (7 scenarios × 4 backends), Julia 1.12:
 | Renewal+NegativeBinomial posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+RightTruncate nowcast posterior |    ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior      |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+Split(parallel+sequential) posterior | ✓     |      ✓      |    ✓    |   ✓   |
 
 ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
 scenario correctly — including both nowcasting models (the `RightTruncate`
-marginal and the `ReportTriangle` joint triangle). Enzyme works on five of the
-seven once configured with `function_annotation = Enzyme.Const` (see
-[`backends`](@ref)), but the two AR-based latent log-densities raise
+marginal and the `ReportTriangle` joint triangle) and the unified `Split`
+observation composition. Enzyme works on six of the eight once configured with
+`function_annotation = Enzyme.Const` (see [`backends`](@ref)), but the two
+AR-based latent log-densities raise
 `IllegalTypeAnalysisException` inside the
 `accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion — a real
 Enzyme type-analysis limitation, not a defect in the package (the same models

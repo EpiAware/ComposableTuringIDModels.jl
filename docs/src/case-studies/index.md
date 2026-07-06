@@ -23,6 +23,12 @@ then to a mechanistic compartmental model:
     a naive fit (which shows the artefactual recent-``R_t`` down-turn) with a
     [`RightTruncate`](@ref)-corrected fit that removes it, again following
     real-time estimation practice [abbott2020estimating](@citep).
+  - [Multiple observation streams: cases, deaths, and strata](@ref case-study-split) —
+    one renewal infection process observed through several named streams with a
+    single [`Split`](@ref) construct, covering parallel streams (cases and deaths
+    off shared infections), a sequential cascade (deaths downstream of reported
+    cases), and data-driven strata (one stream per age band), motivated by the
+    differing biases of surveillance streams [sherratt2021surveillance](@citep).
   - [An SIR compartmental model](@ref case-study-sir) — an alternative infection
     process where dynamics come from an ordinary differential equation solved by
     the SciML stack [rackauckas2017differentialequations](@citep), following the

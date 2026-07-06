@@ -27,7 +27,8 @@ Wrap a model, data, and inference solution into an [`EpiAwareObservables`](@ref)
 
 When `solution` is an MCMC `Chains`, the model is re-run over the draws with
 `DynamicPPL.returned` to recover the model's returned generated quantities (e.g.
-`(; generated_y_t, I_t, Z_t)`) per sample, stored in the `generated` field. For
+`(; generated_y_t, expected_y_t, I_t, Z_t)`) per sample, stored in the
+`generated` field. For
 any other solution (an optimiser result, a prior draw, …) there are no per-draw
 generated quantities, so `generated` is `missing`.
 

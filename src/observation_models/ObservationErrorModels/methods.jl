@@ -25,6 +25,12 @@ constant to avoid degenerate error distributions.
 
 The error family supplies [`generate_observation_error_priors`](@ref) (sampled
 as a submodel) and [`observation_error`](@ref) (the per-time-point distribution).
+
+Like every observation model, it returns the uniform `(; y_t, expected)` named
+tuple: `y_t` is the observed (or simulated) count series and `expected` is the
+pre-error expected series the error was scored against. Exposing `expected` is
+what lets [`Split`](@ref) thread one stream's expectation into another and split a
+pipeline at any point (the option-B return contract of #51/#58).
 "
 @model function as_turing_model(obs_model::AbstractObservationErrorModel, y_t, Y_t)
     priors ~ to_submodel(
@@ -45,7 +51,7 @@ as a submodel) and [`observation_error`](@ref) (the per-time-point distribution)
     for i in eachindex(Y_t)
         y_t[i + diff_t] ~ observation_error(obs_model, pad_Y_t[i], priors...)
     end
-    return y_t
+    return (; y_t, expected = Y_t)
 end
 
 @doc raw"
