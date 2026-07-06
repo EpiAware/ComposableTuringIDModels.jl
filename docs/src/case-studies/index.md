@@ -1,9 +1,10 @@
 # [Case studies](@id case-studies-overview)
 
-These worked examples build complete models from the package's components,
-simulate data from them, and fit them back with [Turing](https://turinglang.org).
-Each one is self-contained and runs when the documentation is built, so the
-numbers you see are produced by the code on the page.
+These worked examples build complete models from the package's components and fit
+them to real epidemic surveillance data with [Turing](https://turinglang.org),
+recreating published analyses. Each one is self-contained and runs when the
+documentation is built, so the numbers you see are produced by the code on the
+page.
 
 They progress from a single renewal model to a layered observation process and
 then to a mechanistic compartmental model:
@@ -33,11 +34,6 @@ Every example uses the same recipe: assemble components into a model, call
 observed data and sampling. Because the components share one interface, you swap
 a modelling assumption by swapping a struct — the
 [Composable design](@ref) page explains the mechanism.
-
-!!! note "Prototype"
-    These examples are written to be didactic and fast to build. They use short
-    sampler runs and simulated data; for real analyses you would use more
-    iterations, check convergence diagnostics, and supply observed data.
 
 ## References
 

@@ -29,8 +29,8 @@ jobs:
               \`\`\`julia
               import Pkg
               Pkg.activate(temp=true)
-              Pkg.add(url="https://github.com/EpiAware/EpiAwarePrototype.jl", rev="${context.payload.pull_request.head.ref}")
-              using EpiAwarePrototype
+              Pkg.add(url="https://github.com/EpiAware/ComposableTuringIDModels.jl", rev="${context.payload.pull_request.head.ref}")
+              using ComposableTuringIDModels
               \`\`\`
 
               ### Option 2: Local Checkout

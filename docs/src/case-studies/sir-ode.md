@@ -42,18 +42,30 @@ in a plausible range for influenza and bounded away from the ``\gamma \to 0``
 ```@example sir
 using ComposableTuringIDModels, Distributions, Random, Turing, LogExpFunctions
 using ADTypes: AutoForwardDiff
+using CSV, DataFrames
 Random.seed!(1978)
 
 N = 763          # children in the school
-n_days = 14
+
+datapath = joinpath(pkgdir(ComposableTuringIDModels),
+    "docs", "src", "case-studies", "data", "influenza_england_1978_school.csv")
+influenza = CSV.read(datapath, DataFrame)
+y_obs = influenza.in_bed            # children confined to bed each day
+ts = collect(1.0:length(y_obs))     # observation times (days)
+n = length(y_obs)
 
 sir_params = SIRParams(
-    tspan = (0.0, Float64(n_days)),
+    tspan = (0.0, ts[end]),
     infectiousness = LogNormal(-0.5, 0.5),
     recovery_rate = Gamma(8, 0.03125),
     initial_prop_infected = Beta(2, 200))
 nothing # hide
 ```
+
+[chatzilena2019contemporary](@citet) fit this to a 1978 influenza outbreak in an
+English boarding school, taking the number of children "in bed" each day as a
+proxy for the infected compartment. Of the 763 children, 512 fell ill over 14
+days.
 
 [`ODEProcess`](@ref) composes those parameters with a solver and a `sol2infs`
 link that pulls the infected compartment out of the ODE solution. This is the
@@ -66,7 +78,7 @@ when the sampler proposes stiff parameter values.
 sir_process = ODEProcess(
     params = sir_params,
     sol2infs = sol -> sol[2, :],
-    solver_options = Dict(:saveat => 1.0))
+    solver_options = Dict(:saveat => ts))
 nothing # hide
 ```
 
@@ -93,27 +105,24 @@ model = IDModel(sir_process, observation)
 nothing # hide
 ```
 
-## Simulate and fit
+## Fit
 
-Simulating from the prior produces an outbreak curve; fitting recovers the SIR
-parameters. This page differentiates with **ForwardDiff**, not the package's
-recommended [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) default: reverse-mode
+Fitting recovers the SIR parameters from the observed "in bed" counts. This page
+differentiates with **ForwardDiff**, not the package's recommended
+[Mooncake](https://chalk-lab.github.io/Mooncake.jl/) default: reverse-mode
 (Mooncake-driven) NUTS through the ODE solver is not available yet — a pre-existing
 Turing + Mooncake + `SciMLSensitivity` integration gap that affects every ODE
 infection model (tracked in
-[issue #46](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/46)).
-Forward-mode autodiff is a good fit here anyway, for a system this small.
+[issue #46](https://github.com/EpiAware/EpiAwarePrototype.jl/issues/46)).
+Forward-mode autodiff is a good fit here anyway, for a system this small. We draw
+two chains in parallel with `MCMCThreads()` so a cross-chain ``\hat R`` is
+available:
 
 ```@example sir
-sim = as_turing_model(model, fill(missing, n_days + 1), n_days + 1)()
-y_obs = sim.generated_y_t
-y_obs
-```
-
-```@example sir
+posterior = as_turing_model(model, y_obs, n)
 chain = sample(
-    as_turing_model(model, y_obs, n_days + 1),
-    NUTS(; adtype = AutoForwardDiff()), 100; progress = false)
+    posterior, NUTS(0.9; adtype = AutoForwardDiff()),
+    MCMCThreads(), 500, 2; progress = false)
 nothing # hide
 ```
 
@@ -138,6 +147,93 @@ using Statistics
 R0 = β ./ γ
 (β = mean(β), γ = mean(γ), R0 = mean(R0))
 ```
+
+## Prior versus posterior
+
+Sampling the same model with [`Prior`](https://turinglang.org/) gives a prior
+draw over the transmission rate ``\beta``, recovery rate ``\gamma`` and initial
+infected proportion ``I_0``. Overlaying it on the posterior with
+[PairPlots.jl](https://sefffal.github.io/PairPlots.jl/) shows how sharply the
+boarding-school outbreak identifies the mechanistic parameters.
+
+```@example sir
+using CairoMakie, PairPlots
+
+prior_chain = sample(posterior, Prior(), 1000; progress = false)
+pp_keys = [@varname(β), @varname(γ), @varname(I₀)]
+pairplot(
+    PairPlots.Series(chain[pp_keys]; label = "posterior"),
+    PairPlots.Series(prior_chain[pp_keys]; label = "prior"))
+```
+
+All three parameters collapse from broad priors onto tight, correlated posteriors
+— ``\beta`` and ``\gamma`` trade off along the ``R_0 = \beta/\gamma`` ridge that
+the 14 days of data constrain.
+
+## Posterior trajectories
+
+A compartmental model has no time-varying ``R_t`` (its ``Z_t`` generated quantity
+is `nothing`); the infection signal is the infectious proportion ``I(t)`` solved
+from the ODE. [`generated_observables`](@ref) recovers ``I_t`` per draw, and the
+posterior-predictive in-bed counts come from `predict` on the model with the
+observations set to `missing`. Two small helpers reduce the per-draw trajectories
+to credible bands.
+
+```@setup sir
+using Statistics
+
+const CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
+
+function credible_bands(mat; qs = CI_QS)
+    reduce(hcat, (map(eachrow(mat)) do row
+        vals = collect(skipmissing(row))
+        isempty(vals) ? missing : quantile(vals, q)
+    end for q in qs))
+end
+
+function ci_ribbon!(ax, ts, bands; color, label)
+    keep = findall(!ismissing, view(bands, :, 3))
+    x, b = ts[keep], Float64.(bands[keep, :])
+    band!(ax, x, b[:, 1], b[:, 5]; color = (color, 0.15))
+    band!(ax, x, b[:, 2], b[:, 4]; color = (color, 0.3))
+    lines!(ax, x, b[:, 3]; color = color, linewidth = 2, label = label)
+end
+
+function predictive_bands(pred, n)
+    ndraws = length(vec(pred[@varname(y_t[n])]))
+    rows = map(1:n) do i
+        try
+            permutedims(vec(pred[@varname(y_t[i])]))
+        catch
+            fill(missing, 1, ndraws)
+        end
+    end
+    credible_bands(reduce(vcat, rows))
+end
+```
+
+```@example sir
+gens = vec(generated_observables(posterior, y_obs, chain).generated)
+It = credible_bands(reduce(hcat, (g.I_t for g in gens)))
+
+pred = predict(as_turing_model(model, fill(missing, n), n), chain)
+yt = predictive_bands(pred, n)
+
+fig = Figure(; size = (760, 620))
+ax1 = Axis(fig[1, 1]; ylabel = "Infectious proportion I(t)")
+ci_ribbon!(ax1, ts, It; color = :purple, label = "posterior median")
+axislegend(ax1; position = :rt)
+ax2 = Axis(fig[2, 1]; xlabel = "Day", ylabel = "Children in bed")
+ci_ribbon!(ax2, ts, yt; color = :teal, label = "posterior predictive")
+scatter!(ax2, ts, y_obs; color = :black, markersize = 7, label = "observed")
+axislegend(ax2; position = :rt)
+fig
+```
+
+The mechanistic infectious-proportion curve peaks mid-outbreak, and the
+posterior-predictive in-bed counts bracket the observed epidemic curve — the SIR
+dynamics, scaled by the population and Poisson observation model, reproduce the
+boarding-school outbreak.
 
 ## Adding a stochastic ascertainment process
 
@@ -188,8 +284,9 @@ sampler stable through the ODE solve.
 
 ```@example sir
 stochastic_chain = sample(
-    as_turing_model(stochastic_model, y_obs, n_days + 1),
-    NUTS(0.9; adtype = AutoForwardDiff()), 100; progress = false)
+    as_turing_model(stochastic_model, y_obs, n),
+    NUTS(0.9; adtype = AutoForwardDiff()),
+    MCMCThreads(), 500, 2; progress = false)
 nothing # hide
 ```
 
@@ -216,18 +313,16 @@ scale is small:
 ```
 
 Because the deterministic model is the ``\kappa_t = 0`` special case, the two
-fits are directly comparable. Here the data were simulated from the deterministic
-model, so the stochastic variant should recover a similar ``R_0`` while shrinking
-its extra latent process towards zero — which is what the small fitted
-``\sigma`` above and the close agreement below show:
+fits are directly comparable on this real outbreak:
 
 ```@example sir
 (deterministic_R0 = mean(R0), stochastic_R0 = mean(βs ./ γs))
 ```
 
-On a real, mis-specified outbreak the stochastic process would instead soak up
-systematic departures from the SIR dynamics, guarding the mechanistic parameters
-against that bias — the reason [chatzilena2019contemporary](@citet) introduce it.
+The SIR model is an approximation to the real transmission dynamics, so here the
+stochastic ascertainment process soaks up systematic departures from the SIR
+mean, guarding the mechanistic ``R_0`` against that bias — the reason
+[chatzilena2019contemporary](@citet) introduce it.
 
 ## References
 

@@ -18,7 +18,7 @@ that only the [`Renewal`](@ref) model carries one.
 Every part is a plain struct that implements a single method of the generic
 constructor [`as_turing_model`](@ref). There is no deep type hierarchy: a part
 is identified by the method it implements, not by its place in a tree. This is
-the central design change from the package this prototype is adapted from, which
+the central design change from the package this one is adapted from, which
 used separate `generate_latent`, `generate_latent_infs`, and
 `generate_observations` functions dispatched over a layered abstract hierarchy.
 

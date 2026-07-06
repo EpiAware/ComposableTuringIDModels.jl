@@ -60,6 +60,11 @@ end
     ar_init ~ model.init_prior
     damp_AR ~ model.damp_prior
     ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n - p), false)
-    ar = accumulate_scan(ARStep(damp_AR), ar_init, ϵ_t)
+    # `ARStep`'s state runs oldest→newest (`[Z_{t-p}, …, Z_{t-1}]`), so reverse
+    # the damping coefficients so `damp_AR[i]` multiplies the lag-`i` term
+    # `Z_{t-i}`, matching the documented recursion `Z_t = Σ ρ_i Z_{t-i}`. Without
+    # the reversal `damp_AR[1]` was applied to the *longest* lag; identical for the
+    # default i.i.d. priors, but wrong for heterogeneous per-lag priors.
+    ar = accumulate_scan(ARStep(reverse(damp_AR)), ar_init, ϵ_t)
     return ar
 end

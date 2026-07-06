@@ -1,9 +1,8 @@
 # ComposableTuringIDModels
 
-!!! warning "Prototype"
-    This package is an exploratory **prototype** for composable probabilistic
-    infectious disease modelling. Treat everything here as exploratory and
-    subject to change.
+!!! warning "Early development"
+    This package is in early development. Expect rough edges and breaking
+    changes as the design settles.
 
 `ComposableTuringIDModels` builds epidemiological models from small, reusable
 components — infection processes (each owning its own latent process) and

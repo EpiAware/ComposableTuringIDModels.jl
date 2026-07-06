@@ -46,12 +46,17 @@ function _apply_method(model::DynamicPPL.Model, method::NUTSampler, prev_result 
 end
 
 function _apply_nuts(model, method, prev_result; kwargs...)
-    return sample(model,
-        Turing.NUTS(method.target_acceptance; adtype = method.adtype,
-            max_depth = method.max_depth, Δ_max = method.Δ_max,
-            init_ϵ = method.init_ϵ, metricT = method.metricT),
+    nuts = Turing.NUTS(method.target_acceptance; adtype = method.adtype,
+        max_depth = method.max_depth, Δ_max = method.Δ_max,
+        init_ϵ = method.init_ϵ, metricT = method.metricT)
+    # The AbstractMCMC keyword is `n_adapts`; the old `nadapts` was silently
+    # swallowed by `kwargs...`, so `NUTSampler.nadapts` never took effect and the
+    # default adaptation was always used. `nadapts == -1` is the sentinel for
+    # "use the Turing default", so only forward an explicit value.
+    adapt_kwargs = method.nadapts == -1 ? (;) : (; n_adapts = method.nadapts)
+    return sample(model, nuts,
         method.mcmc_parallel, method.ndraws ÷ method.nchains, method.nchains;
-        nadapts = method.nadapts, kwargs...)
+        adapt_kwargs..., kwargs...)
 end
 
 function _apply_nuts(model, method, prev_result::PathfinderResult; kwargs...)
@@ -61,8 +66,10 @@ function _apply_nuts(model, method, prev_result::PathfinderResult; kwargs...)
     # in current Turing (`initial_params` now requires an `AbstractInitStrategy`,
     # not a vector) and Pathfinder (no `draws_transformed.value` array). The
     # `pathfinder` integration already initialises its own optimisation from the
-    # model, so we run NUTS with the default strategy here; the Pathfinder result
-    # remains available to the caller. Warm-starting NUTS from the draw will be
-    # reinstated once the init-strategy API stabilises (tracked as a follow-up).
+    # model, so we run NUTS with the default strategy here. Note the Pathfinder
+    # result is currently *not* threaded into the returned solution — this path
+    # runs the optimisation and then samples from the default init. Warm-starting
+    # NUTS from the draw will be reinstated once the init-strategy API stabilises
+    # (tracked as a follow-up).
     return _apply_nuts(model, method, nothing; kwargs...)
 end
