@@ -1,10 +1,5 @@
 # [Overview](@id overview)
 
-!!! warning "Prototype"
-    This package is an exploratory **prototype** for composable probabilistic
-    infectious disease modelling. Treat everything here as exploratory and
-    subject to change.
-
 `EpiAwarePrototype` builds an epidemiological model by assembling small parts
 rather than writing one bespoke model.
 Each part plays one of three roles — a **latent** process, an **infection**
