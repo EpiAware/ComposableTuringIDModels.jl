@@ -5,7 +5,7 @@ A null latent model that generates `nothing` (no latent variables).
 
 # Examples
 ```jldoctest Null
-using EpiAwarePrototype
+using ComposableTuringIDModels
 null = Null()
 mdl = as_turing_model(null, 10)
 isnothing(mdl())

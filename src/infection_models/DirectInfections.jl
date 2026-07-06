@@ -15,7 +15,7 @@ than threaded in from outside, so `as_turing_model` takes only the series length
 `n` and returns the named tuple `(; I_t, Z_t)`.
 
 This model carries no generation interval — it never uses one — so it takes a
-`transformation` directly instead of an [`EpiData`](@ref) object.
+`transformation` directly instead of an [`IDData`](@ref) object.
 
 ## Fields
 
@@ -27,7 +27,7 @@ This model carries no generation interval — it never uses one — so it takes 
 
 # Examples
 ```@example DirectInfections
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 inf = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal())
 mdl = as_turing_model(inf, 10)
 rand(mdl)
