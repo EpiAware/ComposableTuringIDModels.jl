@@ -122,7 +122,7 @@ available:
 posterior = as_turing_model(model, y_obs, n)
 chain = sample(
     posterior, NUTS(0.9; adtype = AutoForwardDiff()),
-    MCMCThreads(), 1000, 2; progress = false)
+    MCMCThreads(), 500, 2; progress = false)
 nothing # hide
 ```
 
@@ -286,7 +286,7 @@ sampler stable through the ODE solve.
 stochastic_chain = sample(
     as_turing_model(stochastic_model, y_obs, n),
     NUTS(0.9; adtype = AutoForwardDiff()),
-    MCMCThreads(), 1000, 2; progress = false)
+    MCMCThreads(), 500, 2; progress = false)
 nothing # hide
 ```
 
