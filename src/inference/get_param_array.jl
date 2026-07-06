@@ -10,7 +10,7 @@ per-sample `NamedTuple`s.
 
 # Examples
 ```@example get_param_array
-using EpiAwarePrototype
+using ComposableTuringIDModels
 nothing
 ```
 "

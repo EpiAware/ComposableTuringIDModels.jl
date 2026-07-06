@@ -1,6 +1,5 @@
 @doc raw"
-A **prototype** for composable probabilistic infectious disease modelling in
-Julia.
+Composable probabilistic infectious disease modelling in Julia.
 
 `ComposableTuringIDModels` builds epidemiological models from small, reusable
 components — infection processes (each owning its own latent parameter process)
@@ -10,8 +9,8 @@ sampling one another as submodels, so a full model is assembled rather than
 hand-written.
 
 This package is **ported and adapted** from the open-source, Apache-2.0 licensed
-`EpiAware` package; see the `NOTICE` file for attribution. It is exploratory and
-clearly labelled as a prototype.
+`EpiAware` package; see the `NOTICE` file for attribution. It is early-stage
+software under active development; expect breaking changes.
 
 # Examples
 ```@example
@@ -29,7 +28,7 @@ module ComposableTuringIDModels
 # Only the names the prototype itself uses or extends are imported below, which
 # keeps the public surface to the package's own exports.
 
-using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix
+using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix, returned
 using Turing: Turing, filldist, arraydist, sample, MCMCSerial
 using CensoredDistributions: double_interval_censored
 using LinearAlgebra: dot
@@ -57,10 +56,11 @@ using Statistics: Statistics
 
 # --- core architecture ---
 export AbstractComposableModel, as_turing_model
-export AbstractLatentModel, AbstractInfectionModel, AbstractObservationModel,
-       AbstractObservationErrorModel
-export implements_latent_interface, implements_infection_interface,
-       implements_observation_interface
+export AbstractPriorModel, AbstractLatentModel, AbstractInfectionModel,
+       AbstractObservationModel, AbstractObservationErrorModel
+export implements_prior_interface, implements_latent_interface,
+       implements_infection_interface, implements_observation_interface
+export BroadcastPrior, as_prior
 
 # --- utilities and distributions ---
 # (double-interval censoring is provided by CensoredDistributions.jl, used
@@ -108,6 +108,7 @@ export IDProblem, IDMethod, NUTSampler, ManyPathfinder, DirectSample,
 include("base/base.jl")
 include("base/roles.jl")
 include("base/interfaces.jl")
+include("base/priors.jl")
 include("base/prettyprinting.jl")
 
 # --- accumulation steps ---

@@ -1,12 +1,12 @@
 # PACKAGE-OWNED — scaffold writes this once and never overwrites it.
 #
-# Benchmark suite for EpiAwarePrototype. Defines a BenchmarkTools `BenchmarkGroup`
+# Benchmark suite for ComposableTuringIDModels. Defines a BenchmarkTools `BenchmarkGroup`
 # named `SUITE` that the managed `run.jl` / `compare.jl` consume.
 #
 # Groups:
 #   "Model evaluation" — building + evaluating representative models: a prior
 #       draw (`rand`) and the generated-quantities forward pass (`model()`) for
-#       latent processes (AR, RandomWalk) and composed `EpiAwareModel`s
+#       latent processes (AR, RandomWalk) and composed `IDModel`s
 #       (DirectInfections+Poisson, Renewal+NegativeBinomial).
 #   "Sampling"         — a short NUTS run on a composed model.
 #   "AD gradients"     — gradient of a representative log-density across AD
@@ -14,7 +14,7 @@
 #       folds it into a per-(scenario × backend) matrix.
 
 using BenchmarkTools
-using EpiAwarePrototype
+using ComposableTuringIDModels
 using Distributions
 using Random: MersenneTwister
 using Turing: NUTS, sample
@@ -32,16 +32,16 @@ const SUITE = BenchmarkGroup()
 const GEN_INT = [0.2, 0.3, 0.5]
 const N = 30
 
-_data() = EpiData(GEN_INT, exp)
+_data() = IDData(GEN_INT, exp)
 
 # The representative models, each as a Turing model ready to evaluate. Posterior
 # models are conditioned on data simulated from the prior with a fixed seed.
 function _eval_models()
     data = _data()
-    direct = EpiAwareModel(
+    direct = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
-    renewal = EpiAwareModel(
+    renewal = IDModel(
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         NegativeBinomialError())
     y_direct = as_turing_model(direct, missing, N)().generated_y_t
@@ -69,7 +69,7 @@ end
 # --- Sampling ---------------------------------------------------------------
 
 let samp_grp = SUITE["Sampling"] = BenchmarkGroup()
-    model = EpiAwareModel(
+    model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
     y = as_turing_model(model, missing, N)().generated_y_t
@@ -106,7 +106,7 @@ const _AD_BACKENDS = [
 
 # (scenario name, model, is_AR_based?)
 function _ad_scenarios()
-    direct = EpiAwareModel(
+    direct = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
     y = as_turing_model(direct, missing, N)().generated_y_t

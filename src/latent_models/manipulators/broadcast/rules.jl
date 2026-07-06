@@ -6,7 +6,7 @@ Broadcast rule that repeats the latent process at each position within a period
 
 # Examples
 ```@example RepeatEach
-using EpiAwarePrototype
+using ComposableTuringIDModels
 broadcast_rule(RepeatEach(), [1, 2], 10, 2)
 ```
 "
@@ -26,7 +26,7 @@ Broadcast rule that repeats the latent process in blocks of length `period`
 
 # Examples
 ```@example RepeatBlock
-using EpiAwarePrototype
+using ComposableTuringIDModels
 broadcast_rule(RepeatBlock(), [1, 2, 3, 4, 5], 10, 2)
 ```
 "

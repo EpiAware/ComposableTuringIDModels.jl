@@ -10,20 +10,20 @@
 # JET reports for every `~`/`:=` line (the tilde macro hides the assignment from
 # JET). To suppress exactly those, drop a package-owned `test/jet/jet_config.jl`
 # that defines `JET_REPORT_FILTER` (a `report -> Bool` predicate; a report is
-# KEPT when it returns `true`). `EpiAwarePackageTools.dynamicppl_model_filter`
+# kept when it returns `true`). `EpiAwarePackageTools.dynamicppl_model_filter`
 # is the ready-made filter for `@model` packages. Without the config the runner
-# fails on ANY report (the strict default).
+# fails on any report (the strict default).
 
 using JET
 using EpiAwarePackageTools: dynamicppl_model_filter
-using EpiAwarePrototype
+using ComposableTuringIDModels
 
 const _CONFIG = joinpath(@__DIR__, "jet_config.jl")
 isfile(_CONFIG) && include(_CONFIG)
 
 if @isdefined(JET_REPORT_FILTER)
-    result = JET.report_package(EpiAwarePrototype;
-        target_modules = (EpiAwarePrototype,))
+    result = JET.report_package(ComposableTuringIDModels;
+        target_modules = (ComposableTuringIDModels,))
     kept = filter(JET_REPORT_FILTER, JET.get_reports(result))
     for r in kept
         @info "JET report (not filtered)" report = sprint(show, r)
@@ -31,5 +31,5 @@ if @isdefined(JET_REPORT_FILTER)
     isempty(kept) || error("JET found $(length(kept)) report(s)")
     println("JET: no reports survived the configured filter")
 else
-    JET.test_package(EpiAwarePrototype; target_modules = (EpiAwarePrototype,))
+    JET.test_package(ComposableTuringIDModels; target_modules = (ComposableTuringIDModels,))
 end

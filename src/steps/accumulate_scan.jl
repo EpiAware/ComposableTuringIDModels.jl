@@ -18,8 +18,8 @@ the scan, and `ϵ_t` is the driving sequence. The returned value is assembled by
 
 # Examples
 ```@example accumulate_scan
-using EpiAwarePrototype
-accumulate_scan(EpiAwarePrototype.RWStep(), 0.0, [1.0, 2.0, 3.0])
+using ComposableTuringIDModels
+accumulate_scan(ComposableTuringIDModels.RWStep(), 0.0, [1.0, 2.0, 3.0])
 ```
 "
 function accumulate_scan(acc_step::AbstractAccumulationStep, initial_state, ϵ_t)
@@ -43,8 +43,8 @@ accumulated state. Step structs whose state is a named tuple (e.g. the `MA` and
 
 # Examples
 ```@example get_state
-using EpiAwarePrototype
-accumulate_scan(EpiAwarePrototype.RWStep(), 0.0, [1.0, 2.0, 3.0])
+using ComposableTuringIDModels
+accumulate_scan(ComposableTuringIDModels.RWStep(), 0.0, [1.0, 2.0, 3.0])
 ```
 "
 function get_state(acc_step::AbstractAccumulationStep, initial_state, state)

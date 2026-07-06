@@ -24,12 +24,39 @@ latent model and `as_turing_model(model, n)` returns a `DynamicPPL.Model`.
 
 # Examples
 ```@example
-using EpiAwarePrototype
+using ComposableTuringIDModels
 implements_latent_interface(RandomWalk())
 ```
 "
 function implements_latent_interface(model; n::Int = 10)
     model isa AbstractLatentModel || return false
+    return as_turing_model(model, n) isa DynamicPPL.Model
+end
+
+@doc raw"
+Check that `model` satisfies the [`AbstractPriorModel`](@ref) interface: it is a
+prior model and `as_turing_model(model, n)` returns a `DynamicPPL.Model`.
+
+Every [`AbstractLatentModel`](@ref) is also an `AbstractPriorModel`, so this holds
+for latent models (a latent process used directly as a prior) as well as for the
+[`BroadcastPrior`](@ref) wrapper and any bespoke prior submodel.
+
+# Arguments
+
+  - `model`: the component to check.
+
+# Keyword Arguments
+
+  - `n`: the prior length used for the construction check (default `10`).
+
+# Examples
+```@example
+using ComposableTuringIDModels, Distributions
+implements_prior_interface(BroadcastPrior(Normal()))
+```
+"
+function implements_prior_interface(model; n::Int = 10)
+    model isa AbstractPriorModel || return false
     return as_turing_model(model, n) isa DynamicPPL.Model
 end
 
@@ -51,7 +78,7 @@ passes only a series length `n` (no external latent path).
 
 # Examples
 ```@example
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 implements_infection_interface(
     DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()))
 ```
@@ -78,7 +105,7 @@ is an observation model and `as_turing_model(model, y_t, Y_t)` returns a
 
 # Examples
 ```@example
-using EpiAwarePrototype
+using ComposableTuringIDModels
 implements_observation_interface(PoissonError())
 ```
 "

@@ -13,7 +13,7 @@ error model `ϵ_t`. The order `q` is the length of the coefficient prior.
 
 # Examples
 ```@example MA
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 ma = MA()
 mdl = as_turing_model(ma, 10)
 rand(mdl)
@@ -50,6 +50,12 @@ end
     @assert n>q "n must be longer than the order of the moving average process"
     θ ~ model.θ
     ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n), false)
-    ma = accumulate_scan(MAStep(θ), (; val = 0, state = ϵ_t[1:q]), ϵ_t[(q + 1):end])
+    # `MAStep` keeps its innovation buffer newest-first (see `MAStep.jl`), so the
+    # warm-up seed must be reversed: `reverse(ϵ_t[1:q]) = [ϵ_q, …, ϵ_1]` puts the
+    # most recent innovation first, so `dot(θ, state)` pairs `θ[1]` with the most
+    # recent innovation. Seeding oldest-first silently mis-ordered the first `q`
+    # outputs for `q ≥ 2`. `get_state` reverses the seed back to natural order.
+    ma = accumulate_scan(
+        MAStep(θ), (; val = 0.0, state = reverse(ϵ_t[1:q])), ϵ_t[(q + 1):end])
     return ma
 end

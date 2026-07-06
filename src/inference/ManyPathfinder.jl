@@ -10,7 +10,7 @@ Variational pre-sampler that runs Pathfinder several times and keeps the best ru
   - `maxiters`: optimiser iterations per run.
   - `max_tries`: extra tries if all runs fail.
 "
-@kwdef struct ManyPathfinder <: AbstractEpiOptMethod
+@kwdef struct ManyPathfinder <: AbstractIDOptMethod
     "Draws per Pathfinder run."
     ndraws::Int = 10
     "Number of Pathfinder runs."
@@ -28,12 +28,13 @@ end
 
 function _apply_pathfinder(model, method, prev_result; kwargs...)
     return manypathfinder(model, method.ndraws; nruns = method.nruns,
-        maxiters = method.maxiters, kwargs...)
+        maxiters = method.maxiters, max_tries = method.max_tries, kwargs...)
 end
 
 function _apply_pathfinder(model, method, prev_result::Vector{<:Real}; kwargs...)
     return manypathfinder(model, method.ndraws; init = prev_result,
-        nruns = method.nruns, maxiters = method.maxiters, kwargs...)
+        nruns = method.nruns, maxiters = method.maxiters,
+        max_tries = method.max_tries, kwargs...)
 end
 
 @doc raw"
@@ -53,9 +54,9 @@ Run Pathfinder several times and return the run with the largest ELBO estimate.
 
 # Examples
 ```@example manypathfinder
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 m = as_turing_model(
-    EpiAwareModel(
+    IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError()), fill(10, 10), 10)
 nothing
@@ -103,8 +104,12 @@ function _continue_manypathfinder!(pfs, mdl::DynamicPPL.Model; max_tries, nruns,
 end
 
 function _get_best_elbo_pathfinder(pfs)
+    # Rank runs by their best ELBO across optimiser iterations, matching how
+    # Pathfinder itself selects a fit. The last iteration's ELBO
+    # (`elbo_estimates[end]`) is not necessarily the ELBO of the returned fit, so
+    # ranking on it could prefer a worse run.
     elbos = map(pfs) do pf_res
-        pf_res == :fail ? -Inf : pf_res.elbo_estimates[end].value
+        pf_res == :fail ? -Inf : maximum(e.value for e in pf_res.elbo_estimates)
     end
     _, choice_of_pf = findmax(elbos)
     return pfs[choice_of_pf]

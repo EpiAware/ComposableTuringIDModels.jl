@@ -17,7 +17,7 @@ A non-centred hierarchical normal latent process.
 
 # Examples
 ```@example HierarchicalNormal
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 hn = HierarchicalNormal()
 mdl = as_turing_model(hn, 10)
 rand(mdl)

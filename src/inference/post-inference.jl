@@ -10,7 +10,7 @@ with `draw`, `chain`, and `iteration` columns).
 
 # Examples
 ```@example spread_draws
-using EpiAwarePrototype
+using ComposableTuringIDModels
 nothing
 ```
 "
