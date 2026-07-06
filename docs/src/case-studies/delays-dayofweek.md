@@ -140,12 +140,14 @@ nothing # hide
 
 Fitting conditions on the observed reports, differentiating with the recommended
 [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) backend (see
-[Automatic differentiation backend](@ref ad-backend)):
+[Automatic differentiation backend](@ref ad-backend)). We draw two chains in
+parallel with `MCMCThreads()`, which gives a cross-chain ``\hat R``:
 
 ```@example delays
+posterior = as_turing_model(problem, (y_t = y_obs,))
 chain = sample(
-    as_turing_model(problem, (y_t = y_obs,)),
-    NUTS(0.9; adtype = AutoMooncake(; config = nothing)), 1000; progress = false)
+    posterior, NUTS(0.9; adtype = AutoMooncake(; config = nothing)),
+    MCMCThreads(), 500, 2; progress = false)
 nothing # hide
 ```
 
@@ -165,6 +167,100 @@ sub-process); `cluster_factor` is the negative-binomial overdispersion. The
 day-of-week effect, the two delay kernels, and the weekly reproduction number
 were all estimated jointly — and any of them can be swapped or removed by
 editing one line of the composition above.
+
+## Prior versus posterior
+
+Sampling the same model with [`Prior`](https://turinglang.org/) gives a prior
+draw over the same parameters. Overlaying it on the posterior with
+[PairPlots.jl](https://sefffal.github.io/PairPlots.jl/) — the FlexiChains
+extension turns each chain, subset to a few keys, into a `PairPlots.Series` —
+shows which parameters the six weeks of Italian data moved.
+
+```@example delays
+using CairoMakie, PairPlots
+
+prior_chain = sample(posterior, Prior(), 1000; progress = false)
+pp_keys = [@varname(damp_AR), @varname(θ), @varname(std),
+    @varname(cluster_factor)]
+pairplot(
+    PairPlots.Series(chain[pp_keys]; label = "posterior"),
+    PairPlots.Series(prior_chain[pp_keys]; label = "prior"))
+```
+
+The innovation scale ``\sigma`` (`std`) and the negative-binomial overdispersion
+(`cluster_factor`) tighten under the data, while the autoregressive damping
+(`damp_AR`) and moving-average (`θ`) coefficients of the ARIMA process stay close
+to their weakly informative priors.
+
+## Posterior trajectories
+
+``R_t = \exp(Z_t)`` and the infections ``I_t`` are generated quantities recovered
+per draw with [`generated_observables`](@ref); the reports ``y_t`` are scored
+element-wise, so their posterior-predictive distribution comes from `predict` on
+the model with the observations set to `missing`. Two small helpers reduce the
+per-draw trajectories to credible bands.
+
+```@setup delays
+using Statistics
+
+const CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
+
+function credible_bands(mat; qs = CI_QS)
+    reduce(hcat, (map(eachrow(mat)) do row
+        vals = collect(skipmissing(row))
+        isempty(vals) ? missing : quantile(vals, q)
+    end for q in qs))
+end
+
+function ci_ribbon!(ax, ts, bands; color, label)
+    keep = findall(!ismissing, view(bands, :, 3))
+    x, b = ts[keep], Float64.(bands[keep, :])
+    band!(ax, x, b[:, 1], b[:, 5]; color = (color, 0.15))
+    band!(ax, x, b[:, 2], b[:, 4]; color = (color, 0.3))
+    lines!(ax, x, b[:, 3]; color = color, linewidth = 2, label = label)
+end
+
+# the two delay convolutions leave the first few reference days unscored,
+# so those predictive entries are filled with `missing` and skipped
+function predictive_bands(pred, n)
+    ndraws = length(vec(pred[@varname(y_t[n])]))
+    rows = map(1:n) do i
+        try
+            permutedims(vec(pred[@varname(y_t[i])]))
+        catch
+            fill(missing, 1, ndraws)
+        end
+    end
+    credible_bands(reduce(vcat, rows))
+end
+```
+
+```@example delays
+gens = vec(generated_observables(posterior, (y_t = y_obs,), chain).generated)
+Rt = credible_bands(reduce(hcat, (exp.(g.Z_t) for g in gens)))
+
+pred = predict(as_turing_model(problem, (y_t = fill(missing, n),)), chain)
+yt = predictive_bands(pred, n)
+
+fig = Figure(; size = (760, 620))
+ax1 = Axis(fig[1, 1]; ylabel = "Reproduction number Rₜ")
+ci_ribbon!(ax1, 1:size(Rt, 1), Rt; color = :purple, label = "posterior median")
+hlines!(ax1, [1.0]; color = :grey, linestyle = :dash)
+axislegend(ax1; position = :rt)
+ax2 = Axis(fig[2, 1]; xlabel = "Day", ylabel = "Confirmed cases")
+ci_ribbon!(ax2, 1:size(yt, 1), yt; color = :teal,
+    label = "posterior predictive")
+scatter!(ax2, 1:n, y_obs; color = :black, markersize = 7, label = "observed")
+axislegend(ax2; position = :lt)
+fig
+```
+
+The weekly ``R_t`` is piecewise-constant by construction, stepping down through
+one as the first wave turns over. The posterior-predictive band starts partway
+into the series — the two delay convolutions leave the earliest reference days
+without a fully supported expected count — and from there tracks the observed
+Italian reports, the layered observation model having absorbed the reporting
+pattern rather than the infection signal.
 
 ## A time-varying reporting pattern
 
