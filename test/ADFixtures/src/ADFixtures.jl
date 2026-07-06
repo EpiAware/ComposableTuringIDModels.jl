@@ -205,24 +205,26 @@ Result matrix (8 scenarios × 4 backends), Julia 1.12:
 | Renewal+NegativeBinomial posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+RightTruncate nowcast posterior |    ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior      |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+Split(parallel+sequential) posterior | ✓     |      ✓      |    ✓    |   ✓   |
+| Renewal+Split(parallel+sequential) posterior | ✓     |      ✓      |    ✓    |   ✗   |
 
 ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
 scenario correctly — including both nowcasting models (the `RightTruncate`
 marginal and the `ReportTriangle` joint triangle) and the unified `Split`
-observation composition. Enzyme works on six of the eight once configured with
-`function_annotation = Enzyme.Const` (see [`backends`](@ref)), but the two
-AR-based latent log-densities raise
-`IllegalTypeAnalysisException` inside the
-`accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion — a real
-Enzyme type-analysis limitation, not a defect in the package (the same models
-sample fine under NUTS with ForwardDiff). They are recorded as `@test_broken`
-for Enzyme below rather than hidden.
+observation composition. Enzyme works on five of the eight once configured with
+`function_annotation = Enzyme.Const` (see [`backends`](@ref)). The two AR-based
+latent log-densities raise `IllegalTypeAnalysisException` inside the
+`accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion, and the
+deeply-nested `Split` composition raises the same exception through its
+per-stream submodel threading — real Enzyme type-analysis limitations, not
+defects in the package (all three sample fine under NUTS with ForwardDiff or
+Mooncake). They are recorded as `@test_broken` for Enzyme below rather than
+hidden.
 """
 function backend_broken_scenarios()
     return Dict{String, Set{String}}(
         "Enzyme reverse" => Set([
-        "AR latent logjoint", "ARIMA latent logjoint"]))
+        "AR latent logjoint", "ARIMA latent logjoint",
+        "Renewal+Split(parallel+sequential) posterior"]))
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."
