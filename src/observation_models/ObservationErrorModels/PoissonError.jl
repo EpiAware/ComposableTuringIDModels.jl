@@ -5,7 +5,7 @@ A Poisson observation-error model.
 
 # Examples
 ```jldoctest PoissonError; output = false
-using EpiAwarePrototype
+using ComposableTuringIDModels
 poi = PoissonError()
 mdl = as_turing_model(poi, missing, fill(10, 10))
 rand(mdl)

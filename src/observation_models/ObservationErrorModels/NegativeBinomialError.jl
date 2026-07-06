@@ -10,7 +10,7 @@ and used to parameterise the negative-binomial error (an
 
 # Examples
 ```@example NegativeBinomialError
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 nb = NegativeBinomialError()
 mdl = as_turing_model(nb, missing, fill(10, 10))
 rand(mdl)

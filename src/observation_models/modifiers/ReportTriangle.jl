@@ -37,7 +37,7 @@ total is split across delays.
 
 # Examples
 ```@example ReportingTriangle
-using EpiAwarePrototype
+using ComposableTuringIDModels
 # A 4 × 3 matrix (reference days 1..4, delays 0..2); now = 4.
 N = [10 5 2; 12 6 3; 14 7 4; 16 8 5]
 rt = define_y_t(ReportTriangle(PoissonError(), [0.5, 0.3, 0.2]), N, fill(20.0, 4))
@@ -78,12 +78,12 @@ delay PMF, the seam an estimated / time-varying delay grows from.
 
   - `ReportingPMF(distribution; D, Δd)` — discretise a continuous reporting-delay
     distribution via double-interval censoring (CensoredDistributions.jl), exactly
-    the released-CD path [`LatentDelay`](@ref) / [`EpiData`](@ref) use.
+    the released-CD path [`LatentDelay`](@ref) / [`IDData`](@ref) use.
   - `ReportingPMF(pmf)` — from a precomputed delay PMF (non-negative, sums to 1).
 
 # Examples
 ```@example ReportingPMF
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 c = ReportingPMF(truncated(Normal(2.0, 1.0), 0.0, Inf))
 as_turing_model(c, 10)()
 ```
@@ -140,7 +140,7 @@ parameterisation — are the seams this grows from (a later phase of the nowcast
 design).
 
 The default PMF is built with the same released-CD `double_interval_censored` +
-`pdf` discretisation path that [`LatentDelay`](@ref) / [`EpiData`](@ref) use, so
+`pdf` discretisation path that [`LatentDelay`](@ref) / [`IDData`](@ref) use, so
 the triangle's per-cell means and the right-truncation nowcast share one delay
 kernel.
 
@@ -178,7 +178,7 @@ triangle (`now = n + Dmax`) of `missing` cells and fills them predictively.
 
 # Examples
 ```@example ReportTriangle
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 obs = ReportTriangle(PoissonError(), truncated(Normal(2.0, 1.0), 0.0, Inf))
 # Simulate a triangle for 15 reference days of expected total 50.
 sim = as_turing_model(obs, missing, fill(50.0, 15))()
@@ -244,7 +244,7 @@ the per-time-point error families). It accepts:
 
 # Examples
 ```@example define_y_t_triangle
-using EpiAwarePrototype
+using ComposableTuringIDModels
 obs = ReportTriangle(PoissonError(), [0.5, 0.3, 0.2])      # Dmax = 2
 N = [10 5 2; 12 6 3; 14 7 4]                            # 3 reference days
 define_y_t(obs, N, fill(20.0, 3)).observed

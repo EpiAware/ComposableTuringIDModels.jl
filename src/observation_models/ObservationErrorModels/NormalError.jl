@@ -21,7 +21,7 @@ bare `Distribution` is coerced via [`as_prior`](@ref)).
 
 # Examples
 ```@example NormalError
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 ne = NormalError()
 mdl = as_turing_model(ne, missing, fill(10.0, 10))
 rand(mdl)

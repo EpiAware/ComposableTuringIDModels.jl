@@ -41,7 +41,7 @@ variable is sampled under the generic name `θ`.
 
 # Examples
 ```@example BroadcastPrior
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 # scalar parameter: length-1, read back with `only`
 only(as_turing_model(BroadcastPrior(Normal()), 1)())
 ```
@@ -95,7 +95,7 @@ is accepted unchanged.
 
 # Examples
 ```@example as_prior
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 as_prior(Normal())        # a BroadcastPrior
 as_prior(RandomWalk())    # a latent model is already a prior model
 ```

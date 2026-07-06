@@ -4,7 +4,7 @@
 # Pretty-printing shared by every model component. The original package leant on
 # PrettyPrinting.jl; here we keep a dependency-free `show` that lists the public
 # fields of a component, which is enough for interactive inspection and doctests.
-function Base.show(io::IO, ::MIME"text/plain", model::AbstractEpiAwareModel)
+function Base.show(io::IO, ::MIME"text/plain", model::AbstractComposableModel)
     print(io, nameof(typeof(model)))
     fields = fieldnames(typeof(model))
     if isempty(fields)

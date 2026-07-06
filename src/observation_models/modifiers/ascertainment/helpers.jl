@@ -22,7 +22,7 @@ with the expected observations by default.
 
 # Examples
 ```@example ascertainment_dayofweek
-using EpiAwarePrototype
+using ComposableTuringIDModels
 obs = ascertainment_dayofweek(PoissonError())
 mdl = as_turing_model(obs, missing, fill(10.0, 14))
 rand(mdl)

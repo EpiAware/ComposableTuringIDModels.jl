@@ -12,7 +12,7 @@ so that ``\mathbb{E}[X] = \mu``.
 
 # Examples
 ```jldoctest HalfNormal; output = false
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 hn = HalfNormal(1.0)
 nothing
 # output

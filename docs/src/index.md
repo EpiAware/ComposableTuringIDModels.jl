@@ -1,10 +1,10 @@
-# EpiAwarePrototype
+# ComposableTuringIDModels
 
 !!! warning "Early development"
     This package is in early development. Expect rough edges and breaking
     changes as the design settles.
 
-`EpiAwarePrototype` builds epidemiological models from small, reusable
+`ComposableTuringIDModels` builds epidemiological models from small, reusable
 components — infection processes (each owning its own latent process) and
 observation models — and turns each one into a
 [Turing](https://turinglang.org) / `DynamicPPL` model through the single generic
@@ -15,12 +15,12 @@ hand.
 ## Getting started
 
 ```@example index
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 
 # Compose infections -> observations. The infection model owns its latent
 # process (here a random walk in its `Z` slot); the latent is folded in rather
 # than threaded as a separate top-level component.
-model = EpiAwareModel(
+model = IDModel(
     DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
     PoissonError())
 
@@ -70,6 +70,6 @@ open-source, Apache-2.0 licensed `EpiAware` package
 ([CDCgov/Rt-without-renewal](https://github.com/CDCgov/Rt-without-renewal),
 ported from the fork
 [seabbs/Rt-without-renewal](https://github.com/seabbs/Rt-without-renewal)).
-`EpiAwarePrototype` is a modified, derived work: renamed, re-architected around
+`ComposableTuringIDModels` is a modified, derived work: renamed, re-architected around
 `as_turing_model`, and upgraded to the latest Turing. See the `NOTICE` file for
 attribution and the list of changes.

@@ -69,7 +69,7 @@ richer `NamedTuple` data contract.
 
 # Examples
 ```@example define_y_t
-using EpiAwarePrototype
+using ComposableTuringIDModels
 # A plain vector passes through; a NamedTuple's `y` field is unpacked.
 define_y_t(PoissonError(), [1, 2, 3], fill(10.0, 3)),
 define_y_t(PoissonError(), (y = [1, 2, 3],), fill(10.0, 3))
@@ -95,7 +95,7 @@ tuple consumed by [`observation_error`](@ref). The default is an empty tuple.
 
 # Examples
 ```@example generate_observation_error_priors
-using EpiAwarePrototype
+using ComposableTuringIDModels
 m = generate_observation_error_priors(NegativeBinomialError(), missing, fill(10.0, 5))
 rand(m)
 ```
@@ -119,7 +119,7 @@ the sampled priors. Each error family implements its own method.
 
 # Examples
 ```@example observation_error
-using EpiAwarePrototype
+using ComposableTuringIDModels
 observation_error(PoissonError(), 10.0)
 ```
 "
