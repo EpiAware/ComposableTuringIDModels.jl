@@ -1,6 +1,6 @@
+# MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 # Configure Dependabot version updates
 # https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
-
 version: 2
 updates:
   # GitHub Actions: keeps the reusable-workflow pins (and any actions) current.
@@ -11,22 +11,19 @@ updates:
     open-pull-requests-limit: 10
     reviewers:
       - "seabbs"
-    assignees:
-      - "seabbs"
     commit-message:
       prefix: "ci"
       include: "scope"
 
   # Julia dependencies. Uses the workspace feature (Julia 1.12+) to coordinate
-  # updates across the main package, test/, docs/, and benchmark/ environments.
+  # updates across the main package, test/, docs/, and (when benchmarks are
+  # enabled) the benchmark/ environment.
   - package-ecosystem: "julia"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
     reviewers:
-      - "seabbs"
-    assignees:
       - "seabbs"
     commit-message:
       prefix: "chore"

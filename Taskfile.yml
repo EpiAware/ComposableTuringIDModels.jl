@@ -1,3 +1,4 @@
+# MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 version: '3'
 
 # Standard EpiAware package development tasks. Generalised from
@@ -18,7 +19,8 @@ tasks:
 
   # === TESTING WORKFLOWS ===
   test:
-    desc: Run the full test suite including quality checks
+    desc: Run the full test suite including quality and AD gradient tests
+    deps: [test-ad]
     cmds:
       - echo "🧪 Running test suite..."
       - julia --project=. --quiet -e 'using Pkg; Pkg.test()'
@@ -72,6 +74,14 @@ tasks:
       - julia --project=test/ad test/ad/runtests.jl {{.TAG}}
       - echo "✅ AD gradient tests for {{.TAG}} completed"
 
+  test-extensions:
+    desc: >-
+      Check package extensions load by importing the package in the docs env
+      (a package can customise which trigger packages to load here)
+    cmds:
+      - echo "🔧 Testing package extensions..."
+      - julia --project=docs --quiet -e 'using {{.PACKAGE}}; println("✅ Package + docs env loaded")'
+
   format:
     desc: Format code with JuliaFormatter (fixes formatting issues)
     cmds:
@@ -89,6 +99,19 @@ tasks:
       - julia --project=test -e 'using Pkg; Pkg.add("Coverage"); using Coverage; LCOV.writefile("lcov.info", process_folder())'
       - echo "✅ Coverage report generated (lcov.info)"
 
+  coverage-ad:
+    desc: >
+      Run AD gradient tests with coverage over src + ext and write
+      lcov-ad.info (mirrors CI). Pass a backend tag to scope it, e.g.
+      `task coverage-ad -- enzyme_reverse`; omit for the full union.
+    cmds:
+      - echo "📊 Running AD gradient tests with coverage..."
+      - julia --project=test/ad -e 'using Pkg; Pkg.instantiate()'
+      - julia --project=test/ad --code-coverage=user test/ad/runtests.jl {{.CLI_ARGS}}
+      - echo "📊 Processing AD coverage data (src + ext)..."
+      - julia --project=test -e 'using Pkg; Pkg.add("Coverage"); using Coverage; cov = vcat(process_folder("src"), process_folder("ext")); LCOV.writefile("lcov-ad.info", cov); clean_folder("src"); clean_folder("ext")'
+      - echo "✅ AD coverage report generated (lcov-ad.info)"
+
   # === DOCUMENTATION WORKFLOWS ===
   docs:
     desc: Build the documentation
@@ -96,6 +119,13 @@ tasks:
       - echo "📚 Building documentation..."
       - julia --project=docs docs/make.jl
       - echo "✅ Documentation built successfully"
+
+  docs-fast:
+    desc: Build documentation quickly (skip notebook processing)
+    cmds:
+      - echo "📚 Building documentation (skipping notebooks)..."
+      - julia --project=docs docs/make.jl --skip-notebooks
+      - echo "✅ Fast documentation build completed"
 
   # === DEVELOPMENT SETUP ===
   setup:
@@ -105,11 +135,21 @@ tasks:
       - julia --project=. -e 'using Pkg; Pkg.instantiate()'
       - julia --project=test -e 'using Pkg; Pkg.instantiate()'
       - >-
-        for d in test/jet test/formatter docs benchmark; do
+        for d in test/ad test/jet test/formatter docs benchmark; do
           [ -f "$d/Project.toml" ] &&
             julia --project="$d" -e 'using Pkg; Pkg.instantiate()' || true;
         done
       - echo "✅ Development environment ready"
+
+  setup-precompile:
+    desc: Force precompilation of all environments
+    cmds:
+      - echo "🔄 Precompiling all environments..."
+      - julia --project=. -e 'using Pkg; Pkg.precompile()'
+      - julia --project=test -e 'using Pkg; Pkg.precompile()'
+      - julia --project=docs -e 'using Pkg; Pkg.precompile()'
+      - julia --project=benchmark -e 'using Pkg; Pkg.precompile()'
+      - echo "✅ Precompilation completed"
 
   # === PACKAGE MANAGEMENT ===
   pkg-status:
@@ -121,18 +161,87 @@ tasks:
       - echo "=== Test Environment ==="
       - julia --project=test --quiet -e 'using Pkg; Pkg.status()'
 
+  pkg-update:
+    desc: Update packages in all environments
+    interactive: true
+    cmds:
+      - |
+        echo "⚠️  WARNING: This will update packages in all environments"
+        printf "   Continue? [y/N] "
+        read -r REPLY
+        if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
+          echo "📦 Updating root environment..."
+          julia --project=. -e 'using Pkg; Pkg.update()'
+          echo "📦 Updating test environment..."
+          julia --project=test -e 'using Pkg; Pkg.update()'
+          echo "📦 Updating docs environment..."
+          julia --project=docs -e 'using Pkg; Pkg.update()'
+          echo "📦 Updating benchmark environment..."
+          julia --project=benchmark -e 'using Pkg; Pkg.update()'
+          echo "✅ All environments updated"
+        else
+          echo "❌ Update cancelled"
+        fi
+
+  pkg-add:
+    desc: "Add package to specified environment (usage: task pkg-add ENV=docs -- PackageName)"
+    cmds:
+      - |
+        ENV_VAR={{.ENV | default "."}}
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task pkg-add ENV=<environment> -- <PackageName>"
+          echo "Environments: . (root), test, docs, benchmark"
+          echo "Example: task pkg-add ENV=docs -- Literate"
+          exit 1
+        fi
+        echo "📦 Adding {{.CLI_ARGS}} to $ENV_VAR environment..."
+        julia --project=$ENV_VAR -e "using Pkg; Pkg.add(\"{{.CLI_ARGS}}\")"
+        echo "✅ Package added successfully"
+
   # === BENCHMARKS ===
+  # Helper to find main repo (works in both main repo and worktrees)
+  _benchmark-repo-path:
+    internal: true
+    cmds:
+      - |
+        git_dir=$(git rev-parse --git-dir)
+        if [[ "$git_dir" == *"/worktrees/"* ]]; then
+          dirname $(dirname $(dirname "$git_dir"))
+        else
+          git rev-parse --show-toplevel
+        fi
+    silent: true
+
   benchmark:
     desc: "Run benchmarks (usage: task benchmark -- --filter=Foo)"
     cmds:
       - echo "⚡ Running benchmarks..."
-      - ~/.julia/bin/benchpkg --rev=dirty --path="$(git rev-parse --show-toplevel)" --script="$(pwd)/benchmark/benchmarks.jl" {{.CLI_ARGS}}
+      - |
+        git_dir=$(git rev-parse --git-dir)
+        if [[ "$git_dir" == *"/worktrees/"* ]]; then
+          REPO_PATH=$(dirname $(dirname $(dirname "$git_dir")))
+        else
+          REPO_PATH=$(git rev-parse --show-toplevel)
+        fi
+        ~/.julia/bin/benchpkg --rev=dirty --path="$REPO_PATH" --script="$(pwd)/benchmark/benchmarks.jl" {{.CLI_ARGS}}
 
   benchmark-compare:
     desc: "Compare main vs current (usage: task benchmark-compare -- --filter=Foo)"
     cmds:
       - echo "⚡ Comparing benchmarks (main vs current)..."
-      - ~/.julia/bin/benchpkg --rev=main,dirty --path="$(git rev-parse --show-toplevel)" --script="$(pwd)/benchmark/benchmarks.jl" {{.CLI_ARGS}}
+      - |
+        git_dir=$(git rev-parse --git-dir)
+        if [[ "$git_dir" == *"/worktrees/"* ]]; then
+          REPO_PATH=$(dirname $(dirname $(dirname "$git_dir")))
+        else
+          REPO_PATH=$(git rev-parse --show-toplevel)
+        fi
+        ~/.julia/bin/benchpkg --rev=main,dirty --path="$REPO_PATH" --script="$(pwd)/benchmark/benchmarks.jl" {{.CLI_ARGS}}
+
+  benchmark-table:
+    desc: "Show benchmark results table (usage: task benchmark-table -- --rev=dirty)"
+    cmds:
+      - ~/.julia/bin/benchpkgtable {{.PACKAGE}} {{.CLI_ARGS}}
 
   benchmark-install:
     desc: Install the benchpkg CLI to the global environment (one-time)
@@ -142,12 +251,22 @@ tasks:
 
   # === DEVELOPMENT WORKFLOWS ===
   dev:
-    desc: Common development workflow (format + precommit + fast test)
+    desc: Common development workflow (format + precommit + fast test + fast docs)
     cmds:
       - task: format
       - task: precommit
       - task: test-fast
+      - task: docs-fast
       - echo "✅ Development checks completed"
+
+  dev-full:
+    desc: Full development workflow (format + precommit + all tests + full docs)
+    cmds:
+      - task: format
+      - task: precommit
+      - task: test
+      - task: docs
+      - echo "✅ Full development checks completed"
 
   precommit:
     desc: Run the pre-commit hooks on all files
@@ -159,10 +278,34 @@ tasks:
   ci:
     desc: Simulate the CI pipeline locally
     cmds:
+      - echo "🤖 Running CI simulation..."
       - task: precommit
       - task: test
-      - task: docs
+      - task: docs-fast
+      - task: benchmark
       - echo "✅ CI simulation completed successfully"
+
+  # === UTILITIES ===
+  clean:
+    desc: Clean build artifacts and temporary files
+    interactive: true
+    cmds:
+      - |
+        echo "⚠️  WARNING: This will delete build artifacts and temporary files"
+        echo "   - docs/build/ directory"
+        echo "   - .cov files"
+        echo "   - Test environment Manifest.toml"
+        printf "   Continue? [y/N] "
+        read -r REPLY
+        if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
+          echo "🗑️  Cleaning build artifacts..."
+          rm -rf docs/build/
+          find . -name "*.cov" -delete
+          rm -f test/Manifest.toml docs/Manifest.toml benchmark/Manifest.toml
+          echo "✅ Cleanup completed"
+        else
+          echo "❌ Cleanup cancelled"
+        fi
 
   # === INFORMATION ===
   info:
