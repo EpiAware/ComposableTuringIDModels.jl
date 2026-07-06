@@ -34,6 +34,33 @@ function implements_latent_interface(model; n::Int = 10)
 end
 
 @doc raw"
+Check that `model` satisfies the [`AbstractPriorModel`](@ref) interface: it is a
+prior model and `as_turing_model(model, n)` returns a `DynamicPPL.Model`.
+
+Every [`AbstractLatentModel`](@ref) is also an `AbstractPriorModel`, so this holds
+for latent models (a latent process used directly as a prior) as well as for the
+[`BroadcastPrior`](@ref) wrapper and any bespoke prior submodel.
+
+# Arguments
+
+  - `model`: the component to check.
+
+# Keyword Arguments
+
+  - `n`: the prior length used for the construction check (default `10`).
+
+# Examples
+```@example
+using EpiAwarePrototype, Distributions
+implements_prior_interface(BroadcastPrior(Normal()))
+```
+"
+function implements_prior_interface(model; n::Int = 10)
+    model isa AbstractPriorModel || return false
+    return as_turing_model(model, n) isa DynamicPPL.Model
+end
+
+@doc raw"
 Check that `model` satisfies the [`AbstractInfectionModel`](@ref) interface: it is
 an infection model and `as_turing_model(model, n)` returns a `DynamicPPL.Model`.
 
