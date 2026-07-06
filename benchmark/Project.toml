@@ -6,7 +6,7 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DynamicPPL = "366bfd00-2699-11ea-058f-f148b4cae6d8"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 EpiAwarePackageTools = "7aaea248-0d11-4a0d-a7dc-86da30abb951"
-EpiAwarePrototype = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
+ComposableTuringIDModels = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LogDensityProblems = "6fdf6af0-433a-55f7-b3ed-c6c6e0b8df7c"
 Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
@@ -16,4 +16,4 @@ Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [sources]
 EpiAwarePackageTools = {rev = "main", url = "https://github.com/EpiAware/EpiAwarePackageTools.jl"}
-EpiAwarePrototype = {path = ".."}
+ComposableTuringIDModels = {path = ".."}

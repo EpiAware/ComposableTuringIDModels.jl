@@ -1,5 +1,5 @@
 @testitem "latent components generate length-n paths" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(1)
     n = 12
     for m in (IID(Normal()), HierarchicalNormal(), RandomWalk(), AR(), MA(),
@@ -12,7 +12,7 @@
 end
 
 @testitem "AR and MA respect their order via priors" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(2)
     ar2 = AR(;
         damp = [truncated(Normal(0, 0.05), 0, 1),
@@ -29,7 +29,7 @@ end
 end
 
 @testitem "DiffLatentModel composes an ARIMA-style latent process" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(3)
     arima = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
     @test arima.d == 2
@@ -39,7 +39,7 @@ end
 end
 
 @testitem "rand from a latent model uses flat (unprefixed) names" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: VarName
     Random.seed!(4)
     draw = rand(as_turing_model(RandomWalk(), 10))

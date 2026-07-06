@@ -47,7 +47,7 @@ process folded into a [`Renewal`](@ref) infection process, observed with a
 [`NegativeBinomialError`](@ref).
 
 ```@example nowcast
-using EpiAwarePrototype, Distributions, Random, Turing
+using ComposableTuringIDModels, Distributions, Random, Turing
 using CSV, DataFrames
 Random.seed!(20240625)
 
@@ -55,7 +55,7 @@ latent = AR(
     damp = [truncated(Normal(0.8, 0.05), 0, 1)],
     init = [Normal(0.0, 0.25)],
     ϵ_t = HierarchicalNormal(std = HalfNormal(0.1)))
-data = EpiData(gen_distribution = Gamma(1.4, 1 / 0.38))
+data = IDData(gen_distribution = Gamma(1.4, 1 / 0.38))
 renewal = Renewal(data; rt = latent, initialisation = Normal(log(1.0), 1.0))
 error = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 nothing # hide
@@ -72,7 +72,7 @@ path the rest of the package uses; [`ReportingCDF`](@ref) builds the completenes
 curve ``F``.
 
 ```@example nowcast
-datapath = joinpath(pkgdir(EpiAwarePrototype),
+datapath = joinpath(pkgdir(ComposableTuringIDModels),
     "docs", "src", "case-studies", "data", "italy_data.csv")
 italy = CSV.read(datapath, DataFrame)
 n = 50
@@ -103,7 +103,7 @@ Condition the plain renewal model on the truncated counts as though they were
 complete.
 
 ```@example nowcast
-naive_model = EpiAwareModel(renewal, error)
+naive_model = IDModel(renewal, error)
 naive_post = as_turing_model(naive_model, observed_so_far, n)
 naive_chain = sample(naive_post, NUTS(0.9), 1000; progress = false)
 nothing # hide
@@ -117,7 +117,7 @@ untouched; only how the expected counts are compared to the truncated data.
 
 ```@example nowcast
 corrected_obs = RightTruncate(error, reporting_delay)
-corrected_model = EpiAwareModel(renewal, corrected_obs)
+corrected_model = IDModel(renewal, corrected_obs)
 corrected_post = as_turing_model(corrected_model, observed_so_far, n)
 corrected_chain = sample(corrected_post, NUTS(0.9), 1000; progress = false)
 nothing # hide

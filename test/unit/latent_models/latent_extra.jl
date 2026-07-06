@@ -1,5 +1,5 @@
 @testitem "latent modifiers generate length-n paths" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(31)
     n = 10
     trans = TransformLatentModel(Intercept(Normal(2, 0.2)), x -> exp.(x))
@@ -11,7 +11,7 @@
 end
 
 @testitem "PrefixLatentModel prefixes inner variable names" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(32)
     pm = PrefixLatentModel(; model = HierarchicalNormal(), prefix = "Test")
     names = string.(collect(keys(rand(as_turing_model(pm, 10)))))
@@ -19,7 +19,7 @@ end
 end
 
 @testitem "CombineLatentModels sums components" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(33)
     combined = CombineLatentModels([Intercept(Normal(2, 0.2)), AR()])
     out = as_turing_model(combined, 10)()
@@ -28,23 +28,23 @@ end
 end
 
 @testitem "ConcatLatentModels concatenates segments" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(34)
     combined = ConcatLatentModels([Intercept(Normal(2, 0.2)), AR()])
     out = as_turing_model(combined, 10)()
     @test length(out) == 10
     @test all(isfinite, out)
     # equal_dimensions splits 10 across 2 models as [5, 5].
-    @test EpiAwarePrototype.equal_dimensions(10, 2) == [5, 5]
+    @test ComposableTuringIDModels.equal_dimensions(10, 2) == [5, 5]
 end
 
 @testitem "equal_dimensions always sums to n (>=3 segments)" begin
-    using EpiAwarePrototype
+    using ComposableTuringIDModels
     # Regression: the remainder must be distributed across the leading segments,
     # not dumped onto the first, so the lengths always sum to exactly n. The old
     # `vcat(ceil(n/m), fill(floor(n/m), m-1))` gave [3,2,2,2]=9 for (10, 4) and
     # tripped ConcatLatentModels' `@assert sum(dims) == n`.
-    ed = EpiAwarePrototype.equal_dimensions
+    ed = ComposableTuringIDModels.equal_dimensions
     @test ed(10, 4) == [3, 3, 2, 2]
     @test ed(11, 3) == [4, 4, 3]
     for (n, m) in ((10, 4), (11, 3), (13, 5), (7, 7), (100, 6), (5, 2))
@@ -57,7 +57,7 @@ end
 end
 
 @testitem "ConcatLatentModels builds and runs with >=3 segments" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(340)
     # Exercises the default equal_dimensions on a partition with a non-trivial
     # remainder (10 across 3 -> [4, 3, 3]); previously threw at model build.
@@ -65,11 +65,11 @@ end
     out = as_turing_model(combined, 10)()
     @test length(out) == 10
     @test all(isfinite, out)
-    @test EpiAwarePrototype.equal_dimensions(10, 3) == [4, 3, 3]
+    @test ComposableTuringIDModels.equal_dimensions(10, 3) == [4, 3, 3]
 end
 
 @testitem "MAStep convolves innovations in correct lag order" begin
-    using EpiAwarePrototype: MAStep, accumulate_scan
+    using ComposableTuringIDModels: MAStep, accumulate_scan
     # MA(2): Z_t = ϵ_t + θ1 ϵ_{t-1} + θ2 ϵ_{t-2}; the first q outputs are the raw
     # warm-up innovations in natural order. Drives the same seeding MA.jl uses
     # (newest-first buffer via `reverse(ϵ[1:q])`).
@@ -86,7 +86,7 @@ end
 end
 
 @testitem "ARStep applies damping in correct lag order" begin
-    using EpiAwarePrototype: ARStep, accumulate_scan
+    using ComposableTuringIDModels: ARStep, accumulate_scan
     # AR reverses the damping coefficients before building the step (see AR.jl)
     # so ρ[i] multiplies the lag-i term. With ρ = [ρ1, ρ2], init [Z1, Z2] and
     # zero innovations: Z3 = ρ1 Z2 + ρ2 Z1, Z4 = ρ1 Z3 + ρ2 Z2, …
@@ -101,7 +101,7 @@ end
 end
 
 @testitem "broadcasting expands a shorter process to length n" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(35)
     each = BroadcastLatentModel(RandomWalk(), 7, RepeatEach())
     @test length(as_turing_model(each, 10)()) == 10
@@ -115,7 +115,7 @@ end
 end
 
 @testitem "arma and arima build composable latent processes" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(36)
     @test length(as_turing_model(arma(), 10)()) == 10
     @test length(as_turing_model(arima(), 10)()) == 10

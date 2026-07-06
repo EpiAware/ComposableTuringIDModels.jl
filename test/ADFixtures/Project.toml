@@ -9,13 +9,13 @@ DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
 DifferentiationInterfaceTest = "a82114a7-5aa3-49a8-9643-716bb13727a3"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DynamicPPL = "366bfd00-2699-11ea-058f-f148b4cae6d8"
-EpiAwarePrototype = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
+ComposableTuringIDModels = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LogDensityProblems = "6fdf6af0-433a-55f7-b3ed-c6c6e0b8df7c"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [sources]
-EpiAwarePrototype = {path = "../.."}
+ComposableTuringIDModels = {path = "../.."}
 
 [compat]
 Distributions = "0.25.128"
