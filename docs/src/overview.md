@@ -1,6 +1,6 @@
 # [Overview](@id overview)
 
-`EpiAwarePrototype` builds an epidemiological model by assembling small parts
+`ComposableTuringIDModels` builds an epidemiological model by assembling small parts
 rather than writing one bespoke model.
 Each part plays one of three roles — a **latent** process, an **infection**
 process, or an **observation** process — and each part becomes a
@@ -11,7 +11,7 @@ a whole model is *composed* from the pieces.
 
 <figure style="margin:1.5rem 0">
 <svg viewBox="0 0 820 445" role="img" aria-labelledby="ovw-t ovw-d" style="width:100%;height:auto;max-width:820px;font-family:system-ui,Segoe UI,Helvetica,Arial,sans-serif">
-<title id="ovw-t">Composable design of EpiAwarePrototype</title>
+<title id="ovw-t">Composable design of ComposableTuringIDModels</title>
 <desc id="ovw-d">A latent process nested inside an infection model feeds an observation model through the single as_turing_model interface; any of the three roles can be swapped.</desc>
 <rect x="2" y="2" width="816" height="441" rx="16" fill="#fbfafc" stroke="#e6e3ec"/>
 <defs>
@@ -90,7 +90,7 @@ An infection model takes a latent slot — `Z` for [`DirectInfections`](@ref),
 `rt` for [`ExpGrowthRate`](@ref) and [`Renewal`](@ref) — draws that process
 internally, and maps it to infections.
 Only [`Renewal`](@ref) needs a generation interval, so it alone carries an
-[`EpiData`](@ref); the others take a transformation directly.
+[`IDData`](@ref); the others take a transformation directly.
 
 ## Swap a part to change an assumption
 
@@ -98,18 +98,18 @@ Because the parts share one interface, you compare modelling assumptions by
 swapping one struct for another and leaving the rest untouched.
 
 ```@example overview
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 
 # One latent process: an ARIMA-style differenced AR.
 latent = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()])
 
 # Fold it into a direct-infections process, then swap only the observation
 # model. Everything else stays the same.
-poisson_model = EpiAwareModel(
+poisson_model = IDModel(
     DirectInfections(; Z = latent, initialisation_prior = Normal()),
     PoissonError())
 
-negbin_model = EpiAwareModel(
+negbin_model = IDModel(
     DirectInfections(; Z = latent, initialisation_prior = Normal()),
     NegativeBinomialError())
 
