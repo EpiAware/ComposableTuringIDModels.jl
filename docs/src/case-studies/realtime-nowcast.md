@@ -105,7 +105,8 @@ complete.
 ```@example nowcast
 naive_model = EpiAwareModel(renewal, error)
 naive_post = as_turing_model(naive_model, observed_so_far, n)
-naive_chain = sample(naive_post, NUTS(0.9), 1000; progress = false)
+naive_chain = sample(
+    naive_post, NUTS(0.9), MCMCThreads(), 500, 2; progress = false)
 nothing # hide
 ```
 
@@ -119,7 +120,8 @@ untouched; only how the expected counts are compared to the truncated data.
 corrected_obs = RightTruncate(error, reporting_delay)
 corrected_model = EpiAwareModel(renewal, corrected_obs)
 corrected_post = as_turing_model(corrected_model, observed_so_far, n)
-corrected_chain = sample(corrected_post, NUTS(0.9), 1000; progress = false)
+corrected_chain = sample(
+    corrected_post, NUTS(0.9), MCMCThreads(), 500, 2; progress = false)
 nothing # hide
 ```
 
@@ -146,7 +148,8 @@ function recent_Rt(posterior, chain; window = 7)
 end
 
 complete_post = as_turing_model(naive_model, eventual, n)
-complete_chain = sample(complete_post, NUTS(0.9), 1000; progress = false)
+complete_chain = sample(
+    complete_post, NUTS(0.9), MCMCThreads(), 500, 2; progress = false)
 
 R_complete_recent = recent_Rt(complete_post, complete_chain)
 R_naive_recent = recent_Rt(naive_post, naive_chain)
@@ -165,9 +168,84 @@ towards the complete-data value. (There is still Monte Carlo noise in the exact
 values, but the robust, repeatable signal is the *direction* — the naive fit
 under-estimates recent ``R_t``, and the correction removes that downward pull.)
 The nowcast of the eventual totals is the corrected model's ``Y_t``, recovered the
-same way from the per-draw generated quantities; this page stops at the ``R_t``
-summary, consistent with the other case studies (the docs build runs no plotting
-stack).
+same way from the per-draw generated quantities; the figures below make the
+correction visible.
+
+## Prior versus posterior
+
+Sampling the corrected model with [`Prior`](https://turinglang.org/) gives a prior
+draw over the shared renewal parameters. Overlaying it on the posterior with
+[PairPlots.jl](https://sefffal.github.io/PairPlots.jl/) confirms the truncation
+correction still identifies them from the thinned tail.
+
+```@example nowcast
+using CairoMakie, PairPlots
+
+prior_chain = sample(corrected_post, Prior(), 1000; progress = false)
+pp_keys = [@varname(damp_AR), @varname(std),
+    @varname(cluster_factor), @varname(init_incidence)]
+pairplot(
+    PairPlots.Series(corrected_chain[pp_keys]; label = "posterior"),
+    PairPlots.Series(prior_chain[pp_keys]; label = "prior"))
+```
+
+## The correction in a figure
+
+``R_t = \exp(Z_t)`` is a generated quantity recovered per draw with
+[`generated_observables`](@ref). Plotting the posterior median and 95% band for
+all three fits over time — the complete-data reference, the naive truncated fit,
+and the [`RightTruncate`](@ref)-corrected fit — shows the right-truncation
+artefact and its removal in the recent window (shaded).
+
+```@setup nowcast
+using Statistics
+
+const CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
+
+function credible_bands(mat; qs = CI_QS)
+    reduce(hcat, (map(eachrow(mat)) do row
+        vals = collect(skipmissing(row))
+        isempty(vals) ? missing : quantile(vals, q)
+    end for q in qs))
+end
+
+# posterior R_t = exp(Z_t) credible bands for one fit
+function rt_bands(post, data, chn)
+    gens = vec(generated_observables(post, data, chn).generated)
+    credible_bands(reduce(hcat, (exp.(g.Z_t) for g in gens)))
+end
+
+# median line with a 95% ribbon
+function rt_line!(ax, ts, bands; color, label)
+    band!(ax, ts, Float64.(bands[:, 1]), Float64.(bands[:, 5]);
+        color = (color, 0.12))
+    lines!(ax, ts, Float64.(bands[:, 3]); color = color, linewidth = 2,
+        label = label)
+end
+```
+
+```@example nowcast
+Rt_complete = rt_bands(complete_post, eventual, complete_chain)
+Rt_naive = rt_bands(naive_post, observed_so_far, naive_chain)
+Rt_corrected = rt_bands(corrected_post, observed_so_far, corrected_chain)
+
+ts = 1:n
+fig = Figure(; size = (760, 420))
+ax = Axis(fig[1, 1]; xlabel = "Reference day",
+    ylabel = "Reproduction number Rₜ")
+vspan!(ax, n - 6, n; color = (:grey, 0.15))
+rt_line!(ax, ts, Rt_complete; color = :black, label = "complete (reference)")
+rt_line!(ax, ts, Rt_naive; color = :crimson, label = "naive (truncated)")
+rt_line!(ax, ts, Rt_corrected; color = :seagreen, label = "corrected")
+hlines!(ax, [1.0]; color = :grey, linestyle = :dash)
+axislegend(ax; position = :lb)
+fig
+```
+
+In the shaded recent window the naive fit (red) dips below the complete-data
+reference (black) — the artefactual late down-turn — while the
+[`RightTruncate`](@ref) correction (green) pulls the recent ``R_t`` back up
+towards the reference, having accounted for the not-yet-reported counts.
 
 ## Reading the shared parameters
 

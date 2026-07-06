@@ -18,4 +18,8 @@ concurrency:
 jobs:
   Documenter:
     uses: EpiAware/.github/.github/workflows/documentation.yml@6d4e35e2515f947acbf7d2a683cbf02b341005c7
+    # Two threads so the case-study samplers can run their two chains in
+    # parallel (MCMCThreads()) during the docs build.
+    with:
+      julia_num_threads: '2'
     secrets: inherit  # pragma: allowlist secret
