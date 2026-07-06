@@ -1,31 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 208 210" role="img" aria-label="Composable infectious-disease modelling: modular blocks tracing an epidemic curve">
-  <title>Composable infectious-disease modelling</title>
-  <rect x="10" y="176" width="28" height="28" rx="7" ry="7" fill="#9558B2"/>
-  <rect x="42" y="176" width="28" height="28" rx="7" ry="7" fill="#389826"/>
-  <rect x="42" y="144" width="28" height="28" rx="7" ry="7" fill="#389826"/>
-  <rect x="42" y="112" width="28" height="28" rx="7" ry="7" fill="#389826"/>
-  <rect x="74" y="176" width="28" height="28" rx="7" ry="7" fill="#9558B2"/>
-  <rect x="74" y="144" width="28" height="28" rx="7" ry="7" fill="#9558B2"/>
-  <rect x="74" y="112" width="28" height="28" rx="7" ry="7" fill="#9558B2"/>
-  <rect x="74" y="80" width="28" height="28" rx="7" ry="7" fill="#9558B2"/>
-  <rect x="74" y="48" width="28" height="28" rx="7" ry="7" fill="#9558B2"/>
-  <rect x="106" y="176" width="28" height="28" rx="7" ry="7" fill="#389826"/>
-  <rect x="106" y="144" width="28" height="28" rx="7" ry="7" fill="#389826"/>
-  <rect x="106" y="112" width="28" height="28" rx="7" ry="7" fill="#389826"/>
-  <rect x="106" y="80" width="28" height="28" rx="7" ry="7" fill="#389826"/>
-  <rect x="106" y="48" width="28" height="28" rx="7" ry="7" fill="#389826"/>
-  <rect x="106" y="16" width="28" height="28" rx="7" ry="7" fill="#389826"/>
-  <rect x="138" y="176" width="28" height="28" rx="7" ry="7" fill="#9558B2"/>
-  <rect x="138" y="144" width="28" height="28" rx="7" ry="7" fill="#9558B2"/>
-  <rect x="138" y="112" width="28" height="28" rx="7" ry="7" fill="#9558B2"/>
-  <rect x="138" y="80" width="28" height="28" rx="7" ry="7" fill="#9558B2"/>
-  <rect x="170" y="176" width="28" height="28" rx="7" ry="7" fill="#389826"/>
-  <rect x="170" y="144" width="28" height="28" rx="7" ry="7" fill="#389826"/>
-  <path d="M 4.0 186.0 C 7.3 183.8 15.3 185.8 24.0 173.0 C 32.7 160.2 45.3 130.3 56.0 109.0 C 66.7 87.7 77.3 61.0 88.0 45.0 C 98.7 29.0 109.3 7.7 120.0 13.0 C 130.7 18.3 141.3 55.7 152.0 77.0 C 162.7 98.3 175.3 126.5 184.0 141.0 C 192.7 155.5 200.7 160.2 204.0 164.0" fill="none" stroke="#CB3C33" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="24.0" cy="173.0" r="4.6" fill="#CB3C33"/>
-  <circle cx="56.0" cy="109.0" r="4.6" fill="#CB3C33"/>
-  <circle cx="88.0" cy="45.0" r="4.6" fill="#CB3C33"/>
-  <circle cx="120.0" cy="13.0" r="4.6" fill="#CB3C33"/>
-  <circle cx="152.0" cy="77.0" r="4.6" fill="#CB3C33"/>
-  <circle cx="184.0" cy="141.0" r="4.6" fill="#CB3C33"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" fill="none">
+  <defs>
+    <linearGradient id="ppl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a870c8"/><stop offset="1" stop-color="#8a4faf"/></linearGradient>
+    <linearGradient id="grn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#46b330"/><stop offset="1" stop-color="#328722"/></linearGradient>
+    <linearGradient id="red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dc4840"/><stop offset="1" stop-color="#c0342c"/></linearGradient>
+  </defs>
+  <g stroke="#949aa8" stroke-width="15" stroke-linecap="round">
+    <line x1="150" y1="150" x2="150" y2="66"/>
+    <line x1="150" y1="150" x2="74" y2="210"/>
+    <line x1="150" y1="150" x2="226" y2="210"/>
+  </g>
+  <circle cx="150" cy="150" r="23" fill="#3a3d4c"/>
+  <circle cx="150" cy="150" r="11.5" fill="none" stroke="#eef0f4" stroke-width="4.5"/>
+  <g>
+    <rect x="108" y="24" width="84" height="84" rx="20" fill="url(#ppl)"/>
+    <rect x="108.5" y="24.5" width="83" height="83" rx="19.5" fill="none" stroke="#fff" stroke-opacity=".25"/>
+    <circle cx="150" cy="66" r="9" fill="#fff"/><circle cx="150" cy="66" r="4" fill="#8a4faf"/>
+  </g>
+  <g>
+    <rect x="32" y="168" width="84" height="84" rx="20" fill="url(#grn)"/>
+    <rect x="32.5" y="168.5" width="83" height="83" rx="19.5" fill="none" stroke="#fff" stroke-opacity=".25"/>
+    <circle cx="74" cy="210" r="9" fill="#fff"/><circle cx="74" cy="210" r="4" fill="#328722"/>
+  </g>
+  <g>
+    <rect x="184" y="168" width="84" height="84" rx="20" fill="url(#red)"/>
+    <rect x="184.5" y="168.5" width="83" height="83" rx="19.5" fill="none" stroke="#fff" stroke-opacity=".25"/>
+    <circle cx="226" cy="210" r="9" fill="#fff"/><circle cx="226" cy="210" r="4" fill="#c0342c"/>
+  </g>
 </svg>
