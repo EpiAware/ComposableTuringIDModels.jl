@@ -2,6 +2,7 @@
 # by make.jl from the module's documented bindings.
 pages = [
     "Home" => "index.md",
+    "Overview" => "overview.md",
     "Composable design" => "design.md",
     "Case studies" => [
         "Overview" => "case-studies/index.md",

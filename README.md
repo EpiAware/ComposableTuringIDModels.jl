@@ -12,25 +12,58 @@
 
 *A toolkit for composable probabilistic infectious disease modelling in Julia.*
 
-> This package is in early development. Expect rough edges and breaking changes.
+> **Prototype.** This package is an exploratory prototype. Expect rough edges
+> and breaking changes.
 
 ## Why EpiAwarePrototype?
 
-- **Composable models**: Build a model from interchangeable infection and
-  observation components — each infection model owning its own latent process —
-  rather than writing one monolithic model.
-- **Swap parts to compare assumptions**: Change the latent process, infection
-  process, or observation model independently to test how each assumption shapes
+- **Composable models**: Assemble a model from interchangeable infection and
+  observation parts — each infection model owning its own latent process —
+  instead of writing one monolithic model.
+- **Swap a part to change an assumption**: Change the latent process, infection
+  process, or observation model on its own to test how each assumption shapes
   your conclusions.
+- **One interface**: Every part becomes a [Turing](https://turinglang.org) /
+  [DynamicPPL](https://github.com/TuringLang/DynamicPPL.jl) model through the
+  single `as_turing_model` constructor, so parts nest freely as submodels. The
+  full Turing inference toolbox (NUTS, Pathfinder, prior simulation) applies.
 - **Simulate and infer**: Generate synthetic data from any model, then run
   Bayesian inference on the same model with real data.
-- **A library of components**: Random walks, AR/MA/ARIMA latent processes,
-  renewal and exponential-growth infection models, ODE (SIR/SEIR) processes,
-  Poisson and negative-binomial observations, reporting delays, ascertainment,
-  and aggregation — all interchangeable.
-- **Turing-native**: Every component becomes a [Turing](https://turinglang.org) /
-  [DynamicPPL](https://github.com/TuringLang/DynamicPPL.jl) model, so the full
-  Turing inference toolbox (NUTS, Pathfinder, prior simulation) is available.
+- **A library of parts**: Random walks, AR/MA/ARIMA latent processes, renewal
+  and exponential-growth infection models, ODE (SIR/SEIR) processes, Poisson and
+  negative-binomial observations, reporting delays, ascertainment, and
+  aggregation — all interchangeable.
+
+## Getting started
+
+You assemble a model from parts, and `EpiAwarePrototype` turns the assembly into
+a single Turing model you can simulate from and fit.
+Each part is itself a model, joined through the generic `as_turing_model`
+constructor.
+
+```julia
+using EpiAwarePrototype, Distributions, Turing
+
+# Compose a model: an ARIMA-style latent process (a differenced AR) folded
+# into a direct-infections process, observed with Poisson error.
+model = EpiAwareModel(
+    DirectInfections(;
+        Z = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]),
+        initialisation_prior = Normal()),
+    PoissonError())
+
+# Build a Turing model; `missing` observations simulate from the prior.
+n = 30
+prior_model = as_turing_model(model, missing, n)
+
+# Sample from the prior and inspect the generated quantities.
+draw = rand(prior_model)
+(; generated_y_t, I_t, Z_t) = prior_model()
+
+# Condition on data and run inference.
+posterior_model = as_turing_model(model, generated_y_t, n)
+chain = sample(posterior_model, NUTS(), 1_000)
+```
 
 ## Installation
 
@@ -41,42 +74,38 @@ using Pkg
 Pkg.add(url = "https://github.com/EpiAware/EpiAwarePrototype.jl")
 ```
 
-## A composable example
+## Swap a part
 
-You assemble a model from components and `EpiAwarePrototype` turns the assembly
-into a single Turing model you can simulate from and fit. Each component is
-itself a model, joined together with the generic `as_turing_model` constructor.
+Because every part is interchangeable, the same swap-in/swap-out pattern applies
+throughout.
+Replace `PoissonError()` with `NegativeBinomialError()`, wrap the observation in
+a `LatentDelay`, or change the latent process — without touching the rest of
+the model.
 
 ```julia
-using EpiAwarePrototype, Distributions, Turing
+# Same infection process, two observation assumptions.
+latent = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()])
+infections = DirectInfections(; Z = latent, initialisation_prior = Normal())
 
-# Compose a model: an ARIMA-style latent process (differenced AR) is folded into
-# a direct-infections process, observed with Poisson error.
-model = EpiAwareModel(
-    DirectInfections(;
-        Z = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]),
-        initialisation_prior = Normal()),
-    PoissonError())
-
-# Build a Turing model. `missing` observations simulate from the prior.
-n = 30
-prior_model = as_turing_model(model, missing, n)
-
-# Sample from the prior, then inspect the generated quantities.
-draw = rand(prior_model)
-(; generated_y_t, I_t, Z_t) = prior_model()
-
-# Condition on data and run inference.
-y = generated_y_t
-posterior_model = as_turing_model(model, y, n)
-chain = sample(posterior_model, NUTS(), 1_000)
+poisson_model = EpiAwareModel(infections, PoissonError())
+negbin_model = EpiAwareModel(infections, NegativeBinomialError())
 ```
 
-Because every component is interchangeable, the same swap-in/swap-out pattern
-applies throughout: replace `PoissonError()` with `NegativeBinomialError()`,
-wrap it in a `LatentDelay`, or change the latent process — without touching the
-rest of the model. That is the point: you compare modelling assumptions by
-swapping parts, not by rewriting models.
+That is the point: you compare modelling assumptions by swapping parts, not by
+rewriting models.
+
+## Where to learn more
+
+- New here? Start with the
+  [Overview](https://epiawareprototype.epiaware.org/dev/overview) and the
+  [Composable design](https://epiawareprototype.epiaware.org/dev/design) page.
+- Want worked examples? See the
+  [case studies](https://epiawareprototype.epiaware.org/dev/case-studies), which
+  fit complete models to real surveillance data.
+- Want the full interface? Browse the
+  [Public API](https://epiawareprototype.epiaware.org/dev/lib/public).
+- Want to see the code or report a problem? Check the
+  [GitHub repository](https://github.com/EpiAware/EpiAwarePrototype.jl).
 
 ## Adapted from
 
