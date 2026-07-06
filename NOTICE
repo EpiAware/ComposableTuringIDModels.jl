@@ -14,8 +14,8 @@ Apache License, Version 2.0.
 ComposableTuringIDModels.jl is a MODIFIED, DERIVED WORK based on that package.
 Significant changes have been made, including (but not limited to):
 
-  - The package has been renamed from `EpiAware` to `ComposableTuringIDModels`, with a
-    fresh package UUID.
+  - The package has been renamed from `EpiAware` to
+    `ComposableTuringIDModels`, with a fresh package UUID.
   - The deep abstract type hierarchy and the per-concept model-generating
     functions (`generate_latent`, `generate_latent_infs`,
     `generate_observations`, `generate_epiaware`) have been re-architected

@@ -1,6 +1,5 @@
 @doc raw"
-A **prototype** for composable probabilistic infectious disease modelling in
-Julia.
+Composable probabilistic infectious disease modelling in Julia.
 
 `ComposableTuringIDModels` builds epidemiological models from small, reusable
 components — infection processes (each owning its own latent parameter process)
@@ -10,8 +9,8 @@ sampling one another as submodels, so a full model is assembled rather than
 hand-written.
 
 This package is **ported and adapted** from the open-source, Apache-2.0 licensed
-`EpiAware` package; see the `NOTICE` file for attribution. It is exploratory and
-clearly labelled as a prototype.
+`EpiAware` package; see the `NOTICE` file for attribution. It is early-stage
+software under active development; expect breaking changes.
 
 # Examples
 ```@example

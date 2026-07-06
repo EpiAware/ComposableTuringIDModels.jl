@@ -10,7 +10,7 @@ over `tspan` and conditions it on `data.y_t`.
 
 # Arguments
 
-  - `epiproblem`: the [`IDProblem`](@ref).
+  - `idproblem`: the [`IDProblem`](@ref).
   - `data`: a value with a `y_t` field holding the observations (or `missing`).
 
 # Examples
@@ -39,10 +39,10 @@ rand(as_turing_model(problem, (; y_t = missing)))
     tspan::Tuple{Int, Int}
 end
 
-@model function as_turing_model(epiproblem::IDProblem, data)
+@model function as_turing_model(idproblem::IDProblem, data)
     y_t = data.y_t
-    time_steps = epiproblem.tspan[end] - epiproblem.tspan[1] + 1
-    model = IDModel(epiproblem.infection, epiproblem.observation_model)
+    time_steps = idproblem.tspan[end] - idproblem.tspan[1] + 1
+    model = IDModel(idproblem.infection, idproblem.observation_model)
     out ~ to_submodel(as_turing_model(model, y_t, time_steps), false)
     return out
 end
