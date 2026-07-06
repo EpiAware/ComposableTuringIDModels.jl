@@ -18,11 +18,11 @@ the series length `n` and returns the named tuple `(; I_t, Z_t)` with `Z_t` the
 (log) ``R_t`` path.
 
 Renewal is the one infection model that needs a generation interval, so it alone
-keeps an [`EpiData`](@ref) object.
+keeps an [`IDData`](@ref) object.
 
 ## Fields
 
-  - `data`: the [`EpiData`](@ref) object (generation interval + transformation).
+  - `data`: the [`IDData`](@ref) object (generation interval + transformation).
   - `rt`: the latent process model (an [`AbstractLatentModel`](@ref)) generating
     the (log) reproduction number.
   - `initialisation_prior`: prior for the unconstrained initial infections.
@@ -31,15 +31,15 @@ keeps an [`EpiData`](@ref) object.
 
 # Examples
 ```@example Renewal
-using EpiAwarePrototype, Distributions
-data = EpiData([0.2, 0.3, 0.5], exp)
+using ComposableTuringIDModels, Distributions
+data = IDData([0.2, 0.3, 0.5], exp)
 renewal = Renewal(data; rt = RandomWalk(), initialisation_prior = Normal())
 rand(as_turing_model(renewal, 20))
 ```
 "
-struct Renewal{E <: EpiData, L <: AbstractLatentModel, S <: Sampleable,
+struct Renewal{E <: IDData, L <: AbstractLatentModel, S <: Sampleable,
     A <: AbstractConstantRenewalStep} <: AbstractInfectionModel
-    "`EpiData` object."
+    "`IDData` object."
     data::E
     "Latent process model generating the (log) reproduction number."
     rt::L
@@ -49,30 +49,30 @@ struct Renewal{E <: EpiData, L <: AbstractLatentModel, S <: Sampleable,
     recurrent_step::A
 end
 
-function Renewal(data::EpiData; rt::AbstractLatentModel = RandomWalk(),
+function Renewal(data::IDData; rt::AbstractLatentModel = RandomWalk(),
         initialisation_prior = Normal())
     recurrent_step = ConstantRenewalStep(reverse(data.gen_int))
     return Renewal(data, rt, initialisation_prior, recurrent_step)
 end
 
-function Renewal(; data::EpiData, rt::AbstractLatentModel = RandomWalk(),
+function Renewal(; data::IDData, rt::AbstractLatentModel = RandomWalk(),
         initialisation_prior = Normal())
     return Renewal(data; rt = rt, initialisation_prior = initialisation_prior)
 end
 
 # Initial renewal state from sampled I₀ and R₀, decaying at the implied rate.
-function _make_renewal_init(epi_model::Renewal, I₀, Rt₀)
-    r_approx = R_to_r(Rt₀, epi_model)
+function _make_renewal_init(infection::Renewal, I₀, Rt₀)
+    r_approx = R_to_r(Rt₀, infection)
     return _renewal_init_state(
-        epi_model.recurrent_step, I₀, r_approx, epi_model.data.len_gen_int)
+        infection.recurrent_step, I₀, r_approx, infection.data.len_gen_int)
 end
 
-@model function as_turing_model(epi_model::Renewal, n)
-    Z_t ~ to_submodel(as_turing_model(epi_model.rt, n), false)
-    init_incidence ~ epi_model.initialisation_prior
-    I₀ = epi_model.data.transformation(init_incidence)
-    Rt = epi_model.data.transformation.(Z_t)
-    init = _make_renewal_init(epi_model, I₀, Rt[1])
-    I_t = accumulate_scan(epi_model.recurrent_step, init, Rt)
+@model function as_turing_model(infection::Renewal, n)
+    Z_t ~ to_submodel(as_turing_model(infection.rt, n), false)
+    init_incidence ~ infection.initialisation_prior
+    I₀ = infection.data.transformation(init_incidence)
+    Rt = infection.data.transformation.(Z_t)
+    init = _make_renewal_init(infection, I₀, Rt[1])
+    I_t = accumulate_scan(infection.recurrent_step, init, Rt)
     return (; I_t, Z_t)
 end

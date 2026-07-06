@@ -12,7 +12,7 @@ inner model repeated across a 7-day period.
 
 # Examples
 ```@example broadcast_dayofweek
-using EpiAwarePrototype
+using ComposableTuringIDModels
 broadcast_dayofweek(RandomWalk())
 ```
 "
@@ -29,7 +29,7 @@ Build a [`BroadcastLatentModel`](@ref) for a piecewise-constant weekly process.
 
 # Examples
 ```@example broadcast_weekly
-using EpiAwarePrototype
+using ComposableTuringIDModels
 broadcast_weekly(RandomWalk())
 ```
 "

@@ -1,5 +1,5 @@
 @testitem "Ascertainment scales expected observations by a latent model" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(51)
     Y = fill(100.0, 14)
     asc = Ascertainment(model = NegativeBinomialError(), latent_model = FixedIntercept(0.1))
@@ -12,7 +12,7 @@
 end
 
 @testitem "Aggregate sums expected observations over windows" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(52)
     agg = Aggregate(PoissonError(), [0, 0, 0, 0, 7, 0, 0])
     res = as_turing_model(agg, missing, fill(1.0, 28))()
@@ -27,7 +27,7 @@ end
 end
 
 @testitem "ReportingCDF produces a length-n completeness curve" begin
-    using EpiAwarePrototype, Distributions
+    using ComposableTuringIDModels, Distributions
 
     # Role + interface conformance: the correction is a latent-role component.
     c = ReportingCDF([0.2, 0.6, 1.0])
@@ -50,7 +50,7 @@ end
     @test as_turing_model(nonmono, 3)() == [0.6, 0.2, 0.9]
 
     # The distribution constructor builds the CDF from the released-CD
-    # double-interval-censored PMF (the LatentDelay / EpiData path): cumulative,
+    # double-interval-censored PMF (the LatentDelay / IDData path): cumulative,
     # non-decreasing, ending at 1.
     cd = ReportingCDF(truncated(Normal(5.0, 2.0), 0.0, Inf))
     F = as_turing_model(cd, 10)()
@@ -60,7 +60,7 @@ end
 end
 
 @testitem "RightTruncate construction and interface" begin
-    using EpiAwarePrototype, Distributions
+    using ComposableTuringIDModels, Distributions
 
     # Role + interface conformance (the nowcasting modifier is an observation model).
     o = RightTruncate(PoissonError(), [0.2, 0.6, 1.0])
@@ -76,7 +76,7 @@ end
 end
 
 @testitem "RightTruncate scales expected eventual totals by the delay CDF" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(60)
 
     # Huge expected means make the Poisson draw ≈ its mean, so the realised
@@ -98,7 +98,7 @@ end
 end
 
 @testitem "RightTruncate with a complete delay reduces to the inner model" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(61)
     n = 8
     Y = fill(50.0, n)
@@ -116,7 +116,7 @@ end
 end
 
 @testitem "RightTruncate accepts a custom (non-default) correction submodel" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(64)
     # The correction is a submodel, so a user can supply any latent component
     # producing the length-n completeness curve — here a flat 0.5 correction
@@ -132,7 +132,7 @@ end
 end
 
 @testitem "RightTruncate simulate-then-condition and length handling" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(62)
     n = 10
     Y = fill(100.0, n)
@@ -154,11 +154,11 @@ end
 end
 
 @testitem "RightTruncate composes with a renewal model end-to-end" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(63)
-    data = EpiData([0.2, 0.3, 0.5], exp)
+    data = IDData([0.2, 0.3, 0.5], exp)
     n = 25
-    model = EpiAwareModel(
+    model = IDModel(
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         RightTruncate(NegativeBinomialError(),
             truncated(Normal(4.0, 1.5), 0.0, Inf)))
@@ -179,7 +179,7 @@ end
 end
 
 @testitem "PrefixObservationModel prefixes observation parameters" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(53)
     pom = PrefixObservationModel(model = NegativeBinomialError(), prefix = "Test")
     names = string.(collect(keys(rand(as_turing_model(pom, missing, fill(10.0, 5))))))
@@ -187,7 +187,7 @@ end
 end
 
 @testitem "RecordExpectedObs and TransformObservationModel wrap an error model" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(54)
     Y = fill(10.0, 30)
     reo = RecordExpectedObs(NegativeBinomialError())
@@ -198,7 +198,7 @@ end
 end
 
 @testitem "ReportTriangle constructs the reporting triangle and masks t+d≤now" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(70)
     obs = ReportTriangle(PoissonError(), [0.5, 0.3, 0.2])     # Dmax = 2
 
@@ -225,7 +225,7 @@ end
 end
 
 @testitem "ReportTriangle takes the delay as a composable PMF submodel" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(76)
 
     # ReportingPMF is the delay submodel (a latent-role component), mirroring how
@@ -256,7 +256,7 @@ end
 end
 
 @testitem "define_y_t builds a triangle from a matrix and a long-form table" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(71)
     obs = ReportTriangle(PoissonError(), [0.6, 0.25, 0.15])   # Dmax = 2
     N = [10 5 2; 12 6 3; 14 7 4]                            # 3 reference days
@@ -289,7 +289,7 @@ end
 end
 
 @testitem "ReportTriangle simulates, conditions, and recovers per-cell means" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(72)
     pmf = [0.5, 0.3, 0.2]
     obs = ReportTriangle(PoissonError(), pmf)
@@ -318,7 +318,7 @@ end
 end
 
 @testitem "ReportTriangle observed row-sums reconcile with RightTruncate marginal" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(74)
     # #50's consistency check: the observed row-sums of the triangle are the
     # marginal that the right-truncation (CDF-scaling) nowcast conditions on. With
@@ -354,15 +354,15 @@ end
 end
 
 @testitem "ReportTriangle composes with the renewal infection process" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(75)
-    data = EpiData([0.2, 0.3, 0.5], exp)
+    data = IDData([0.2, 0.3, 0.5], exp)
     renewal = Renewal(data; rt = RandomWalk(), initialisation_prior = Normal())
 
-    # Released-CD discretised-delay constructor (the LatentDelay / EpiData path).
+    # Released-CD discretised-delay constructor (the LatentDelay / IDData path).
     obs = ReportTriangle(NegativeBinomialError(),
         truncated(Normal(2.0, 1.0), 0.0, Inf))
-    model = EpiAwareModel(renewal, obs)
+    model = IDModel(renewal, obs)
 
     sim = as_turing_model(model, missing, 15)()
     @test sim.generated_y_t isa ReportingTriangle

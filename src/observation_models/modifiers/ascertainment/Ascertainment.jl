@@ -21,7 +21,7 @@ empty string.
 
 # Examples
 ```@example Ascertainment
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 obs = Ascertainment(PoissonError(), FixedIntercept(0.1))
 mdl = as_turing_model(obs, missing, fill(10.0, 5))
 rand(mdl)

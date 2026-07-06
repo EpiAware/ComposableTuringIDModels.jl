@@ -10,7 +10,7 @@ Record the inner latent vector as a tracked generated quantity (`exp_latent`).
 
 # Examples
 ```@example RecordExpectedLatent
-using EpiAwarePrototype
+using ComposableTuringIDModels
 rm = RecordExpectedLatent(FixedIntercept(0.1))
 rand(as_turing_model(rm, 1))
 ```

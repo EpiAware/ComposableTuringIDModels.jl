@@ -1,5 +1,5 @@
 @testitem "Split composes several streams in parallel with name prefixes" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(80)
     split = Split((cases = PoissonError(), deaths = NegativeBinomialError()))
     @test split isa AbstractObservationModel
@@ -24,7 +24,7 @@
 end
 
 @testitem "Split accepts a per-stream NamedTuple of expected series" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(81)
     split = Split((cases = PoissonError(), deaths = PoissonError()))
     Y = (cases = fill(5.0, 6), deaths = fill(50.0, 6))
@@ -34,7 +34,7 @@ end
 end
 
 @testitem "Split cascades a stream downstream by nesting after a shared delay" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(82)
     # Share the case delay, then split: cases apply their error to the delayed
     # expectation and deaths sit DOWNSTREAM, delayed again and scaled ×0.1.
@@ -58,7 +58,7 @@ end
 end
 
 @testitem "Placing Split high vs low chooses parallel vs cascade" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(83)
     # High (on infections): deaths fork off the raw input alongside a delayed cases
     # stream — parallel. Low (under the case delay): deaths see the shortened
@@ -79,7 +79,7 @@ end
 end
 
 @testitem "Nesting Splits builds an arbitrary branch DAG" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(84)
     # b and c both branch off a's delayed expectation by nesting a Split under a's
     # delay: a general DAG built purely by placement, no source wiring.
@@ -95,7 +95,7 @@ end
 end
 
 @testitem "Split builds data-driven strata from a single template" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(85)
     # One template, replicated per data stream: the number and names of streams
     # come from the `y_t` data, not the struct.
@@ -120,7 +120,7 @@ end
 end
 
 @testitem "StrataMap maps infection strata to observation streams (1:1, m:1, m:m)" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(86)
     template = Split(PoissonError())
     # 2 infection strata over 6 days.
@@ -145,7 +145,7 @@ end
 end
 
 @testitem "Split simulate-then-condition round-trips" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(87)
     split = Split((cases = PoissonError(), deaths = PoissonError()))
     sim = as_turing_model(
@@ -157,9 +157,9 @@ end
 end
 
 @testitem "Split composes with a renewal model and samples under NUTS" tags=[:sample] begin
-    using EpiAwarePrototype, Distributions, Random, Turing
+    using ComposableTuringIDModels, Distributions, Random, Turing
     Random.seed!(88)
-    data = EpiData([0.2, 0.3, 0.5], exp)
+    data = IDData([0.2, 0.3, 0.5], exp)
     n = 25
 
     # Parallel cases + deaths off one shared renewal infection trajectory.
@@ -169,7 +169,7 @@ end
         deaths = LatentDelay(
             Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.05))),
             truncated(Normal(7.0, 2.0), 0.0, Inf))))
-    model = EpiAwareModel(
+    model = IDModel(
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()), obs)
 
     sim = as_turing_model(model, missing, n)()

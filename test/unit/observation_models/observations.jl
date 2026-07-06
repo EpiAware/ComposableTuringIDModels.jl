@@ -1,5 +1,5 @@
 @testitem "observation error models simulate and condition" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(11)
     Y_t = fill(10.0, 15)
     for obs in (PoissonError(), NegativeBinomialError())
@@ -18,7 +18,7 @@
 end
 
 @testitem "NormalError is a continuous observation-error model" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(111)
 
     ne = NormalError()
@@ -59,7 +59,7 @@ end
 end
 
 @testitem "BinomialError reads trials from NamedTuple data" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(222)
 
     be = BinomialError()
@@ -101,7 +101,7 @@ end
 end
 
 @testitem "define_y_t unpacks counts for vector or NamedTuple data" begin
-    using EpiAwarePrototype
+    using ComposableTuringIDModels
     Y_t = fill(10.0, 5)
     # Plain vector passes through.
     @test define_y_t(PoissonError(), [1, 2, 3, 4, 5], Y_t) == [1, 2, 3, 4, 5]
@@ -116,7 +116,7 @@ end
 end
 
 @testitem "LatentDelay shortens expectations and wraps an error model" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(12)
     obs = LatentDelay(PoissonError(), truncated(Normal(5.0, 2.0), 0.0, Inf))
     Y_t = fill(10.0, 30)
@@ -130,7 +130,7 @@ end
 end
 
 @testitem "safe count distributions tolerate very large means" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(13)
     # exp(48) overflows Int; the safe samplers must not throw.
     bigλ = exp(48.0)

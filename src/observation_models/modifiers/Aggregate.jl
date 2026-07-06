@@ -28,7 +28,7 @@ back into a full-length vector (zeros elsewhere).
 
 # Examples
 ```@example Aggregate
-using EpiAwarePrototype
+using ComposableTuringIDModels
 obs = Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7])
 mdl = as_turing_model(obs, missing, fill(10.0, 14))
 rand(mdl)

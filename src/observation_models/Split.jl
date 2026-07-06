@@ -22,7 +22,7 @@ one-to-one (`map = I`), many-to-one (an aggregation row), and many-to-many
 
 # Examples
 ```@example StrataMap
-using EpiAwarePrototype
+using ComposableTuringIDModels
 M = [10.0 10.0 10.0 10.0 10.0; 4.0 4.0 4.0 4.0 4.0]
 W = [1.0 0.0; 0.0 1.0; 1.0 1.0]      # stratum 1, stratum 2, and their sum
 sm = StrataMap(M, W)
@@ -85,7 +85,7 @@ it sits chooses the composition:
 
   - **Parallel** — placed high, on infections: every stream observes the same
     ``I_t`` (cases and deaths each a delayed, ascertained fraction of the *same*
-    infections). `EpiAwareModel(inf, Split((cases = …, deaths = …)))`.
+    infections). `IDModel(inf, Split((cases = …, deaths = …)))`.
   - **Cascade** — placed low, inside a stream's pipeline: the shared upstream
     layers run first and `Split` branches on their expected output, so a later
     stream is observed *downstream* of an earlier one. For deaths as a delayed
@@ -120,7 +120,7 @@ a per-stream NamedTuple, an `inf_strata × time` matrix (one stream per row), or
 
 # Examples
 ```@example Split
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 # Parallel: cases and deaths, each a delayed fraction of the SAME infections.
 parallel = Split((
     cases = LatentDelay(NegativeBinomialError(), [0.4, 0.3, 0.2, 0.1]),

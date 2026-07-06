@@ -35,24 +35,24 @@ vector to condition.
   - `observation_model`: the observation model mapping ``I_t`` to ``y_t``.
 
 # Examples
-```@example EpiAwareModel
-using EpiAwarePrototype, Distributions
-model = EpiAwareModel(
+```@example IDModel
+using ComposableTuringIDModels, Distributions
+model = IDModel(
     DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
     PoissonError())
 mdl = as_turing_model(model, missing, 20)
 rand(mdl)
 ```
 "
-struct EpiAwareModel{I <: AbstractInfectionModel, O <: AbstractObservationModel} <:
-       AbstractEpiAwareModel
+struct IDModel{I <: AbstractInfectionModel, O <: AbstractObservationModel} <:
+       AbstractComposableModel
     "Infection process model generating ``I_t`` (and its internal latent ``Z_t``)."
     infection_model::I
     "Observation model mapping ``I_t`` to ``y_t``."
     observation_model::O
 end
 
-@model function as_turing_model(model::EpiAwareModel, y_t, n)
+@model function as_turing_model(model::IDModel, y_t, n)
     infections ~ to_submodel(as_turing_model(model.infection_model, n), false)
     I_t = infections.I_t
     Z_t = infections.Z_t

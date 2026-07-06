@@ -4,11 +4,11 @@
 # package-specific inputs the shared helpers need; the standard testset logic
 # stays in `quality.jl` (managed). Edit freely.
 
-using EpiAwarePrototype
+using ComposableTuringIDModels
 
 const QA_CONFIG = (
     # The module under test.
-    mod = EpiAwarePrototype,
+    mod = ComposableTuringIDModels,
 
     # Path to the isolated JET environment (see test/jet/Project.toml).
     jet_env = joinpath(@__DIR__, "..", "jet"),

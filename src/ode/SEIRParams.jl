@@ -57,7 +57,7 @@ infectious compartments using the constant-incidence equilibrium proportions
 
 # Examples
 ```@example SEIRParams
-using EpiAwarePrototype, OrdinaryDiffEq, Distributions
+using ComposableTuringIDModels, OrdinaryDiffEq, Distributions
 seirparams = SEIRParams(
     tspan = (0.0, 30.0),
     infectiousness = LogNormal(log(0.3), 0.05),

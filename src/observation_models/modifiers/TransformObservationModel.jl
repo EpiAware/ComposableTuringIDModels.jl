@@ -16,7 +16,7 @@ passed to the inner `model`. The default `transform` applies a softplus
 
 # Examples
 ```@example TransformObservationModel
-using EpiAwarePrototype
+using ComposableTuringIDModels
 obs = TransformObservationModel(PoissonError(), x -> x .* 2)
 mdl = as_turing_model(obs, missing, fill(10.0, 5))
 rand(mdl)

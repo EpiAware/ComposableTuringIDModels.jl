@@ -22,7 +22,7 @@ observed data.
 
 # Examples
 ```@example LatentDelay
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 obs = LatentDelay(NegativeBinomialError(), truncated(Normal(5.0, 2.0), 0.0, Inf))
 mdl = as_turing_model(obs, missing, fill(10, 30))
 mdl()

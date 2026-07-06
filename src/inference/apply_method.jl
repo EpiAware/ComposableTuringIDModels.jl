@@ -6,8 +6,8 @@ an inference `method`.
 
 # Arguments
 
-  - `epiproblem`: the [`EpiProblem`](@ref) (or a `DynamicPPL.Model`).
-  - `method`: the inference method (a sampler or an [`EpiMethod`](@ref)).
+  - `epiproblem`: the [`IDProblem`](@ref) (or a `DynamicPPL.Model`).
+  - `method`: the inference method (a sampler or an [`IDMethod`](@ref)).
   - `data`: the data to condition on (with a `y_t` field).
 
 # Keyword Arguments
@@ -18,16 +18,16 @@ an inference `method`.
 
 # Examples
 ```@example apply_method
-using EpiAwarePrototype, Distributions
-problem = EpiProblem(
-    epi_model = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+using ComposableTuringIDModels, Distributions
+problem = IDProblem(
+    infection = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
     observation_model = PoissonError(),
     tspan = (1, 20))
 y = rand(as_turing_model(problem, (; y_t = missing)))
 nothing
 ```
 "
-function apply_method(epiproblem::EpiProblem, method::AbstractEpiMethod, data;
+function apply_method(epiproblem::IDProblem, method::AbstractIDMethod, data;
         fix_parameters::NamedTuple = NamedTuple(),
         condition_parameters::NamedTuple = NamedTuple(), kwargs...)
     model = as_turing_model(epiproblem, data)
@@ -37,21 +37,21 @@ end
 
 # Apply a method to a model and wrap the solution as observables. Mirrors the
 # upstream two- and three-argument `apply_method`: run the method (`_apply_method`,
-# or the `EpiMethod` pre-sampler→sampler chain) and return an
-# [`EpiAwareObservables`](@ref) via [`generated_observables`](@ref).
-function apply_method(model::DynamicPPL.Model, method::AbstractEpiMethod, data;
+# or the `IDMethod` pre-sampler→sampler chain) and return an
+# [`IDObservables`](@ref) via [`generated_observables`](@ref).
+function apply_method(model::DynamicPPL.Model, method::AbstractIDMethod, data;
         kwargs...)
     solution = _run_method(model, method; kwargs...)
     return generated_observables(model, data, solution)
 end
 
-function apply_method(model::DynamicPPL.Model, method::AbstractEpiMethod; kwargs...)
+function apply_method(model::DynamicPPL.Model, method::AbstractIDMethod; kwargs...)
     return apply_method(model, method, nothing; kwargs...)
 end
 
-# Run a method to its raw solution. An `EpiMethod` threads its pre-sampler steps
+# Run a method to its raw solution. An `IDMethod` threads its pre-sampler steps
 # into the sampler; a bare method goes straight to its `_apply_method`.
-function _run_method(model::DynamicPPL.Model, method::EpiMethod; kwargs...)
+function _run_method(model::DynamicPPL.Model, method::IDMethod; kwargs...)
     prev_result = nothing
     for pre_sampler in method.pre_sampler_steps
         prev_result = _apply_method(model, pre_sampler, prev_result; kwargs...)
@@ -59,6 +59,6 @@ function _run_method(model::DynamicPPL.Model, method::EpiMethod; kwargs...)
     return _apply_method(model, method.sampler, prev_result; kwargs...)
 end
 
-function _run_method(model::DynamicPPL.Model, method::AbstractEpiMethod; kwargs...)
+function _run_method(model::DynamicPPL.Model, method::AbstractIDMethod; kwargs...)
     _apply_method(model, method, nothing; kwargs...)
 end

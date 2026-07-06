@@ -58,11 +58,11 @@ ascertainment can be a fixed fraction or, as here, a latent [`Intercept`](@ref)
 model with a prior.
 
 ```@example split
-using EpiAwarePrototype, Distributions, Random, Turing, Mooncake
+using ComposableTuringIDModels, Distributions, Random, Turing, Mooncake
 using ADTypes: AutoMooncake
 Random.seed!(1234)
 
-data = EpiData(gen_distribution = Gamma(6.5, 0.62))
+data = IDData(gen_distribution = Gamma(6.5, 0.62))
 latent = AR(
     damp_priors = [truncated(Normal(0.8, 0.05), 0, 1),
         truncated(Normal(0.1, 0.05), 0, 1)],
@@ -86,7 +86,7 @@ The composed model assembles the renewal infection process and the two-stream
 observation model exactly like a single-stream study.
 
 ```@example split
-model = EpiAwareModel(renewal, parallel)
+model = IDModel(renewal, parallel)
 ```
 
 Passing `missing` data simulates a synthetic outbreak.
@@ -150,7 +150,7 @@ cascade = LatentDelay(                                   # infection→case dela
                 FixedIntercept(log(0.02))),
             LogNormal(2.2, 0.3)))),
     LogNormal(1.6, 0.5))
-cascade_model = EpiAwareModel(renewal, cascade)
+cascade_model = IDModel(renewal, cascade)
 cas = as_turing_model(cascade_model, (cases = missing, deaths = missing), n)()
 ```
 
@@ -182,7 +182,7 @@ strata_obs = Split((
     old = LatentDelay(
         Ascertainment(NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
             FixedIntercept(log(0.4))), LogNormal(1.8, 0.4))))
-strata_model = EpiAwareModel(renewal, strata_obs)
+strata_model = IDModel(renewal, strata_obs)
 strata_sim = as_turing_model(
     strata_model, (young = missing, old = missing), n)().generated_y_t
 map(s -> sum(skipmissing(s)), strata_sim)                # totals per band

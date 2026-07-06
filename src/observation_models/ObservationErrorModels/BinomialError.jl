@@ -40,7 +40,7 @@ scores, and `BinomialError` additionally reads the `N` field it needs.
 
 # Examples
 ```@example BinomialError
-using EpiAwarePrototype
+using ComposableTuringIDModels
 be = BinomialError()
 # 20 trials per time point; the expected series is a success probability.
 mdl = as_turing_model(be, (y = missing, N = fill(20, 10)), fill(0.3, 10))

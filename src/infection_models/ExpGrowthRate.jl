@@ -19,7 +19,7 @@ so `as_turing_model` takes only the series length `n` and returns the named tupl
 `(; I_t, Z_t)` with `Z_t` the growth-rate path.
 
 This model carries no generation interval — it never uses one — so it takes a
-`transformation` directly instead of an [`EpiData`](@ref) object.
+`transformation` directly instead of an [`IDData`](@ref) object.
 
 ## Fields
 
@@ -32,7 +32,7 @@ This model carries no generation interval — it never uses one — so it takes 
 
 # Examples
 ```@example ExpGrowthRate
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 egr = ExpGrowthRate(; rt = RandomWalk(), initialisation_prior = Normal())
 rand(as_turing_model(egr, 10))
 ```

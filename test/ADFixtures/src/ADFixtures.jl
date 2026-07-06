@@ -3,7 +3,7 @@
 # AD-fixture registry implementing the EpiAwarePackageTools `ADRegistry`
 # contract. The scenarios are REAL differentiable log-densities from the
 # package: the (linked) log-joint of representative latent processes and of
-# composed `EpiAwareModel`s conditioned on simulated data — the gradients an AD
+# composed `IDModel`s conditioned on simulated data — the gradients an AD
 # backend must get right for NUTS to work. Each scenario carries a ForwardDiff
 # reference gradient. The shared harness (driven from `test/ad/setup.jl`)
 # consumes this registry.
@@ -13,7 +13,7 @@ using ADTypes: AutoForwardDiff
 using DifferentiationInterface: DifferentiationInterface
 import DifferentiationInterfaceTest as DIT
 import ForwardDiff
-using EpiAwarePrototype
+using ComposableTuringIDModels
 using Distributions
 using Random: Random, MersenneTwister
 using DynamicPPL: DynamicPPL, LogDensityFunction, VarInfo, link, getlogjoint
@@ -45,7 +45,7 @@ const _GEN_INT = [0.2, 0.3, 0.5]
 # Build the registry's models once. Conditioned (posterior) scenarios use data
 # simulated from the prior with a fixed seed so the target is deterministic.
 function _models()
-    data = EpiData(_GEN_INT, exp)
+    data = IDData(_GEN_INT, exp)
     n = 12
 
     rw = as_turing_model(RandomWalk(), n)
@@ -53,10 +53,10 @@ function _models()
     arima = as_turing_model(
         DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]), n)
 
-    direct = EpiAwareModel(
+    direct = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
-    renewal = EpiAwareModel(
+    renewal = IDModel(
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         NegativeBinomialError())
 
@@ -64,7 +64,7 @@ function _models()
     # observation error is wrapped in `RightTruncate` (fixed reporting-delay CDF
     # supplied as a `ReportingCDF` submodel). This exercises the `reverse`/
     # broadcast scaling the modifier adds on top of the inner error.
-    nowcast = EpiAwareModel(
+    nowcast = IDModel(
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         RightTruncate(NegativeBinomialError(),
             truncated(Normal(4.0, 1.5), 0.0, Inf)))
@@ -73,7 +73,7 @@ function _models()
     # per-cell `ReportTriangle` observation model. The gradient of the per-cell
     # Poisson log-likelihood over the masked triangle (`t + d ≤ now`) is what
     # nowcasting under NUTS depends on.
-    triangle = EpiAwareModel(
+    triangle = IDModel(
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         ReportTriangle(PoissonError(), [0.6, 0.25, 0.15]))
 
@@ -81,7 +81,7 @@ function _models()
     # streams, with `deaths` cascaded downstream of `cases` by sharing the case
     # delay and splitting after it. Exercises the per-stream prefixing and the
     # expected-series threading gradient path.
-    split = EpiAwareModel(
+    split = IDModel(
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         LatentDelay(
             Split((
@@ -119,7 +119,7 @@ end
 
 The AD gradient scenarios — each a `DIT.Scenario{:gradient, :out}` over a real
 package log-density (a latent process prior log-joint, or a composed
-`EpiAwareModel` posterior conditioned on simulated data). When
+`IDModel` posterior conditioned on simulated data). When
 `with_reference = true` each scenario carries its ForwardDiff reference gradient
 in `res1`. `category` is accepted for the harness's group selector; all
 scenarios are in the single `:marginal` group here.

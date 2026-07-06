@@ -17,7 +17,7 @@ Composing `DiffLatentModel` over an `AR` gives an ARIMA-style latent process.
 
 # Examples
 ```@example DiffLatentModel
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 diff = DiffLatentModel(; model = RandomWalk(), init_priors = [Normal(), Normal()])
 mdl = as_turing_model(diff, 10)
 rand(mdl)

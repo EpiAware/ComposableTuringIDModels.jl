@@ -1,4 +1,4 @@
-# `EpiAwareObservables` container and `generated_observables` wrapper.
+# `IDObservables` container and `generated_observables` wrapper.
 
 @doc raw"
 Container for the outputs of an inference run: the model, the data, the posterior
@@ -11,7 +11,7 @@ samples, and any generated quantities.
   - `samples`: the posterior samples (or optimiser result).
   - `generated`: generated quantities, or `missing` if not computed.
 "
-struct EpiAwareObservables{M, D, S, G}
+struct IDObservables{M, D, S, G}
     "The model that was sampled."
     model::M
     "The data the model was conditioned on."
@@ -23,7 +23,7 @@ struct EpiAwareObservables{M, D, S, G}
 end
 
 @doc raw"
-Wrap a model, data, and inference solution into an [`EpiAwareObservables`](@ref).
+Wrap a model, data, and inference solution into an [`IDObservables`](@ref).
 
 When `solution` is an MCMC `Chains`, the model is re-run over the draws with
 `DynamicPPL.returned` to recover the model's returned generated quantities (e.g.
@@ -40,16 +40,16 @@ generated quantities, so `generated` is `missing`.
 
 # Examples
 ```@example generated_observables
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 m = as_turing_model(
-    EpiAwareModel(
+    IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError()), missing, 10)
 generated_observables(m, (; y_t = missing), rand(m))
 ```
 "
 function generated_observables(model, data, solution)
-    return EpiAwareObservables(model, data, solution, _generated_quantities(model, solution))
+    return IDObservables(model, data, solution, _generated_quantities(model, solution))
 end
 
 # Re-run the (conditioned) model over the posterior draws to recover its returned

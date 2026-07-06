@@ -24,7 +24,7 @@ latent model and `as_turing_model(model, n)` returns a `DynamicPPL.Model`.
 
 # Examples
 ```@example
-using EpiAwarePrototype
+using ComposableTuringIDModels
 implements_latent_interface(RandomWalk())
 ```
 "
@@ -51,7 +51,7 @@ for latent models (a latent process used directly as a prior) as well as for the
 
 # Examples
 ```@example
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 implements_prior_interface(BroadcastPrior(Normal()))
 ```
 "
@@ -78,7 +78,7 @@ passes only a series length `n` (no external latent path).
 
 # Examples
 ```@example
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 implements_infection_interface(
     DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()))
 ```
@@ -105,7 +105,7 @@ is an observation model and `as_turing_model(model, y_t, Y_t)` returns a
 
 # Examples
 ```@example
-using EpiAwarePrototype
+using ComposableTuringIDModels
 implements_observation_interface(PoissonError())
 ```
 "
