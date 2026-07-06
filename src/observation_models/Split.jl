@@ -1,28 +1,19 @@
-# Unified observation composition: split one expected series into several named
-# observation streams, in parallel (shared input), in sequence (one stream's
-# expected output feeds the next), or across data-driven strata. Supersedes the
-# parallel-only `StackObservationModels` and the sequential cascade of #51/#58.
+# Observation composition: split one expected series into several named
+# observation streams. Each stream sees the expected series arriving at the point
+# where `Split` sits in the pipeline, so placement alone gives parallel streams
+# (split high, on infections) or a cascade (split low, after a shared delay).
 
 @doc raw"
-A strata mapping supplied as `Y_t` data to a [`Split`](@ref): project a
-**multi-stratum** expected series onto a set of observation streams through a
-(possibly weighted) linear map.
+A strata mapping supplied as the expected series to a [`Split`](@ref): project a
+**multi-stratum** expected series onto observation streams through a (possibly
+weighted) linear map.
 
 `strata` is an `inf_strata × time` matrix of per-infection-stratum expected
-series; `map` is an `obs_strata × inf_strata` weight matrix. Observation stream
-`k` receives the expected series ``\sum_j \mathrm{map}[k, j]\,\mathrm{strata}[j,
-:]``. The three infection→observation mappings of issue #45 are all special cases
-of one `map`:
-
-  - **one-to-one** — `map = I` (each infection stratum is its own stream);
-  - **many-to-one** — an aggregation row sums several infection strata into one
-    stream (e.g. age-stratified infections → total hospitalisations);
-  - **many-to-many** — a general weight matrix (e.g. age × region → a different
-    reporting partition).
-
-The number of observation streams is `size(map, 1)`, read from the **data** at
-model-build time (like the series length `n`), so the strata count is not fixed on
-the model struct.
+series; `map` is an `obs_strata × inf_strata` weight matrix. Stream `k` receives
+``\sum_j \mathrm{map}[k, j]\,\mathrm{strata}[j, :]``, so one `map` covers the
+one-to-one (`map = I`), many-to-one (an aggregation row), and many-to-many
+(a general weight matrix) infection→observation mappings. The stream count is
+`size(map, 1)`, read from the data at model-build time.
 
 ## Fields
 
@@ -32,8 +23,6 @@ the model struct.
 # Examples
 ```@example StrataMap
 using EpiAwarePrototype
-# Two infection strata over 5 days, aggregated many-to-one into one stream and
-# also kept as a per-stratum stream (a 3 × 2 map: rows = obs streams).
 M = [10.0 10.0 10.0 10.0 10.0; 4.0 4.0 4.0 4.0 4.0]
 W = [1.0 0.0; 0.0 1.0; 1.0 1.0]      # stratum 1, stratum 2, and their sum
 sm = StrataMap(M, W)
@@ -47,126 +36,87 @@ struct StrataMap{M <: AbstractMatrix, W <: AbstractMatrix}
     map::W
 
     function StrataMap(strata::M, map::W) where {M <: AbstractMatrix, W <: AbstractMatrix}
-        @assert size(map, 2)==size(strata, 1) "The strata map has $(size(map, 2)) columns but the expected series has $(size(strata, 1)) infection strata (rows); they must match"
+        @assert size(map, 2)==size(strata, 1) "The strata map has $(size(map, 2)) columns but the expected series has $(size(strata, 1)) infection strata (rows)"
         return new{M, W}(strata, map)
     end
 end
 
-# --- per-stream expected input from the incoming `Y_t` ------------------------
+# --- per-stream expected input from the incoming expected series --------------
 
-# A single shared expected series is broadcast to every stream (the parallel /
-# `StackObservationModels` case: cases and deaths off the same infections).
+# A single shared series is broadcast to every stream (the parallel case).
 _split_expected(Y_t::AbstractVector, names) = [Y_t for _ in names]
 
-# A per-stream `NamedTuple` supplies each stream's expected series by name.
+# A per-stream NamedTuple supplies each stream's series by name.
 function _split_expected(Y_t::NamedTuple, names)
-    @assert Set(Symbol.(names)) == Set(keys(Y_t)) "The expected series `Y_t` NamedTuple keys $(keys(Y_t)) must match the stream names $(Tuple(Symbol.(names)))"
+    @assert Set(Symbol.(names)) == Set(keys(Y_t)) "The expected series keys $(keys(Y_t)) must match the stream names $(Tuple(Symbol.(names)))"
     return [Y_t[Symbol(nm)] for nm in names]
 end
 
-# A multi-stratum matrix (`inf_strata × time`): stream `k` is row `k` (one-to-one).
+# A multi-stratum matrix: stream `k` is row `k` (one-to-one).
 function _split_expected(Y_t::AbstractMatrix, names)
-    @assert size(Y_t, 1)==length(names) "The expected series matrix has $(size(Y_t, 1)) strata (rows) but there are $(length(names)) streams; supply a `StrataMap` for a non-identity mapping"
+    @assert size(Y_t, 1)==length(names) "The expected series has $(size(Y_t, 1)) strata (rows) but there are $(length(names)) streams; supply a `StrataMap` for a non-identity mapping"
     return [Y_t[k, :] for k in 1:length(names)]
 end
 
-# A `StrataMap`: project infection strata onto observation streams via the map.
+# A StrataMap: project infection strata onto streams via the weight matrix.
 function _split_expected(Y_t::StrataMap, names)
-    W = Y_t.map
-    M = Y_t.strata
+    W, M = Y_t.map, Y_t.strata
     @assert size(W, 1)==length(names) "The strata map has $(size(W, 1)) observation strata (rows) but there are $(length(names)) streams"
     return [vec(sum(W[k, j] .* M[j, :] for j in 1:size(M, 1))) for k in 1:length(names)]
 end
 
-# --- source topology ----------------------------------------------------------
-
-# Resolve the per-stream source list from the constructor keywords. Each entry is
-# `:root` (fed the incoming expected series) or the name of an EARLIER stream
-# (fed that stream's expected output — the sequential / cascade case).
-function _resolve_sources(streamkeys, sequential::Bool, sources)
-    ks = collect(streamkeys)
-    if sources !== nothing
-        @assert !sequential "Pass either `sequential = true` or an explicit `sources`, not both"
-        out = Symbol[:root for _ in ks]
-        for (k, src) in pairs(sources)
-            i = findfirst(==(Symbol(k)), Symbol.(ks))
-            i === nothing && error("`sources` names unknown stream `$k`")
-            j = findfirst(==(Symbol(src)), Symbol.(ks))
-            j === nothing && error("stream `$k` sources unknown stream `$src`")
-            @assert j<i "stream `$k` must source an EARLIER stream than itself (streams are evaluated in order); `$src` is not before `$k`"
-            out[i] = Symbol(src)
-        end
-        return out
-    elseif sequential
-        # A chain: the first stream is fed infections, each later stream is fed the
-        # previous stream's expected output.
-        return Symbol[i == 1 ? :root : Symbol(ks[i - 1]) for i in eachindex(ks)]
-    else
-        return Symbol[:root for _ in ks]
-    end
-end
-
 @doc raw"
 Split one expected series into several named observation streams — the single
-observation-composition construct for **parallel**, **sequential**, and
-**data-driven strata** composition. It replaces the parallel-only
-`StackObservationModels` and the sequential cascade sketched in issues #51/#58.
+observation-composition construct for **parallel**, **cascade**, and
+**data-driven strata** composition.
 
-Each stream is a full [`AbstractObservationModel`](@ref) (a bare error family or a
-delay / ascertainment / truncation pipeline), wrapped in a
-[`PrefixObservationModel`](@ref) keyed by its name so the streams' sampled
-variables stay distinct. What differs between the composition modes is only where
-each stream's **expected input** comes from — resolved through the uniform
-`(; y_t, expected)` observation return contract, which exposes every stream's
-pre-error expected series so it can be threaded on or split at any point.
+Each stream is a full [`AbstractObservationModel`](@ref) (a bare error family or
+a delay / ascertainment / truncation pipeline). `Split` feeds every stream the
+expected series arriving at the point where it sits in the pipeline and
+automatically prefixes each stream's sampled variables with its name (via
+`DynamicPPL.prefix`), so no manual prefix layer is needed. The uniform
+`(; y_t, expected)` return contract exposes each stream's pre-error expected
+series so streams can thread on one another.
 
-## Composition modes
+## Composition by placement
 
-  - **Parallel** (default) — every stream observes the same incoming expected
-    series (e.g. cases and deaths each a delayed fraction of the *same*
-    infections). This is the `StackObservationModels` use case, subsumed.
-  - **Sequential** (`sequential = true`, or an explicit `sources`) — a stream is
-    observed *downstream* of another: its expected input is an earlier stream's
-    expected output, so a cascade `I_t → stream 1 → stream 2 → …` forms (e.g.
-    deaths as a delayed fraction of *reported cases*). The threaded quantity is
-    the earlier stream's **expected** (pre-error, post-transform) series — never
-    its sampled output.
-  - **Data-driven strata** — constructed from a single **template** observation
-    model instead of named streams; the number of streams and their names come
-    from the **data** at model-build time (one stream per entry of the `y_t`
-    NamedTuple), and a [`StrataMap`](@ref) `Y_t` maps infection strata onto
-    observation streams (1:1, many:1, many:many — issue #45).
+`Split` is itself an observation model consuming an expected series, so *where*
+it sits chooses the composition:
 
-## Splitting at any point
+  - **Parallel** — placed high, on infections: every stream observes the same
+    ``I_t`` (cases and deaths each a delayed, ascertained fraction of the *same*
+    infections). `EpiAwareModel(inf, Split((cases = …, deaths = …)))`.
+  - **Cascade** — placed low, inside a stream's pipeline: the shared upstream
+    layers run first and `Split` branches on their expected output, so a later
+    stream is observed *downstream* of an earlier one. For deaths as a delayed
+    fraction of the *expected reported cases*, share the case delay then split:
+    `LatentDelay(Split((cases = leaf, deaths = pipeline)), case_delay)`.
+  - **Data-driven strata** — built from a single **template** model: the number
+    and names of streams come from the data at model-build time (one per entry
+    of the `y_t` NamedTuple), and a [`StrataMap`](@ref) maps infection strata
+    onto observation streams.
 
-Because `Split` is itself an observation model that consumes an expected series,
-it can be placed **high** (directly on infections) or **low** (after a shared
-delay / ascertainment): `Split(streams)` splits on infections, while
-`LatentDelay(Split(streams), pmf)` applies a shared delay first and splits the
-delayed expectation. The uniform `(; y_t, expected)` contract is what makes this
-work at any layer.
+The threaded quantity is always a stream's **expected** (pre-error) series, never
+its realised noisy draw; observing a downstream stream off another's *sampled*
+counts is out of scope.
 
 ## Data contract
 
-`y_t` is a `NamedTuple` of observed series, one per stream, keyed by stream name
-(pass `missing` for a stream, or `missing` for the whole model, to simulate). The
-return value is the uniform `(; y_t, expected)` pair, where each is a `NamedTuple`
-of per-stream series.
+`y_t` is a NamedTuple of observed series keyed by stream name (or `missing` to
+simulate). The return value is `(; y_t, expected)`, each a NamedTuple of
+per-stream series. When `Split` is nested inside another modifier the incoming
+`missing` reaches it as a shared placeholder; the explicit stream names let it
+still fan out.
 
-`Y_t` (the incoming expected series) may be:
-
-  - a single vector — broadcast to every stream (parallel, shared infections);
-  - a per-stream `NamedTuple` — each stream's own expected series;
-  - an `inf_strata × time` matrix — one stream per row (one-to-one strata);
-  - a [`StrataMap`](@ref) — infection strata projected onto streams (many:many).
+The incoming expected series may be a single vector (broadcast to every stream),
+a per-stream NamedTuple, an `inf_strata × time` matrix (one stream per row), or a
+[`StrataMap`](@ref).
 
 ## Constructors
 
-  - `Split(streams::NamedTuple; sequential = false, sources = nothing)` — explicit
-    named streams. `sequential = true` chains them; `sources = (b = :a, …)` wires
-    an explicit dependency DAG (each source must be an earlier stream).
-  - `Split(template::AbstractObservationModel)` — a data-driven strata split: the
-    template is replicated once per `y_t` entry, prefixed by that entry's name.
+  - `Split(streams::NamedTuple)` — explicit named streams.
+  - `Split(template::AbstractObservationModel)` — a data-driven strata split
+    replicating the template once per `y_t` entry.
 
 # Examples
 ```@example Split
@@ -177,81 +127,72 @@ parallel = Split((
     deaths = LatentDelay(NegativeBinomialError(), [0.1, 0.2, 0.3, 0.4])))
 rand(as_turing_model(parallel, (cases = missing, deaths = missing), fill(100.0, 12)))
 
-# Sequential: deaths as a delayed fraction of REPORTED cases (downstream).
-sequential = Split((
-    cases = LatentDelay(PoissonError(), [0.5, 0.3, 0.2]),
-    deaths = LatentDelay(Ascertainment(PoissonError(), FixedIntercept(log(0.1))),
-        [0.2, 0.3, 0.5])); sequential = true)
-rand(as_turing_model(sequential, (cases = missing, deaths = missing), fill(100.0, 12)))
+# Cascade: share the case delay, then split so deaths sit downstream of cases.
+cascade = LatentDelay(
+    Split((
+        cases = PoissonError(),
+        deaths = LatentDelay(
+            Ascertainment(PoissonError(), FixedIntercept(log(0.1))),
+            [0.2, 0.3, 0.5]))),
+    [0.5, 0.3, 0.2])
+rand(as_turing_model(cascade, (cases = missing, deaths = missing), fill(100.0, 12)))
 ```
 
 ## Fields
 
-  - `streams`: a `NamedTuple` of per-stream observation models, or a single
-    template observation model for the data-driven strata mode.
-  - `names`: the stream names (a vector of strings), or `nothing` in strata mode
-    (the names come from the `y_t` data).
-  - `sources`: the per-stream source list (`:root` or an earlier stream name), or
-    `nothing` in strata mode (every stream sources the mapped infections).
+  - `streams`: a NamedTuple of per-stream models, or a single strata template.
+  - `names`: the stream names, or `nothing` in strata mode (names come from data).
 "
-struct Split{S, N, U} <: AbstractObservationModel
-    "Per-stream observation models (`NamedTuple`) or a single strata template."
+struct Split{S, N} <: AbstractObservationModel
+    "Per-stream observation models (NamedTuple) or a single strata template."
     streams::S
     "The stream names, or `nothing` in the data-driven strata mode."
     names::N
-    "The per-stream source list, or `nothing` in the strata mode."
-    sources::U
 end
 
-function Split(streams::NamedTuple; sequential::Bool = false, sources = nothing)
+function Split(streams::NamedTuple)
     @assert !isempty(streams) "A Split needs at least one stream"
-    names = collect(string.(keys(streams)))
-    src = _resolve_sources(keys(streams), sequential, sources)
-    return Split(streams, names, src)
+    return Split(streams, collect(string.(keys(streams))))
 end
 
-# Data-driven strata: a single template replicated per data stream. The stream
-# count and names are supplied by the `y_t` data at model-build time.
-Split(template::AbstractObservationModel) = Split(template, nothing, nothing)
+# Data-driven strata: a single template replicated per data stream.
+Split(template::AbstractObservationModel) = Split(template, nothing)
 
-# Resolve the ordered stream names: fixed for explicit streams, or the `y_t`
-# NamedTuple keys for the data-driven strata mode.
-function _split_names(m::Split, y_t::NamedTuple)
-    m.names === nothing && return collect(string.(keys(y_t)))
-    @assert m.names==collect(string.(keys(y_t))) "The stream names $(m.names) must match the keys of the observed series $(keys(y_t)) (in order)"
-    return m.names
+# Ordered stream names: fixed for explicit streams, else the `y_t` keys.
+function _split_names(m::Split, y_t)
+    m.names === nothing || return m.names
+    y_t isa NamedTuple ||
+        error("A strata Split needs a NamedTuple `y_t` to name its streams")
+    return collect(string.(keys(y_t)))
 end
 
-# The per-stream models: the named entries, or the template replicated per stream.
+# Per-stream models: the named entries, or the template replicated per stream.
 function _split_models(m::Split, names)
     m.streams isa NamedTuple && return [m.streams[Symbol(nm)] for nm in names]
-    return [m.streams for _ in names]   # strata template, one copy per stream
+    return [m.streams for _ in names]
 end
 
-# The per-stream source index (0 = root, else the earlier stream's position).
-function _split_source_index(m::Split, names)
-    m.sources === nothing && return zeros(Int, length(names))
-    syms = Symbol.(names)
-    return [m.sources[i] === :root ? 0 : findfirst(==(m.sources[i]), syms)
-            for i in eachindex(names)]
+# Per-stream data: a NamedTuple splits by name; anything else (a `missing` or a
+# nested placeholder vector) is shared to every stream.
+function _split_y_t(names, y_t::NamedTuple)
+    @assert Set(Symbol.(names)) == Set(keys(y_t)) "The stream names $(Tuple(names)) must match the observed-series keys $(keys(y_t))"
+    return [y_t[Symbol(nm)] for nm in names]
 end
+_split_y_t(names, y_t) = [y_t for _ in names]
 
-@model function as_turing_model(m::Split, y_t::NamedTuple, Y_t)
+@model function as_turing_model(m::Split, y_t, Y_t)
     names = _split_names(m, y_t)
     models = _split_models(m, names)
-    src_idx = _split_source_index(m, names)
-    root_expected = _split_expected(Y_t, names)
+    expected_in = _split_expected(Y_t, names)
+    yt = _split_y_t(names, y_t)
 
     ys = Vector{Any}(undef, length(names))
     exps = Vector{Any}(undef, length(names))
     for i in eachindex(names)
         nm = names[i]
-        # `:root` streams read the split expected input; a sourced stream reads its
-        # upstream stream's exposed expected (pre-error) output — the cascade hop.
-        Yin = src_idx[i] == 0 ? root_expected[i] : exps[src_idx[i]]
         res ~ to_submodel(
-            prefix(as_turing_model(models[i], y_t[Symbol(nm)], Yin), Symbol(nm)),
-            false)
+            prefix(as_turing_model(models[i], yt[i], expected_in[i]),
+                Symbol(nm)), false)
         ys[i] = res.y_t
         exps[i] = res.expected
     end
@@ -259,14 +200,4 @@ end
     keysyms = Tuple(Symbol.(names))
     return (; y_t = NamedTuple{keysyms}(Tuple(ys)),
         expected = NamedTuple{keysyms}(Tuple(exps)))
-end
-
-# Simulate the whole split predictively: expand a `missing` into a per-stream
-# NamedTuple of `missing`s (only possible for explicit streams, whose names are
-# known without data).
-@model function as_turing_model(m::Split, y_t::Missing, Y_t)
-    @assert m.names!==nothing "A data-driven strata Split needs a NamedTuple `y_t` to name its streams (pass e.g. `(band1 = missing, …)`)"
-    yt = NamedTuple{Tuple(Symbol.(m.names))}(ntuple(_ -> missing, length(m.names)))
-    out ~ to_submodel(as_turing_model(m, yt, Y_t), false)
-    return out
 end

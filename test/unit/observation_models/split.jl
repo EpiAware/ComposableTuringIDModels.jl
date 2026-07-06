@@ -33,74 +33,65 @@ end
     @test out.expected.deaths == fill(50.0, 6)
 end
 
-@testitem "Split threads a stream downstream of another (sequential)" begin
+@testitem "Split cascades a stream downstream by nesting after a shared delay" begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(82)
-    # cases: a delayed fraction of infections; deaths: a 0.1x delayed fraction of
-    # the EXPECTED cases (downstream), not of infections directly.
-    split = Split(
-        (
-            cases = LatentDelay(PoissonError(), [0.5, 0.3, 0.2]),
+    # Share the case delay, then split: cases apply their error to the delayed
+    # expectation and deaths sit DOWNSTREAM, delayed again and scaled ×0.1.
+    cascade = LatentDelay(
+        Split((
+            cases = PoissonError(),
             deaths = LatentDelay(
                 Ascertainment(PoissonError(), FixedIntercept(log(0.1))),
-                [0.2, 0.3, 0.5]));
-        sequential = true)
+                [0.2, 0.3, 0.5]))),
+        [0.5, 0.3, 0.2])
 
     out = as_turing_model(
-        split, (cases = missing, deaths = missing), fill(100.0, 12))()
+        cascade, (cases = missing, deaths = missing), fill(100.0, 12))()
 
-    # cases' expected is the post-delay mean of the length-12 input, shortened by
-    # the 3-bin delay to length 10 (mean 100).
+    # cases see the shared delayed expectation (12 → 10, mean 100).
     @test length(out.expected.cases) == 10
     @test all(≈(100.0), out.expected.cases)
-    # deaths is fed cases' expected (len 10), delayed again (→ 8) and scaled ×0.1.
+    # deaths are delayed again (10 → 8) and scaled ×0.1.
     @test length(out.expected.deaths) == 8
     @test all(≈(10.0), out.expected.deaths)
 end
 
-@testitem "Split sequential differs from parallel on the first hop" begin
+@testitem "Placing Split high vs low chooses parallel vs cascade" begin
     using EpiAwarePrototype, Distributions, Random
     Random.seed!(83)
-    # A length-shortening delay on the first stream: under `sequential` the second
-    # stream sees the SHORTENED expected (a genuine cascade), under parallel it
-    # sees the raw input (a fork off the same infections).
-    streams = (cases = LatentDelay(PoissonError(), [0.5, 0.3, 0.2]),
-        deaths = PoissonError())
-    seq = Split(streams; sequential = true)
-    par = Split(streams)
+    # High (on infections): deaths fork off the raw input alongside a delayed cases
+    # stream — parallel. Low (under the case delay): deaths see the shortened
+    # expectation — cascade. Only the placement differs.
+    high = Split((cases = LatentDelay(PoissonError(), [0.5, 0.3, 0.2]),
+        deaths = PoissonError()))
+    low = LatentDelay(Split((cases = PoissonError(), deaths = PoissonError())),
+        [0.5, 0.3, 0.2])
 
     Yin = fill(20.0, 12)
-    oseq = as_turing_model(seq, (cases = missing, deaths = missing), Yin)()
-    opar = as_turing_model(par, (cases = missing, deaths = missing), Yin)()
+    ohigh = as_turing_model(high, (cases = missing, deaths = missing), Yin)()
+    olow = as_turing_model(low, (cases = missing, deaths = missing), Yin)()
 
-    # Sequential: deaths fed cases' shortened expected (length 10).
-    @test length(oseq.expected.deaths) == 10
-    # Parallel: deaths fed the raw infections (length 12).
-    @test length(opar.expected.deaths) == 12
+    # High: deaths fed the raw infections (length 12).
+    @test length(ohigh.expected.deaths) == 12
+    # Low: deaths fed the shared shortened expected (length 10).
+    @test length(olow.expected.deaths) == 10
 end
 
-@testitem "Split wires an explicit source DAG and rejects bad sources" begin
+@testitem "Nesting Splits builds an arbitrary branch DAG" begin
     using EpiAwarePrototype, Random
     Random.seed!(84)
-    # c is sourced from a (not the immediately-preceding b): a branch, not a chain.
-    split = Split((a = PoissonError(), b = PoissonError(), c = PoissonError());
-        sources = (c = :a,))
-    out = as_turing_model(split,
-        (a = missing, b = missing, c = missing), fill(30.0, 5))()
-    @test out.expected.a == fill(30.0, 5)   # a: root
-    @test out.expected.b == fill(30.0, 5)   # b: root (default)
-    @test out.expected.c == out.expected.a  # c: sourced from a's expected
-
-    # A source pointing at a LATER stream is rejected at construction.
-    @test_throws Exception Split(
-        (a = PoissonError(), b = PoissonError()); sources = (a = :b,))
-    # A source naming an unknown stream is rejected.
-    @test_throws Exception Split(
-        (a = PoissonError(),); sources = (a = :ghost,))
-    # `sequential` and `sources` cannot both be given.
-    @test_throws Exception Split(
-        (a = PoissonError(), b = PoissonError()); sequential = true,
-        sources = (b = :a,))
+    # b and c both branch off a's delayed expectation by nesting a Split under a's
+    # delay: a general DAG built purely by placement, no source wiring.
+    split = Split((
+        a = LatentDelay(
+        Split((leaf = PoissonError(), b = PoissonError(), c = PoissonError())),
+        [0.5, 0.3, 0.2]),))
+    out = as_turing_model(split, (a = missing,), fill(30.0, 8))()
+    # a's streams share a's delayed expectation (8 → 6, mean 30).
+    @test length(out.expected.a.b) == 6
+    @test out.expected.a.b == out.expected.a.c
+    @test all(≈(30.0), out.expected.a.leaf)
 end
 
 @testitem "Split builds data-driven strata from a single template" begin

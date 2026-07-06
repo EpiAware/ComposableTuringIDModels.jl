@@ -58,9 +58,7 @@ end
     Z_t = infections.Z_t
     obs ~ to_submodel(
         as_turing_model(model.observation_model, y_t, I_t), false)
-    # Unpack the uniform observation return contract: `generated_y_t` stays the
-    # sampled observation series (a vector, or a `NamedTuple` of streams for a
-    # `Split`) and `expected_y_t` exposes the pre-error expected series.
+    # Uniform observation contract: sampled series and pre-error expected.
     generated_y_t = obs.y_t
     expected_y_t = obs.expected
     return (; generated_y_t, expected_y_t, I_t, Z_t)

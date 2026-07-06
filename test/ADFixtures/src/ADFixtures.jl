@@ -77,20 +77,19 @@ function _models()
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         ReportTriangle(PoissonError(), [0.6, 0.25, 0.15]))
 
-    # Unified `Split` observation composition (parallel + sequential): a renewal
-    # model observed through two streams — reported `cases` (a delayed fraction of
-    # infections) and `deaths` threaded DOWNSTREAM off the expected cases (a
-    # sequential cascade). Exercises the per-stream prefixing and the
-    # expected-series threading gradient path of the `Split` construct.
+    # `Split` observation composition: a renewal model observed through two
+    # streams, with `deaths` cascaded downstream of `cases` by sharing the case
+    # delay and splitting after it. Exercises the per-stream prefixing and the
+    # expected-series threading gradient path.
     split = EpiAwareModel(
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
-        Split(
-            (
-                cases = LatentDelay(NegativeBinomialError(), [0.4, 0.3, 0.2, 0.1]),
+        LatentDelay(
+            Split((
+                cases = NegativeBinomialError(),
                 deaths = LatentDelay(
                     Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.1))),
-                    [0.2, 0.3, 0.5]));
-            sequential = true))
+                    [0.2, 0.3, 0.5]))),
+            [0.4, 0.3, 0.2, 0.1]))
 
     y_direct = as_turing_model(direct, missing, n)().generated_y_t
     y_renewal = as_turing_model(renewal, missing, n)().generated_y_t
@@ -110,7 +109,7 @@ function _models()
             as_turing_model(nowcast, y_nowcast, n)),
         ("Renewal+ReportTriangle posterior",
             as_turing_model(triangle, y_triangle, n)),
-        ("Renewal+Split(parallel+sequential) posterior",
+        ("Renewal+Split cascade posterior",
             as_turing_model(split, y_split, n))
     ]
 end
@@ -205,7 +204,7 @@ Result matrix (8 scenarios × 4 backends), Julia 1.12:
 | Renewal+NegativeBinomial posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+RightTruncate nowcast posterior |    ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior      |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+Split(parallel+sequential) posterior | ✓     |      ✓      |    ✓    |   ✗   |
+| Renewal+Split cascade posterior       |      ✓      |      ✓      |    ✓    |   ✗   |
 
 ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
 scenario correctly — including both nowcasting models (the `RightTruncate`
@@ -224,7 +223,7 @@ function backend_broken_scenarios()
     return Dict{String, Set{String}}(
         "Enzyme reverse" => Set([
         "AR latent logjoint", "ARIMA latent logjoint",
-        "Renewal+Split(parallel+sequential) posterior"]))
+        "Renewal+Split cascade posterior"]))
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."
