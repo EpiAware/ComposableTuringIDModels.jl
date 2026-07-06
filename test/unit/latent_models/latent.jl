@@ -1,5 +1,5 @@
 @testitem "latent components generate length-n paths" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(1)
     n = 12
     for m in (IID(Normal()), HierarchicalNormal(), RandomWalk(), AR(), MA(),
@@ -12,7 +12,7 @@
 end
 
 @testitem "AR and MA respect their order via priors" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(2)
     ar2 = AR(;
         damp_priors = [truncated(Normal(0, 0.05), 0, 1),
@@ -29,7 +29,7 @@ end
 end
 
 @testitem "DiffLatentModel composes an ARIMA-style latent process" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(3)
     arima = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()])
     @test arima.d == 2
@@ -39,7 +39,7 @@ end
 end
 
 @testitem "HilbertSpaceGP draws a length-n path with named GP parameters" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(5)
     gp = HilbertSpaceGP(; m = 8)
     @test gp isa AbstractLatentModel
@@ -59,9 +59,9 @@ end
 end
 
 @testitem "HilbertSpaceGP basis approximates the squared-exponential kernel" begin
-    using EpiAwarePrototype, Distributions, LinearAlgebra
-    using EpiAwarePrototype: hsgp_basis, se_spectral_density,
-                             _hsgp_standardised_index
+    using ComposableTuringIDModels, Distributions, LinearAlgebra
+    using ComposableTuringIDModels: hsgp_basis, se_spectral_density,
+                                    _hsgp_standardised_index
     # With enough basis functions the reconstructed covariance
     # Φ diag(S(√λ)) Φ' converges to the exact SE-kernel Gram matrix, built on the
     # same standardised inputs the basis uses (so ℓ is on the standardised scale).
@@ -76,7 +76,7 @@ end
 end
 
 @testitem "HilbertSpaceGP rejects invalid m and c" begin
-    using EpiAwarePrototype, Distributions
+    using ComposableTuringIDModels, Distributions
     @test_throws AssertionError HilbertSpaceGP(; m = 0)
     @test_throws AssertionError HilbertSpaceGP(; c = 1.0)
     # n must exceed 1 for a meaningful basis.
@@ -84,7 +84,7 @@ end
 end
 
 @testitem "HilbertSpaceGP supports squared-exponential and Matern kernels" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(6)
     n = 25
     # Default kernel is squared-exponential.
@@ -102,8 +102,8 @@ end
 end
 
 @testitem "HilbertSpaceGP spectral densities are positive, finite, and kernel-specific" begin
-    using EpiAwarePrototype
-    using EpiAwarePrototype: spectral_density, se_spectral_density
+    using ComposableTuringIDModels
+    using ComposableTuringIDModels: spectral_density, se_spectral_density
     ω = collect(range(0, 5; length = 12))
     σ, ℓ = 1.0, 1.0
     for K in (SquaredExponentialKernel(), Matern32Kernel(), Matern52Kernel())
@@ -123,9 +123,9 @@ end
 end
 
 @testitem "HilbertSpaceGP Matern bases approximate their kernel covariance" begin
-    using EpiAwarePrototype, LinearAlgebra
-    using EpiAwarePrototype: hsgp_basis, spectral_density,
-                             _hsgp_standardised_index
+    using ComposableTuringIDModels, LinearAlgebra
+    using ComposableTuringIDModels: hsgp_basis, spectral_density,
+                                    _hsgp_standardised_index
     # The reconstructed covariance Φ diag(S(√λ)) Φ' should approximate the exact
     # Matern Gram matrix as the basis count grows, built on the same standardised
     # inputs the basis uses. Matern-5/2 covariance:
@@ -144,7 +144,7 @@ end
 end
 
 @testitem "HilbertSpaceGP builds its basis once, outside the model body" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: DynamicPPL
     Random.seed!(7)
     # as_turing_model returns a plain DynamicPPL.Model (the basis is built in the
@@ -159,7 +159,7 @@ end
 end
 
 @testitem "HilbertSpaceGP samples in the DEFAULT ℓ/m regime" tags=[:sample] begin
-    using EpiAwarePrototype, Distributions, Turing, Random
+    using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(8)
     # The reconstruction tests use large m; this exercises the *sampled* regime at
     # the DEFAULT settings (m = 20) where ℓ is a free parameter pushed through the
@@ -181,7 +181,7 @@ end
 end
 
 @testitem "rand from a latent model uses flat (unprefixed) names" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: VarName
     Random.seed!(4)
     draw = rand(as_turing_model(RandomWalk(), 10))

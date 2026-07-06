@@ -171,7 +171,7 @@ need a larger `m`.
 
 # Examples
 ```@example HilbertSpaceGP
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 gp = HilbertSpaceGP()
 mdl = as_turing_model(gp, 30)
 rand(mdl)

@@ -73,7 +73,7 @@ The latent process is a model in its own right. Constructing a
 draw, just like any other latent component.
 
 ```@example gp
-using EpiAwarePrototype, Distributions, Random
+using ComposableTuringIDModels, Distributions, Random
 Random.seed!(202)
 
 gp = HilbertSpaceGP(
@@ -90,8 +90,8 @@ draw = as_turing_model(gp, 60)()
 Because the basis is fixed, the reconstructed covariance of the approximation
 converges to the exact squared-exponential kernel as the number of basis
 functions grows. The package exposes the basis builder
-[`EpiAwarePrototype.hsgp_basis`](@ref) and spectral density
-[`EpiAwarePrototype.se_spectral_density`](@ref) used internally, so we can check
+[`ComposableTuringIDModels.hsgp_basis`](@ref) and spectral density
+[`ComposableTuringIDModels.se_spectral_density`](@ref) used internally, so we can check
 the approximation directly against the kernel it targets:
 
 ```@example gp
@@ -101,8 +101,8 @@ n = 40
 x = collect(1:n) .- (n + 1) / 2
 K_exact = [σ^2 * exp(-(xi - xj)^2 / (2ℓ^2)) for xi in x, xj in x]
 
-Φ, sqrt_λ = EpiAwarePrototype.hsgp_basis(n, 40, c)
-sd = sqrt.(EpiAwarePrototype.se_spectral_density(sqrt_λ, σ, ℓ))
+Φ, sqrt_λ = ComposableTuringIDModels.hsgp_basis(n, 40, c)
+sd = sqrt.(ComposableTuringIDModels.se_spectral_density(sqrt_λ, σ, ℓ))
 K_approx = Φ * Diagonal(sd .^ 2) * Φ'
 
 round(norm(K_approx - K_exact) / norm(K_exact), digits = 4)
@@ -135,14 +135,14 @@ To use the GP as the time-varying reproduction number we hand it to a
 [`Renewal`](@ref) infection model as its `rt` latent process. Nothing about the
 renewal process changes — it asks its latent slot for a length-`n` ``\log R_t``
 path and gets one. The generation interval is a ``\mathrm{Gamma}(6.5, 0.62)``
-serial interval discretised by [`EpiData`](@ref), and reported cases are
+serial interval discretised by [`IDData`](@ref), and reported cases are
 overdispersed counts via [`NegativeBinomialError`](@ref).
 
 ```@example gp
-data = EpiData(gen_distribution = Gamma(6.5, 0.62))
+data = IDData(gen_distribution = Gamma(6.5, 0.62))
 renewal = Renewal(data; rt = gp, initialisation_prior = Normal(log(2.0), 0.1))
 obs = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1))
-model = EpiAwareModel(renewal, obs)
+model = IDModel(renewal, obs)
 ```
 
 ## Simulate

@@ -33,8 +33,8 @@ mechanistic compartmental model, and a flexible Gaussian-process latent:
     simulated latent.
 
 Every example uses the same recipe: assemble components into a model, call
-[`as_turing_model`](@ref) (directly or through [`EpiAwareModel`](@ref) /
-[`EpiProblem`](@ref)), simulate by passing `missing` data, and fit by passing
+[`as_turing_model`](@ref) (directly or through [`IDModel`](@ref) /
+[`IDProblem`](@ref)), simulate by passing `missing` data, and fit by passing
 observed data and sampling. Because the components share one interface, you swap
 a modelling assumption by swapping a struct — the
 [Composable design](@ref) page explains the mechanism.
