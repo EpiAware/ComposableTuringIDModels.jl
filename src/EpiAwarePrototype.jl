@@ -29,7 +29,7 @@ module EpiAwarePrototype
 # Only the names the prototype itself uses or extends are imported below, which
 # keeps the public surface to the package's own exports.
 
-using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix
+using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix, returned
 using Turing: Turing, filldist, arraydist, sample, MCMCSerial
 using CensoredDistributions: double_interval_censored
 using LinearAlgebra: dot
