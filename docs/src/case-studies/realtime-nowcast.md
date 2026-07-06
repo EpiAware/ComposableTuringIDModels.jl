@@ -49,14 +49,14 @@ process folded into a [`Renewal`](@ref) infection process, observed with a
 [`NegativeBinomialError`](@ref).
 
 ```@example nowcast
-using EpiAwarePrototype, Distributions, Random, Turing
+using ComposableTuringIDModels, Distributions, Random, Turing
 Random.seed!(20240625)
 
 latent = AR(
     damp_priors = [truncated(Normal(0.8, 0.05), 0, 1)],
     init_priors = [Normal(0.0, 0.25)],
     ϵ_t = HierarchicalNormal(std_prior = HalfNormal(0.1)))
-data = EpiData(gen_distribution = Gamma(6.5, 0.62))
+data = IDData(gen_distribution = Gamma(6.5, 0.62))
 renewal = Renewal(data; rt = latent, initialisation_prior = Normal(log(1.4), 0.1))
 error = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1))
 nothing # hide
@@ -83,7 +83,7 @@ Simulate the eventual totals from the model (no truncation), and treat one path
 as the ground truth.
 
 ```@example nowcast
-truth_model = EpiAwareModel(renewal, error)
+truth_model = IDModel(renewal, error)
 truth = as_turing_model(truth_model, fill(missing, n), n)()
 eventual = truth.generated_y_t              # the eventual totals
 R_true = exp.(truth.Z_t)
@@ -110,7 +110,7 @@ Condition the plain renewal model on the truncated counts as though they were
 complete.
 
 ```@example nowcast
-naive_model = EpiAwareModel(renewal, error)
+naive_model = IDModel(renewal, error)
 naive_post = as_turing_model(naive_model, observed_so_far, n)
 naive_chain = sample(naive_post, NUTS(0.9), 100; progress = false)
 nothing # hide
@@ -124,7 +124,7 @@ untouched; only how the expected counts are compared to the truncated data.
 
 ```@example nowcast
 corrected_obs = RightTruncate(error, reporting_delay)
-corrected_model = EpiAwareModel(renewal, corrected_obs)
+corrected_model = IDModel(renewal, corrected_obs)
 corrected_post = as_turing_model(corrected_model, observed_so_far, n)
 corrected_chain = sample(corrected_post, NUTS(0.9), 100; progress = false)
 nothing # hide

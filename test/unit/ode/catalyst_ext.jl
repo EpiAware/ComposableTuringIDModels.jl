@@ -1,4 +1,4 @@
-# Tests for the optional Catalyst extension (`EpiAwarePrototypeCatalystExt`).
+# Tests for the optional Catalyst extension (`ComposableTuringIDModelsCatalystExt`).
 # `Catalyst` + `ModelingToolkit` are test-only deps (see test/Project.toml);
 # loading them triggers the extension, which supplies the `ReactionSystem`
 # constructor / sampling for the public, exported `CatalystODEParams` type.
@@ -7,25 +7,25 @@
 # (no positional-index bookkeeping).
 
 @testitem "Catalyst extension loads and CatalystODEParams is public" begin
-    using EpiAwarePrototype, Catalyst, ModelingToolkit
-    ext = Base.get_extension(EpiAwarePrototype, :EpiAwarePrototypeCatalystExt)
+    using ComposableTuringIDModels, Catalyst, ModelingToolkit
+    ext = Base.get_extension(ComposableTuringIDModels, :ComposableTuringIDModelsCatalystExt)
     @test ext !== nothing
     # The type is a first-class exported public component (defined in `src/`),
     # not something dug out of the extension module.
     @test CatalystODEParams isa Type
-    @test isdefined(EpiAwarePrototype, :CatalystODEParams)
+    @test isdefined(ComposableTuringIDModels, :CatalystODEParams)
 end
 
 @testitem "CatalystODEParams errors helpfully before Catalyst is loaded" begin
     # The fallback constructor lives in `src/`; without a `ReactionSystem` it
     # raises an informative error rather than a bare MethodError.
-    using EpiAwarePrototype
+    using ComposableTuringIDModels
     @test_throws ArgumentError CatalystODEParams(:not_a_reaction_system;
         tspan = (0.0, 1.0), u0_priors = [], p_priors = [])
 end
 
 @testitem "CatalystODEParams samples (u0, p) for an arbitrary (SIR) network" begin
-    using EpiAwarePrototype, Catalyst, ModelingToolkit, OrdinaryDiffEq,
+    using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq,
           Distributions, Random
     Random.seed!(101)
 
@@ -58,7 +58,7 @@ end
 end
 
 @testitem "CatalystODEParams enforces a prior for every species and parameter" begin
-    using EpiAwarePrototype, Catalyst, ModelingToolkit, OrdinaryDiffEq, Distributions
+    using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq, Distributions
     sir = @reaction_network begin
         β, S + I --> 2I
         γ, I --> R
@@ -72,7 +72,7 @@ end
 end
 
 @testitem "Catalyst SEIR trajectory matches the hand-coded SEIR" begin
-    using EpiAwarePrototype, Catalyst, ModelingToolkit, OrdinaryDiffEq, Distributions
+    using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq, Distributions
 
     tspan = (0.0, 60.0)
     seir = @reaction_network begin
@@ -114,7 +114,7 @@ end
 end
 
 @testitem "CatalystODEParams composes into an ODEProcess and exposes no latent" begin
-    using EpiAwarePrototype, Catalyst, ModelingToolkit, OrdinaryDiffEq,
+    using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq,
           Distributions, LogExpFunctions, Random
     Random.seed!(102)
 
@@ -146,7 +146,7 @@ end
 end
 
 @testitem "Catalyst SEIR + observation samples under ForwardDiff NUTS" tags=[:forwarddiff] begin
-    using EpiAwarePrototype, Catalyst, ModelingToolkit, OrdinaryDiffEq,
+    using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq,
           Distributions, LogExpFunctions, Turing, ADTypes, Random
     using DynamicPPL: @varname
     Random.seed!(103)
@@ -168,7 +168,7 @@ end
     process = ODEProcess(params = params,
         sol2infs = sol -> sol[seir.I, :],
         solver_options = Dict(:saveat => 1.0))
-    model = EpiAwareModel(process, obs)
+    model = IDModel(process, obs)
 
     sim = as_turing_model(model, fill(missing, n_days + 1), n_days + 1)()
     y_obs = sim.generated_y_t

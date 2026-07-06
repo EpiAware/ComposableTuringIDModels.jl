@@ -14,7 +14,7 @@ and the segments are concatenated.
 
 # Examples
 ```@example ConcatLatentModels
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 combined = ConcatLatentModels([Intercept(Normal(2, 0.2)), AR()])
 rand(as_turing_model(combined, 10))
 ```
@@ -90,8 +90,8 @@ default `dimension_adaptor` for [`ConcatLatentModels`](@ref).
 
 # Examples
 ```@example equal_dimensions
-using EpiAwarePrototype
-EpiAwarePrototype.equal_dimensions(10, 3)
+using ComposableTuringIDModels
+ComposableTuringIDModels.equal_dimensions(10, 3)
 ```
 "
 function equal_dimensions(n::Int, m::Int)::AbstractVector{Int}

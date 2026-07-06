@@ -10,7 +10,7 @@ Variational pre-sampler that runs Pathfinder several times and keeps the best ru
   - `maxiters`: optimiser iterations per run.
   - `max_tries`: extra tries if all runs fail.
 "
-@kwdef struct ManyPathfinder <: AbstractEpiOptMethod
+@kwdef struct ManyPathfinder <: AbstractIDOptMethod
     "Draws per Pathfinder run."
     ndraws::Int = 10
     "Number of Pathfinder runs."
@@ -53,9 +53,9 @@ Run Pathfinder several times and return the run with the largest ELBO estimate.
 
 # Examples
 ```@example manypathfinder
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 m = as_turing_model(
-    EpiAwareModel(
+    IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError()), fill(10, 10), 10)
 nothing

@@ -14,7 +14,7 @@ inferred step standard deviation).
 
 # Examples
 ```@example RandomWalk
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 rw = RandomWalk()
 mdl = as_turing_model(rw, 10)
 rand(mdl)

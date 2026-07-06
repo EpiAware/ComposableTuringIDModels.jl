@@ -1,15 +1,15 @@
-# EpiAwarePrototype.jl
+# ComposableTuringIDModels.jl
 
 | **Documentation** | **Build Status** | **Code Quality** | **License** |
 |:-----------------:|:----------------:|:----------------:|:-----------:|
-| [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://epiaware.github.io/EpiAwarePrototype.jl/dev/) | [![Test](https://github.com/EpiAware/EpiAwarePrototype.jl/actions/workflows/test.yaml/badge.svg?branch=main)](https://github.com/EpiAware/EpiAwarePrototype.jl/actions/workflows/test.yaml) [![AD](https://github.com/EpiAware/EpiAwarePrototype.jl/actions/workflows/ad.yaml/badge.svg?branch=main)](https://github.com/EpiAware/EpiAwarePrototype.jl/actions/workflows/ad.yaml) [![codecov](https://codecov.io/gh/EpiAware/EpiAwarePrototype.jl/graph/badge.svg)](https://codecov.io/gh/EpiAware/EpiAwarePrototype.jl) | [![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle) [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl) [![JET](https://img.shields.io/badge/%E2%9C%88%EF%B8%8F%20tested%20with%20-%20JET.jl%20-%20red)](https://github.com/aviatesk/JET.jl) | [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) |
+| [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://epiaware.github.io/ComposableTuringIDModels.jl/dev/) | [![Test](https://github.com/EpiAware/ComposableTuringIDModels.jl/actions/workflows/test.yaml/badge.svg?branch=main)](https://github.com/EpiAware/ComposableTuringIDModels.jl/actions/workflows/test.yaml) [![AD](https://github.com/EpiAware/ComposableTuringIDModels.jl/actions/workflows/ad.yaml/badge.svg?branch=main)](https://github.com/EpiAware/ComposableTuringIDModels.jl/actions/workflows/ad.yaml) [![codecov](https://codecov.io/gh/EpiAware/ComposableTuringIDModels.jl/graph/badge.svg)](https://codecov.io/gh/EpiAware/ComposableTuringIDModels.jl) | [![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle) [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl) [![JET](https://img.shields.io/badge/%E2%9C%88%EF%B8%8F%20tested%20with%20-%20JET.jl%20-%20red)](https://github.com/aviatesk/JET.jl) | [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) |
 
 *A toolkit for composable probabilistic infectious disease modelling in Julia.*
 
 > **Prototype.** This package is an exploratory prototype. Expect rough edges and
 > breaking changes.
 
-## Why EpiAwarePrototype?
+## Why ComposableTuringIDModels?
 
 - **Composable models**: Build a model from interchangeable infection and
   observation components — each infection model owning its own latent process —
@@ -33,21 +33,21 @@ This package is not registered. Install it directly from the repository:
 
 ```julia
 using Pkg
-Pkg.add(url = "https://github.com/EpiAware/EpiAwarePrototype.jl")
+Pkg.add(url = "https://github.com/EpiAware/ComposableTuringIDModels.jl")
 ```
 
 ## A composable example
 
-You assemble a model from components and `EpiAwarePrototype` turns the assembly
+You assemble a model from components and `ComposableTuringIDModels` turns the assembly
 into a single Turing model you can simulate from and fit. Each component is
 itself a model, joined together with the generic `as_turing_model` constructor.
 
 ```julia
-using EpiAwarePrototype, Distributions, Turing
+using ComposableTuringIDModels, Distributions, Turing
 
 # Compose a model: an ARIMA-style latent process (differenced AR) is folded into
 # a direct-infections process, observed with Poisson error.
-model = EpiAwareModel(
+model = IDModel(
     DirectInfections(;
         Z = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]),
         initialisation_prior = Normal()),
@@ -79,7 +79,7 @@ The modelling code in this package is **ported and adapted** from the
 open-source, Apache-2.0 licensed `EpiAware` package
 ([CDCgov/Rt-without-renewal](https://github.com/CDCgov/Rt-without-renewal),
 ported from the fork [seabbs/Rt-without-renewal](https://github.com/seabbs/Rt-without-renewal)).
-EpiAwarePrototype is a modified, derived work: it has been renamed, re-architected
+ComposableTuringIDModels is a modified, derived work: it has been renamed, re-architected
 around the generic `as_turing_model` constructor, and upgraded to build against
 the latest Turing.jl. See the [`NOTICE`](NOTICE) file for full attribution and a
 summary of the changes, and [`LICENSE`](LICENSE) for the Apache-2.0 terms.

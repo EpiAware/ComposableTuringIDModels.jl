@@ -5,7 +5,7 @@
 # is KEPT when it returns `true`), the runner switches from `test_package` to
 # `report_package` + filter and fails only on reports the predicate keeps.
 #
-# EpiAwarePrototype's public surface is DynamicPPL `@model` functions
+# ComposableTuringIDModels's public surface is DynamicPPL `@model` functions
 # (`as_turing_model` and friends), so JET emits a false `UndefVarErrorReport`
 # for every `~`-assigned local (and `MethodErrorReport`s through the `:=`
 # tracker) because the tilde macro hides the assignment from JET's static

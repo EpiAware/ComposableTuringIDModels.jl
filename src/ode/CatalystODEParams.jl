@@ -6,7 +6,7 @@
 # name no `Catalyst`/`ModelingToolkit` types, so this file has no heavy-stack
 # dependency. Everything that DOES need Catalyst — the `ReactionSystem`
 # constructor, the `as_turing_model` sampling method, and the `remake_ode_problem`
-# hook — lives in the `EpiAwarePrototypeCatalystExt` extension and is only defined
+# hook — lives in the `ComposableTuringIDModelsCatalystExt` extension and is only defined
 # once a user runs `using Catalyst, ModelingToolkit`.
 
 @doc raw"
@@ -31,7 +31,7 @@ handles: `sol2infs = sol -> sol[rn.I, :]`.
 
 !!! note \"Optional extension\"
     The constructor and sampling logic load only when `Catalyst` and
-    `ModelingToolkit` are present (`using EpiAwarePrototype, Catalyst,
+    `ModelingToolkit` are present (`using ComposableTuringIDModels, Catalyst,
     ModelingToolkit`). The heavy symbolic stack stays out of the default install;
     the hand-coded models remain the zero-latency default. Constructing a
     `CatalystODEParams` before loading `Catalyst` raises an informative error.
@@ -60,7 +60,7 @@ handles: `sol2infs = sol -> sol[rn.I, :]`.
 
 # Examples
 ```julia
-using EpiAwarePrototype, Catalyst, ModelingToolkit, OrdinaryDiffEq, Distributions
+using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq, Distributions
 sir = @reaction_network begin
     β, S + I --> 2I
     γ, I --> R

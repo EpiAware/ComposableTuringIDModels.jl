@@ -12,7 +12,7 @@ This case study keeps the renewal infection core of the
 model with a layered one: infections are convolved through two delay
 distributions and then modulated by a day-of-week reporting pattern. It also
 shows the latent process as an ARIMA-style differenced process broadcast to a
-weekly timescale, and assembles everything with [`EpiProblem`](@ref).
+weekly timescale, and assembles everything with [`IDProblem`](@ref).
 
 ## The model
 
@@ -36,7 +36,7 @@ Differencing makes the level a random walk rather than mean-reverting, which
 suits a reproduction number that can drift.
 
 ```@example delays
-using EpiAwarePrototype, Distributions, Random, Turing, Mooncake
+using ComposableTuringIDModels, Distributions, Random, Turing, Mooncake
 using ADTypes: AutoMooncake
 Random.seed!(20240601)
 
@@ -68,7 +68,7 @@ weekly ``\log R_t`` process built above is folded into the renewal model's `rt`
 slot.
 
 ```@example delays
-data = EpiData(gen_distribution = Gamma(1.4, 1 / 0.38))
+data = IDData(gen_distribution = Gamma(1.4, 1 / 0.38))
 renewal = Renewal(data;
     rt = weekly_latent, initialisation_prior = Normal(log(1.0), 1.0))
 nothing # hide
@@ -108,14 +108,14 @@ composition.
 
 ## Assemble, simulate, fit
 
-[`EpiProblem`](@ref) ties the latent, infection, and observation models to a
+[`IDProblem`](@ref) ties the latent, infection, and observation models to a
 time span. Its [`as_turing_model`](@ref) method takes data as a named tuple with
 a `y_t` field; `missing` values simulate.
 
 ```@example delays
 n = 42
-problem = EpiProblem(
-    epi_model = renewal,
+problem = IDProblem(
+    infection = renewal,
     observation_model = observation,
     tspan = (1, n))
 

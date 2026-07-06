@@ -1,5 +1,5 @@
 @testitem "latent modifiers generate length-n paths" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(31)
     n = 10
     trans = TransformLatentModel(Intercept(Normal(2, 0.2)), x -> exp.(x))
@@ -11,7 +11,7 @@
 end
 
 @testitem "PrefixLatentModel prefixes inner variable names" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(32)
     pm = PrefixLatentModel(; model = HierarchicalNormal(), prefix = "Test")
     names = string.(collect(keys(rand(as_turing_model(pm, 10)))))
@@ -19,7 +19,7 @@ end
 end
 
 @testitem "CombineLatentModels sums components" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(33)
     combined = CombineLatentModels([Intercept(Normal(2, 0.2)), AR()])
     out = as_turing_model(combined, 10)()
@@ -28,18 +28,18 @@ end
 end
 
 @testitem "ConcatLatentModels concatenates segments" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(34)
     combined = ConcatLatentModels([Intercept(Normal(2, 0.2)), AR()])
     out = as_turing_model(combined, 10)()
     @test length(out) == 10
     @test all(isfinite, out)
     # equal_dimensions splits 10 across 2 models as [5, 5].
-    @test EpiAwarePrototype.equal_dimensions(10, 2) == [5, 5]
+    @test ComposableTuringIDModels.equal_dimensions(10, 2) == [5, 5]
 end
 
 @testitem "broadcasting expands a shorter process to length n" begin
-    using EpiAwarePrototype, Random
+    using ComposableTuringIDModels, Random
     Random.seed!(35)
     each = BroadcastLatentModel(RandomWalk(), 7, RepeatEach())
     @test length(as_turing_model(each, 10)()) == 10
@@ -53,7 +53,7 @@ end
 end
 
 @testitem "arma and arima build composable latent processes" begin
-    using EpiAwarePrototype, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random
     Random.seed!(36)
     @test length(as_turing_model(arma(), 10)()) == 10
     @test length(as_turing_model(arima(), 10)()) == 10

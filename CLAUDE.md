@@ -1,4 +1,4 @@
-# EpiAwarePrototype.jl
+# ComposableTuringIDModels.jl
 
 A **prototype** for composable probabilistic infectious disease modelling in Julia.
 Goal: reach a state external collaborators can install and test. Treat everything
@@ -57,7 +57,7 @@ as_turing_model(model, args...; kwargs...)  # returns a DynamicPPL.Model
 - Keep backend-agnostic pieces backend-agnostic (`accumulate_scan`,
   `AbstractAccumulationStep` step structs, distribution/utility helpers).
 - Collapse the deep abstract hierarchy. A single light supertype (e.g.
-  `AbstractEpiAwareModel`) for shared behaviour/printing is fine; the deep
+  `AbstractComposableModel`) for shared behaviour/printing is fine; the deep
   `AbstractTuring*` tree is not needed.
 
 ## Turing / DynamicPPL: target the latest
@@ -81,7 +81,7 @@ as_turing_model(model, args...; kwargs...)  # returns a DynamicPPL.Model
 
 ## Naming
 
-- Package name and top-level module: **`EpiAwarePrototype`** (with its own fresh
+- Package name and top-level module: **`ComposableTuringIDModels`** (with its own fresh
   UUID in `Project.toml`, distinct from the upstream EpiAware package).
 
 ## Docs

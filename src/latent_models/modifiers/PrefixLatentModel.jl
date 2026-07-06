@@ -15,7 +15,7 @@ appear as `prefix.varname`.
 
 # Examples
 ```@example PrefixLatentModel
-using EpiAwarePrototype
+using ComposableTuringIDModels
 pm = PrefixLatentModel(; model = HierarchicalNormal(), prefix = \"Test\")
 rand(as_turing_model(pm, 10))
 ```

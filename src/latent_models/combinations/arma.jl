@@ -13,7 +13,7 @@ Build an ARMA(p, q) latent process: an [`AR`](@ref) whose innovation model is an
 
 # Examples
 ```@example arma
-using EpiAwarePrototype, Distributions
+using ComposableTuringIDModels, Distributions
 model = arma(; θ = [truncated(Normal(0.0, 0.02), -1, 1)],
     damp = [truncated(Normal(0.0, 0.02), 0, 1)])
 rand(as_turing_model(model, 10))

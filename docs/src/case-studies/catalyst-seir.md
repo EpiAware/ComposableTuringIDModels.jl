@@ -19,7 +19,7 @@ class or a second strain — only the reactions change.
 !!! note "Optional extension"
     The Catalyst path lives in an optional package extension. It loads only when
     you add and import `Catalyst` (and `ModelingToolkit`) alongside
-    `EpiAwarePrototype`, which keeps the heavy symbolic stack out of the default
+    `ComposableTuringIDModels`, which keeps the heavy symbolic stack out of the default
     install. The hand-coded [`SIRParams`](@ref) / [`SEIRParams`](@ref) remain the
     zero-latency default; the declarative path is opt-in for users building new
     or more complex compartmental models.
@@ -50,7 +50,7 @@ and generates its Jacobian symbolically — there is no `_seir_jac` to write or
 maintain.
 
 ```@example catalyst
-using EpiAwarePrototype, Catalyst, ModelingToolkit, OrdinaryDiffEq
+using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq
 using Distributions, Random, Turing, LogExpFunctions, ADTypes
 Random.seed!(1066)
 
@@ -65,7 +65,7 @@ nothing # hide
 ## The infection process
 
 Loading `Catalyst` activates the extension that backs `CatalystODEParams` (the
-type itself is a normal, exported `EpiAwarePrototype` component). We hand it the
+type itself is a normal, exported `ComposableTuringIDModels` component). We hand it the
 network, a solver time span, and priors for the initial conditions and rates. A
 prior can be a `Distribution` (sampled, and named after its symbol in the chain —
 `β`, `α`, `γ`) or a plain number (a fixed value, not sampled — here the
@@ -108,12 +108,12 @@ nothing # hide
 
 From here nothing is Catalyst-specific. We scale the infectious proportion to
 expected counts with a population [`TransformObservationModel`](@ref) and a
-[`PoissonError`](@ref), assemble with [`EpiAwareModel`](@ref), simulate from the
+[`PoissonError`](@ref), assemble with [`IDModel`](@ref), simulate from the
 prior, and fit.
 
 ```@example catalyst
 observation = TransformObservationModel(PoissonError(), x -> softplus.(N .* x))
-model = EpiAwareModel(seir_process, observation)
+model = IDModel(seir_process, observation)
 nothing # hide
 ```
 

@@ -1,7 +1,7 @@
 # Catalyst.jl-backed ODE infection models (opt-in package extension).
 #
 # Loads only when `Catalyst` and `ModelingToolkit` are present alongside
-# `EpiAwarePrototype`. The public, model-agnostic parameter component itself —
+# `ComposableTuringIDModels`. The public, model-agnostic parameter component itself —
 # `CatalystODEParams` — is defined in `src/` (so it is exported and `@ref`-able);
 # this extension supplies only the parts that genuinely need the symbolic stack:
 # the `ReactionSystem` constructor, the `as_turing_model` sampling method, and the
@@ -30,12 +30,12 @@
 # `build_initializeprob = false`, which bypasses that init system and is the
 # reverse-mode-AD-safe path.
 
-module EpiAwarePrototypeCatalystExt
+module ComposableTuringIDModelsCatalystExt
 
 # `CatalystODEParams` (the public struct), `as_turing_model` and
-# `remake_ode_problem` are extended below as `EpiAwarePrototype.<name>`
+# `remake_ode_problem` are extended below as `ComposableTuringIDModels.<name>`
 # (qualified), so they are not imported as bare names.
-using EpiAwarePrototype: EpiAwarePrototype, CatalystODEParams
+using ComposableTuringIDModels: ComposableTuringIDModels, CatalystODEParams
 using Catalyst: Catalyst, ReactionSystem
 # `unknowns` / `parameters` (the system's symbolic species / rate handles) are
 # owned by ModelingToolkit; we call them qualified as `ModelingToolkit.<name>`
@@ -66,7 +66,7 @@ function _spec(sym, spec)
     return SymbolSpec(v, name, spec)
 end
 
-function EpiAwarePrototype.CatalystODEParams(
+function ComposableTuringIDModels.CatalystODEParams(
         rn::ReactionSystem; tspan, u0_priors, p_priors)
     species = ModelingToolkit.unknowns(rn)
     rates = ModelingToolkit.parameters(rn)
@@ -92,7 +92,7 @@ end
 # symbolic `remake` below places each value into the problem by name, so the
 # stored (Catalyst-sorted) layout is never assumed and the ForwardDiff `Dual`
 # values propagate through `remake` unchanged.
-@model function EpiAwarePrototype.as_turing_model(params::CatalystODEParams, n)
+@model function ComposableTuringIDModels.as_turing_model(params::CatalystODEParams, n)
     u0 = Vector{Pair}(undef, length(params.u0_specs))
     p = Vector{Pair}(undef, length(params.p_specs))
     for (k, s) in enumerate(params.u0_specs)
@@ -118,8 +118,8 @@ end
 # the initialization system. `build_initializeprob = false` is the
 # reverse-mode-AD-safe path; the symbolic maps keep ordering out of the picture and
 # let promoted `Dual` values flow straight through `remake`.
-function EpiAwarePrototype.remake_ode_problem(::CatalystODEParams, prob, u0, p)
+function ComposableTuringIDModels.remake_ode_problem(::CatalystODEParams, prob, u0, p)
     return remake(prob; u0 = u0, p = p, build_initializeprob = false)
 end
 
-end # module EpiAwarePrototypeCatalystExt
+end # module ComposableTuringIDModelsCatalystExt

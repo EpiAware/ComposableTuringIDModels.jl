@@ -21,7 +21,7 @@ length-`n` broadcasted series. Each rule implements its own method.
 
 # Examples
 ```@example broadcast_n
-using EpiAwarePrototype
+using ComposableTuringIDModels
 broadcast_n(RepeatEach(), 10, 7), broadcast_n(RepeatBlock(), 10, 7)
 ```
 "
@@ -40,7 +40,7 @@ Expand an inner latent series to length `n` under an
 
 # Examples
 ```@example broadcast_rule
-using EpiAwarePrototype
+using ComposableTuringIDModels
 broadcast_rule(RepeatEach(), [1, 2], 5, 2)
 ```
 "
@@ -59,7 +59,7 @@ The inner model is generated over the length the rule requires
 
 # Examples
 ```@example BroadcastLatentModel
-using EpiAwarePrototype
+using ComposableTuringIDModels
 each = BroadcastLatentModel(RandomWalk(), 7, RepeatEach())
 rand(as_turing_model(each, 10))
 ```

@@ -28,8 +28,8 @@ then to a mechanistic compartmental model:
     Bayesian compartmental-inference example of [chatzilena2019contemporary](@citet).
 
 Every example uses the same recipe: assemble components into a model, call
-[`as_turing_model`](@ref) (directly or through [`EpiAwareModel`](@ref) /
-[`EpiProblem`](@ref)), simulate by passing `missing` data, and fit by passing
+[`as_turing_model`](@ref) (directly or through [`IDModel`](@ref) /
+[`IDProblem`](@ref)), simulate by passing `missing` data, and fit by passing
 observed data and sampling. Because the components share one interface, you swap
 a modelling assumption by swapping a struct — the
 [Composable design](@ref) page explains the mechanism.

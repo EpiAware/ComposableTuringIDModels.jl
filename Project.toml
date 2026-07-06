@@ -1,4 +1,4 @@
-name = "EpiAwarePrototype"
+name = "ComposableTuringIDModels"
 uuid = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
 version = "0.1.0-DEV"
 authors = ["Sam Abbott"]
@@ -28,7 +28,7 @@ Catalyst = "479239e8-5488-4da2-87a7-35f2df7eef83"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 
 [extensions]
-EpiAwarePrototypeCatalystExt = ["Catalyst", "ModelingToolkit"]
+ComposableTuringIDModelsCatalystExt = ["Catalyst", "ModelingToolkit"]
 
 [compat]
 ADTypes = "1.22.1"
