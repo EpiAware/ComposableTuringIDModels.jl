@@ -3,7 +3,7 @@
 # AD-fixture registry implementing the EpiAwarePackageTools `ADRegistry`
 # contract. The scenarios are REAL differentiable log-densities from the
 # package: the (linked) log-joint of representative latent processes and of
-# composed `EpiAwareModel`s conditioned on simulated data — the gradients an AD
+# composed `IDModel`s conditioned on simulated data — the gradients an AD
 # backend must get right for NUTS to work. Each scenario carries a ForwardDiff
 # reference gradient. The shared harness (driven from `test/ad/setup.jl`)
 # consumes this registry.
@@ -13,7 +13,7 @@ using ADTypes: AutoForwardDiff
 using DifferentiationInterface: DifferentiationInterface
 import DifferentiationInterfaceTest as DIT
 import ForwardDiff
-using EpiAwarePrototype
+using ComposableTuringIDModels
 using Distributions
 using Random: Random, MersenneTwister
 using DynamicPPL: DynamicPPL, LogDensityFunction, VarInfo, link, getlogjoint
@@ -45,7 +45,7 @@ const _GEN_INT = [0.2, 0.3, 0.5]
 # Build the registry's models once. Conditioned (posterior) scenarios use data
 # simulated from the prior with a fixed seed so the target is deterministic.
 function _models()
-    data = EpiData(_GEN_INT, exp)
+    data = IDData(_GEN_INT, exp)
     n = 12
 
     # Simulate observations from a composed model's prior (its `generated_y_t`).
@@ -95,15 +95,15 @@ function _models()
         AR(; damp = PrefixLatentModel(RandomWalk(), "damp")), 8)
 
     # --- infection posteriors ---------------------------------------------------
-    direct = EpiAwareModel(
+    direct = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
-    renewal = EpiAwareModel(
+    renewal = IDModel(
         Renewal(data; rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
     # Exponential-growth-rate infections (the third infection family alongside
     # `DirectInfections` / `Renewal`): a cumulative growth-rate path exponentiated.
-    egr = EpiAwareModel(
+    egr = IDModel(
         ExpGrowthRate(; rt = RandomWalk(), initialisation = Normal()),
         PoissonError())
 
@@ -111,7 +111,7 @@ function _models()
     # observation error is wrapped in `RightTruncate` (fixed reporting-delay CDF
     # supplied as a `ReportingCDF` submodel). This exercises the `reverse`/
     # broadcast scaling the modifier adds on top of the inner error.
-    nowcast = EpiAwareModel(
+    nowcast = IDModel(
         Renewal(data; rt = RandomWalk(), initialisation = Normal()),
         RightTruncate(NegativeBinomialError(),
             truncated(Normal(4.0, 1.5), 0.0, Inf)))
@@ -120,33 +120,33 @@ function _models()
     # per-cell `ReportTriangle` observation model. The gradient of the per-cell
     # Poisson log-likelihood over the masked triangle (`t + d ≤ now`) is what
     # nowcasting under NUTS depends on.
-    triangle = EpiAwareModel(
+    triangle = IDModel(
         Renewal(data; rt = RandomWalk(), initialisation = Normal()),
         ReportTriangle(PoissonError(), [0.6, 0.25, 0.15]))
 
     # --- observation modifiers / error families over a composed model ----------
     # Reporting delay: convolves the expected observations with a delay PMF
     # (`accumulate_scan(LDStep(rev_pmf), ...)`) before the inner error.
-    latdelay = EpiAwareModel(
+    latdelay = IDModel(
         Renewal(data; rt = RandomWalk(), initialisation = Normal()),
         LatentDelay(NegativeBinomialError(), [0.3, 0.4, 0.3]))
     # Day-of-week ascertainment: scales the expected observations by a broadcast
     # latent (an `Ascertainment` wrapping `broadcast_dayofweek`).
-    ascert = EpiAwareModel(
+    ascert = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         ascertainment_dayofweek(PoissonError()))
     # Aggregation: sum the expected observations over weekly reporting windows
     # (only the window endpoints are scored).
-    aggregate = EpiAwareModel(
+    aggregate = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7]))
     # Transform-the-expected-observations: softplus applied before the error.
-    transobs = EpiAwareModel(
+    transobs = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         TransformObservationModel(PoissonError()))
     # Gaussian observation error (continuous, `σ`-inferred) rather than a count
     # family — the minimal non-count likelihood.
-    normalobs = EpiAwareModel(
+    normalobs = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         NormalError())
 
@@ -222,7 +222,7 @@ end
 
 The AD gradient scenarios — each a `DIT.Scenario{:gradient, :out}` over a real
 package log-density (a latent process prior log-joint, or a composed
-`EpiAwareModel` posterior conditioned on simulated data). When
+`IDModel` posterior conditioned on simulated data). When
 `with_reference = true` each scenario carries its ForwardDiff reference gradient
 in `res1`. `category` is accepted for the harness's group selector; all
 scenarios are in the single `:marginal` group here.
