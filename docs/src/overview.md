@@ -9,6 +9,29 @@ constructor, [`as_turing_model`](@ref).
 Because every part speaks that one interface, parts nest inside one another and
 a whole model is *composed* from the pieces.
 
+## Three roles, one interface
+
+A model is put together from parts filling three roles.
+
+  - A **latent** process describes an unobserved series ``Z_t`` over time, e.g.
+    a log reproduction number or a growth rate.
+  - An **infection** process turns that latent series into unobserved infections
+    ``I_t`` (directly, through exponential growth, or through the renewal
+    equation). It takes the latent process as a slot and draws it while building
+    the infections.
+  - An **observation** process turns infections into the observed data ``y_t``,
+    adding reporting delays, ascertainment, day-of-week effects,
+    right-truncation, and count noise.
+
+Each part is a plain struct with a single method of
+[`as_turing_model`](@ref), which returns a `DynamicPPL.Model`.
+There is no deep type hierarchy: a part is identified by the method it
+implements, not by its place in a tree.
+A part that contains another part builds the inner model and samples it as a
+submodel, so the parts nest through the same interface they expose.
+
+The three roles feed one another and plug into that single interface:
+
 <figure style="margin:1.5rem 0">
 <svg viewBox="0 0 820 445" role="img" aria-labelledby="ovw-t ovw-d" style="width:100%;height:auto;max-width:820px;font-family:system-ui,Segoe UI,Helvetica,Arial,sans-serif">
 <title id="ovw-t">Composable design of ComposableTuringIDModels</title>
@@ -19,11 +42,11 @@ a whole model is *composed* from the pieces.
 </defs>
 <rect x="28" y="52" width="312" height="150" rx="14" fill="#e7eef8" stroke="#2f6fb0" stroke-width="2"/>
 <text x="44" y="78" font-size="15" font-weight="700" fill="#204a75">Infection model</text>
-<text x="44" y="96" font-size="11" fill="#3f6fa0">owns and drives its own latent process</text>
+<text x="44" y="96" font-size="11" fill="#3f6fa0">takes a latent process as a slot</text>
 <rect x="44" y="110" width="284" height="82" rx="10" fill="#efe7f6" stroke="#8a4faf" stroke-width="1.6"/>
 <text x="58" y="134" font-size="13" font-weight="700" fill="#6a3d8f">Latent process  Z<tspan baseline-shift="sub" font-size="9">t</tspan></text>
 <text x="58" y="154" font-size="10.5" fill="#86659e">random walk · AR · differenced AR …</text>
-<text x="58" y="174" font-size="10.5" font-style="italic" fill="#86659e">the infection model draws it, then maps it to I<tspan baseline-shift="sub" font-size="8">t</tspan></text>
+<text x="58" y="174" font-size="10.5" font-style="italic" fill="#86659e">drawn, then mapped to infections I<tspan baseline-shift="sub" font-size="8">t</tspan></text>
 <line x1="340" y1="127" x2="396" y2="127" stroke="#6b6b72" stroke-width="1.6" marker-end="url(#ovw-arrow)"/>
 <text x="356" y="118" font-size="12" font-style="italic" fill="#4a4a52">I<tspan baseline-shift="sub" font-size="8">t</tspan></text>
 <rect x="400" y="52" width="300" height="150" rx="14" fill="#e7f3df" stroke="#3f9a2c" stroke-width="2"/>
@@ -57,40 +80,8 @@ a whole model is *composed* from the pieces.
 <rect x="578" y="386" width="232" height="20" rx="6" fill="#eef6e8" stroke="#3f9a2c"/><text x="588" y="400" font-size="11" fill="#2c6a1e">NegativeBinomialError</text>
 <rect x="578" y="410" width="232" height="20" rx="6" fill="#eef6e8" stroke="#3f9a2c"/><text x="588" y="424" font-size="11" fill="#2c6a1e">LatentDelay wrapper</text>
 </svg>
-<figcaption style="font-size:0.85rem;color:#6b6b72;text-align:center;margin-top:0.4rem">The three roles plug into one <code>as_turing_model</code> interface. The infection model owns its latent process, and any part can be swapped for a compatible one.</figcaption>
+<figcaption style="font-size:0.85rem;color:#6b6b72;text-align:center;margin-top:0.4rem">The three roles plug into one <code>as_turing_model</code> interface, and any part can be swapped for a compatible one.</figcaption>
 </figure>
-
-## Three roles, one interface
-
-A model is put together from parts filling three roles.
-
-  - A **latent** process describes an unobserved series ``Z_t`` over time, e.g.
-    a log reproduction number or a growth rate.
-  - An **infection** process turns that latent series into unobserved infections
-    ``I_t`` (directly, through exponential growth, or through the renewal
-    equation).
-  - An **observation** process turns infections into the observed data ``y_t``,
-    adding reporting delays, ascertainment, day-of-week effects,
-    right-truncation, and count noise.
-
-Each part is a plain struct with a single method of
-[`as_turing_model`](@ref), which returns a `DynamicPPL.Model`.
-There is no deep type hierarchy: a part is identified by the method it
-implements, not by its place in a tree.
-A part that contains another part builds the inner model and samples it as a
-submodel, so the parts nest through the same interface they expose.
-
-## The infection model owns its latent
-
-The latent process is not a separate top-level component.
-The reason is that the latent (e.g. ``\log R_t``) is not always the quantity you
-care about, so it is handed to the infection model that consumes it rather than
-threaded through the composer.
-An infection model takes a latent slot — `Z` for [`DirectInfections`](@ref),
-`rt` for [`ExpGrowthRate`](@ref) and [`Renewal`](@ref) — draws that process
-internally, and maps it to infections.
-Only [`Renewal`](@ref) needs a generation interval, so it alone carries an
-[`IDData`](@ref); the others take a transformation directly.
 
 ## Swap a part to change an assumption
 
