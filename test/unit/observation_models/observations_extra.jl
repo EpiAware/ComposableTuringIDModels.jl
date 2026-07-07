@@ -11,6 +11,28 @@
     @test length(as_turing_model(adw, missing, Y)()) == length(Y)
 end
 
+@testitem "Ascertainment accepts a prior model (constant vs time-varying)" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using ComposableTuringIDModels: AbstractPriorModel
+    Random.seed!(53)
+    # A bare Distribution is coerced to the prior interface (a constant factor).
+    asc_const = Ascertainment(PoissonError(), Normal(0.0, 0.1))
+    @test asc_const.latent_model isa AbstractPriorModel
+    sim = as_turing_model(asc_const, missing, fill(50.0, 8))()
+    @test length(sim) == 8
+    @test all(>=(0), sim)
+    # The constant factor is one shared draw: the underlying expected series is a
+    # single global exp(θ) scaling. Recover the scaling with FixedIntercept.
+    Y = fill(20.0, 6)
+    asc_fixed = Ascertainment(PoissonError(), FixedIntercept(0.0);
+        transform = (Y_t, x) -> Y_t .* x)
+    @test asc_fixed.latent_model isa AbstractPriorModel
+    # A latent model still gives a time-varying effect (existing behaviour).
+    asc_tv = Ascertainment(PoissonError(), RandomWalk())
+    @test asc_tv.latent_model isa AbstractPriorModel
+    @test length(as_turing_model(asc_tv, missing, Y)()) == length(Y)
+end
+
 @testitem "Aggregate sums expected observations over windows" begin
     using ComposableTuringIDModels, Random
     Random.seed!(52)

@@ -8,7 +8,9 @@ pages = [
         "Renewal model with negative-binomial reporting" => "case-studies/renewal-negbin.md",
         "Reporting delays and day-of-week effects" => "case-studies/delays-dayofweek.md",
         "Real-time nowcasting: correcting right-truncation" => "case-studies/realtime-nowcast.md",
-        "An SIR compartmental model" => "case-studies/sir-ode.md"
+        "An SIR compartmental model" => "case-studies/sir-ode.md",
+        "Time-varying damping in an AR process" => "case-studies/arima-time-varying-damping.md",
+        "Partial pooling across groups" => "case-studies/hierarchy-stacked.md"
     ],
     "API reference" => [
         "Public API" => "lib/public.md",

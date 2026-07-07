@@ -79,6 +79,61 @@ end
     @test all(x -> x isa Real, out.Z_t)
 end
 
+@testitem "Hierarchy drives a per-group quantity in a stacked composed model" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
+    using Turing: to_submodel, returned
+    Random.seed!(388)
+    # A FULL composed model (IDModel: infection + observation) whose per-group
+    # reporting level is partially pooled by a Hierarchy. The group dimension is
+    # read from the data matrix (its columns), NOT stored on any component.
+    idmodel = IDModel(
+        DirectInfections(;
+            Z = RandomWalk(), initialisation = Normal(log(50.0), 0.2)),
+        PoissonError())
+    hierarchy = Hierarchy(;
+        mean = Normal(0.0, 0.5), across = IID(Normal(0.0, 0.5)))
+
+    @model function grouped_epidemic(idmodel, hierarchy, Y)
+        n_time, n_groups = size(Y)
+        # Namespace the group prior so its IID innovations do not collide with the
+        # infection process's own `ϵ_t` under the prefix-off convention: this is
+        # the group-requirement threading made explicit.
+        group_levels ~ to_submodel(
+            as_turing_model(PrefixLatentModel(hierarchy, "groups"), n_groups),
+            false)
+        infections ~ to_submodel(
+            as_turing_model(idmodel.infection_model, n_time), false)
+        I_t = infections.I_t
+        ys = Vector{Any}(undef, n_groups)
+        for g in 1:n_groups
+            expected_g = exp(group_levels[g]) .* I_t
+            og = PrefixObservationModel(idmodel.observation_model, "group$g")
+            y_g ~ to_submodel(as_turing_model(og, Y[:, g], expected_g), false)
+            ys[g] = y_g
+        end
+        return (; I_t, group_levels, y = ys)
+    end
+
+    n_time, n_groups = 20, 4
+    # n_groups threads from the number of columns of the (missing) data matrix.
+    Ymiss = Matrix{Union{Missing, Float64}}(missing, n_time, n_groups)
+    sim = grouped_epidemic(idmodel, hierarchy, Ymiss)()
+    @test length(sim.I_t) == n_time
+    @test length(sim.group_levels) == n_groups
+    Ydata = reduce(hcat, [Int.(sim.y[g]) for g in 1:n_groups])
+    @test size(Ydata) == (n_time, n_groups)
+
+    posterior = grouped_epidemic(idmodel, hierarchy, Float64.(Ydata))
+    chain = sample(posterior, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 80;
+        progress = false)
+    @test size(chain, 1) == 80
+    # The per-group levels are recovered as generated quantities.
+    draws = reduce(hcat, [g.group_levels for g in vec(returned(posterior, chain))])
+    @test size(draws) == (n_groups, 80)
+    post_mean = vec(mean(draws; dims = 2))
+    @test cor(sim.group_levels, post_mean) > 0.5
+end
+
 @testitem "a partially-pooled model samples under NUTS (ForwardDiff)" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     using DynamicPPL: to_submodel

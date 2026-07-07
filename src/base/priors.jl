@@ -106,9 +106,18 @@ as_prior(v::AbstractVector{<:Distribution}) = BroadcastPrior(v)
 
 # Name-carrying coercion used by component constructors: a bare `Distribution`
 # (or vector) is wrapped in a `BroadcastPrior` that samples under the component's
-# own parameter `name`, so the flat chain names are unchanged. A richer prior /
-# latent model is passed through and keeps its own internal names.
+# own parameter `name`, so the flat chain names are unchanged. A non-latent prior
+# model (e.g. a `BroadcastPrior`) already carries its own naming, so it is passed
+# through unchanged.
 as_prior(p::AbstractPriorModel, ::Symbol) = p
+# A latent model used directly as another component's prior carries its own inner
+# variable names (`std`, `ϵ_t`, `rw_init`, …). Under the prefix-off submodel
+# convention these collide with the host component's own latent, so a linked
+# log-density mis-threads the flattened parameter vector (issue #80): e.g. a bare
+# `AR(damp = RandomWalk())` samples via `rand` but errors as a linked log-density.
+# Auto-prefix the latent-model prior with the component's parameter `name` inside
+# the coercion seam, so the bare form threads without a manual `PrefixLatentModel`.
+as_prior(p::AbstractLatentModel, name::Symbol) = PrefixLatentModel(p, String(name))
 as_prior(d::Distribution, name::Symbol) = BroadcastPrior(d, name)
 function as_prior(v::AbstractVector{<:Distribution}, name::Symbol)
     return BroadcastPrior(v, name)

@@ -2,16 +2,20 @@
 # process).
 
 @doc raw"
-Scale the expected observations of an underlying observation model by a latent
-ascertainment process.
+Scale the expected observations of an underlying observation model by an
+ascertainment prior process.
 
-A latent model generates a length-`length(Y_t)` series which is combined with the
-expected observations `Y_t` through `transform` before being passed to the inner
-observation `model`. The default `transform` applies a multiplicative effect on
-the exponential scale (`(Y_t, x) -> xexpy.(Y_t, x)`), so a latent value `x`
-multiplies the expected observation by `exp(x)`. The latent model is wrapped in a
-[`PrefixLatentModel`](@ref) (with prefix `latent_prefix`) unless the prefix is the
-empty string.
+The `latent_model` slot is an [`AbstractPriorModel`](@ref): pass a latent model
+for a **time-varying** ascertainment effect, or a bare `Distribution` / prior
+(coerced via [`as_prior`](@ref)) for a single **constant** ascertainment factor
+shared across the series. Whatever is passed generates a length-`length(Y_t)`
+series which is combined with the expected observations `Y_t` through `transform`
+before being passed to the inner observation `model`. The default `transform`
+applies a multiplicative effect on the exponential scale
+(`(Y_t, x) -> xexpy.(Y_t, x)`), so a value `x` multiplies the expected
+observation by `exp(x)`. The prior is prefixed with `latent_prefix` (a latent
+model via [`PrefixLatentModel`](@ref), a distribution via its sampled-variable
+name) unless the prefix is the empty string.
 
 # Arguments
 
@@ -22,55 +26,63 @@ empty string.
 # Examples
 ```@example Ascertainment
 using ComposableTuringIDModels, Distributions
+# A latent model gives a time-varying ascertainment effect.
 obs = Ascertainment(PoissonError(), FixedIntercept(0.1))
-mdl = as_turing_model(obs, missing, fill(10.0, 5))
-rand(mdl)
+rand(as_turing_model(obs, missing, fill(10.0, 5)))
+# A bare Distribution / prior gives a single constant ascertainment factor.
+obs_const = Ascertainment(PoissonError(), Normal(0.0, 0.1))
+rand(as_turing_model(obs_const, missing, fill(10.0, 5)))
 ```
 
 ## Fields
 
   - `model`: the underlying observation model the ascertained expected
     observations are passed to.
-  - `latent_model`: the latent model generating the ascertainment effect
-    (prefix-wrapped unless `latent_prefix` is empty).
+  - `latent_model`: the prior model generating the ascertainment effect (a latent
+    model for a time-varying effect, a distribution/prior for a constant factor),
+    prefixed unless `latent_prefix` is empty.
   - `transform`: the function `(Y_t, x)` combining expected observations with the
-    latent effect.
-  - `latent_prefix`: the prefix applied to the latent model's variables.
+    ascertainment effect.
+  - `latent_prefix`: the prefix applied to the ascertainment prior's variables.
 "
 struct Ascertainment{
-    M <: AbstractObservationModel, L <: AbstractLatentModel, F <: Function,
+    M <: AbstractObservationModel, L <: AbstractPriorModel, F <: Function,
     P <: String} <: AbstractObservationModel
     "The underlying observation model."
     model::M
-    "The latent model generating the ascertainment effect."
+    "The prior model generating the ascertainment effect."
     latent_model::L
-    "The function combining expected observations with the latent effect."
+    "The function combining expected observations with the ascertainment effect."
     transform::F
-    "The prefix applied to the latent model's variables."
+    "The prefix applied to the ascertainment prior's variables."
     latent_prefix::P
 
-    function Ascertainment(model::M, latent_model::L, transform::F,
+    function Ascertainment(model::M, latent_model, transform::F,
             latent_prefix::P) where {M <: AbstractObservationModel,
-            L <: AbstractLatentModel, F <: Function, P <: String}
+            F <: Function, P <: String}
         @assert hasmethod(transform, Tuple{Vector, Vector}) "transform must have a method for (Vector, Vector)"
-        wrapped_latent_model = latent_prefix == "" ? latent_model :
-                               PrefixLatentModel(latent_model, latent_prefix)
-        return new{M, typeof(wrapped_latent_model), F, P}(
-            model, wrapped_latent_model, transform, latent_prefix)
+        # Coerce whatever was passed to the prior interface (a latent model is
+        # already one; a bare `Distribution`/vector becomes a `BroadcastPrior`),
+        # and prefix it under `latent_prefix` — a latent model via
+        # `PrefixLatentModel`, a distribution via its sampled-variable name — so
+        # the ascertainment variables stay distinct. An empty prefix opts out,
+        # leaving the coerced prior unprefixed.
+        prior = latent_prefix == "" ? as_prior(latent_model) :
+                as_prior(latent_model, Symbol(latent_prefix))
+        return new{M, typeof(prior), F, P}(
+            model, prior, transform, latent_prefix)
     end
 end
 
-function Ascertainment(model::M, latent_model::L;
+function Ascertainment(model::AbstractObservationModel, latent_model;
         transform = (Y_t, x) -> xexpy.(Y_t, x),
-        latent_prefix::String = "Ascertainment") where {
-        M <: AbstractObservationModel, L <: AbstractLatentModel}
+        latent_prefix::String = "Ascertainment")
     return Ascertainment(model, latent_model, transform, latent_prefix)
 end
 
-function Ascertainment(; model::M, latent_model::L,
+function Ascertainment(; model::AbstractObservationModel, latent_model,
         transform = (Y_t, x) -> xexpy.(Y_t, x),
-        latent_prefix::String = "Ascertainment") where {
-        M <: AbstractObservationModel, L <: AbstractLatentModel}
+        latent_prefix::String = "Ascertainment")
     return Ascertainment(model, latent_model, transform, latent_prefix)
 end
 

@@ -17,6 +17,34 @@ end
     @test as_prior([Normal(), Normal(2, 1)]) isa BroadcastPrior
     rw = RandomWalk()
     @test as_prior(rw) === rw            # a prior/latent model is accepted unchanged
+    # Name-carrying coercion: a bare Distribution keeps the component's name; a
+    # latent-model prior is auto-prefixed (issue #80) so its inner variable names
+    # cannot collide with the host component's own latent under prefix-off.
+    @test as_prior(Normal(), :damp_AR) isa BroadcastPrior
+    pref = as_prior(rw, :damp_AR)
+    @test pref isa PrefixLatentModel
+    @test pref.prefix == "damp_AR"
+end
+
+@testitem "bare latent-model-as-prior threads under a linked log-density (#80)" begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    using DynamicPPL: LogDensityFunction, VarInfo, link, getlogjoint
+    import LogDensityProblems as LDP
+    Random.seed!(180)
+    # The exact #80 repro: a bare `AR(damp = RandomWalk())` used to sample via
+    # `rand` but ERROR as a linked log-density, because the damping RandomWalk's
+    # inner `std`/`ϵ_t`/`rw_init` collided with the AR innovation's under the
+    # prefix-off convention. `as_prior` now auto-prefixes the latent-model prior.
+    m = as_turing_model(AR(; damp = RandomWalk()), 8)
+    @test rand(m) !== nothing                        # sampled fine before too
+    vi = link(VarInfo(m), m)
+    ldf = LogDensityFunction(m, getlogjoint, vi)
+    val = LDP.logdensity(ldf, zeros(LDP.dimension(ldf)))   # previously threw
+    @test isfinite(val)
+    # And it samples under NUTS end-to-end.
+    chn = sample(m, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 40;
+        progress = false)
+    @test size(chn, 1) == 40
 end
 
 @testitem "BroadcastPrior scalar (repeat-one) mode" begin
