@@ -314,7 +314,7 @@ Result matrix (24 scenarios × 4 backends), Julia 1.12:
 | AR vector BroadcastPrior latent logjoint              |      ✓      |      ✓      |    ✓    |   ✗   |
 | AR latent-model-as-prior latent logjoint              |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Poisson posterior                    |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+NegativeBinomial posterior                    |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+NegativeBinomial posterior                    |      ✓      |      ✓      |    ✓    |   ✗   |
 | ExpGrowthRate+Poisson posterior                       |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+RightTruncate nowcast posterior               |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior                      |      ✓      |      ✓      |    ✓    |   ✓   |
@@ -353,7 +353,8 @@ function backend_broken_scenarios()
         "CombineLatentModels latent logjoint",
         "AR vector BroadcastPrior latent logjoint",
         "AR latent-model-as-prior latent logjoint",
-        "DirectInfections+NormalError posterior"]))
+        "DirectInfections+NormalError posterior",
+        "Renewal+NegativeBinomial posterior"]))
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."
