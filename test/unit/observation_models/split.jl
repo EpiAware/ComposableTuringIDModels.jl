@@ -144,6 +144,26 @@ end
     @test_throws Exception StrataMap(M, [1.0 0.0 0.0])
 end
 
+@testitem "Split(template, map) projects infection strata inside a composed model" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(89)
+    # The weight map lives in the observation model, so the strata come from the
+    # composed infection process at run time (not a hand-built matrix).
+    W = reshape([0.7, 0.3, 1.0], 3, 1)          # young, old, and their total
+    weighted = Split(PoissonError(), W)
+    model = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        weighted)
+    out = as_turing_model(
+        model, (young = missing, old = missing, total = missing), 12)()
+    @test keys(out.generated_y_t) == (:young, :old, :total)
+    e = out.expected_y_t
+    # young/old are weighted fractions of the one infection stratum; total sums.
+    @test e.young ≈ 0.7 .* out.I_t
+    @test e.old ≈ 0.3 .* out.I_t
+    @test e.total ≈ e.young .+ e.old
+end
+
 @testitem "Split simulate-then-condition round-trips" begin
     using ComposableTuringIDModels, Random
     Random.seed!(87)
@@ -183,6 +203,56 @@ end
 
     # It samples under NUTS (default ForwardDiff): a few steps is enough to
     # exercise the gradient path on the composed renewal → split posterior.
+    chain = sample(as_turing_model(model, ydata, n), NUTS(), 5; progress = false)
+    @test size(chain, 1) == 5
+end
+
+@testitem "Split cascade composes with a renewal model and samples under NUTS" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Random, Turing
+    Random.seed!(90)
+    data = IDData([0.2, 0.3, 0.5], exp)
+    n = 25
+
+    # Cascade: deaths downstream of the delayed expected cases (placement, no flag).
+    cascade = LatentDelay(
+        Split((
+            cases = NegativeBinomialError(),
+            deaths = LatentDelay(
+                Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.02))),
+                truncated(Normal(5.0, 1.5), 0.0, Inf)))),
+        truncated(Normal(3.0, 1.0), 0.0, Inf))
+    model = IDModel(
+        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()), cascade)
+
+    sim = as_turing_model(model, (cases = missing, deaths = missing), n)()
+    @test keys(sim.generated_y_t) == (:cases, :deaths)
+    ydata = (cases = sim.generated_y_t.cases, deaths = sim.generated_y_t.deaths)
+
+    chain = sample(as_turing_model(model, ydata, n), NUTS(), 5; progress = false)
+    @test size(chain, 1) == 5
+end
+
+@testitem "Split strata composes with a renewal model and samples under NUTS" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Random, Turing
+    Random.seed!(91)
+    data = IDData([0.2, 0.3, 0.5], exp)
+    n = 25
+
+    # Strata: one full stream per band off the shared renewal infections.
+    strata = Split((
+        young = LatentDelay(
+            Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.7))),
+            truncated(Normal(2.0, 1.0), 0.0, Inf)),
+        old = LatentDelay(
+            Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.4))),
+            truncated(Normal(3.0, 1.0), 0.0, Inf))))
+    model = IDModel(
+        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()), strata)
+
+    sim = as_turing_model(model, (young = missing, old = missing), n)()
+    @test keys(sim.generated_y_t) == (:young, :old)
+    ydata = (young = sim.generated_y_t.young, old = sim.generated_y_t.old)
+
     chain = sample(as_turing_model(model, ydata, n), NUTS(), 5; progress = false)
     @test size(chain, 1) == 5
 end

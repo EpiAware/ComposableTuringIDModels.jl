@@ -110,8 +110,8 @@ recommended backend for this package (see
 ydata = (cases = y.cases, deaths = y.deaths)
 posterior = as_turing_model(model, ydata, n)
 chain = sample(
-    posterior, NUTS(0.9; adtype = AutoMooncake(; config = nothing)), 1000;
-    progress = false)
+    posterior, NUTS(0.9; adtype = AutoMooncake(; config = nothing)),
+    MCMCThreads(), 500, 2; progress = false)
 nothing # hide
 ```
 
@@ -188,31 +188,36 @@ strata_sim = as_turing_model(
 map(s -> sum(skipmissing(s)), strata_sim)                # totals per band
 ```
 
-When the bands come from *different infection strata* rather than the same shared
-infections, a [`StrataMap`](@ref) supplies the expected series as an
-`infection-strata × time` matrix together with an
-`observation-strata × infection-strata` weight matrix, and a single **template**
-model is replicated once per data stream.
-The mapping covers the one-to-one, many-to-one, and many-to-many infection →
-observation cases with one weight matrix: an identity map is one-to-one, an
-aggregation row sums several infection strata into one stream (many-to-one), and
-a general matrix is many-to-many.
+The streams above each observe the *same* infections. When the streams instead
+draw on a **weighted mix** of infections — one band, another band, and a summed
+total — the same `Split` carries an `observation-strata × infection-strata` weight
+matrix, and a single **template** model is replicated once per data stream.
+`Split(template, W)` projects the infection series reaching it through `W`, so it
+composes inside an `IDModel` like any other observation model: the infections come
+from the modelled process, not a hand-built series.
+One weight matrix covers the one-to-one (an identity map), many-to-one (an
+aggregation row summing infection strata into one stream), and many-to-many
+(a general matrix) infection → observation cases.
+
+Here the renewal process supplies one infection stratum, and `W` maps it onto a
+`young` band, an `old` band, and their `total`:
 
 ```@example split
-template = Split(LatentDelay(PoissonError(), LogNormal(1.6, 0.5)))
-young_inf = fill(200.0, n)
-old_inf = fill(80.0, n)
-inf_strata = permutedims(hcat(young_inf, old_inf))       # 2 × n (inf strata × time)
-W = [1.0 0.0; 0.0 1.0; 1.0 1.0]                          # bands and their total
-agemap = StrataMap(inf_strata, W)
+W = reshape([0.7, 0.3, 1.0], 3, 1)                  # young, old, and their total
+weighted = Split(LatentDelay(PoissonError(), LogNormal(1.6, 0.5)), W)
+weighted_model = IDModel(renewal, weighted)
 age = as_turing_model(
-    template, (young = missing, old = missing, total = missing), agemap)()
-map(length, age.y_t)                                     # one series per stream
+    weighted_model, (young = missing, old = missing, total = missing), n)()
+map(s -> sum(skipmissing(s)), age.generated_y_t)         # simulated total per band
 ```
 
-The aggregate `total` stream sees the summed expected infections of both bands,
-and swapping the identity/aggregation rows of `W` for estimated weights is the
-seam a partially-observed or cross-classified reporting structure grows from.
+The aggregate `total` stream sees the summed expected infections of both bands —
+its expected series is exactly `young .+ old`.
+Swapping the single infection stratum for an `infection-strata × time` matrix (one
+row per genuinely distinct infection process) and the weights for estimated ones
+is the seam a partially-observed or cross-classified reporting structure grows
+from; modelling those separate infection strata jointly is future work
+([#45](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/45)).
 
 ## References
 

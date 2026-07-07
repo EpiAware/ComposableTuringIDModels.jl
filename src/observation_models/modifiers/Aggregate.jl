@@ -76,8 +76,7 @@ end
     end
     inner ~ to_submodel(
         as_turing_model(ag.model, y_t[present], agg_Y_t), false)
-    # Scatter counts and expected means back into length-`n` vectors (zeros where
-    # absent) for the uniform `(; y_t, expected)` contract.
+    # Scatter counts and means back into length-`n` vectors (zeros where absent).
     y_t = _return_aggregate(inner.y_t, present, n)
     expected = _return_aggregate(inner.expected, present, n)
     return (; y_t, expected)

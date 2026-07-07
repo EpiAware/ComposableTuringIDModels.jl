@@ -117,6 +117,13 @@ a per-stream NamedTuple, an `inf_strata × time` matrix (one stream per row), or
   - `Split(streams::NamedTuple)` — explicit named streams.
   - `Split(template::AbstractObservationModel)` — a data-driven strata split
     replicating the template once per `y_t` entry.
+  - `Split(template::AbstractObservationModel, map::AbstractMatrix)` — a strata
+    split that projects the incoming expected series (an `inf_strata × time`
+    matrix, or a single vector treated as one infection stratum) onto the
+    observation streams through the `obs_strata × inf_strata` weight `map`. This
+    is the composed-model form of a [`StrataMap`](@ref): the strata come from the
+    infection process at run time, so `IDModel(infection, Split(template, map))`
+    maps infections onto streams end-to-end.
 
 # Examples
 ```@example Split
@@ -142,21 +149,31 @@ rand(as_turing_model(cascade, (cases = missing, deaths = missing), fill(100.0, 1
 
   - `streams`: a NamedTuple of per-stream models, or a single strata template.
   - `names`: the stream names, or `nothing` in strata mode (names come from data).
+  - `map`: an `obs_strata × inf_strata` weight matrix projecting infection strata
+    onto streams, or `nothing` when the incoming expected series is used directly.
 "
-struct Split{S, N} <: AbstractObservationModel
+struct Split{S, N, W} <: AbstractObservationModel
     "Per-stream observation models (NamedTuple) or a single strata template."
     streams::S
     "The stream names, or `nothing` in the data-driven strata mode."
     names::N
+    "Weight matrix projecting infection strata onto streams, or `nothing`."
+    map::W
 end
 
 function Split(streams::NamedTuple)
     @assert !isempty(streams) "A Split needs at least one stream"
-    return Split(streams, collect(string.(keys(streams))))
+    return Split(streams, collect(string.(keys(streams))), nothing)
 end
 
 # Data-driven strata: a single template replicated per data stream.
-Split(template::AbstractObservationModel) = Split(template, nothing)
+Split(template::AbstractObservationModel) = Split(template, nothing, nothing)
+
+# Strata with a weight map: project the incoming infection strata (matrix or a
+# single-stratum vector) onto the streams through `map` inside a composed model.
+function Split(template::AbstractObservationModel, map::AbstractMatrix)
+    Split(template, nothing, map)
+end
 
 # Ordered stream names: fixed for explicit streams, else the `y_t` keys.
 function _split_names(m::Split, y_t)
@@ -164,6 +181,15 @@ function _split_names(m::Split, y_t)
     y_t isa NamedTuple ||
         error("A strata Split needs a NamedTuple `y_t` to name its streams")
     return collect(string.(keys(y_t)))
+end
+
+# Per-Split expected input: with a stored weight `map` the incoming series is the
+# infection strata (a matrix, or a vector taken as one stratum) projected through
+# it; otherwise the incoming series is used directly (dispatch on its type).
+function _split_expected(m::Split, Y_t, names)
+    m.map === nothing && return _split_expected(Y_t, names)
+    strata = Y_t isa AbstractMatrix ? Y_t : permutedims(collect(Y_t))
+    return _split_expected(StrataMap(strata, m.map), names)
 end
 
 # Per-stream models: the named entries, or the template replicated per stream.
@@ -183,7 +209,7 @@ _split_y_t(names, y_t) = [y_t for _ in names]
 @model function as_turing_model(m::Split, y_t, Y_t)
     names = _split_names(m, y_t)
     models = _split_models(m, names)
-    expected_in = _split_expected(Y_t, names)
+    expected_in = _split_expected(m, Y_t, names)
     yt = _split_y_t(names, y_t)
 
     ys = Vector{Any}(undef, length(names))
