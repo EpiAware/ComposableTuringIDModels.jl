@@ -89,17 +89,22 @@ draw = as_turing_model(gp, 60)()
 
 Because the basis is fixed, the reconstructed covariance of the approximation
 converges to the exact squared-exponential kernel as the number of basis
-functions grows. The package exposes the basis builder
+functions grows. The kernel itself is the ecosystem-standard
+[KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/)
+`SqExponentialKernel`, so we can check the approximation directly against that
+kernel's own Gram matrix. The package exposes the basis builder
 [`ComposableTuringIDModels.hsgp_basis`](@ref) and spectral density
-[`ComposableTuringIDModels.se_spectral_density`](@ref) used internally, so we can check
-the approximation directly against the kernel it targets:
+[`ComposableTuringIDModels.se_spectral_density`](@ref) used internally; the inputs
+are standardised, so we build the target Gram matrix on the same standardised
+coordinates:
 
 ```@example gp
 using LinearAlgebra
+using KernelFunctions: with_lengthscale, kernelmatrix
 n = 40
 σ, ℓ, c = 1.0, 1.0, 2.0
-x = collect(1:n) .- (n + 1) / 2
-K_exact = [σ^2 * exp(-(xi - xj)^2 / (2ℓ^2)) for xi in x, xj in x]
+x = ComposableTuringIDModels._hsgp_standardised_index(n)
+K_exact = kernelmatrix(σ^2 * with_lengthscale(SqExponentialKernel(), ℓ), x)
 
 Φ, sqrt_λ = ComposableTuringIDModels.hsgp_basis(n, 40, c)
 sd = sqrt.(ComposableTuringIDModels.se_spectral_density(sqrt_λ, σ, ℓ))
@@ -109,25 +114,61 @@ round(norm(K_approx - K_exact) / norm(K_exact), digits = 4)
 ```
 
 The relative error is a fraction of a percent: with enough basis functions the
-approximation reproduces the kernel it stands in for.
+Hilbert-space weights reproduce the KernelFunctions kernel they stand in for. This
+is the concrete link to the GP ecosystem — the spectral density the HSGP applies
+is the Fourier transform of exactly this KernelFunctions kernel.
 
 ## Choosing a kernel
 
+The kernels are the standard [KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/)
+types, so the model reuses the ecosystem's kernels rather than defining its own.
 Only the spectral density changes between kernels, so the kernel is a one-field
-choice on the model. The default [`SquaredExponentialKernel`](@ref) gives very
-smooth paths; [`Matern32Kernel`](@ref) and [`Matern52Kernel`](@ref) give
-progressively rougher ones, which can suit a less smooth latent process. The
-basis is shared, so swapping the kernel reuses everything else:
+choice on the model. The default `SqExponentialKernel` gives very smooth paths;
+`Matern32Kernel` and `Matern52Kernel` give progressively rougher ones, which can
+suit a less smooth latent process. These three match the kernels offered by the
+EpiNow2 Gaussian-process implementation. The basis is shared, so swapping the
+kernel reuses everything else:
 
 ```@example gp
-gp_se = HilbertSpaceGP(m = 20, kernel = SquaredExponentialKernel())
+using KernelFunctions: SqExponentialKernel, Matern52Kernel
+gp_se = HilbertSpaceGP(m = 20, kernel = SqExponentialKernel())
 gp_matern = HilbertSpaceGP(m = 20, kernel = Matern52Kernel())
 (se = length(as_turing_model(gp_se, 60)()),
     matern = length(as_turing_model(gp_matern, 60)()))
 ```
 
-This case study uses the squared-exponential kernel; the renewal example below is
-identical for a Matérn kernel bar that one argument.
+A kernel enters the HSGP only through its spectral density, so adding a new kernel
+is a single `ComposableTuringIDModels.spectral_density(::MyKernel, ω, σ, ℓ)`
+method — any KernelFunctions `Kernel` for which that method exists can drive the
+GP. This case study uses the squared-exponential kernel; the renewal example below
+is identical for a Matérn kernel bar that one argument.
+
+### Where this sits in the Julia GP ecosystem
+
+The HSGP is deliberately a *NUTS-friendly approximation*, not a hand-rolled GP in
+isolation. It connects to the wider ecosystem at two points, and has two natural
+siblings:
+
+  - **[KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/)**
+    supplies the covariance kernels used here. KernelFunctions defines the kernels
+    and their Gram matrices (which we validated against above) but not their
+    spectral densities; the HSGP adds the one-dimensional spectral density each
+    kernel needs for the basis-function approximation.
+  - **[AbstractGPs.jl](https://juliagaussianprocesses.github.io/AbstractGPs.jl/)**
+    is the ecosystem's interface for *exact* GPs built from those same kernels. It
+    gives an exact posterior in closed form for Gaussian likelihoods, but the
+    ``O(n^3)`` factorisation it performs at every evaluation is what makes an exact
+    GP impractical inside NUTS at realistic ``n`` — the obstacle the HSGP exists to
+    sidestep. It is the right tool when an exact GP is affordable; the HSGP is the
+    approximation that stays cheap under gradient-based sampling.
+  - **[TemporalGPs.jl](https://github.com/JuliaGaussianProcesses/TemporalGPs.jl)**
+    is the closest sibling: for a one-dimensional input (like time here) it
+    reformulates an AbstractGPs GP as a linear-Gaussian state-space model and gives
+    an *exact* GP at ``O(n)`` cost via Kalman filtering. That makes it an appealing
+    alternative latent process for ``\log R_t`` — exact rather than approximate,
+    and still linear in the series length — though the HSGP's non-centred,
+    fixed-basis form is the more direct fit for a Turing model differentiated under
+    Mooncake. Both would plug into the same length-`n` latent contract.
 
 ## Composing it into an infection model
 
@@ -199,22 +240,37 @@ using MCMCChains, Statistics
 summarystats(chain)
 ```
 
+Individual parameters are read by name straight off the FlexiChains chain with
+`vec(chain[@varname(...)])` — no conversion step — from which posterior summaries
+of the GP hyperparameters follow directly:
+
+```@example gp
+using Turing: @varname
+ℓ_post = vec(chain[@varname(ℓ)])
+σ_post = vec(chain[@varname(σ)])
+(ℓ = round(mean(ℓ_post), digits = 2), σ = round(mean(σ_post), digits = 2))
+```
+
 The length scale ``\ell``, marginal standard deviation ``\sigma``, and the
 observation cluster factor are all identified from the single simulated series.
 
 ## Recover the latent process
 
 The reproduction number ``R_t = \exp(Z_t)`` is a generated quantity rather than a
-sampled parameter. We do not need to rebuild it by hand from the basis weights:
-the composed model already *returns* `Z_t` (alongside `I_t` and `generated_y_t`),
-so [`Turing.returned`](https://turinglang.org/) re-runs the fitted model over the
-chain and hands back the generated quantities for every posterior draw. This is
-the basis-function form paying off — the posterior over the latent function is
-just the model pushed forward over the posterior over its weights.
+sampled parameter, so we do not rebuild it by hand from the basis weights. The
+composed model already *returns* `Z_t` (alongside `I_t` and `generated_y_t`), and
+[`generated_observables`](@ref) re-runs the fitted model over the chain and hands
+back those returned quantities for every posterior draw. It is the counterpart of
+`predict`: `predict` samples the *observed* variables (the reported counts `y_t`)
+forward, whereas `generated_observables` collects the model's *returned* latent
+quantities — which is what we want for ``Z_t``. Both push the fitted model forward
+over the posterior; neither reaches into the basis. This is the basis-function
+form paying off — the posterior over the latent function is just the model pushed
+forward over the posterior over its weights.
 
 ```@example gp
-gen = returned(posterior, chain)
-Z_draws = [g.Z_t for g in vec(gen)]
+gen = vec(generated_observables(posterior, y_obs, chain).generated)
+Z_draws = [g.Z_t for g in gen]
 Z_post_mean = mean(Z_draws)
 
 (correlation = round(cor(Z_post_mean, Z_true), digits = 2),

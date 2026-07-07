@@ -36,6 +36,12 @@ using LogExpFunctions: softmax, xexpy, log1pexp
 using OrdinaryDiffEq: ODEProblem, ODEFunction, solve, remake, AutoVern7, Rodas5P
 using Random: AbstractRNG, randexp
 
+# KernelFunctions.jl supplies the ecosystem-standard covariance kernel types used
+# by `HilbertSpaceGP`; the package adds only the 1-D spectral densities those
+# kernels need for the Hilbert-space approximation (see HilbertSpaceGP.jl).
+using KernelFunctions: Kernel, SqExponentialKernel, Matern32Kernel,
+                       Matern52Kernel
+
 # Inference-layer dependencies.
 using ADTypes: ADTypes, AutoForwardDiff
 using AbstractMCMC: AbstractMCMC
@@ -71,7 +77,9 @@ export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial
 # --- latent models ---
 export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept, FixedIntercept,
        Null, DiffLatentModel, HilbertSpaceGP
-export AbstractGPKernel, SquaredExponentialKernel, Matern32Kernel, Matern52Kernel
+# Covariance kernels for `HilbertSpaceGP` are re-exported from KernelFunctions.jl
+# (the ecosystem standard); `spectral_density` adds their Hilbert-space weights.
+export SqExponentialKernel, Matern32Kernel, Matern52Kernel, spectral_density
 
 # --- latent modifiers / manipulators / combinations / broadcasting ---
 export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,

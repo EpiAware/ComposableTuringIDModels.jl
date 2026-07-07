@@ -62,12 +62,16 @@ end
     using ComposableTuringIDModels, Distributions, LinearAlgebra
     using ComposableTuringIDModels: hsgp_basis, se_spectral_density,
                                     _hsgp_standardised_index
+    using KernelFunctions: with_lengthscale, kernelmatrix
     # With enough basis functions the reconstructed covariance
-    # Φ diag(S(√λ)) Φ' converges to the exact SE-kernel Gram matrix, built on the
-    # same standardised inputs the basis uses (so ℓ is on the standardised scale).
+    # Φ diag(S(√λ)) Φ' converges to the exact SE-kernel Gram matrix. Ground truth
+    # is the KernelFunctions.jl Gram matrix σ² · SqExponentialKernel(ℓ), evaluated
+    # on the same standardised inputs the basis uses (so ℓ is on the standardised
+    # scale). Tying the spectral-density weights to the ecosystem kernel is exactly
+    # the HSGP↔KernelFunctions correspondence the model relies on.
     n, σ, ℓ, c = 20, 1.0, 0.5, 2.0
     x = _hsgp_standardised_index(n)
-    K_exact = [σ^2 * exp(-(xi - xj)^2 / (2ℓ^2)) for xi in x, xj in x]
+    K_exact = kernelmatrix(σ^2 * with_lengthscale(SqExponentialKernel(), ℓ), x)
     Φ, sqrt_λ = hsgp_basis(n, 40, c)
     sd = sqrt.(se_spectral_density(sqrt_λ, σ, ℓ))
     K_approx = Φ * Diagonal(sd .^ 2) * Φ'
@@ -85,13 +89,15 @@ end
 
 @testitem "HilbertSpaceGP supports squared-exponential and Matern kernels" begin
     using ComposableTuringIDModels, Distributions, Random
+    using KernelFunctions: Kernel
     Random.seed!(6)
     n = 25
-    # Default kernel is squared-exponential.
-    @test HilbertSpaceGP().kernel isa SquaredExponentialKernel
-    # Each kernel is an AbstractGPKernel and yields a finite length-n path.
-    for K in (SquaredExponentialKernel(), Matern32Kernel(), Matern52Kernel())
-        @test K isa AbstractGPKernel
+    # Default kernel is the ecosystem-standard squared-exponential kernel.
+    @test HilbertSpaceGP().kernel isa SqExponentialKernel
+    # Each kernel is a KernelFunctions.jl `Kernel` and yields a finite length-n
+    # path.
+    for K in (SqExponentialKernel(), Matern32Kernel(), Matern52Kernel())
+        @test K isa Kernel
         gp = HilbertSpaceGP(; m = 10, kernel = K)
         @test gp.kernel === K
         @test implements_latent_interface(gp; n = n)
@@ -106,7 +112,7 @@ end
     using ComposableTuringIDModels: spectral_density, se_spectral_density
     ω = collect(range(0, 5; length = 12))
     σ, ℓ = 1.0, 1.0
-    for K in (SquaredExponentialKernel(), Matern32Kernel(), Matern52Kernel())
+    for K in (SqExponentialKernel(), Matern32Kernel(), Matern52Kernel())
         S = spectral_density(K, ω, σ, ℓ)
         @test length(S) == length(ω)
         @test all(>(0), S)
@@ -116,27 +122,25 @@ end
     end
     # se_spectral_density is the squared-exponential convenience wrapper.
     @test se_spectral_density(ω, σ, ℓ) ≈
-          spectral_density(SquaredExponentialKernel(), ω, σ, ℓ)
+          spectral_density(SqExponentialKernel(), ω, σ, ℓ)
     # Different kernels give genuinely different weightings.
     @test spectral_density(Matern32Kernel(), ω, σ, ℓ) !=
-          spectral_density(SquaredExponentialKernel(), ω, σ, ℓ)
+          spectral_density(SqExponentialKernel(), ω, σ, ℓ)
 end
 
 @testitem "HilbertSpaceGP Matern bases approximate their kernel covariance" begin
     using ComposableTuringIDModels, LinearAlgebra
     using ComposableTuringIDModels: hsgp_basis, spectral_density,
                                     _hsgp_standardised_index
+    using KernelFunctions: with_lengthscale, kernelmatrix
     # The reconstructed covariance Φ diag(S(√λ)) Φ' should approximate the exact
-    # Matern Gram matrix as the basis count grows, built on the same standardised
-    # inputs the basis uses. Matern-5/2 covariance:
-    #   k(d) = σ²(1 + √5 d/ℓ + 5d²/(3ℓ²)) exp(-√5 d/ℓ)
+    # Matern Gram matrix as the basis count grows. Ground truth is the
+    # KernelFunctions.jl Gram matrix σ² · Matern52Kernel(ℓ) on the same
+    # standardised inputs the basis uses — the spectral density and the ecosystem
+    # kernel must agree.
     n, σ, ℓ, c = 20, 1.0, 0.8, 3.0
     x = _hsgp_standardised_index(n)
-    function matern52(d)
-        a = sqrt(5) * abs(d) / ℓ
-        return σ^2 * (1 + a + a^2 / 3) * exp(-a)
-    end
-    K_exact = [matern52(xi - xj) for xi in x, xj in x]
+    K_exact = kernelmatrix(σ^2 * with_lengthscale(Matern52Kernel(), ℓ), x)
     Φ, sqrt_λ = hsgp_basis(n, 60, c)
     sd = sqrt.(spectral_density(Matern52Kernel(), sqrt_λ, σ, ℓ))
     K_approx = Φ * Diagonal(sd .^ 2) * Φ'
