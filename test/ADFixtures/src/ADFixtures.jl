@@ -161,7 +161,7 @@ function _enzyme()
     # derivative data, and without this Enzyme raises `EnzymeMutabilityException`
     # ("argument cannot be proven readonly") on every DynamicPPL log-density.
     # With it, three of the five scenarios differentiate correctly; the AR-based
-    # two remain genuinely broken (see `backend_broken_scenarios`).
+    # three remain genuinely broken (see `backend_broken_scenarios`).
     return ADTypes.AutoEnzyme(;
         mode = Enzyme.set_runtime_activity(Enzyme.Reverse),
         function_annotation = Enzyme.Const)
@@ -184,7 +184,7 @@ Result matrix (7 scenarios × 4 backends), Julia 1.12:
 | AR latent logjoint                    |      ✓      |      ✓      |    ✓    |   ✗   |
 | ARIMA latent logjoint                 |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Poisson posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+NegativeBinomial posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+NegativeBinomial posterior    |      ✓      |      ✓      |    ✓    |   ✗   |
 | Renewal+RightTruncate nowcast posterior |    ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior      |      ✓      |      ✓      |    ✓    |   ✓   |
 
@@ -202,7 +202,8 @@ for Enzyme below rather than hidden.
 function backend_broken_scenarios()
     return Dict{String, Set{String}}(
         "Enzyme reverse" => Set([
-        "AR latent logjoint", "ARIMA latent logjoint"]))
+        "AR latent logjoint", "ARIMA latent logjoint",
+        "Renewal+NegativeBinomial posterior"]))
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."
