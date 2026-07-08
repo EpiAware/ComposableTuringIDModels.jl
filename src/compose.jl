@@ -18,8 +18,11 @@ I_t \;\xrightarrow{\text{infections}}\;
 y_t \;\xrightarrow{\text{observations}}\; \text{data}
 ```
 
-The returned generated quantities are `(; generated_y_t, I_t, Z_t)`, where `Z_t`
-is the infection model's internal latent draw (e.g. the (log) ``R_t`` path), kept
+The returned generated quantities are `(; generated_y_t, expected_y_t, I_t, Z_t)`.
+`generated_y_t` is the observation model's sampled `y_t` (the observed-or-simulated
+series, or a `NamedTuple` of streams for a [`Split`](@ref)); `expected_y_t` is its
+pre-error `expected` series (the uniform observation return contract). `Z_t` is the
+infection model's internal latent draw (e.g. the (log) ``R_t`` path), kept
 accessible as a generated quantity even though it is no longer a top-level
 component — or `nothing` for infection models with no exposable latent (e.g.
 [`ODEProcess`](@ref)). Pass `y_t = missing` to simulate from the prior, or a data
@@ -53,7 +56,10 @@ end
     infections ~ to_submodel(as_turing_model(model.infection_model, n), false)
     I_t = infections.I_t
     Z_t = infections.Z_t
-    generated_y_t ~ to_submodel(
+    obs ~ to_submodel(
         as_turing_model(model.observation_model, y_t, I_t), false)
-    return (; generated_y_t, I_t, Z_t)
+    # Uniform observation contract: sampled series and pre-error expected.
+    generated_y_t = obs.y_t
+    expected_y_t = obs.expected
+    return (; generated_y_t, expected_y_t, I_t, Z_t)
 end

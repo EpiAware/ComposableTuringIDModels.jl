@@ -25,17 +25,18 @@ constant to avoid degenerate error distributions.
 
 The error family supplies [`generate_observation_error_priors`](@ref) (sampled
 as a submodel) and [`observation_error`](@ref) (the per-time-point distribution).
+
+Returns the uniform `(; y_t, expected)` tuple: `y_t` is the observed (or
+simulated) counts and `expected` is the pre-error series. Exposing `expected`
+lets a [`Split`](@ref) thread one stream's expectation into another.
 "
 @model function as_turing_model(obs_model::AbstractObservationErrorModel, y_t, Y_t)
     priors ~ to_submodel(
         generate_observation_error_priors(obs_model, y_t, Y_t), false)
 
-    # Unpack the observed count series from `y_t`. `y_t` may be a plain vector
-    # (the simple single-stream case), `missing` (predictive simulation), or a
-    # `NamedTuple` carrying extra per-time-point data alongside the counts; each
-    # model's `define_y_t` extracts the count series it scores. We rebind `y_t`
-    # itself (rather than a fresh name) so DynamicPPL still treats the entries as
-    # conditioned observations when concrete data is supplied.
+    # Extract the count series scored by this model (plain vector, `missing`, or
+    # a NamedTuple carrying extra data). Rebinding `y_t` keeps DynamicPPL treating
+    # the entries as conditioned observations.
     y_t = define_y_t(obs_model, y_t, Y_t)
 
     diff_t = length(y_t) - length(Y_t)
@@ -45,7 +46,7 @@ as a submodel) and [`observation_error`](@ref) (the per-time-point distribution)
     for i in eachindex(Y_t)
         y_t[i + diff_t] ~ observation_error(obs_model, pad_Y_t[i], priors...)
     end
-    return y_t
+    return (; y_t, expected = Y_t)
 end
 
 @doc raw"

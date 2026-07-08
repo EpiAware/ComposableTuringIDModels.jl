@@ -90,6 +90,7 @@ end
     expected_obs_mod ~ to_submodel(
         as_turing_model(obs_model.latent_model, length(Y_t)), false)
     expected_obs = obs_model.transform(Y_t, expected_obs_mod)
-    y_t ~ to_submodel(as_turing_model(obs_model.model, y_t, expected_obs), false)
-    return y_t
+    inner ~ to_submodel(
+        as_turing_model(obs_model.model, y_t, expected_obs), false)
+    return (; y_t = inner.y_t, expected = inner.expected)
 end

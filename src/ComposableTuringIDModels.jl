@@ -84,7 +84,7 @@ export IDData, DirectInfections, ExpGrowthRate, Renewal,
        R_to_r, r_to_R, expected_Rt
 
 # --- ODE compartmental models ---
-export SIRParams, SEIRParams, ODEProcess
+export SIRParams, SEIRParams, ODEProcess, CatalystODEParams
 
 # --- observation models ---
 export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDelay,
@@ -93,8 +93,10 @@ export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDe
 # --- observation modifiers / manipulators ---
 export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
        ReportingCDF, ReportTriangle, ReportingTriangle, ReportingPMF,
-       PrefixObservationModel, RecordExpectedObs, TransformObservationModel,
-       StackObservationModels
+       PrefixObservationModel, RecordExpectedObs, TransformObservationModel
+
+# --- observation composition ---
+export Split, StrataMap
 
 # --- composition ---
 export IDModel
@@ -166,6 +168,7 @@ include("infection_models/utils.jl")
 include("ode/SIRParams.jl")
 include("ode/SEIRParams.jl")
 include("ode/ODEProcess.jl")
+include("ode/CatalystODEParams.jl")
 
 # --- observation models ---
 include("observation_models/ObservationErrorModels/methods.jl")
@@ -182,7 +185,7 @@ include("observation_models/modifiers/ReportTriangle.jl")
 include("observation_models/modifiers/PrefixObservationModel.jl")
 include("observation_models/modifiers/RecordExpectedObs.jl")
 include("observation_models/modifiers/TransformObservationModel.jl")
-include("observation_models/StackObservationModels.jl")
+include("observation_models/Split.jl")
 
 # --- composition ---
 include("compose.jl")

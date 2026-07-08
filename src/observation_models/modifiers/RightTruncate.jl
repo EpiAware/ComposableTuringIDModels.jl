@@ -169,6 +169,7 @@ end
     # completeness onto the reference-day axis: `scale[t] = completeness(age = n - t)`.
     scaled_Y_t = Y_t .* reverse(completeness)
 
-    y_t ~ to_submodel(as_turing_model(obs_model.model, y_t, scaled_Y_t), false)
-    return y_t
+    inner ~ to_submodel(
+        as_turing_model(obs_model.model, y_t, scaled_Y_t), false)
+    return (; y_t = inner.y_t, expected = inner.expected)
 end

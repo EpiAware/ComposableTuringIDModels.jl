@@ -164,6 +164,20 @@ function _models()
     Ybase_b = fill(1.0, n_b)
     y_binom = as_turing_model(binom_obs, (y = missing, N = N_b), Ybase_b)()
 
+    # `Split` observation composition: a renewal model observed through two
+    # streams, with `deaths` cascaded downstream of `cases` by sharing the case
+    # delay and splitting after it. Exercises the per-stream prefixing and the
+    # expected-series threading gradient path.
+    split = IDModel(
+        Renewal(data; rt = RandomWalk(), initialisation = Normal()),
+        LatentDelay(
+            Split((
+                cases = NegativeBinomialError(),
+                deaths = LatentDelay(
+                    Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.1))),
+                    [0.2, 0.3, 0.5]))),
+            [0.4, 0.3, 0.2, 0.1]))
+
     y_direct = sim(direct, n)
     y_renewal = sim(renewal, n)
     y_egr = sim(egr, n)
@@ -174,6 +188,7 @@ function _models()
     y_aggregate = sim(aggregate, 14)
     y_transobs = sim(transobs, n)
     y_normalobs = sim(normalobs, n)
+    y_split = sim(split, n)
 
     return [
         # latent-process log-joints
@@ -215,7 +230,10 @@ function _models()
         ("DirectInfections+NormalError posterior",
             as_turing_model(normalobs, y_normalobs, n)),
         ("BinomialError ascertainment posterior",
-            as_turing_model(binom_obs, (y = y_binom, N = N_b), Ybase_b))
+            as_turing_model(binom_obs, (y = y_binom, N = N_b), Ybase_b)),
+        # unified Split observation composition
+        ("Renewal+Split cascade posterior",
+            as_turing_model(split, y_split, n))
     ]
 end
 
@@ -298,7 +316,7 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (24 scenarios × 4 backends), Julia 1.12:
+Result matrix (25 scenarios × 4 backends), Julia 1.12:
 
 | scenario                                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
 |-------------------------------------------------------|:-----------:|:-----------:|:--------:|:------:|
@@ -326,24 +344,26 @@ Result matrix (24 scenarios × 4 backends), Julia 1.12:
 | DirectInfections+TransformObservation posterior       |      ✓      |      ✓      |    ✓    |   ✓   |
 | DirectInfections+NormalError posterior                |      ✓      |      ✓      |    ✓    |   ✗   |
 | BinomialError ascertainment posterior                 |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+Split cascade posterior                       |      ✓      |      ✓      |    ✓    |   ✗   |
 
-ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
 scenario correctly. Enzyme (configured with `function_annotation = Enzyme.Const`,
-see [`backends`](@ref)) works on eighteen of the twenty-four but raises
-`IllegalTypeAnalysisException` / a related type-analysis error on eight:
+see [`backends`](@ref)) works on fifteen of the twenty-five but raises
+`IllegalTypeAnalysisException` / a related type-analysis error on ten:
 
   - the `AR`-based latent log-densities (`AR`, `ARIMA`, `ARMA`,
     `CombineLatentModels` (which contains an `AR`), and both prior-interface `AR`
     scenarios), inside the `accumulate_scan(ARStep(damp_AR), ...)` /
     `LinearAlgebra.dot` recursion;
-  - `DiffLatentModel(RandomWalk)` (the repeated `cumsum` reconstruction); and
-  - `DirectInfections+NormalError` (the Gaussian likelihood loop).
+  - `DiffLatentModel(RandomWalk)` (the repeated `cumsum` reconstruction);
+  - `DirectInfections+NormalError` (the Gaussian likelihood loop); and
+  - the deeply-nested `Renewal+Split` cascade, through its per-stream submodel
+    threading.
 
 These are real Enzyme type-analysis limitations, not defects in the package (the
-same models sample fine under NUTS with ForwardDiff). They are recorded as
-`@test_broken` for Enzyme below rather than hidden. Notably `MA` — whose step
-also uses `dot` — differentiates under Enzyme, so the brokenness is specific to
-these recursions rather than to `dot` in general.
+same models sample fine under NUTS with ForwardDiff or Mooncake). They are
+recorded as `@test_broken` for Enzyme below rather than hidden. Notably `MA` —
+whose step also uses `dot` — differentiates under Enzyme, so the brokenness is
+specific to these recursions rather than to `dot` in general.
 """
 function backend_broken_scenarios()
     return Dict{String, Set{String}}(
@@ -356,7 +376,8 @@ function backend_broken_scenarios()
         "AR vector BroadcastPrior latent logjoint",
         "AR latent-model-as-prior latent logjoint",
         "DirectInfections+NormalError posterior",
-        "Renewal+NegativeBinomial posterior"]))
+        "Renewal+NegativeBinomial posterior",
+        "Renewal+Split cascade posterior"]))
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."
