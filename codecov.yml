@@ -47,30 +47,24 @@ flags:
   ad-forwarddiff:
     paths:
       - src
-      - ext
     carryforward: true
   ad-reversediff:
     paths:
       - src
-      - ext
     carryforward: true
   ad-enzyme-forward:
     paths:
       - src
-      - ext
     carryforward: true
   ad-enzyme-reverse:
     paths:
       - src
-      - ext
     carryforward: true
   ad-mooncake-reverse:
     paths:
       - src
-      - ext
     carryforward: true
   ad-mooncake-forward:
     paths:
       - src
-      - ext
     carryforward: true

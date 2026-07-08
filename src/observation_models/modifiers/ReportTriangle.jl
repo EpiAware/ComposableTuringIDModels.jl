@@ -323,5 +323,6 @@ end
         μ = Y_t[t] * pmf[d + 1] + 1e-6
         y_t[t, d + 1] ~ observation_error(obs_model.error_model, μ, priors...)
     end
-    return ReportingTriangle(y_t, observed, Dmax)
+    # `expected` is the eventual-total series `Y_t` (uniform contract).
+    return (; y_t = ReportingTriangle(y_t, observed, Dmax), expected = Y_t)
 end

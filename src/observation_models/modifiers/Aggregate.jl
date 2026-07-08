@@ -74,7 +74,10 @@ end
     agg_Y_t = map(findall(present)) do i
         sum(Y_t[max(1, i - aggregation[i] + 1):i])
     end
-    pred_obs ~ to_submodel(
+    inner ~ to_submodel(
         as_turing_model(ag.model, y_t[present], agg_Y_t), false)
-    return _return_aggregate(pred_obs, present, n)
+    # Scatter counts and means back into length-`n` vectors (zeros where absent).
+    y_t = _return_aggregate(inner.y_t, present, n)
+    expected = _return_aggregate(inner.expected, present, n)
+    return (; y_t, expected)
 end

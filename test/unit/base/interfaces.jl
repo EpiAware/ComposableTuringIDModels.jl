@@ -69,8 +69,9 @@ end
     @test PrefixObservationModel(; model = PoissonError(), prefix = "P") isa
           AbstractObservationModel
     @test RecordExpectedObs(PoissonError()) isa AbstractObservationModel
-    @test StackObservationModels((a = PoissonError(), b = PoissonError())) isa
+    @test Split((a = PoissonError(), b = PoissonError())) isa
           AbstractObservationModel
+    @test Split(PoissonError()) isa AbstractObservationModel
 end
 
 @testitem "role slots reject wrong-role components at construction" begin
@@ -158,8 +159,11 @@ end
     @test length(inf.I_t) == n
     @test length(inf.Z_t) == n
     @test all(>=(0), inf.I_t)
-    # Observation: maps an expected series to observed counts.
+    # Observation: maps an expected series to observed counts, returning the
+    # uniform `(; y_t, expected)` contract.
     y = as_turing_model(PoissonError(), missing, fill(10.0, n))()
-    @test length(y) == n
-    @test all(>=(0), y)
+    @test keys(y) == (:y_t, :expected)
+    @test length(y.y_t) == n
+    @test all(>=(0), y.y_t)
+    @test y.expected == fill(10.0, n)
 end

@@ -2,6 +2,7 @@
 # by make.jl from the module's documented bindings.
 pages = [
     "Home" => "index.md",
+    "Overview" => "overview.md",
     "Composable design" => "design.md",
     "Case studies" => [
         "Overview" => "case-studies/index.md",
@@ -9,6 +10,8 @@ pages = [
         "Reporting delays and day-of-week effects" => "case-studies/delays-dayofweek.md",
         "Real-time nowcasting: correcting right-truncation" => "case-studies/realtime-nowcast.md",
         "An SIR compartmental model" => "case-studies/sir-ode.md",
+        "Declarative compartmental models with Catalyst" => "case-studies/catalyst-ode.md",
+        "Multiple observation streams: cases, deaths, and strata" => "case-studies/split-observations.md",
         "A Gaussian-process latent process" => "case-studies/gaussian-process.md"
     ],
     "API reference" => [
