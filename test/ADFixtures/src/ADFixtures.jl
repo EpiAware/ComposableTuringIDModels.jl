@@ -377,6 +377,7 @@ function backend_broken_scenarios()
         "AR latent-model-as-prior latent logjoint",
         "DirectInfections+NormalError posterior",
         "Renewal+NegativeBinomial posterior",
+        # Enzyme type-analysis brokenness tracked in #97.
         "Renewal+Split cascade posterior"]))
 end
 
