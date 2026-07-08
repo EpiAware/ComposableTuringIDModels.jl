@@ -24,20 +24,29 @@ function _role_label(f::Symbol)
     return s
 end
 
+# Whether a value is a component the tree should recurse into. Components are
+# `AbstractComposableModel`s, but the default `BroadcastPrior` distribution wrapper
+# is a leaf: it wraps a bare `Distribution` (or vector of them), so showing it adds
+# a `BroadcastPrior` node with nothing beneath it. A richer prior (a latent model
+# used as a prior, e.g. `RandomWalk`) is itself a component and is still recursed
+# into.
+_is_tree_component(v) = v isa AbstractComposableModel && !(v isa BroadcastPrior)
+
 # Collect the component children of `model` as `(role, child)` pairs. A field is a
-# child when its value is itself an `AbstractComposableModel`, or a vector/tuple
-# containing components (as combined/stacked models hold); leaf fields (priors,
-# `IDData`, step structs, functions) are skipped so the tree stays compact.
+# child when its value is a tree component (see [`_is_tree_component`](@ref)), or a
+# vector/tuple containing components (as combined/stacked models hold); leaf fields
+# (bare-distribution priors, `IDData`, step structs, functions) are skipped so the
+# tree stays compact.
 function _component_children(model::AbstractComposableModel)
     children = Tuple{String, AbstractComposableModel}[]
     for f in fieldnames(typeof(model))
         v = getfield(model, f)
         role = _role_label(f)
-        if v isa AbstractComposableModel
+        if _is_tree_component(v)
             push!(children, (role, v))
         elseif v isa Union{AbstractVector, Tuple}
             for (i, el) in enumerate(v)
-                el isa AbstractComposableModel &&
+                _is_tree_component(el) &&
                     push!(children, (string(role, "[", i, "]"), el))
             end
         end

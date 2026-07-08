@@ -18,7 +18,7 @@ end
     # A bare Distribution is coerced to the prior interface (a constant factor).
     asc_const = Ascertainment(PoissonError(), Normal(0.0, 0.1))
     @test asc_const.latent_model isa AbstractPriorModel
-    sim = as_turing_model(asc_const, missing, fill(50.0, 8))()
+    sim = as_turing_model(asc_const, missing, fill(50.0, 8))().y_t
     @test length(sim) == 8
     @test all(>=(0), sim)
     # The constant factor is one shared draw: the underlying expected series is a
@@ -30,7 +30,7 @@ end
     # A latent model still gives a time-varying effect (existing behaviour).
     asc_tv = Ascertainment(PoissonError(), RandomWalk())
     @test asc_tv.latent_model isa AbstractPriorModel
-    @test length(as_turing_model(asc_tv, missing, Y)()) == length(Y)
+    @test length(as_turing_model(asc_tv, missing, Y)().y_t) == length(Y)
 end
 
 @testitem "Aggregate sums expected observations over windows" begin

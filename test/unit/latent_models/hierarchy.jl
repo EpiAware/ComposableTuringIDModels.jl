@@ -120,7 +120,7 @@ end
     sim = grouped_epidemic(idmodel, hierarchy, Ymiss)()
     @test length(sim.I_t) == n_time
     @test length(sim.group_levels) == n_groups
-    Ydata = reduce(hcat, [Int.(sim.y[g]) for g in 1:n_groups])
+    Ydata = reduce(hcat, [Int.(sim.y[g].y_t) for g in 1:n_groups])
     @test size(Ydata) == (n_time, n_groups)
 
     posterior = grouped_epidemic(idmodel, hierarchy, Float64.(Ydata))
