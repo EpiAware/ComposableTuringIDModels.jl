@@ -1,6 +1,6 @@
 # [A Gaussian-process latent process](@id case-study-gp)
 
-One of the design claims of the prototype is that *any* latent process — anything
+One of the design claims of the package is that *any* latent process — anything
 implementing `as_turing_model(model, n)` and returning a length-`n` path — can
 drive an infection model, without the latent process knowing anything about the
 rest of the package. This case study makes good on that claim with a **Gaussian
@@ -285,6 +285,76 @@ reproduction number recovers the simulated range:
     Rt_posterior_mean = round.(extrema(exp.(Z_post_mean)), digits = 2))
 ```
 
+## Posterior trajectories
+
+Point summaries only go so far. Following the same plotting convention as the
+other case studies, two small helpers reduce the per-draw trajectories to
+credible bands, which we overlay on the simulated truth.
+
+```@setup gp
+using Statistics
+
+const CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
+
+function credible_bands(mat; qs = CI_QS)
+    reduce(hcat, (map(eachrow(mat)) do row
+        vals = collect(skipmissing(row))
+        isempty(vals) ? missing : quantile(vals, q)
+    end for q in qs))
+end
+
+function ci_ribbon!(ax, ts, bands; color, label)
+    keep = findall(!ismissing, view(bands, :, 3))
+    x, b = ts[keep], Float64.(bands[keep, :])
+    band!(ax, x, b[:, 1], b[:, 5]; color = (color, 0.15))
+    band!(ax, x, b[:, 2], b[:, 4]; color = (color, 0.3))
+    lines!(ax, x, b[:, 3]; color = color, linewidth = 2, label = label)
+end
+
+function predictive_bands(pred, n)
+    ndraws = length(vec(pred[@varname(y_t[n])]))
+    rows = map(1:n) do i
+        try
+            permutedims(vec(pred[@varname(y_t[i])]))
+        catch
+            fill(missing, 1, ndraws)
+        end
+    end
+    credible_bands(reduce(vcat, rows))
+end
+```
+
+The reproduction number ``R_t = \exp(Z_t)`` comes from the returned `Z_t` draws;
+the posterior-predictive case counts come from `predict` on the model with the
+observations set to `missing`.
+
+```@example gp
+using CairoMakie
+
+ts = 1:n
+Rt = credible_bands(reduce(hcat, (exp.(z) for z in Z_draws)))
+
+pred = predict(as_turing_model(model, fill(missing, n), n), chain)
+yt = predictive_bands(pred, n)
+
+fig = Figure(; size = (760, 620))
+ax1 = Axis(fig[1, 1]; ylabel = "Reproduction number R(t)")
+ci_ribbon!(ax1, ts, Rt; color = :purple, label = "posterior")
+lines!(ax1, ts, exp.(Z_true); color = :black, linewidth = 2,
+    linestyle = :dash, label = "truth")
+axislegend(ax1; position = :rt)
+ax2 = Axis(fig[2, 1]; xlabel = "Day", ylabel = "Reported cases")
+ci_ribbon!(ax2, ts, yt; color = :teal, label = "posterior predictive")
+scatter!(ax2, ts, y_obs; color = :black, markersize = 7, label = "observed")
+axislegend(ax2; position = :rt)
+fig
+```
+
+The posterior credible band for ``R_t`` brackets the simulated truth, and the
+posterior-predictive case counts cover the observed epidemic curve — the GP has
+recovered the latent reproduction number through the renewal and observation
+models without ever seeing them directly.
+
 The GP never had to know it was modelling a reproduction number, and the renewal
 and observation models never had to know their latent process was a GP. The two
 sides met only through the length-`n` latent contract — which is exactly the
@@ -292,7 +362,7 @@ composability the package is built around. Swapping the GP for an
 [`AR`](@ref) or a [`RandomWalk`](@ref) latent is a one-line change to the
 `rt` argument; the rest of the model is untouched.
 
-!!! note "Prototype"
+!!! note "Illustrative run"
     This example uses a short sampler run and simulated data to stay fast to
     build. For a real analysis you would use more iterations, check convergence
     diagnostics, tune the number of basis functions `m` to the expected
