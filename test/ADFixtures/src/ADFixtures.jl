@@ -77,10 +77,25 @@ function _models()
         Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
         ReportTriangle(PoissonError(), [0.6, 0.25, 0.15]))
 
+    # `Split` observation composition: a renewal model observed through two
+    # streams, with `deaths` cascaded downstream of `cases` by sharing the case
+    # delay and splitting after it. Exercises the per-stream prefixing and the
+    # expected-series threading gradient path.
+    split = IDModel(
+        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        LatentDelay(
+            Split((
+                cases = NegativeBinomialError(),
+                deaths = LatentDelay(
+                    Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.1))),
+                    [0.2, 0.3, 0.5]))),
+            [0.4, 0.3, 0.2, 0.1]))
+
     y_direct = as_turing_model(direct, missing, n)().generated_y_t
     y_renewal = as_turing_model(renewal, missing, n)().generated_y_t
     y_nowcast = as_turing_model(nowcast, missing, n)().generated_y_t
     y_triangle = as_turing_model(triangle, missing, n)().generated_y_t
+    y_split = as_turing_model(split, missing, n)().generated_y_t
 
     return [
         ("RandomWalk latent logjoint", rw),
@@ -93,7 +108,9 @@ function _models()
         ("Renewal+RightTruncate nowcast posterior",
             as_turing_model(nowcast, y_nowcast, n)),
         ("Renewal+ReportTriangle posterior",
-            as_turing_model(triangle, y_triangle, n))
+            as_turing_model(triangle, y_triangle, n)),
+        ("Renewal+Split cascade posterior",
+            as_turing_model(split, y_split, n))
     ]
 end
 
@@ -176,7 +193,7 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (7 scenarios × 4 backends), Julia 1.12:
+Result matrix (8 scenarios × 4 backends), Julia 1.12:
 
 | scenario                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
 |---------------------------------------|:-----------:|:-----------:|:--------:|:------:|
@@ -187,22 +204,26 @@ Result matrix (7 scenarios × 4 backends), Julia 1.12:
 | Renewal+NegativeBinomial posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+RightTruncate nowcast posterior |    ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior      |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+Split cascade posterior       |      ✓      |      ✓      |    ✓    |   ✗   |
 
 ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
 scenario correctly — including both nowcasting models (the `RightTruncate`
-marginal and the `ReportTriangle` joint triangle). Enzyme works on five of the
-seven once configured with `function_annotation = Enzyme.Const` (see
-[`backends`](@ref)), but the two AR-based latent log-densities raise
-`IllegalTypeAnalysisException` inside the
-`accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion — a real
-Enzyme type-analysis limitation, not a defect in the package (the same models
-sample fine under NUTS with ForwardDiff). They are recorded as `@test_broken`
-for Enzyme below rather than hidden.
+marginal and the `ReportTriangle` joint triangle) and the unified `Split`
+observation composition. Enzyme works on five of the eight once configured with
+`function_annotation = Enzyme.Const` (see [`backends`](@ref)). The two AR-based
+latent log-densities raise `IllegalTypeAnalysisException` inside the
+`accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion, and the
+deeply-nested `Split` composition raises the same exception through its
+per-stream submodel threading — real Enzyme type-analysis limitations, not
+defects in the package (all three sample fine under NUTS with ForwardDiff or
+Mooncake). They are recorded as `@test_broken` for Enzyme below rather than
+hidden.
 """
 function backend_broken_scenarios()
     return Dict{String, Set{String}}(
         "Enzyme reverse" => Set([
-        "AR latent logjoint", "ARIMA latent logjoint"]))
+        "AR latent logjoint", "ARIMA latent logjoint",
+        "Renewal+Split cascade posterior"]))
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."

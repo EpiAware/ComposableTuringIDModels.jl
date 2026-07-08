@@ -92,8 +92,10 @@ export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDe
 # --- observation modifiers / manipulators ---
 export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
        ReportingCDF, ReportTriangle, ReportingTriangle, ReportingPMF,
-       PrefixObservationModel, RecordExpectedObs, TransformObservationModel,
-       StackObservationModels
+       PrefixObservationModel, RecordExpectedObs, TransformObservationModel
+
+# --- observation composition ---
+export Split, StrataMap
 
 # --- composition ---
 export IDModel
@@ -180,7 +182,7 @@ include("observation_models/modifiers/ReportTriangle.jl")
 include("observation_models/modifiers/PrefixObservationModel.jl")
 include("observation_models/modifiers/RecordExpectedObs.jl")
 include("observation_models/modifiers/TransformObservationModel.jl")
-include("observation_models/StackObservationModels.jl")
+include("observation_models/Split.jl")
 
 # --- composition ---
 include("compose.jl")

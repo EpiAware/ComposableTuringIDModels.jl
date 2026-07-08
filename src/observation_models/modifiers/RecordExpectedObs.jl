@@ -32,6 +32,6 @@ end
 
 @model function as_turing_model(model::RecordExpectedObs, y_t, Y_t)
     exp_y_t := Y_t
-    y_t ~ to_submodel(as_turing_model(model.model, y_t, Y_t), false)
-    return y_t
+    inner ~ to_submodel(as_turing_model(model.model, y_t, Y_t), false)
+    return (; y_t = inner.y_t, expected = inner.expected)
 end

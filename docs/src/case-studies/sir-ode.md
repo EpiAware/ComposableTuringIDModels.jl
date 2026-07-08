@@ -113,7 +113,7 @@ differentiates with **ForwardDiff**, not the package's recommended
 (Mooncake-driven) NUTS through the ODE solver is not available yet — a pre-existing
 Turing + Mooncake + `SciMLSensitivity` integration gap that affects every ODE
 infection model (tracked in
-[issue #46](https://github.com/EpiAware/EpiAwarePrototype.jl/issues/46)).
+[issue #46](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/46)).
 Forward-mode autodiff is a good fit here anyway, for a system this small. We draw
 two chains in parallel with `MCMCThreads()` so a cross-chain ``\hat R`` is
 available:

@@ -44,6 +44,7 @@ end
 
 @model function as_turing_model(obs::TransformObservationModel, y_t, Y_t)
     transformed_Y_t = obs.transform(Y_t)
-    y_t ~ to_submodel(as_turing_model(obs.model, y_t, transformed_Y_t), false)
-    return y_t
+    inner ~ to_submodel(
+        as_turing_model(obs.model, y_t, transformed_Y_t), false)
+    return (; y_t = inner.y_t, expected = inner.expected)
 end
