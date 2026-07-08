@@ -28,6 +28,23 @@
     @test !occursin("ConstantRenewalStep", out)
 end
 
+@testitem "show recurses through a vector of component children" begin
+    using ComposableTuringIDModels, Distributions
+
+    # A manipulator holding a vector of latent models exercises the vector branch
+    # of the child collector: each element is indexed and recursed into.
+    model = ConcatLatentModels([Intercept(Normal(2, 0.2)), RandomWalk()])
+    out = sprint(show, MIME"text/plain"(), model)
+    @test occursin("ConcatLatentModels", out)
+    # Each vector element is indexed and recursed into (the models are prefixed).
+    @test occursin("models[1]: PrefixLatentModel", out)
+    @test occursin("models[2]: PrefixLatentModel", out)
+    @test occursin("model: Intercept", out)
+    @test occursin("model: RandomWalk", out)
+    # The BroadcastPrior wrapper stays a leaf even inside a vector child.
+    @test !occursin("BroadcastPrior", out)
+end
+
 @testitem "show recurses through nested observation modifiers" begin
     using ComposableTuringIDModels, Distributions
 

@@ -75,6 +75,31 @@ end
     @test_throws Exception as_turing_model(BroadcastPrior([Normal(), Normal()]), 3)()
 end
 
+@testitem "ergonomic constructor forms coerce priors" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: _prior_order
+    # A single-distribution (repeat-one) or richer prior implies order 1, while a
+    # vector wrapper fixes it to the vector length.
+    @test _prior_order(BroadcastPrior(Normal())) == 1
+    @test _prior_order(BroadcastPrior([Normal(), Normal()])) == 2
+    # A name-carrying coercion passes an already-wrapped prior model through.
+    bp = BroadcastPrior(Normal())
+    @test as_prior(bp, :cluster_factor) === bp
+    # A single (non-vector) damping distribution coerces to an order-1 AR.
+    @test AR(; damp = Normal()).p == 1
+    # Positional bare-`Distribution` constructor forms coerce to the prior interface.
+    for m in (AR(Normal(), Normal()),
+        HierarchicalNormal(truncated(Normal(0, 1), 0, Inf)),
+        HierarchicalNormal(0.5, truncated(Normal(0, 1), 0, Inf)),
+        Intercept(; intercept = Normal()),
+        MA(truncated(Normal(0.0, 0.05), -1, 1)),
+        DiffLatentModel(RandomWalk(), Normal(); d = 2))
+        @test m isa AbstractLatentModel
+    end
+    @test NegativeBinomialError(HalfNormal(0.1)).cluster_factor isa AbstractPriorModel
+    @test NormalError(truncated(Normal(0, 1), 0, Inf)).std isa AbstractPriorModel
+end
+
 @testitem "priors compose as submodels (wrapper and latent)" begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(103)

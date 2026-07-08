@@ -162,7 +162,7 @@ function _models()
     n_b = 10
     N_b = fill(20, n_b)
     Ybase_b = fill(1.0, n_b)
-    y_binom = as_turing_model(binom_obs, (y = missing, N = N_b), Ybase_b)()
+    y_binom = as_turing_model(binom_obs, (y = missing, N = N_b), Ybase_b)().y_t
 
     # `Split` observation composition: a renewal model observed through two
     # streams, with `deaths` cascaded downstream of `cases` by sharing the case
