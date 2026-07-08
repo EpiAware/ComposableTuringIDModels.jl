@@ -62,6 +62,7 @@ end
         (; val = 0, current = Y_t[1:pmf_length]),
         vcat(Y_t[(pmf_length + 1):end], 0.0))
 
-    y_t ~ to_submodel(as_turing_model(obs_model.model, y_t, expected_obs), false)
-    return y_t
+    inner ~ to_submodel(
+        as_turing_model(obs_model.model, y_t, expected_obs), false)
+    return (; y_t = inner.y_t, expected = inner.expected)
 end
