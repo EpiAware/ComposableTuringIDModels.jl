@@ -10,7 +10,7 @@ pages = [
         "Reporting delays and day-of-week effects" => "case-studies/delays-dayofweek.md",
         "Real-time nowcasting: correcting right-truncation" => "case-studies/realtime-nowcast.md",
         "An SIR compartmental model" => "case-studies/sir-ode.md",
-        "Declarative compartmental models with Catalyst" => "case-studies/catalyst-ode.md"
+        "Declarative compartmental models with Catalyst" => "case-studies/catalyst-ode.md",
         "Multiple observation streams: cases, deaths, and strata" => "case-studies/split-observations.md",
     ],
     "API reference" => [
