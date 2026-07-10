@@ -33,7 +33,7 @@ jobs:
     steps:
       # fetch-depth: 0 so all tags resolve; benchpkg checks out each
       # historical rev from this working tree.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
