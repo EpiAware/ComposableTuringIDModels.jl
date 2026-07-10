@@ -41,7 +41,7 @@ jobs:
     steps:
       # For a Dependabot PR, check out its branch so the sync amends that PR;
       # otherwise check out the triggering ref (the default branch).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
