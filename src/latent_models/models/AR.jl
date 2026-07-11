@@ -46,24 +46,24 @@ struct AR{D <: AbstractPriorModel, I <: AbstractPriorModel, P <: Int,
 end
 
 function AR(damp::Sampleable, init::Sampleable; p::Int = 1,
-        ϵ_t::AbstractLatentModel = HierarchicalNormal())
+        ϵ_t = HierarchicalNormal())
     return AR(; damp = fill(damp, p), init = fill(init, p), ϵ_t = ϵ_t)
 end
 
 function AR(; damp = [truncated(Normal(0.0, 0.05), 0, 1)], init = [Normal()],
-        ϵ_t::AbstractLatentModel = HierarchicalNormal())
-    damp_prior = as_prior(damp, :damp_AR)
-    init_prior = as_prior(init, :ar_init)
+        ϵ_t = HierarchicalNormal())
+    damp_prior = as_prior(damp)
+    init_prior = as_prior(init)
     p = _prior_order(damp_prior)
-    return AR(damp_prior, init_prior, p, ϵ_t)
+    return AR(damp_prior, init_prior, p, as_prior(ϵ_t))
 end
 
 @model function as_turing_model(model::AR, n)
     p = model.p
     @assert n>p "n must be longer than the order of the autoregressive process"
-    ar_init ~ to_submodel(as_turing_model(model.init, p), false)
-    damp_AR ~ to_submodel(as_turing_model(model.damp, p), false)
-    ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n - p), false)
+    ar_init ~ to_submodel(as_turing_model(model.init, p))
+    damp_AR ~ to_submodel(as_turing_model(model.damp, p))
+    ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n - p))
     # `ARStep`'s state runs oldest→newest (`[Z_{t-p}, …, Z_{t-1}]`), so reverse
     # the damping coefficients so `damp_AR[i]` multiplies the lag-`i` term
     # `Z_{t-i}`, matching the documented recursion `Z_t = Σ ρ_i Z_{t-i}`. Without

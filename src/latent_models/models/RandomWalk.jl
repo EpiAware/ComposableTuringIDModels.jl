@@ -31,14 +31,14 @@ struct RandomWalk{D <: AbstractPriorModel, E <: AbstractLatentModel} <:
     ϵ_t::E
 end
 
-function RandomWalk(; init = Normal(), ϵ_t::AbstractLatentModel = HierarchicalNormal())
-    return RandomWalk(as_prior(init, :rw_init), ϵ_t)
+function RandomWalk(; init = Normal(), ϵ_t = HierarchicalNormal())
+    return RandomWalk(as_prior(init), as_prior(ϵ_t))
 end
 
 @model function as_turing_model(model::RandomWalk, n)
     @assert n>0 "n must be greater than 0"
-    rw_init ~ to_submodel(as_turing_model(model.init, 1), false)
-    ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n - 1), false)
+    rw_init ~ to_submodel(as_turing_model(model.init, 1))
+    ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n - 1))
     rw = accumulate_scan(RWStep(), only(rw_init), ϵ_t)
     return rw
 end

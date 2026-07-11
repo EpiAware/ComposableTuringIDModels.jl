@@ -29,6 +29,6 @@ rand(as_turing_model(trans, 5))
 end
 
 @model function as_turing_model(model::TransformLatentModel, n)
-    untransformed ~ to_submodel(as_turing_model(model.model, n), false)
+    untransformed ~ to_submodel(as_turing_model(model.model, n))
     return model.transform(untransformed)
 end

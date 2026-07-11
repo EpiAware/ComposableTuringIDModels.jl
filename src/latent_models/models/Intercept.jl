@@ -21,11 +21,11 @@ struct Intercept{D <: AbstractPriorModel} <: AbstractLatentModel
     Intercept(intercept::AbstractPriorModel) = new{typeof(intercept)}(intercept)
 end
 
-Intercept(intercept) = Intercept(as_prior(intercept, :intercept))
-Intercept(; intercept) = Intercept(as_prior(intercept, :intercept))
+Intercept(intercept) = Intercept(as_prior(intercept))
+Intercept(; intercept) = Intercept(as_prior(intercept))
 
 @model function as_turing_model(model::Intercept, n)
-    intercept ~ to_submodel(as_turing_model(model.intercept, 1), false)
+    intercept ~ to_submodel(as_turing_model(model.intercept, 1))
     return fill(only(intercept), n)
 end
 

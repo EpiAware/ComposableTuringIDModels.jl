@@ -37,7 +37,7 @@ end
 
 function HierarchicalNormal(; mean::Real = 0.0,
         std = truncated(Normal(0, 0.1), 0, Inf), add_mean::Bool = mean != 0)
-    return HierarchicalNormal(mean, as_prior(std, :std), add_mean)
+    return HierarchicalNormal(mean, as_prior(std), add_mean)
 end
 HierarchicalNormal(std::Distribution) = HierarchicalNormal(; std = std)
 function HierarchicalNormal(mean::Real, std::Distribution)
@@ -45,8 +45,8 @@ function HierarchicalNormal(mean::Real, std::Distribution)
 end
 
 @model function as_turing_model(model::HierarchicalNormal, n)
-    std ~ to_submodel(as_turing_model(model.std, 1), false)
-    ϵ_t ~ to_submodel(as_turing_model(IID(Normal()), n), false)
+    std ~ to_submodel(as_turing_model(model.std, 1))
+    ϵ_t ~ to_submodel(as_turing_model(IID(Normal()), n))
     η_t = model.add_mean ? model.mean .+ only(std) * ϵ_t : only(std) * ϵ_t
     return η_t
 end

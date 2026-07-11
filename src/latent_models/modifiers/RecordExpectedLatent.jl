@@ -25,7 +25,7 @@ struct RecordExpectedLatent{M <: AbstractLatentModel} <: AbstractLatentModel
 end
 
 @model function as_turing_model(model::RecordExpectedLatent, n)
-    latent ~ to_submodel(as_turing_model(model.model, n), false)
+    latent ~ to_submodel(as_turing_model(model.model, n))
     exp_latent := latent
     return latent
 end

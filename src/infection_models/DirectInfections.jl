@@ -45,16 +45,16 @@ struct DirectInfections{L <: AbstractLatentModel, F <: Function,
     initialisation::S
 end
 
-function DirectInfections(; Z::AbstractLatentModel = RandomWalk(),
+function DirectInfections(; Z = RandomWalk(),
         transformation::Function = exp, initialisation = Normal())
     return DirectInfections(
-        Z, transformation, as_prior(initialisation, :init_incidence))
+        as_prior(Z), transformation, as_prior(initialisation))
 end
 
 @model function as_turing_model(model::DirectInfections, n)
-    Z_t ~ to_submodel(as_turing_model(model.Z, n), false)
+    Z_t ~ to_submodel(as_turing_model(model.Z, n))
     init_incidence ~ to_submodel(
-        as_turing_model(model.initialisation, 1), false)
+        as_turing_model(model.initialisation, 1))
     I_t = model.transformation.(only(init_incidence) .+ Z_t)
     return (; I_t, Z_t)
 end

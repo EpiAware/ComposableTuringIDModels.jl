@@ -49,7 +49,7 @@ function DiffLatentModel(model::AbstractLatentModel, init::Distribution; d::Int)
 end
 
 function DiffLatentModel(; model::AbstractLatentModel, init = [Normal()])
-    init_prior = as_prior(init, :latent_init)
+    init_prior = as_prior(init)
     d = _prior_order(init_prior)
     return DiffLatentModel(model, init_prior, d)
 end
@@ -57,8 +57,8 @@ end
 @model function as_turing_model(model::DiffLatentModel, n)
     d = model.d
     @assert n>d "n must be longer than d"
-    latent_init ~ to_submodel(as_turing_model(model.init, d), false)
-    diff_latent ~ to_submodel(as_turing_model(model.model, n - d), false)
+    latent_init ~ to_submodel(as_turing_model(model.init, d))
+    diff_latent ~ to_submodel(as_turing_model(model.model, n - d))
     return _combine_diff(latent_init, diff_latent, d)
 end
 

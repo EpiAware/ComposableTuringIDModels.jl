@@ -98,6 +98,6 @@ end
 
 @model function as_turing_model(model::BroadcastLatentModel, n)
     m = broadcast_n(model.broadcast_rule, n, model.period)
-    latent_period ~ to_submodel(as_turing_model(model.model, m), false)
+    latent_period ~ to_submodel(as_turing_model(model.model, m))
     return broadcast_rule(model.broadcast_rule, latent_period, n, model.period)
 end

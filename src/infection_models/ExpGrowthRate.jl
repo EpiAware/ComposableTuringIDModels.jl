@@ -49,16 +49,16 @@ struct ExpGrowthRate{L <: AbstractLatentModel, F <: Function,
     initialisation::S
 end
 
-function ExpGrowthRate(; rt::AbstractLatentModel = RandomWalk(),
+function ExpGrowthRate(; rt = RandomWalk(),
         transformation::Function = _oneexpy, initialisation = Normal())
     return ExpGrowthRate(
-        rt, transformation, as_prior(initialisation, :init_incidence))
+        as_prior(rt), transformation, as_prior(initialisation))
 end
 
 @model function as_turing_model(model::ExpGrowthRate, n)
-    Z_t ~ to_submodel(as_turing_model(model.rt, n), false)
+    Z_t ~ to_submodel(as_turing_model(model.rt, n))
     init_incidence ~ to_submodel(
-        as_turing_model(model.initialisation, 1), false)
+        as_turing_model(model.initialisation, 1))
     I_t = model.transformation.(only(init_incidence) .+ cumsum(Z_t))
     return (; I_t, Z_t)
 end

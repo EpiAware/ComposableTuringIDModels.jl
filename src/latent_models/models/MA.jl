@@ -35,22 +35,22 @@ struct MA{C <: AbstractPriorModel, Q <: Int, E <: AbstractLatentModel} <:
     end
 end
 
-function MA(θ::Distribution; q::Int = 1, ϵ_t::AbstractLatentModel = HierarchicalNormal())
+function MA(θ::Distribution; q::Int = 1, ϵ_t = HierarchicalNormal())
     return MA(; θ = fill(θ, q), ϵ_t = ϵ_t)
 end
 
 function MA(; θ = [truncated(Normal(0.0, 0.05), -1, 1)],
-        ϵ_t::AbstractLatentModel = HierarchicalNormal())
-    θ_prior = as_prior(θ, :θ)
+        ϵ_t = HierarchicalNormal())
+    θ_prior = as_prior(θ)
     q = _prior_order(θ_prior)
-    return MA(θ_prior, q, ϵ_t)
+    return MA(θ_prior, q, as_prior(ϵ_t))
 end
 
 @model function as_turing_model(model::MA, n)
     q = model.q
     @assert n>q "n must be longer than the order of the moving average process"
-    θ ~ to_submodel(as_turing_model(model.θ, q), false)
-    ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n), false)
+    θ ~ to_submodel(as_turing_model(model.θ, q))
+    ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n))
     # `MAStep` keeps its innovation buffer newest-first (see `MAStep.jl`), so the
     # warm-up seed must be reversed: `reverse(ϵ_t[1:q]) = [ϵ_q, …, ϵ_1]` puts the
     # most recent innovation first, so `dot(θ, state)` pairs `θ[1]` with the most

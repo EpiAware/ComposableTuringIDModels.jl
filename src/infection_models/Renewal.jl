@@ -51,14 +51,14 @@ struct Renewal{E <: IDData, L <: AbstractLatentModel, S <: AbstractPriorModel,
     recurrent_step::A
 end
 
-function Renewal(data::IDData; rt::AbstractLatentModel = RandomWalk(),
+function Renewal(data::IDData; rt = RandomWalk(),
         initialisation = Normal())
     recurrent_step = ConstantRenewalStep(reverse(data.gen_int))
-    return Renewal(data, rt, as_prior(initialisation, :init_incidence),
+    return Renewal(data, as_prior(rt), as_prior(initialisation),
         recurrent_step)
 end
 
-function Renewal(; data::IDData, rt::AbstractLatentModel = RandomWalk(),
+function Renewal(; data::IDData, rt = RandomWalk(),
         initialisation = Normal())
     return Renewal(data; rt = rt, initialisation = initialisation)
 end
@@ -71,9 +71,9 @@ function _make_renewal_init(infection::Renewal, I₀, Rt₀)
 end
 
 @model function as_turing_model(infection::Renewal, n)
-    Z_t ~ to_submodel(as_turing_model(infection.rt, n), false)
+    Z_t ~ to_submodel(as_turing_model(infection.rt, n))
     init_incidence ~ to_submodel(
-        as_turing_model(infection.initialisation, 1), false)
+        as_turing_model(infection.initialisation, 1))
     I₀ = infection.data.transformation(only(init_incidence))
     Rt = infection.data.transformation.(Z_t)
     init = _make_renewal_init(infection, I₀, Rt[1])

@@ -18,26 +18,20 @@ modes, dispatching on what it wraps:
     chain stays as small as a bare `~ dist`.
   - **A vector of `Distribution`s — one i.i.d. draw per element.** The length is
     fixed by the vector (`n` must match). A homogeneous vector uses `filldist` and
-    a heterogeneous one `arraydist` — reproducing the eager `_expand_dist` helper,
-    but as a submodel. This is the explicit way to ask for `n` independent draws.
+    a heterogeneous one `arraydist`. This is the explicit way to ask for `n`
+    independent draws.
 
 Because `BroadcastPrior` is itself an [`AbstractPriorModel`](@ref), anything richer
 a user writes (a partially-pooled prior, a time-varying prior wrapping a
 [`RandomWalk`](@ref)) drops into the same prior slot with no struct changes.
 
-An optional `name` fixes the sampled variable's name in the chain. When a
-component samples a prior as a submodel via `to_submodel(..., false)`, the
-component sets `name` to its own parameter name (e.g. `:damp_AR`, `:std`,
-`:init_incidence`) so the flat chain names are unchanged when the default wrapper
-replaces a bare `~ dist`. It also keeps two broadcast priors in one model from
-colliding on a shared internal name. When `name === nothing` (the default) the
-variable is sampled under the generic name `θ`.
+The sampled variable is always the generic `θ`; the component that samples the
+prior namespaces it by turning submodel prefixing on at the slot (the left-hand
+name becomes the chain prefix), so two priors in one model never collide.
 
 ## Fields
 
   - `dist`: a `Distribution`, or a `Vector{<:Distribution}`.
-  - `name`: the sampled variable name (a `Symbol`), or `nothing` for the generic
-    `θ`.
 
 # Examples
 ```@example BroadcastPrior
@@ -46,36 +40,26 @@ using ComposableTuringIDModels, Distributions
 only(as_turing_model(BroadcastPrior(Normal()), 1)())
 ```
 "
-struct BroadcastPrior{D, N <: Union{Symbol, Nothing}} <: AbstractPriorModel
+struct BroadcastPrior{D} <: AbstractPriorModel
     "A `Distribution`, or a `Vector{<:Distribution}`."
     dist::D
-    "The sampled variable name, or `nothing` for the generic `θ`."
-    name::N
 end
-
-BroadcastPrior(dist) = BroadcastPrior(dist, nothing)
-
-# Sample from `dist` under the wrapper's fixed name, or the generic `θ` when no
-# name is set. `NamedDist` fixes the chain variable name regardless of the
-# tilde's left-hand side.
-_named(dist, ::Nothing) = dist
-_named(dist, name::Symbol) = NamedDist(dist, name)
 
 @model function as_turing_model(prior::BroadcastPrior{<:Distribution}, n)
     @assert n>0 "n must be greater than 0"
     # Repeat-one: a single random variable repeated to length `n`, so a global
     # parameter is not expanded into `n` i.i.d. draws.
-    θ ~ _named(prior.dist, prior.name)
+    θ ~ prior.dist
     return fill(θ, n)
 end
 
 @model function as_turing_model(prior::BroadcastPrior{<:AbstractVector}, n)
     @assert length(prior.dist)==n "BroadcastPrior of a length-$(length(prior.dist)) vector cannot produce a length-$n prior"
-    # One i.i.d. draw per element; `filldist` for a homogeneous vector (as
-    # `_expand_dist` did), `arraydist` otherwise.
+    # One i.i.d. draw per element; `filldist` for a homogeneous vector, `arraydist`
+    # otherwise.
     product_dist = all(first(prior.dist) .== prior.dist) ?
                    filldist(first(prior.dist), n) : arraydist(prior.dist)
-    θ ~ _named(product_dist, prior.name)
+    θ ~ product_dist
     return θ
 end
 
@@ -85,9 +69,13 @@ Coerce a user-supplied prior into an [`AbstractPriorModel`](@ref).
 This is the seam that keeps constructors ergonomic: a prior field is typed
 `::AbstractPriorModel` and the constructor calls `as_prior` on whatever the user
 passed, so a bare `Distribution` (or a vector of them) is wrapped in a
-[`BroadcastPrior`](@ref) while a prior submodel — including any
-[`AbstractLatentModel`](@ref), e.g. `RandomWalk()` for a time-varying parameter —
-is accepted unchanged.
+[`BroadcastPrior`](@ref) while a prior submodel — including any latent process,
+e.g. `RandomWalk()` for a time-varying parameter — is accepted unchanged.
+
+Collision-free naming is handled at the call site rather than here: a component
+turns submodel prefixing on when it samples the prior, so the slot's left-hand
+name namespaces the whole prior submodel (a process prior's inner variables can
+never collide with the host's own — issue #80).
 
 # Arguments
 
@@ -103,25 +91,6 @@ as_prior(RandomWalk())    # a latent model is already a prior model
 as_prior(p::AbstractPriorModel) = p
 as_prior(d::Distribution) = BroadcastPrior(d)
 as_prior(v::AbstractVector{<:Distribution}) = BroadcastPrior(v)
-
-# Name-carrying coercion used by component constructors: a bare `Distribution`
-# (or vector) is wrapped in a `BroadcastPrior` that samples under the component's
-# own parameter `name`, so the flat chain names are unchanged. A non-latent prior
-# model (e.g. a `BroadcastPrior`) already carries its own naming, so it is passed
-# through unchanged.
-as_prior(p::AbstractPriorModel, ::Symbol) = p
-# A latent model used directly as another component's prior carries its own inner
-# variable names (`std`, `ϵ_t`, `rw_init`, …). Under the prefix-off submodel
-# convention these collide with the host component's own latent, so a linked
-# log-density mis-threads the flattened parameter vector (issue #80): e.g. a bare
-# `AR(damp = RandomWalk())` samples via `rand` but errors as a linked log-density.
-# Auto-prefix the latent-model prior with the component's parameter `name` inside
-# the coercion seam, so the bare form threads without a manual `PrefixLatentModel`.
-as_prior(p::AbstractLatentModel, name::Symbol) = PrefixLatentModel(p, String(name))
-as_prior(d::Distribution, name::Symbol) = BroadcastPrior(d, name)
-function as_prior(v::AbstractVector{<:Distribution}, name::Symbol)
-    return BroadcastPrior(v, name)
-end
 
 # Order (p / q / d) implied by a prior: a vector wrapper fixes it to the vector
 # length; a single-distribution (repeat-one) or richer prior defaults to order 1.

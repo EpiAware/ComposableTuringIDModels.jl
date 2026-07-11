@@ -63,12 +63,12 @@ struct Ascertainment{
         @assert hasmethod(transform, Tuple{Vector, Vector}) "transform must have a method for (Vector, Vector)"
         # Coerce whatever was passed to the prior interface (a latent model is
         # already one; a bare `Distribution`/vector becomes a `BroadcastPrior`),
-        # and prefix it under `latent_prefix` — a latent model via
-        # `PrefixLatentModel`, a distribution via its sampled-variable name — so
-        # the ascertainment variables stay distinct. An empty prefix opts out,
-        # leaving the coerced prior unprefixed.
-        prior = latent_prefix == "" ? as_prior(latent_model) :
-                as_prior(latent_model, Symbol(latent_prefix))
+        # and namespace it under `latent_prefix` via `PrefixLatentModel` so the
+        # ascertainment variables stay distinct. An empty prefix opts out, leaving
+        # the coerced prior unprefixed.
+        coerced = as_prior(latent_model)
+        prior = latent_prefix == "" ? coerced :
+                PrefixLatentModel(coerced, latent_prefix)
         return new{M, typeof(prior), F, P}(
             model, prior, transform, latent_prefix)
     end

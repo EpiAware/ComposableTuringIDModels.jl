@@ -11,16 +11,11 @@
 # but do not sample it, so they are cheap conformance checks.
 
 @doc raw"
-Check that `model` satisfies the [`AbstractLatentModel`](@ref) interface: it is a
-latent model and `as_turing_model(model, n)` returns a `DynamicPPL.Model`.
+Deprecated alias for [`implements_prior_interface`](@ref).
 
-# Arguments
-
-  - `model`: the component to check.
-
-# Keyword Arguments
-
-  - `n`: the latent series length used for the construction check (default `10`).
+The latent and prior roles are one ([`AbstractLatentModel`](@ref) `===`
+[`AbstractPriorModel`](@ref)), so this simply forwards to
+[`implements_prior_interface`](@ref).
 
 # Examples
 ```@example
@@ -28,10 +23,7 @@ using ComposableTuringIDModels
 implements_latent_interface(RandomWalk())
 ```
 "
-function implements_latent_interface(model; n::Int = 10)
-    model isa AbstractLatentModel || return false
-    return as_turing_model(model, n) isa DynamicPPL.Model
-end
+implements_latent_interface(model; kwargs...) = implements_prior_interface(model; kwargs...)
 
 @doc raw"
 Check that `model` satisfies the [`AbstractPriorModel`](@ref) interface: it is a

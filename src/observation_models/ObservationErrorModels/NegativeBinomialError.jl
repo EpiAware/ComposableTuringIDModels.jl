@@ -26,10 +26,10 @@ struct NegativeBinomialError{S <: AbstractPriorModel} <:
 end
 
 function NegativeBinomialError(cluster_factor)
-    return NegativeBinomialError(as_prior(cluster_factor, :cluster_factor))
+    return NegativeBinomialError(as_prior(cluster_factor))
 end
 function NegativeBinomialError(; cluster_factor = HalfNormal(0.01))
-    return NegativeBinomialError(as_prior(cluster_factor, :cluster_factor))
+    return NegativeBinomialError(as_prior(cluster_factor))
 end
 
 @model function generate_observation_error_priors(

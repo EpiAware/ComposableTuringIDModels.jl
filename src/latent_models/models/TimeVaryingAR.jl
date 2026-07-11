@@ -63,20 +63,20 @@ struct TimeVaryingAR{D <: AbstractPriorModel, I <: AbstractPriorModel,
 end
 
 function TimeVaryingAR(; damp = RandomWalk(), init = Normal(),
-        ϵ_t::AbstractLatentModel = HierarchicalNormal(), transform = tanh)
+        ϵ_t = HierarchicalNormal(), transform = tanh)
     return TimeVaryingAR(
-        as_prior(damp, :damp_tv), as_prior(init, :tvar_init), ϵ_t, transform)
+        as_prior(damp), as_prior(init), ϵ_t, transform)
 end
 
 @model function as_turing_model(model::TimeVaryingAR, n)
     @assert n>1 "n must be greater than 1"
-    tvar_init ~ to_submodel(as_turing_model(model.init, 1), false)
-    damp_tv ~ to_submodel(as_turing_model(model.damp, n - 1), false)
+    tvar_init ~ to_submodel(as_turing_model(model.init, 1))
+    damp_tv ~ to_submodel(as_turing_model(model.damp, n - 1))
     # Track the coefficient path as a generated quantity so it is recoverable from
     # the chain, while the model still returns the numeric path (stays a drop-in
     # latent).
     ρ := model.transform.(damp_tv)
-    ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n - 1), false)
+    ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n - 1))
     z = accumulate_scan(TVARStep(), only(tvar_init), collect(zip(ρ, ϵ_t)))
     return z
 end

@@ -64,8 +64,8 @@ rand(turing_model)
 ```
 "
 function as_turing_model(model, args...; kwargs...)
-    hint = if model isa AbstractLatentModel
-        " expected the latent interface `as_turing_model(m, n)`"
+    hint = if model isa AbstractPriorModel
+        " expected the prior/latent interface `as_turing_model(m, n)`"
     elseif model isa AbstractInfectionModel
         " expected the infection interface `as_turing_model(m, n)`"
     elseif model isa AbstractObservationModel

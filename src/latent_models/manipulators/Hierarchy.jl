@@ -67,10 +67,10 @@ struct Hierarchy{M <: AbstractPriorModel, A <: AbstractPriorModel} <:
 end
 
 function Hierarchy(mean, across)
-    return Hierarchy(as_prior(mean, :hierarchy_mean), as_prior(across))
+    return Hierarchy(as_prior(mean), as_prior(across))
 end
 function Hierarchy(; mean = Normal(), across = IID(Normal()))
-    return Hierarchy(as_prior(mean, :hierarchy_mean), as_prior(across))
+    return Hierarchy(as_prior(mean), as_prior(across))
 end
 
 @model function as_turing_model(h::Hierarchy, n_groups::Int)
@@ -78,7 +78,7 @@ end
     # One shared level μ (a single global draw), plus n_groups deviations from the
     # cross-group prior: the latent parameterises the pooling (iid ⇒ exchangeable,
     # RandomWalk ⇒ correlated neighbours). The result is a numeric per-group path.
-    hierarchy_mean ~ to_submodel(as_turing_model(h.mean, 1), false)
-    group_effects ~ to_submodel(as_turing_model(h.across, n_groups), false)
+    hierarchy_mean ~ to_submodel(as_turing_model(h.mean, 1))
+    group_effects ~ to_submodel(as_turing_model(h.across, n_groups))
     return only(hierarchy_mean) .+ group_effects
 end
