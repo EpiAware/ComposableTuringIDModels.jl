@@ -31,10 +31,12 @@ end
     # A process-valued damping prior still gives an order-1 constant-coefficient
     # AR (a structured prior over the constant coefficient), NOT a time path.
     @test AR(; damp = RandomWalk()).p == 1
-    # A length-2 vector prior still gives an order-2 AR.
+    # A length-2 vector damping prior still gives an order-2 AR (init length
+    # must match the order).
     @test AR(;
         damp = [truncated(Normal(0.5, 0.1), 0, 1),
-        truncated(Normal(0.2, 0.1), 0, 1)]).p == 2
+            truncated(Normal(0.2, 0.1), 0, 1)],
+        init = [Normal(), Normal()]).p == 2
 end
 
 @testitem "TimeVaryingAR composes as a latent in the stack" begin
