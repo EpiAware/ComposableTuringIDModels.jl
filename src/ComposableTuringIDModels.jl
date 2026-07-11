@@ -70,7 +70,8 @@ export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial
        NegativeBinomialMeanClust, condition_model
 
 # --- latent models ---
-export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept, FixedIntercept,
+export IID, HierarchicalNormal, RandomWalk, AR, TimeVaryingAR, MA, Intercept,
+       FixedIntercept,
        Null, DiffLatentModel
 
 # --- latent modifiers / manipulators / combinations / broadcasting ---
@@ -122,6 +123,7 @@ include("steps/AbstractAccumulationStep.jl")
 include("steps/accumulate_scan.jl")
 include("steps/RWStep.jl")
 include("steps/ARStep.jl")
+include("steps/TVARStep.jl")
 include("steps/MAStep.jl")
 include("steps/LDStep.jl")
 include("steps/RenewalSteps.jl")
@@ -139,6 +141,7 @@ include("latent_models/models/IID.jl")
 include("latent_models/models/HierarchicalNormal.jl")
 include("latent_models/models/RandomWalk.jl")
 include("latent_models/models/AR.jl")
+include("latent_models/models/TimeVaryingAR.jl")
 include("latent_models/models/MA.jl")
 include("latent_models/models/Intercept.jl")
 include("latent_models/models/Null.jl")
