@@ -17,13 +17,11 @@ end
     @test as_prior([Normal(), Normal(2, 1)]) isa BroadcastPrior
     rw = RandomWalk()
     @test as_prior(rw) === rw            # a prior/latent model is accepted unchanged
-    # Name-carrying coercion: a bare Distribution keeps the component's name; a
-    # latent-model prior is auto-prefixed (issue #80) so its inner variable names
-    # cannot collide with the host component's own latent under prefix-off.
-    @test as_prior(Normal(), :damp_AR) isa BroadcastPrior
-    pref = as_prior(rw, :damp_AR)
-    @test pref isa PrefixLatentModel
-    @test pref.prefix == "damp_AR"
+    # Coercion is name-free: namespacing happens at the component's call site
+    # (prefix-on `to_submodel`), not by carrying a name here (issue #80 is covered
+    # by the linked-log-density test below).
+    @test as_prior(Normal()) isa BroadcastPrior
+    @test as_prior([Normal(), Normal()]) isa BroadcastPrior
 end
 
 @testitem "bare latent-model-as-prior threads under a linked log-density (#80)" begin
@@ -33,8 +31,9 @@ end
     Random.seed!(180)
     # The exact #80 repro: a bare `AR(damp = RandomWalk())` used to sample via
     # `rand` but ERROR as a linked log-density, because the damping RandomWalk's
-    # inner `std`/`ϵ_t`/`rw_init` collided with the AR innovation's under the
-    # prefix-off convention. `as_prior` now auto-prefixes the latent-model prior.
+    # inner `std`/`ϵ_t`/`rw_init` collided with the AR innovation's. The prior slot
+    # now namespaces the whole submodel (prefix-on `to_submodel`), so they cannot
+    # collide.
     m = as_turing_model(AR(; damp = RandomWalk()), 8)
     @test rand(m) !== nothing                        # sampled fine before too
     vi = link(VarInfo(m), m)
@@ -82,9 +81,9 @@ end
     # vector wrapper fixes it to the vector length.
     @test _prior_order(BroadcastPrior(Normal())) == 1
     @test _prior_order(BroadcastPrior([Normal(), Normal()])) == 2
-    # A name-carrying coercion passes an already-wrapped prior model through.
+    # An already-wrapped prior model passes through unchanged.
     bp = BroadcastPrior(Normal())
-    @test as_prior(bp, :cluster_factor) === bp
+    @test as_prior(bp) === bp
     # A single (non-vector) damping distribution coerces to an order-1 AR.
     @test AR(; damp = Normal()).p == 1
     # Positional bare-`Distribution` constructor forms coerce to the prior interface.

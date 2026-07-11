@@ -44,14 +44,14 @@ struct DiffLatentModel{M <: AbstractLatentModel, P <: AbstractPriorModel} <:
     end
 end
 
-function DiffLatentModel(model::AbstractLatentModel, init::Distribution; d::Int)
+function DiffLatentModel(model, init::Distribution; d::Int)
     return DiffLatentModel(; model = model, init = fill(init, d))
 end
 
-function DiffLatentModel(; model::AbstractLatentModel, init = [Normal()])
+function DiffLatentModel(; model, init = [Normal()])
     init_prior = as_prior(init)
     d = _prior_order(init_prior)
-    return DiffLatentModel(model, init_prior, d)
+    return DiffLatentModel(as_prior(model), init_prior, d)
 end
 
 @model function as_turing_model(model::DiffLatentModel, n)

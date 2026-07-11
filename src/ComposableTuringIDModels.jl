@@ -29,7 +29,7 @@ module ComposableTuringIDModels
 # keeps the public surface to the package's own exports.
 
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
-                  NamedDist, returned
+                  returned
 using Turing: Turing, filldist, arraydist, sample, MCMCSerial
 using CensoredDistributions: double_interval_censored
 using LinearAlgebra: dot

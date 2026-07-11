@@ -38,8 +38,8 @@ struct ConcatLatentModels{
     "A vector of prefixes for the latent models."
     prefixes::P
 
-    function ConcatLatentModels(models::M, no_models::I, dimension_adaptor::F,
-            prefixes::P) where {M <: AbstractVector{<:AbstractLatentModel},
+    function ConcatLatentModels(models::AbstractVector, no_models::I,
+            dimension_adaptor::F, prefixes::P) where {
             I <: Int, F <: Function, P <: AbstractVector{<:String}}
         @assert length(models)>1 "At least two models are required"
         @assert length(models)==no_models "no_models must be equal to the number of models"
@@ -47,17 +47,19 @@ struct ConcatLatentModels{
         @assert typeof(check_dim)<:AbstractVector{Int} "Output of dimension_adaptor must be a vector of integers"
         @assert length(check_dim)==no_models "The vector of dimensions must have the same length as the number of models"
         @assert length(prefixes)==no_models "The number of models and prefixes must be equal"
-        prefix_models = [prefixes[i] == "" ? models[i] :
-                         PrefixLatentModel(models[i], prefixes[i])
-                         for i in eachindex(models)]
-        return new{AbstractVector{<:AbstractLatentModel}, Int, Function,
+        # Coerce each member so a bare `Distribution` member is accepted.
+        coerced = as_prior.(models)
+        prefix_models = [prefixes[i] == "" ? coerced[i] :
+                         PrefixLatentModel(coerced[i], prefixes[i])
+                         for i in eachindex(coerced)]
+        return new{AbstractVector{<:AbstractPriorModel}, Int, Function,
             AbstractVector{<:String}}(
             prefix_models, no_models, dimension_adaptor, prefixes)
     end
 end
 
-function ConcatLatentModels(models::M, dimension_adaptor::Function;
-        prefixes = nothing) where {M <: AbstractVector{<:AbstractLatentModel}}
+function ConcatLatentModels(models::AbstractVector, dimension_adaptor::Function;
+        prefixes = nothing)
     no_models = length(models)
     if isnothing(prefixes)
         prefixes = "Concat." .* string.(1:no_models)
@@ -65,15 +67,13 @@ function ConcatLatentModels(models::M, dimension_adaptor::Function;
     return ConcatLatentModels(models, no_models, dimension_adaptor, prefixes)
 end
 
-function ConcatLatentModels(models::M;
-        dimension_adaptor::Function = equal_dimensions, prefixes = nothing) where {
-        M <: AbstractVector{<:AbstractLatentModel}}
+function ConcatLatentModels(models::AbstractVector;
+        dimension_adaptor::Function = equal_dimensions, prefixes = nothing)
     return ConcatLatentModels(models, dimension_adaptor; prefixes = prefixes)
 end
 
-function ConcatLatentModels(; models::M,
-        dimension_adaptor::Function = equal_dimensions, prefixes = nothing) where {
-        M <: AbstractVector{<:AbstractLatentModel}}
+function ConcatLatentModels(; models::AbstractVector,
+        dimension_adaptor::Function = equal_dimensions, prefixes = nothing)
     return ConcatLatentModels(models, dimension_adaptor; prefixes = prefixes)
 end
 
