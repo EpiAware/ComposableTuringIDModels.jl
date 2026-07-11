@@ -135,7 +135,6 @@ include("utils/censored_pmf.jl")
 include("utils/turing-methods.jl")
 
 # --- latent models ---
-include("latent_models/utils.jl")
 include("latent_models/models/IID.jl")
 include("latent_models/models/HierarchicalNormal.jl")
 include("latent_models/models/RandomWalk.jl")
