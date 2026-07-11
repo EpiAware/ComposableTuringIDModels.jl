@@ -175,6 +175,19 @@ function Split(template::AbstractObservationModel, map::AbstractMatrix)
     Split(template, nothing, map)
 end
 
+# Pretty-printing: a Split's children are its named streams, one per line, so the
+# split reads as a branch per stream rather than an opaque `Split` leaf. The
+# generic field walk skips the `streams` NamedTuple (a NamedTuple is neither an
+# `AbstractComposableModel` nor a `Tuple`), so name each stream explicitly here;
+# the shared tree printer then handles the connectors and nesting indentation. In
+# the data-driven strata mode `streams` is a single template, shown as one child.
+function _component_children(m::Split)
+    m.streams isa NamedTuple ||
+        return Tuple{String, AbstractComposableModel}[("template", m.streams)]
+    return Tuple{String, AbstractComposableModel}[(string(nm), m.streams[nm])
+                                                  for nm in keys(m.streams)]
+end
+
 # Ordered stream names: fixed for explicit streams, else the `y_t` keys.
 function _split_names(m::Split, y_t)
     m.names === nothing || return m.names
