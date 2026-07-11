@@ -42,6 +42,62 @@ end
     @test !occursin("{", out)
 end
 
+@testitem "show renders each Split stream on its own line" begin
+    using ComposableTuringIDModels, Distributions
+
+    split = Split((
+        cases = LatentDelay(NegativeBinomialError(), [0.4, 0.3, 0.2, 0.1]),
+        deaths = LatentDelay(PoissonError(), [0.1, 0.2, 0.3, 0.4])))
+    out = sprint(show, MIME"text/plain"(), split)
+
+    # Each stream is a labelled branch on its own line, keyed by its name, and the
+    # inner model of each stream is recursed into beneath it.
+    @test startswith(out, "Split")
+    @test occursin("├─ cases: LatentDelay", out)
+    @test occursin("└─ deaths: LatentDelay", out)
+    @test occursin("model: NegativeBinomialError", out)
+    @test occursin("model: PoissonError", out)
+    # Two streams means two separate lines, not one collapsed leaf.
+    @test count("LatentDelay", out) == 2
+    @test !occursin("{", out)
+end
+
+@testitem "Split show composes with nesting in both directions" begin
+    using ComposableTuringIDModels, Distributions
+
+    # A Split nested inside a modifier, with a further submodel nested inside one
+    # of its streams: indentation must compose through both layers.
+    model = LatentDelay(
+        Split((
+            cases = PoissonError(),
+            deaths = LatentDelay(
+                Ascertainment(PoissonError(), FixedIntercept(log(0.1))),
+                [0.2, 0.3, 0.5]))),
+        [0.5, 0.3, 0.2])
+    out = sprint(show, MIME"text/plain"(), model)
+
+    # The Split sits under the outer modifier, and its streams are indented one
+    # level deeper again (three leading spaces of continuation prefix).
+    @test occursin("└─ model: Split", out)
+    @test occursin("   ├─ cases: PoissonError", out)
+    @test occursin("   └─ deaths: LatentDelay", out)
+    # The downstream stream keeps recursing, deeper still.
+    @test occursin("Ascertainment", out)
+    @test occursin("FixedIntercept", out)
+    @test !occursin("{", out)
+end
+
+@testitem "data-driven strata Split shows its template" begin
+    using ComposableTuringIDModels, Distributions
+
+    split = Split(PoissonError())
+    out = sprint(show, MIME"text/plain"(), split)
+
+    @test startswith(out, "Split")
+    @test occursin("└─ template: PoissonError", out)
+    @test !occursin("{", out)
+end
+
 @testitem "compact 2-arg show prints only the component name" begin
     using ComposableTuringIDModels, Distributions
 

@@ -66,11 +66,11 @@ chain = sample(posterior_model, NUTS(), 1_000)
 
 ## Installation
 
-This package is not registered. Install it directly from the repository:
+Install the package from the Julia General registry:
 
 ```julia
 using Pkg
-Pkg.add(url = "https://github.com/EpiAware/ComposableTuringIDModels.jl")
+Pkg.add("ComposableTuringIDModels")
 ```
 
 ## Swap a part
