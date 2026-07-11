@@ -81,7 +81,7 @@ We simulate four groups over 24 time steps:
 n_time, n_groups = 24, 4
 Ymiss = Matrix{Union{Missing, Float64}}(missing, n_time, n_groups)
 sim = grouped_epidemic(idmodel, hierarchy, Ymiss)()
-Ydata = reduce(hcat, [Int.(sim.y[g]) for g in 1:n_groups])
+Ydata = reduce(hcat, [Int.(sim.y[g].y_t) for g in 1:n_groups])
 true_levels = sim.group_levels
 (n_time = n_time, n_groups = n_groups, data_size = size(Ydata),
     true_levels = round.(true_levels, digits = 2))
