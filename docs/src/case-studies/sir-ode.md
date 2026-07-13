@@ -294,8 +294,8 @@ The SIR parameters keep their flat names (`β`, `γ`, `I₀`); the ascertainment
 process contributes its own block, prefixed `Ascertainment.` because modifiers
 that introduce a named sub-process prefix their variables to keep them distinct.
 `summarystats` shows both blocks, including the ascertainment innovation scale
-``\sigma`` (`Ascertainment.std`), which quantifies how much observation-level
-noise the latent process absorbed:
+``\sigma`` (`Ascertainment.ϵ_t.std.θ`), which quantifies how much
+observation-level noise the latent process absorbed:
 
 ```@example sir
 summarystats(stochastic_chain)
@@ -308,8 +308,8 @@ scale is small:
 ```@example sir
 βs = vec(stochastic_chain[@varname(β)])
 γs = vec(stochastic_chain[@varname(γ)])
-(R0 = mean(βs ./ γs),
-    ascertainment_sigma = mean(vec(stochastic_chain[@varname(Ascertainment.std)])))
+asc_std = vec(stochastic_chain[@varname(Ascertainment.ϵ_t.std.θ)])
+(R0 = mean(βs ./ γs), ascertainment_sigma = mean(asc_std))
 ```
 
 Because the deterministic model is the ``\kappa_t = 0`` special case, the two

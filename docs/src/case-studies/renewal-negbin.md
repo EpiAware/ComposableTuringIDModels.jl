@@ -182,15 +182,16 @@ chain = sample(
 nothing # hide
 ```
 
-Sampling returns a chain whose parameters keep their flat component names
-(prefixing is disabled throughout the package). `sample` returns a
+Sampling returns a chain whose parameters are namespaced by the component slot
+that samples them, so a prior's inner variables never collide across the model.
+`sample` returns a
 [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which
 `summarystats` summarises directly — no conversion step — giving point estimates
 *and* their uncertainty alongside the effective sample size and ``\hat{R}``
-convergence diagnostic. The autoregressive damping ``\rho`` (`damp_AR[1]`), the
-innovation scale ``\sigma`` (`std`), and the observation cluster factor
-``\sqrt{1/\phi}`` (`cluster_factor`) are all identified from the observed South
-Korean series:
+convergence diagnostic. The autoregressive damping ``\rho``
+(`Z_t.damp_AR.θ[1]`), the innovation scale ``\sigma`` (`Z_t.ϵ_t.std.θ`), and the
+observation cluster factor ``\sqrt{1/\phi}`` (`cluster_factor.θ`) are all
+identified from the observed South Korean series:
 
 ```@example renewal
 using MCMCChains
@@ -212,17 +213,17 @@ extension turns a chain (subset to a few keys with `chain[[...]]`) into a
 using CairoMakie, PairPlots
 
 prior_chain = sample(posterior, Prior(), 1000; progress = false)
-pp_keys = [@varname(damp_AR), @varname(std),
-    @varname(cluster_factor), @varname(init_incidence)]
+pp_keys = [@varname(Z_t.damp_AR.θ), @varname(Z_t.ϵ_t.std.θ),
+    @varname(cluster_factor.θ), @varname(init_incidence.θ)]
 pairplot(
     PairPlots.Series(chain[pp_keys]; label = "posterior"),
     PairPlots.Series(prior_chain[pp_keys]; label = "prior"))
 ```
 
-The innovation scale ``\sigma`` (`std`) is sharply updated away from its prior —
-the data are informative about how much ``\log R_t`` wiggles — while the
-autoregressive damping ``\rho`` (`damp_AR`), the cluster factor and the initial
-infections stay closer to their priors on this short window.
+The innovation scale ``\sigma`` (`Z_t.ϵ_t.std.θ`) is sharply updated away from
+its prior — the data are informative about how much ``\log R_t`` wiggles — while
+the autoregressive damping ``\rho`` (`Z_t.damp_AR.θ`), the cluster factor and the
+initial infections stay closer to their priors on this short window.
 
 ## Posterior trajectories
 

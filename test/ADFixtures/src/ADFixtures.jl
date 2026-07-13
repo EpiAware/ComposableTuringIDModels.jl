@@ -339,7 +339,7 @@ Result matrix (25 scenarios × 4 backends), Julia 1.12:
 | Renewal+RightTruncate nowcast posterior               |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior                      |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+LatentDelay posterior                         |      ✓      |      ✓      |    ✓    |   ✓   |
-| DirectInfections+Ascertainment day-of-week posterior  |      ✓      |      ✓      |    ✓    |   ✓   |
+| DirectInfections+Ascertainment day-of-week posterior  |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Aggregate posterior                  |      ✓      |      ✓      |    ✓    |   ✓   |
 | DirectInfections+TransformObservation posterior       |      ✓      |      ✓      |    ✓    |   ✓   |
 | DirectInfections+NormalError posterior                |      ✓      |      ✓      |    ✓    |   ✗   |
@@ -347,15 +347,19 @@ Result matrix (25 scenarios × 4 backends), Julia 1.12:
 | Renewal+Split cascade posterior                       |      ✓      |      ✓      |    ✓    |   ✗   |
 
 scenario correctly. Enzyme (configured with `function_annotation = Enzyme.Const`,
-see [`backends`](@ref)) works on fifteen of the twenty-five but raises
-`IllegalTypeAnalysisException` / a related type-analysis error on ten:
+see [`backends`](@ref)) works on fourteen of the twenty-five but raises
+`IllegalTypeAnalysisException` / a related type-analysis or shadow error on
+eleven:
 
   - the `AR`-based latent log-densities (`AR`, `ARIMA`, `ARMA`,
     `CombineLatentModels` (which contains an `AR`), and both prior-interface `AR`
     scenarios), inside the `accumulate_scan(ARStep(damp_AR), ...)` /
     `LinearAlgebra.dot` recursion;
   - `DiffLatentModel(RandomWalk)` (the repeated `cumsum` reconstruction);
-  - `DirectInfections+NormalError` (the Gaussian likelihood loop); and
+  - `DirectInfections+NormalError` (the Gaussian likelihood loop);
+  - `DirectInfections+Ascertainment day-of-week` — an `EnzymeNoShadowError`
+    through the `PrefixLatentModel`-wrapped day-of-week `BroadcastLatentModel`
+    submodel threading, surfaced by the #76 prefix-on prior collapse; and
   - the deeply-nested `Renewal+Split` cascade, through its per-stream submodel
     threading.
 
@@ -378,7 +382,14 @@ function backend_broken_scenarios()
         "DirectInfections+NormalError posterior",
         "Renewal+NegativeBinomial posterior",
         # Enzyme type-analysis brokenness tracked in #97.
-        "Renewal+Split cascade posterior"]))
+        "Renewal+Split cascade posterior",
+        # `EnzymeNoShadowError` through the `Ascertainment` +
+        # `broadcast_dayofweek` submodel threading after the #76 prior collapse
+        # (prefix-on prior slots): Enzyme cannot find a shadow for the
+        # `PrefixLatentModel`-wrapped day-of-week `BroadcastLatentModel`. Enzyme
+        # only; ForwardDiff/ReverseDiff/Mooncake differentiate it correctly.
+        # Tracked in #97.
+        "DirectInfections+Ascertainment day-of-week posterior"]))
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."

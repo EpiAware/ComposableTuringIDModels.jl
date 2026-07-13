@@ -153,17 +153,19 @@ nothing # hide
 
 `sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
 chain, which `summarystats` summarises directly — no conversion step. The
-day-of-week scale (`DayofWeek.std`) and the negative-binomial overdispersion
-(`cluster_factor`) appear alongside the latent-process parameters:
+day-of-week scale (`DayofWeek.latent_period.untransformed.std.θ`) and the
+negative-binomial overdispersion (`cluster_factor.θ`) appear alongside the
+latent-process parameters:
 
 ```@example delays
 using MCMCChains
 summarystats(chain)
 ```
 
-`DayofWeek.std` is the scale of the partially pooled weekday multipliers (its
-own block, prefixed because the ascertainment modifier introduces a named
-sub-process); `cluster_factor` is the negative-binomial overdispersion. The
+`DayofWeek.latent_period.untransformed.std.θ` is the scale of the partially
+pooled weekday multipliers (its own block, namespaced because the ascertainment
+modifier introduces a named sub-process); `cluster_factor.θ` is the
+negative-binomial overdispersion. The
 day-of-week effect, the two delay kernels, and the weekly reproduction number
 were all estimated jointly — and any of them can be swapped or removed by
 editing one line of the composition above.
@@ -180,17 +182,21 @@ shows which parameters the six weeks of Italian data moved.
 using CairoMakie, PairPlots
 
 prior_chain = sample(posterior, Prior(), 1000; progress = false)
-pp_keys = [@varname(damp_AR), @varname(θ), @varname(std),
-    @varname(cluster_factor)]
+pp_keys = [@varname(Z_t.latent_period.diff_latent.damp_AR.θ),
+    @varname(Z_t.latent_period.diff_latent.ϵ_t.θ.θ),
+    @varname(Z_t.latent_period.diff_latent.ϵ_t.ϵ_t.std.θ),
+    @varname(cluster_factor.θ)]
 pairplot(
     PairPlots.Series(chain[pp_keys]; label = "posterior"),
     PairPlots.Series(prior_chain[pp_keys]; label = "prior"))
 ```
 
-The innovation scale ``\sigma`` (`std`) and the negative-binomial overdispersion
-(`cluster_factor`) tighten under the data, while the autoregressive damping
-(`damp_AR`) and moving-average (`θ`) coefficients of the ARIMA process stay close
-to their weakly informative priors.
+The innovation scale ``\sigma`` (`Z_t.latent_period.diff_latent.ϵ_t.ϵ_t.std.θ`)
+and the negative-binomial overdispersion (`cluster_factor.θ`) tighten under the
+data, while the autoregressive damping
+(`Z_t.latent_period.diff_latent.damp_AR.θ`) and moving-average
+(`Z_t.latent_period.diff_latent.ϵ_t.θ.θ`) coefficients of the ARIMA process stay
+close to their weakly informative priors.
 
 ## Posterior trajectories
 

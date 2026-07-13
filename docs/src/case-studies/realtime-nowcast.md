@@ -182,8 +182,8 @@ correction still identifies them from the thinned tail.
 using CairoMakie, PairPlots
 
 prior_chain = sample(corrected_post, Prior(), 1000; progress = false)
-pp_keys = [@varname(damp_AR), @varname(std),
-    @varname(cluster_factor), @varname(init_incidence)]
+pp_keys = [@varname(Z_t.damp_AR.θ), @varname(Z_t.ϵ_t.std.θ),
+    @varname(cluster_factor.θ), @varname(init_incidence.θ)]
 pairplot(
     PairPlots.Series(corrected_chain[pp_keys]; label = "posterior"),
     PairPlots.Series(prior_chain[pp_keys]; label = "prior"))
@@ -251,10 +251,11 @@ towards the reference, having accounted for the not-yet-reported counts.
 
 Wrapping the error model in [`RightTruncate`](@ref) does not touch the renewal
 process, so the corrected fit recovers the *same* shared parameters: the
-autoregressive damping ``\rho`` (`damp_AR[1]`), the innovation scale ``\sigma``
-(`std`), the observation overdispersion (`cluster_factor`), and the initial
-infections (`init_incidence`). They keep their flat names (prefixing is disabled
-throughout the package).
+autoregressive damping ``\rho`` (`Z_t.damp_AR.θ[1]`), the innovation scale
+``\sigma`` (`Z_t.ϵ_t.std.θ`), the observation overdispersion
+(`cluster_factor.θ`), and the initial infections (`init_incidence.θ`). Each is
+namespaced by the component slot that samples it, so a prior's inner variables
+never collide across the model.
 
 `sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
 chain, which `summarystats` summarises directly — no conversion step — giving
