@@ -31,7 +31,7 @@ module ComposableTuringIDModels
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix, returned
 using Turing: Turing, filldist, arraydist, sample, MCMCSerial
 using CensoredDistributions: double_interval_censored
-using LinearAlgebra: dot
+using LinearAlgebra: dot, cholesky, Symmetric, I
 using LogExpFunctions: softmax, xexpy, log1pexp
 using OrdinaryDiffEq: ODEProblem, ODEFunction, solve, remake, AutoVern7, Rodas5P
 using Random: AbstractRNG, randexp
@@ -40,7 +40,7 @@ using Random: AbstractRNG, randexp
 # by `HilbertSpaceGP`; the package adds only the 1-D spectral densities those
 # kernels need for the Hilbert-space approximation (see HilbertSpaceGP.jl).
 using KernelFunctions: Kernel, SqExponentialKernel, Matern32Kernel,
-                       Matern52Kernel
+                       Matern52Kernel, with_lengthscale, kernelmatrix
 
 # Inference-layer dependencies.
 using ADTypes: ADTypes, AutoForwardDiff
@@ -76,7 +76,7 @@ export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial
 
 # --- latent models ---
 export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept, FixedIntercept,
-       Null, DiffLatentModel, HilbertSpaceGP
+       Null, DiffLatentModel, HilbertSpaceGP, ExactGP
 # Covariance kernels for `HilbertSpaceGP` are re-exported from KernelFunctions.jl
 # (the ecosystem standard); `spectral_density` adds their Hilbert-space weights.
 export SqExponentialKernel, Matern32Kernel, Matern52Kernel, spectral_density
@@ -150,6 +150,7 @@ include("latent_models/models/RandomWalk.jl")
 include("latent_models/models/AR.jl")
 include("latent_models/models/MA.jl")
 include("latent_models/models/HilbertSpaceGP.jl")
+include("latent_models/models/ExactGP.jl")
 include("latent_models/models/Intercept.jl")
 include("latent_models/models/Null.jl")
 include("latent_models/modifiers/DiffLatentModel.jl")
