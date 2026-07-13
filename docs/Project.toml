@@ -1,5 +1,6 @@
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
+AbstractGPs = "99985d1d-32ba-4be9-9821-2ec096f28918"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Catalyst = "479239e8-5488-4da2-87a7-35f2df7eef83"
@@ -25,6 +26,7 @@ ComposableTuringIDModels = {path = ".."}
 
 [compat]
 ADTypes = "1"
+AbstractGPs = "0.5"
 CSV = "0.10"
 CairoMakie = "0.15"
 Catalyst = "16"

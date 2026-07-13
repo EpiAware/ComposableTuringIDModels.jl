@@ -184,6 +184,88 @@ end
     @test all(isfinite, path)
 end
 
+@testitem "ExactGP draws a length-n path with named GP parameters" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(9)
+    gp = ExactGP()
+    @test gp isa AbstractLatentModel
+    @test implements_latent_interface(gp; n = 25)
+    n = 25
+    path = as_turing_model(gp, n)()
+    @test length(path) == n
+    @test all(isfinite, path)
+    # The sampled parameters are the length scale, the marginal sd, and the
+    # n non-centred weights — no inner variables leak through.
+    draw = rand(as_turing_model(gp, n))
+    pairs_dict = Dict(string(k) => v for (k, v) in pairs(draw))
+    @test haskey(pairs_dict, "ℓ")
+    @test haskey(pairs_dict, "σ")
+    @test haskey(pairs_dict, "z")
+    @test length(pairs_dict["z"]) == n
+end
+
+@testitem "ExactGP prior covariance is the exact kernel Gram matrix" begin
+    using ComposableTuringIDModels, Distributions, Random, LinearAlgebra
+    using ComposableTuringIDModels: _hsgp_standardised_index
+    using DynamicPPL: fix
+    using KernelFunctions: with_lengthscale, kernelmatrix
+    using Statistics: cov, mean
+    Random.seed!(10)
+    # With ℓ and σ fixed, the returned path is L·z with L the Cholesky factor of
+    # the covariance, so its prior covariance is exactly the KernelFunctions Gram
+    # matrix σ²·SqExponentialKernel(ℓ) on the standardised inputs. Drawing many
+    # paths and comparing the sample covariance is a direct check that the exact
+    # GP reproduces the ecosystem kernel — no approximation error to tolerate
+    # beyond Monte-Carlo noise.
+    n, σ, ℓ = 10, 1.0, 0.6
+    x = _hsgp_standardised_index(n)
+    K_exact = kernelmatrix(σ^2 * with_lengthscale(SqExponentialKernel(), ℓ), x)
+    mdl = fix(as_turing_model(ExactGP(), n), (ℓ = ℓ, σ = σ))
+    draws = reduce(hcat, (mdl() for _ in 1:4000))
+    K_emp = cov(draws; dims = 2)
+    @test norm(K_emp - K_exact) / norm(K_exact) < 0.1
+end
+
+@testitem "ExactGP rejects invalid jitter and n" begin
+    using ComposableTuringIDModels, Distributions
+    @test_throws AssertionError ExactGP(; jitter = 0.0)
+    @test_throws Exception as_turing_model(ExactGP(), 1)()
+end
+
+@testitem "ExactGP supports squared-exponential and Matern kernels" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using KernelFunctions: Kernel
+    Random.seed!(11)
+    n = 25
+    @test ExactGP().kernel isa SqExponentialKernel
+    for K in (SqExponentialKernel(), Matern32Kernel(), Matern52Kernel())
+        gp = ExactGP(; kernel = K)
+        @test gp.kernel === K
+        @test implements_latent_interface(gp; n = n)
+        path = as_turing_model(gp, n)()
+        @test length(path) == n
+        @test all(isfinite, path)
+    end
+end
+
+@testitem "ExactGP samples in the DEFAULT regime" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(12)
+    # Exercise the sampled regime: ℓ and σ are free, so the covariance and its
+    # Cholesky factor are rebuilt on every gradient evaluation. A short prior
+    # sample must stay finite with the length scale positive.
+    gp = ExactGP()
+    @test minimum(gp.length_scale_prior) > 0
+    n = 20
+    chn = sample(as_turing_model(gp, n), NUTS(), 40; progress = false)
+    @test size(chn, 1) == 40
+    @test all(isfinite, Array(chn))
+    @test all(>(0), vec(chn[:ℓ]))
+    path = as_turing_model(gp, n)()
+    @test length(path) == n
+    @test all(isfinite, path)
+end
+
 @testitem "rand from a latent model uses flat (unprefixed) names" begin
     using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: VarName
