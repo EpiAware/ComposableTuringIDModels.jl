@@ -32,6 +32,7 @@ submodel, so the parts nest through the same interface they expose.
 
 The three roles feed one another and plug into that single interface:
 
+```@raw html
 <figure style="margin:1.5rem 0">
 <svg viewBox="0 0 820 445" role="img" aria-labelledby="ovw-t ovw-d" style="width:100%;height:auto;max-width:820px;font-family:system-ui,Segoe UI,Helvetica,Arial,sans-serif">
 <title id="ovw-t">Composable design of ComposableTuringIDModels</title>
@@ -82,6 +83,7 @@ The three roles feed one another and plug into that single interface:
 </svg>
 <figcaption style="font-size:0.85rem;color:#6b6b72;text-align:center;margin-top:0.4rem">The three roles plug into one <code>as_turing_model</code> interface, and any part can be swapped for a compatible one.</figcaption>
 </figure>
+```
 
 ## Swap a part to change an assumption
 
