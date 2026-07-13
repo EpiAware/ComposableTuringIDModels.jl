@@ -38,15 +38,15 @@ end
     @test all(isfinite, path)
 end
 
-@testitem "rand from a latent model uses flat (unprefixed) names" begin
+@testitem "rand from a latent model namespaces prior variables" begin
     using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: VarName
     Random.seed!(4)
     draw = rand(as_turing_model(RandomWalk(), 10))
     names = string.(collect(keys(draw)))
-    # to_submodel(..., false) keeps inner variable names flat: a RandomWalk
-    # exposes its init and the inner HierarchicalNormal's std/ϵ_t without a
-    # path prefix.
-    @test "rw_init" in names
-    @test any(startswith("std"), names) || "std" in names
+    # Prior slots are prefixed at the call site (prefix-on `to_submodel`), so a
+    # RandomWalk exposes its init and the inner HierarchicalNormal's std under a
+    # namespace path (e.g. `rw_init.θ`, `ϵ_t.std.θ`).
+    @test any(startswith("rw_init"), names)
+    @test any(contains("std"), names)
 end

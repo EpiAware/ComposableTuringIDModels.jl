@@ -35,7 +35,7 @@ end
 @model function generate_observation_error_priors(
         obs_model::NegativeBinomialError, y_t, Y_t)
     cluster_factor ~ to_submodel(
-        as_turing_model(obs_model.cluster_factor, 1), false)
+        as_turing_model(obs_model.cluster_factor, 1))
     sq_cluster_factor = only(cluster_factor)^2
     return (; sq_cluster_factor)
 end

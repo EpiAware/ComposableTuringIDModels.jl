@@ -37,7 +37,7 @@ NormalError(std) = NormalError(as_prior(std))
 NormalError(; std = HalfNormal(0.1)) = NormalError(as_prior(std))
 
 @model function generate_observation_error_priors(obs_model::NormalError, y_t, Y_t)
-    σ ~ to_submodel(as_turing_model(obs_model.std, 1), false)
+    σ ~ to_submodel(as_turing_model(obs_model.std, 1))
     return (; σ = only(σ))
 end
 
