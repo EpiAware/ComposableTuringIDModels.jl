@@ -64,6 +64,9 @@ each = BroadcastLatentModel(RandomWalk(), 7, RepeatEach())
 rand(as_turing_model(each, 10))
 ```
 
+The `model` slot is an [`AbstractPriorModel`](@ref): a bare `Distribution` (or a
+vector of them) is coerced via [`as_prior`](@ref), as at the top-level slots.
+
 ## Fields
 
   - `model`: the underlying latent model.
@@ -90,9 +93,15 @@ struct BroadcastLatentModel{
     end
 end
 
-function BroadcastLatentModel(model::M; period::Integer,
-        broadcast_rule::B) where {
-        M <: AbstractLatentModel, B <: AbstractBroadcastRule}
+# Coerce a bare `Distribution` (or vector) member to the prior interface so it is
+# accepted alongside a process, matching the top-level slots and Combine/Concat.
+function BroadcastLatentModel(model,
+        period::Integer, broadcast_rule::AbstractBroadcastRule)
+    return BroadcastLatentModel(as_prior(model), period, broadcast_rule)
+end
+
+function BroadcastLatentModel(model; period::Integer,
+        broadcast_rule::AbstractBroadcastRule)
     return BroadcastLatentModel(model, period, broadcast_rule)
 end
 

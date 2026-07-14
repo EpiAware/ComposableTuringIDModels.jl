@@ -20,6 +20,9 @@ pm = PrefixLatentModel(; model = HierarchicalNormal(), prefix = \"Test\")
 rand(as_turing_model(pm, 10))
 ```
 
+The `model` slot is an [`AbstractPriorModel`](@ref): a bare `Distribution` (or a
+vector of them) is coerced via [`as_prior`](@ref), as at the top-level slots.
+
 ## Fields
 
   - `model`: the latent model to prefix.
@@ -31,6 +34,12 @@ rand(as_turing_model(pm, 10))
     model::M
     "The prefix for the latent model."
     prefix::P
+end
+
+# Coerce a bare `Distribution` (or vector) member to the prior interface so it is
+# accepted alongside a process, matching the top-level slots and Combine/Concat.
+function PrefixLatentModel(model, prefix)
+    return PrefixLatentModel(as_prior(model), prefix)
 end
 
 @model function as_turing_model(model::PrefixLatentModel, n)
