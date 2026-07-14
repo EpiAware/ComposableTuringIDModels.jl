@@ -10,6 +10,43 @@
     @test length(as_turing_model(rec, 5)()) == 5
 end
 
+@testitem "latent modifiers coerce a bare-Distribution member" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using ComposableTuringIDModels: BroadcastPrior
+    Random.seed!(310)
+    n = 5
+
+    # Each @kwdef / modifier struct wraps a bare `Distribution` member via
+    # `as_prior`, matching the top-level slots and Combine/Concat members.
+    trans = TransformLatentModel(Normal(), x -> exp.(x))
+    @test trans.model isa BroadcastPrior
+    @test length(as_turing_model(trans, n)()) == n
+
+    rec = RecordExpectedLatent(Normal())
+    @test rec.model isa BroadcastPrior
+    @test length(as_turing_model(rec, n)()) == n
+
+    pref = PrefixLatentModel(Normal(), "Test")
+    @test pref.model isa BroadcastPrior
+    pref_kw = PrefixLatentModel(; model = Normal(), prefix = "Test")
+    @test pref_kw.model isa BroadcastPrior
+
+    bcast = BroadcastLatentModel(Normal(), 7, RepeatEach())
+    @test bcast.model isa BroadcastPrior
+    bcast_kw = BroadcastLatentModel(Normal(); period = 7,
+        broadcast_rule = RepeatEach())
+    @test bcast_kw.model isa BroadcastPrior
+    @test length(as_turing_model(bcast, 10)()) == 10
+
+    # A vector of `Distribution`s coerces to the vector `BroadcastPrior`.
+    vec_member = TransformLatentModel([Normal(), Normal()], identity)
+    @test vec_member.model isa BroadcastPrior
+
+    # A richer prior model is stored unchanged (no double-wrapping).
+    proc = TransformLatentModel(RandomWalk(), identity)
+    @test proc.model isa RandomWalk
+end
+
 @testitem "PrefixLatentModel prefixes inner variable names" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(32)
