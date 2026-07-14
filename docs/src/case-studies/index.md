@@ -17,7 +17,8 @@ page.
     Turing 0.46 release.
     The draws will be restored once Pathfinder supports Turing 0.46 and the
     already-widened compat bounds resolve the update automatically.
-    See [issue #124](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/124).
+    See [issue #124](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/124)
+    and the upstream fix [mlcolab/Pathfinder.jl#400](https://github.com/mlcolab/Pathfinder.jl/pull/400).
 
 They progress from a single renewal model to a layered observation process and
 then to a mechanistic compartmental model:

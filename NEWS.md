@@ -32,7 +32,8 @@
   nested-submodel type-inference fix that makes prefix-on composition fast again.
   Until then the docs case studies draw fewer NUTS samples than a real analysis
   would as a documented interim, restored when Pathfinder supports Turing 0.46.
-  See [#124](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/124).
+  See [#124](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/124)
+  and the upstream fix [mlcolab/Pathfinder.jl#400](https://github.com/mlcolab/Pathfinder.jl/pull/400).
 
 ### Added
 
