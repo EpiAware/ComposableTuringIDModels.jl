@@ -24,6 +24,16 @@
 - **`as_prior(p, name)` and `BroadcastPrior`'s `name` field are removed**, along
   with the internal `NamedDist`/`_named` naming and the dead `_expand_dist` helper.
 
+### Changed
+
+- **Turing/DynamicPPL compat widened to allow 0.46/0.42**, so the update resolves
+  automatically once the upstream block clears. The move is currently held back by
+  Pathfinder, which has no Turing 0.46 release; DynamicPPL 0.42.1 carries the
+  nested-submodel type-inference fix that makes prefix-on composition fast again.
+  Until then the docs case studies draw fewer NUTS samples than a real analysis
+  would as a documented interim, restored when Pathfinder supports Turing 0.46.
+  See [#124](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/124).
+
 ### Added
 
 - **`TimeVaryingAR`** — a first-order AR whose damping coefficient is a per-step

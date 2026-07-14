@@ -6,6 +6,19 @@ recreating published analyses. Each one is self-contained and runs when the
 documentation is built, so the numbers you see are produced by the code on the
 page.
 
+!!! note "Interim sampling settings"
+    The case studies currently draw fewer NUTS samples than we would use for a
+    real analysis.
+    This is a documented interim measure, not a modelling choice.
+    The prefix-on model composition this package relies on is slow to evaluate on
+    DynamicPPL 0.41, and the fix is the nested-submodel type-inference improvement
+    in DynamicPPL 0.42.1 (Turing 0.46).
+    We cannot yet move to those versions because Pathfinder, a dependency, has no
+    Turing 0.46 release.
+    The draws will be restored once Pathfinder supports Turing 0.46 and the
+    already-widened compat bounds resolve the update automatically.
+    See [issue #124](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/124).
+
 They progress from a single renewal model to a layered observation process and
 then to a mechanistic compartmental model:
 
