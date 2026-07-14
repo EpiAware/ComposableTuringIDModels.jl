@@ -26,8 +26,10 @@ name) unless the prefix is the empty string.
 # Examples
 ```@example Ascertainment
 using ComposableTuringIDModels, Distributions
-# A latent model gives a time-varying ascertainment effect.
-obs = Ascertainment(PoissonError(), FixedIntercept(0.1))
+# A latent model gives a time-varying ascertainment effect. The default
+# transform reads the effect on the log scale, so `log(0.1)` is a 10%
+# ascertainment rate.
+obs = Ascertainment(PoissonError(), FixedIntercept(log(0.1)))
 rand(as_turing_model(obs, missing, fill(10.0, 5)))
 # A bare Distribution / prior gives a single constant ascertainment factor.
 obs_const = Ascertainment(PoissonError(), Normal(0.0, 0.1))
