@@ -17,6 +17,15 @@ The latent and prior roles are one ([`AbstractLatentModel`](@ref) `===`
 [`AbstractPriorModel`](@ref)), so this simply forwards to
 [`implements_prior_interface`](@ref).
 
+# Arguments
+
+  - `model`: the component to check.
+
+# Keyword Arguments
+
+  - `n`: the prior length used for the construction check (default `10`),
+    forwarded to [`implements_prior_interface`](@ref).
+
 # Examples
 ```@example
 using ComposableTuringIDModels
