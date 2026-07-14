@@ -136,7 +136,7 @@ nothing # hide
 posterior = as_turing_model(model, y_obs, n)
 chain = sample(
     posterior, NUTS(0.9; adtype = AutoForwardDiff()),
-    MCMCThreads(), 500, 2; progress = false)
+    MCMCThreads(), 150, 2; progress = false)
 nothing # hide
 ```
 
@@ -281,7 +281,7 @@ seir_model = IDModel(
 
 seir_chain = sample(
     as_turing_model(seir_model, y_obs, n),
-    NUTS(0.9; adtype = AutoForwardDiff()), 200; progress = false)
+    NUTS(0.9; adtype = AutoForwardDiff()), 100; progress = false)
 βe = vec(seir_chain[@varname(β)])
 αe = vec(seir_chain[@varname(α)])
 γe = vec(seir_chain[@varname(γ)])

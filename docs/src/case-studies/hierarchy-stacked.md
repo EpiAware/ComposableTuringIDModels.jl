@@ -99,7 +99,7 @@ is hard-coded in the components:
 
 ```@example hier
 posterior = grouped_epidemic(idmodel, hierarchy, Float64.(Ydata))
-chain = sample(posterior, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 300;
+chain = sample(posterior, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 100;
     progress = false)
 size(chain, 1)
 ```
