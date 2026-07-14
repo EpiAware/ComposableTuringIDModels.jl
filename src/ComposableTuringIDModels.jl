@@ -28,6 +28,7 @@ module ComposableTuringIDModels
 # Only the names the prototype itself uses or extends are imported below, which
 # keeps the public surface to the package's own exports.
 
+using Accessors: Accessors
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix, returned
 using Turing: Turing, filldist, arraydist, sample, MCMCSerial
 using CensoredDistributions: double_interval_censored
@@ -95,7 +96,7 @@ export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
        PrefixObservationModel, RecordExpectedObs, TransformObservationModel
 
 # --- observation composition ---
-export Split, StrataMap
+export Split, StrataMap, Hierarchy
 
 # --- composition ---
 export IDModel
@@ -184,6 +185,7 @@ include("observation_models/modifiers/PrefixObservationModel.jl")
 include("observation_models/modifiers/RecordExpectedObs.jl")
 include("observation_models/modifiers/TransformObservationModel.jl")
 include("observation_models/Split.jl")
+include("observation_models/Hierarchy.jl")
 
 # --- composition ---
 include("compose.jl")
