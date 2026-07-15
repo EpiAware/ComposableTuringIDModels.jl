@@ -24,16 +24,23 @@
 - **`as_prior(p, name)` and `BroadcastPrior`'s `name` field are removed**, along
   with the internal `NamedDist`/`_named` naming and the dead `_expand_dist` helper.
 
+### Removed
+
+- **The Pathfinder-based `ManyPathfinder` pre-sampler and the Pathfinder NUTS
+  warm-start are removed**, and `Pathfinder` is dropped as a dependency. It was
+  the only dependency without a Turing 0.46 release, so it blocked the move to
+  DynamicPPL 0.42.1 and its nested-submodel type-inference fix. The now-unused
+  `IDMethod` optimisation-then-sampler combinator and the `AbstractIDOptMethod`
+  supertype are removed with it; a variational warm-start can be re-added later
+  in an extension or a separate package. Resolves
+  [#124](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/124).
+
 ### Changed
 
-- **Turing/DynamicPPL compat widened to allow 0.46/0.42**, so the update resolves
-  automatically once the upstream block clears. The move is currently held back by
-  Pathfinder, which has no Turing 0.46 release; DynamicPPL 0.42.1 carries the
-  nested-submodel type-inference fix that makes prefix-on composition fast again.
-  Until then the docs case studies draw fewer NUTS samples than a real analysis
-  would as a documented interim, restored when Pathfinder supports Turing 0.46.
-  See [#124](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/124)
-  and the upstream fix [mlcolab/Pathfinder.jl#400](https://github.com/mlcolab/Pathfinder.jl/pull/400).
+- **Moved to Turing 0.46 / DynamicPPL 0.42.1.** DynamicPPL 0.42.1's
+  nested-submodel type-inference fix makes the package's prefix-on composition
+  fast to evaluate and differentiate again, so the docs case studies run their
+  full NUTS draw counts.
 
 ### Added
 
