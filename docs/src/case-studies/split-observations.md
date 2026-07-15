@@ -9,8 +9,9 @@ Fitting them jointly — one infection trajectory, several observation streams �
 propagates uncertainty correctly and lets a sparse stream (deaths) borrow
 strength from a dense one (cases).
 
-This case study uses one construct, [`Split`](@ref), for every multi-stream
-shape.
+This case study uses one construct, [`Split`](@ref), for most multi-stream
+shapes, and a second, [`Chain`](@ref), for the ordered case where a stream must
+inherit an upstream stream's own reporting.
 `Split` observes the expected series arriving at the point where it sits in the
 pipeline through several named streams, so *where you place it* chooses the
 composition:
@@ -20,7 +21,10 @@ composition:
   - **cascade** — placed low, after a shared layer: a later stream is observed
     *downstream* of an earlier one (deaths as a delayed fraction of the
     *expected reported cases*);
-  - **strata** — one stream per data-defined group (an age band).
+  - **strata** — one stream per data-defined group (an age band);
+  - **ordered chain** — [`Chain`](@ref) threads each stream's expected output
+    into the next, so a later stream inherits an earlier stream's own delay and
+    ascertainment, not just a shared branch point.
 
 ## How `Split` threads streams
 
@@ -165,6 +169,44 @@ shortened by the case delay.
     deaths_are_a_fraction_of_cases =
         sum(cas.expected_y_t.deaths) < sum(cas.expected_y_t.cases))
 ```
+
+## Ordered chains: inheriting an upstream stream's own reporting
+
+The cascade above branches every stream off the *same* delayed expectation at the
+point where the `Split` sits, so the cases stream is a bare error on that shared
+series.
+When the cases stream carries reporting effects of its *own* — an ascertainment,
+a further delay — a `Split` branch cannot pass them on, because each branch reads
+the shared series at the split point rather than another branch's output.
+[`Chain`](@ref) covers that ordered case.
+It holds an ordered `NamedTuple` of streams and threads each stream's `expected`
+output into the next stream's `expected` input, so a later stream inherits the
+whole of an earlier stream's delay and ascertainment.
+
+Here cases are reported at ~60% ascertainment, and deaths are observed off the
+*ascertained expected cases* at a ~2% fatality fraction, so the death expectation
+is ``0.6 \times 0.02`` of infections rather than ``0.02`` of them.
+
+```@example split
+chained = Chain((
+    cases = Ascertainment(NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
+        FixedIntercept(log(0.6))),                      # cases carry their own ~60%
+    deaths = LatentDelay(                                # case→death delay
+        Ascertainment(NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
+            FixedIntercept(log(0.02))),                 # ~2% of the reported cases
+        LogNormal(2.2, 0.3))))
+chained_model = IDModel(renewal, chained)
+chn = as_turing_model(chained_model, (cases = missing, deaths = missing), n)()
+(mean_case_ascertainment = sum(chn.expected_y_t.cases) / sum(chn.I_t),
+    deaths_inherit_case_ascertainment =
+        sum(chn.expected_y_t.deaths) < 0.02 * sum(chn.expected_y_t.cases))
+```
+
+The death expectation is a fraction of the *ascertained* case expectation, so a
+change in case ascertainment now reaches deaths — which a `Split` cascade, reading
+the pre-ascertainment series, would not carry.
+As with the cascade, the threaded quantity stays the expected series, never a
+realised draw.
 
 ## Strata: one stream per age band
 
