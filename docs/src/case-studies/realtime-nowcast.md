@@ -106,7 +106,7 @@ complete.
 naive_model = IDModel(renewal, error)
 naive_post = as_turing_model(naive_model, observed_so_far, n)
 naive_chain = sample(
-    naive_post, NUTS(0.9), MCMCThreads(), 120, 2; progress = false)
+    naive_post, NUTS(0.9), MCMCThreads(), 500, 2; progress = false)
 nothing # hide
 ```
 
@@ -121,7 +121,7 @@ corrected_obs = RightTruncate(error, reporting_delay)
 corrected_model = IDModel(renewal, corrected_obs)
 corrected_post = as_turing_model(corrected_model, observed_so_far, n)
 corrected_chain = sample(
-    corrected_post, NUTS(0.9), MCMCThreads(), 120, 2; progress = false)
+    corrected_post, NUTS(0.9), MCMCThreads(), 500, 2; progress = false)
 nothing # hide
 ```
 
@@ -149,7 +149,7 @@ end
 
 complete_post = as_turing_model(naive_model, eventual, n)
 complete_chain = sample(
-    complete_post, NUTS(0.9), MCMCThreads(), 120, 2; progress = false)
+    complete_post, NUTS(0.9), MCMCThreads(), 500, 2; progress = false)
 
 R_complete_recent = recent_Rt(complete_post, complete_chain)
 R_naive_recent = recent_Rt(naive_post, naive_chain)
