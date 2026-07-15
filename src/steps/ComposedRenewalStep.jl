@@ -38,8 +38,8 @@ S_t = S_{t-1} - I_t,
 ```
 
 with population size ``N`` = `pop_size`. Its substate is the current susceptible
-count ``S``. Composing it over a [`ConstantRenewalStep`](@ref) reproduces
-[`ConstantRenewalWithPopulationStep`](@ref) exactly.
+count ``S``. Composing it over a [`ConstantRenewalStep`](@ref) gives a renewal
+process with a fixed population and susceptible depletion.
 "
 struct SusceptibleDepletion{T} <: AbstractRenewalModifier
     pop_size::T
@@ -62,9 +62,9 @@ by one substate per modifier. Each step computes the core force of infection,
 threads it through the modifiers (each transforming the incidence and updating
 its own substate), then advances the shared window once with the final incidence.
 
-`ComposedRenewalStep(ConstantRenewalStep(g), (SusceptibleDepletion(N),))`
-reproduces `ConstantRenewalWithPopulationStep(g, N)`; this equivalence is the
-acceptance test for the composable contract (#48).
+`ComposedRenewalStep(ConstantRenewalStep(g), (SusceptibleDepletion(N),))` is a
+renewal process with a fixed population `N` and susceptible depletion; a
+[`Renewal`](@ref) built with `population = N` uses exactly this step.
 "
 struct ComposedRenewalStep{R <: AbstractConstantRenewalStep, M <: Tuple} <:
        AbstractConstantRenewalStep

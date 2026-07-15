@@ -74,6 +74,29 @@ negbin_model = IDModel(
 nothing # hide
 ```
 
+## Composing accumulation steps
+
+The recurrences that drive the time series — a random walk, an autoregression, a
+renewal process — are expressed as [`accumulate_scan`](@ref) steps. Within the
+renewal family these steps compose: a [`ComposedRenewalStep`](@ref) is a
+force-of-infection core plus an ordered tuple of modifiers that share one
+incidence window. The first modifier, [`SusceptibleDepletion`](@ref), scales the
+proposed incidence by the available susceptible fraction and depletes the pool,
+turning the renewal process into one with a fixed population. A [`Renewal`](@ref)
+picks it up through the `population` keyword:
+
+```@example design
+data = IDData([0.2, 0.3, 0.5], exp)
+
+# A renewal process with a fixed population of 1000 and susceptible depletion.
+depleting = Renewal(data; rt = RandomWalk(), population = 1000.0)
+nothing # hide
+```
+
+Depletion is not baked into the renewal recurrence: it is a separate modifier
+composed onto the plain core, so further renewal-family mechanisms can be added
+the same way without rewriting the model.
+
 ## Inference
 
 A composed model is an ordinary Turing model. Pass observed data instead of

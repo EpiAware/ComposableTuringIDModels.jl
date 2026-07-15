@@ -1,15 +1,13 @@
-# Proof-of-concept for #48 Phase 2: a composable renewal accumulation step.
+# Composable renewal accumulation step (#48).
 #
-# The acceptance test is behaviour-equivalence: composing the plain
-# `ConstantRenewalStep` force-of-infection core with a `SusceptibleDepletion`
-# modifier must reproduce the hand-fused `ConstantRenewalWithPopulationStep`
-# exactly, under the same `accumulate_scan`. This is the renewal-family
-# realisation of the "renewal with susceptible depletion" use case the issue
-# calls out, and it is the yardstick for whether the composable contract works.
+# Susceptible depletion is expressed compositionally: a `ConstantRenewalStep`
+# force-of-infection core plus a `SusceptibleDepletion` modifier, assembled by
+# `ComposedRenewalStep`. The regression guard is behaviour-equivalence against an
+# explicit reference recurrence, and a `Renewal` built with `population = N` uses
+# exactly this step (dogfooding the composition).
 
 @testitem "renewal_foi matches the ConstantRenewalStep recurrence" begin
-    using ComposableTuringIDModels:
-                                    ConstantRenewalStep, renewal_foi
+    using ComposableTuringIDModels: ConstantRenewalStep, renewal_foi
     rev_gen = reverse([0.2, 0.3, 0.5])
     step = ConstantRenewalStep(rev_gen)
     window = [1.0, 2.0, 3.0]
@@ -18,38 +16,47 @@
     @test renewal_foi(step, window, Rt) ≈ step(window, Rt)[end]
 end
 
-@testitem "ComposedRenewalStep reproduces ConstantRenewalWithPopulationStep" begin
-    using ComposableTuringIDModels:
-                                    ConstantRenewalStep, ConstantRenewalWithPopulationStep,
-                                    ComposedRenewalStep, SusceptibleDepletion,
-                                    accumulate_scan,
+@testitem "ComposedRenewalStep matches the depletion reference recurrence" begin
+    using ComposableTuringIDModels: ConstantRenewalStep, ComposedRenewalStep,
+                                    SusceptibleDepletion, accumulate_scan,
                                     _renewal_init_state
+    using LinearAlgebra: dot
     rev_gen = reverse([0.2, 0.3, 0.5])
     N = 1000.0
     Rt = [1.6, 1.4, 1.2, 1.0, 0.9, 0.8]
 
-    # Reference: the existing hand-fused with-population step.
-    ref_step = ConstantRenewalWithPopulationStep(rev_gen, N)
-    ref_init = _renewal_init_state(ref_step, 5.0, 0.1, length(rev_gen))
-    ref = accumulate_scan(ref_step, ref_init, Rt)
+    core = ConstantRenewalStep(rev_gen)
+    comp_step = ComposedRenewalStep(core, (SusceptibleDepletion(N),))
+    init = _renewal_init_state(comp_step, 5.0, 0.1, length(rev_gen))
+    comp = accumulate_scan(comp_step, init, Rt)
 
-    # Composed form: plain renewal core + a susceptible-depletion modifier.
-    comp_step = ComposedRenewalStep(
-        ConstantRenewalStep(rev_gen), (SusceptibleDepletion(N),))
-    comp_init = _renewal_init_state(comp_step, 5.0, 0.1, length(rev_gen))
-    comp = accumulate_scan(comp_step, comp_init, Rt)
+    # Explicit reference: the S/N-scaled renewal recurrence, hand-rolled. Guards
+    # against drift in either the FOI core or the depletion modifier.
+    function depletion_reference(Rt, window0, S0, rev_gen, N)
+        window = copy(window0)
+        S = S0
+        ref = similar(Rt)
+        for (k, r) in enumerate(Rt)
+            inc = max(S / N, 1e-6) * r * dot(window, rev_gen)
+            S -= inc
+            window = vcat(window[2:end], inc)
+            ref[k] = inc
+        end
+        return ref
+    end
+    ref = depletion_reference(Rt, init[1], init[2], rev_gen, N)
 
     @test comp ≈ ref
-    # Init states must also agree so the two are seeded identically.
-    @test comp_init[1] ≈ ref_init[1]
-    @test comp_init[2] ≈ ref_init[2]
+    @test init[2] ≈ N          # seeded with the full population
+    # Depletion never raises incidence above the unconstrained renewal path.
+    plain = accumulate_scan(core, init[1], Rt)
+    @test all(comp .<= plain .+ 1e-8)
 end
 
 @testitem "ComposedRenewalStep is ForwardDiff-differentiable" begin
-    using ComposableTuringIDModels:
-                                    ConstantRenewalStep, ComposedRenewalStep,
-                                    SusceptibleDepletion,
-                                    accumulate_scan, _renewal_init_state
+    using ComposableTuringIDModels: ConstantRenewalStep, ComposedRenewalStep,
+                                    SusceptibleDepletion, accumulate_scan,
+                                    _renewal_init_state
     using ForwardDiff
     rev_gen = reverse([0.2, 0.3, 0.5])
     N = 1000.0
@@ -64,4 +71,52 @@ end
     g = ForwardDiff.gradient(f, [1.6, 1.4, 1.2, 1.0])
     @test all(isfinite, g)
     @test length(g) == 4
+end
+
+@testitem "Renewal(population = N) wires in a ComposedRenewalStep" begin
+    using ComposableTuringIDModels: ComposedRenewalStep, ConstantRenewalStep,
+                                    SusceptibleDepletion
+    data = IDData([0.2, 0.3, 0.5], exp)
+    plain = Renewal(data; rt = RandomWalk())
+    depleting = Renewal(data; rt = RandomWalk(), population = 1000.0)
+    @test plain.recurrent_step isa ConstantRenewalStep
+    @test depleting.recurrent_step isa ComposedRenewalStep
+    @test depleting.recurrent_step.core isa ConstantRenewalStep
+    @test only(depleting.recurrent_step.modifiers) isa SusceptibleDepletion
+end
+
+@testitem "Renewal susceptible depletion bends incidence below the no-depletion path" begin
+    using ComposableTuringIDModels
+    using DynamicPPL: fix
+    using Random
+    Random.seed!(48)
+    data = IDData([0.2, 0.3, 0.5], exp)
+    # Pin R_t high and constant so, without depletion, incidence grows unbounded.
+    logR = log(2.0)
+    plain = Renewal(data; rt = FixedIntercept(logR))
+    depleting = Renewal(data; rt = FixedIntercept(logR), population = 500.0)
+    fixinit = (init_incidence = log(1.0),)
+    I_plain = fix(as_turing_model(plain, 40), fixinit)().I_t
+    I_dep = fix(as_turing_model(depleting, 40), fixinit)().I_t
+    @test all(isfinite, I_dep)
+    @test all(>=(0), I_dep)
+    # Depletion holds late incidence far below the unlimited-growth path.
+    @test I_dep[end] < I_plain[end]
+    # With a finite population the epidemic peaks and turns over, so late
+    # incidence falls below the peak (impossible under unbounded growth).
+    @test I_dep[end] < maximum(I_dep)
+end
+
+@testitem "Renewal with susceptible depletion samples under NUTS" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(482)
+    data = IDData([0.2, 0.3, 0.5], exp)
+    model = IDModel(
+        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal(),
+            population = 1000.0),
+        PoissonError())
+    y = as_turing_model(model, missing, 20)().generated_y_t
+    # A few NUTS steps exercise the composed-step gradient path (ForwardDiff).
+    chn = sample(as_turing_model(model, y, 20), NUTS(), 30; progress = false)
+    @test chn !== nothing
 end

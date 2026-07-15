@@ -20,6 +20,14 @@ the series length `n` and returns the named tuple `(; I_t, Z_t)` with `Z_t` the
 Renewal is the one infection model that needs a generation interval, so it alone
 keeps an [`IDData`](@ref) object.
 
+Passing `population = N` swaps the plain [`ConstantRenewalStep`](@ref) for a
+[`ComposedRenewalStep`](@ref) carrying a [`SusceptibleDepletion`](@ref) modifier,
+giving a renewal process with a fixed population ``N`` and susceptible depletion
+```math
+I_t = \frac{S_{t-1}}{N} \mathcal R_t \sum_{i=1}^{n-1} I_{t-i} g_i, \qquad
+S_t = S_{t-1} - I_t.
+```
+
 ## Fields
 
   - `data`: the [`IDData`](@ref) object (generation interval + transformation).
@@ -27,7 +35,8 @@ keeps an [`IDData`](@ref) object.
     the (log) reproduction number.
   - `initialisation_prior`: prior for the unconstrained initial infections.
   - `recurrent_step`: the renewal accumulation step (an
-    [`AbstractConstantRenewalStep`](@ref)).
+    [`AbstractConstantRenewalStep`](@ref)); a [`ConstantRenewalStep`](@ref) by
+    default, or a [`ComposedRenewalStep`](@ref) when `population` is set.
 
 # Examples
 ```@example Renewal
@@ -35,6 +44,10 @@ using ComposableTuringIDModels, Distributions
 data = IDData([0.2, 0.3, 0.5], exp)
 renewal = Renewal(data; rt = RandomWalk(), initialisation_prior = Normal())
 rand(as_turing_model(renewal, 20))
+
+# With a fixed population and susceptible depletion.
+depleting = Renewal(data; rt = RandomWalk(), population = 1000.0)
+rand(as_turing_model(depleting, 20))
 ```
 "
 struct Renewal{E <: IDData, L <: AbstractLatentModel, S <: Sampleable,
@@ -50,14 +63,17 @@ struct Renewal{E <: IDData, L <: AbstractLatentModel, S <: Sampleable,
 end
 
 function Renewal(data::IDData; rt::AbstractLatentModel = RandomWalk(),
-        initialisation_prior = Normal())
-    recurrent_step = ConstantRenewalStep(reverse(data.gen_int))
+        initialisation_prior = Normal(), population = nothing)
+    core = ConstantRenewalStep(reverse(data.gen_int))
+    recurrent_step = isnothing(population) ? core :
+                     ComposedRenewalStep(core, (SusceptibleDepletion(population),))
     return Renewal(data, rt, initialisation_prior, recurrent_step)
 end
 
 function Renewal(; data::IDData, rt::AbstractLatentModel = RandomWalk(),
-        initialisation_prior = Normal())
-    return Renewal(data; rt = rt, initialisation_prior = initialisation_prior)
+        initialisation_prior = Normal(), population = nothing)
+    return Renewal(data; rt = rt, initialisation_prior = initialisation_prior,
+        population = population)
 end
 
 # Initial renewal state from sampled I₀ and R₀, decaying at the implied rate.
