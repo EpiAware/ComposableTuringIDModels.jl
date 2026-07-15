@@ -37,10 +37,16 @@
 
 ### Changed
 
-- **Moved to Turing 0.46 / DynamicPPL 0.42.1.** DynamicPPL 0.42.1's
-  nested-submodel type-inference fix makes the package's prefix-on composition
-  fast to evaluate and differentiate again, so the docs case studies run their
-  full NUTS draw counts.
+- **Moved to Turing 0.46 / DynamicPPL 0.42.1.** This tracks the latest Turing
+  and picks up DynamicPPL 0.42.1's nested-submodel type-inference fix. For this
+  package's composed models the fix is a modest evaluation speedup (~1.2x on a
+  representative renewal model, not the order-of-magnitude seen for pathological
+  pure-nesting), so it does not by itself make the heavy case-study builds cheap.
+- **Docs case studies sample moderate NUTS draws** (250 draws x 2 chains for the
+  multi-chain fits; 200-300 for the single-chain ones) rather than research-grade
+  counts. This keeps the documentation build to a sensible time while remaining
+  statistically valid for the demonstrations; a production analysis would use
+  more draws.
 
 ### Added
 

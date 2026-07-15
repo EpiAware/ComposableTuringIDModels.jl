@@ -178,7 +178,7 @@ this package (see [Automatic differentiation backend](@ref ad-backend)).
 posterior = as_turing_model(model, y_obs, n)
 chain = sample(
     posterior, NUTS(0.9; adtype = AutoMooncake(; config = nothing)),
-    MCMCThreads(), 500, 2; progress = false)
+    MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
 

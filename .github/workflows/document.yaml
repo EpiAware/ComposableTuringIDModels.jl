@@ -19,5 +19,5 @@ jobs:
   Documenter:
     uses: EpiAware/.github/.github/workflows/documentation.yml@c758269c3e60b7148e9f15d7f0d493aaa4fb8ffc
     with:
-      timeout_minutes: 120
+      timeout_minutes: 150
     secrets: inherit  # pragma: allowlist secret
