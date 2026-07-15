@@ -39,6 +39,18 @@ This is the numeric, contract-compliant partial-pooling construct: it returns
 length-`n_groups` values rather than per-group model variants, and takes its
 cross-group relationship through the prior interface.
 
+Because `Hierarchy` is itself an [`AbstractPriorModel`](@ref), it also drops
+straight into **any component's prior slot** through the priors weave, with no
+per-component code. A prior slot builds its prior with the slot's own length,
+`as_turing_model(prior, n)`, so the pooling is across that length `n`; when `n`
+is the grouping dimension the parameter is partially pooled across groups. For
+example, `Ascertainment(model, Hierarchy(...))` passes `n = length(Y_t)`, so with
+one observation per group it gives a per-group, partially-pooled ascertainment
+intercept. Slots that carry a single global value for a single series (a scalar
+`n == 1` read with `only`, e.g. a `cluster_factor` or `std`) collapse a
+`Hierarchy` to one group and do not pool — pooling such a parameter across groups
+is a composition-level concern (see the partial-pooling case study).
+
 ## Fields
 
   - `mean`: prior for the shared level ``\mu`` (an [`AbstractPriorModel`](@ref)).

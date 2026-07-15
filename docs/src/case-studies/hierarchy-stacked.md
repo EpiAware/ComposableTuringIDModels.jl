@@ -143,3 +143,64 @@ dimension threaded from the data, and namespacing the group prior let it compose
 with the infection process's own latent.
 Swapping `across = RandomWalk()` would instead pool *neighbouring* groups
 (correlated ordered strata) with no other change.
+
+## Partial pooling through a component prior slot
+
+The model above threads the group dimension by hand.
+Because [`Hierarchy`](@ref) is itself an [`AbstractPriorModel`](@ref), it can also
+be dropped **straight into a component's prior slot** through the priors weave,
+with no bespoke grouped model.
+A prior slot builds its prior with the slot's own length, `as_turing_model(prior,
+n)`, so the pooling is across that length `n`; when `n` is the grouping dimension
+the parameter is partially pooled across groups.
+
+[`Ascertainment`](@ref) passes `n = length(Y_t)` to its prior slot, so with one
+observation per group a [`Hierarchy`](@ref) there is a per-group,
+partially-pooled ascertainment intercept.
+Here `G` groups each report a single count whose expected value is a shared
+baseline scaled by the pooled per-group effect ``\exp(\ell_g)``:
+
+```@example hierprior
+using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
+using Turing: returned
+Random.seed!(391)
+
+pooled_ascertainment = Ascertainment(
+    PoissonError(),
+    Hierarchy(; mean = Normal(0.0, 0.3), across = IID(Normal(0.0, 0.4))))
+
+G = 8
+baseline = fill(300.0, G)                       # shared expected level per group
+sim = as_turing_model(pooled_ascertainment, missing, baseline)()
+ydata = Int.(sim.y_t)
+true_levels = log.(sim.expected ./ baseline)    # per-group intercepts ℓ_g
+(counts = ydata, true_levels = round.(true_levels, digits = 2))
+```
+
+There is no hand-written loop and no [`PrefixLatentModel`](@ref): the
+[`Hierarchy`](@ref) sits in the ascertainment prior slot and the group dimension
+is the length of the observation vector.
+Conditioning on the counts and sampling recovers the per-group intercepts:
+
+```@example hierprior
+posterior = as_turing_model(pooled_ascertainment, Float64.(ydata), baseline)
+chain = sample(posterior, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 150;
+    progress = false)
+
+rets = vec(returned(posterior, chain))
+expected_draws = reduce(hcat, [r.expected for r in rets])
+post_levels = log.(expected_draws ./ baseline)
+post_mean = vec(mean(post_levels; dims = 2))
+(true_levels = round.(true_levels, digits = 2),
+    posterior_means = round.(post_mean, digits = 2),
+    correlation = round(cor(true_levels, post_mean), digits = 3))
+```
+
+The pooled per-group ascertainment intercepts line up with the simulated truth,
+recovered from a plain component prior slot.
+The same [`Hierarchy`](@ref) drops into any other slot whose length is the group
+dimension.
+A slot that carries a single global value for a single series — a scalar prior
+read with `only`, such as a `cluster_factor` or a `std` — passes `n = 1`, so a
+[`Hierarchy`](@ref) there collapses to one group and does not pool; pooling such a
+parameter across groups is the composition-level task shown earlier on this page.

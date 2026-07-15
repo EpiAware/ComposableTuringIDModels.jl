@@ -134,6 +134,52 @@ end
     @test cor(sim.group_levels, post_mean) > 0.5
 end
 
+@testitem "Hierarchy plugs into a component prior slot (Ascertainment)" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(390)
+    # Because `Hierarchy` is an `AbstractPriorModel`, it drops straight into any
+    # component prior slot through the priors weave — no bespoke grouped model.
+    # A prior slot passes its own length `n`, so when that length is the group
+    # dimension the pooling is across groups. Here the `Ascertainment` slot passes
+    # `n = length(Y_t)`: with one observation per group, each group gets its own
+    # partially-pooled ascertainment intercept.
+    h = Hierarchy(; mean = Normal(0.0, 0.3), across = IID(Normal(0.0, 0.4)))
+    asc = Ascertainment(PoissonError(), h)
+    @test asc isa AbstractObservationModel
+    @test implements_observation_interface(asc; Y_t = fill(300.0, 6))
+    G = 6
+    draw = as_turing_model(asc, missing, fill(300.0, G))()
+    # One observation per group; the per-group expected carries the pooled effect.
+    @test length(draw.y_t) == G
+    @test length(draw.expected) == G
+end
+
+@testitem "Hierarchy as an Ascertainment prior recovers per-group intercepts" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
+    using Turing: returned
+    Random.seed!(391)
+    # A per-group ascertainment intercept partially pooled by a `Hierarchy` passed
+    # straight into the `Ascertainment` prior slot. Each group contributes one
+    # Poisson count whose expected value is a shared baseline scaled by the pooled
+    # per-group effect `exp(ℓ_g)`. Sampling recovers the per-group intercepts.
+    h = Hierarchy(; mean = Normal(0.0, 0.3), across = IID(Normal(0.0, 0.4)))
+    asc = Ascertainment(PoissonError(), h)
+    G = 8
+    base = fill(300.0, G)
+    sim = as_turing_model(asc, missing, base)()
+    ydata = Int.(sim.y_t)
+    true_levels = log.(sim.expected ./ base)
+    post = as_turing_model(asc, Float64.(ydata), base)
+    chain = sample(post, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 200;
+        progress = false)
+    @test size(chain, 1) == 200
+    # Per-group intercepts recovered from the returned expected series.
+    rets = vec(returned(post, chain))
+    expected_draws = reduce(hcat, [r.expected for r in rets])
+    post_mean = vec(mean(log.(expected_draws ./ base); dims = 2))
+    @test cor(true_levels, post_mean) > 0.8
+end
+
 @testitem "a partially-pooled model samples under NUTS (ForwardDiff)" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     using DynamicPPL: to_submodel
