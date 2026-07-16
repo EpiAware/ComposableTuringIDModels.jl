@@ -72,9 +72,9 @@ the ``r_t`` process of a [`Renewal`](@ref) inside a composed [`IDModel`](@ref),
 with no glue code:
 
 ```@example tvdamp
-data = IDData([0.2, 0.3, 0.5], exp)
+gen_int = [0.2, 0.3, 0.5]
 nested = IDModel(
-    Renewal(data; rt = TimeVaryingAR(), initialisation = Normal()),
+    Renewal(gen_int; rt = TimeVaryingAR(), initialisation = Normal()),
     PoissonError())
 length(as_turing_model(nested, missing, 12)().generated_y_t)
 ```
