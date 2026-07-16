@@ -115,7 +115,7 @@ end
         return (; I_t, group_levels, y = ys)
     end
 
-    n_time, n_groups = 20, 4
+    n_time, n_groups = 20, 8
     # n_groups threads from the number of columns of the (missing) data matrix.
     Ymiss = Matrix{Union{Missing, Float64}}(missing, n_time, n_groups)
     sim = grouped_epidemic(idmodel, hierarchy, Ymiss)()
