@@ -24,6 +24,28 @@ end
     @test length(use_prior([Normal(), Normal()], 2)()) == 2
 end
 
+@testitem "as_turing_submodel prefix kwarg namespaces inner variables" begin
+    using ComposableTuringIDModels, Turing
+    using DynamicPPL: VarInfo
+    # prefix = true names the inner variables under the slot's LHS name, so a
+    # RandomWalk's `rw_init`/`ϵ_t` become `z.rw_init...`/`z.ϵ_t...`.
+    @model function prefixed(m, n)
+        z ~ as_turing_submodel(m, n; prefix = true)
+        return z
+    end
+    prefixed_keys = string.(keys(VarInfo(prefixed(RandomWalk(), 6))))
+    @test all(startswith("z."), prefixed_keys)
+    @test any(occursin("rw_init", k) for k in prefixed_keys)
+    # prefix = false (the default) keeps the inner variables flat, unprefixed.
+    @model function flat(m, n)
+        z ~ as_turing_submodel(m, n; prefix = false)
+        return z
+    end
+    flat_keys = string.(keys(VarInfo(flat(RandomWalk(), 6))))
+    @test !any(startswith("z."), flat_keys)
+    @test any(occursin("rw_init", k) for k in flat_keys)
+end
+
 @testitem "as_turing_model over a Distribution draws n i.i.d. values" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(101)
