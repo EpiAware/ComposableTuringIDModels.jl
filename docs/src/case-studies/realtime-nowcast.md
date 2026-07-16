@@ -84,7 +84,7 @@ path the rest of the package uses.
 datapath = joinpath(pkgdir(ComposableTuringIDModels),
     "docs", "src", "case-studies", "data", "italy_data.csv")
 italy = CSV.read(datapath, DataFrame)
-n = 45
+n = 35
 eventual = italy.confirm[1:n]                 # eventual (complete) totals
 
 reporting_delay = LogNormal(1.6, 0.5)         # mean ≈ 5.6 days
@@ -163,14 +163,14 @@ built through the shared [`define_y_t`](@ref) hook.
 naive_model = IDModel(renewal, error)
 naive_post = as_turing_model(naive_model, observed_so_far, n)
 naive_chain = sample(
-    naive_post, NUTS(1000, 0.9; adtype = adt), MCMCThreads(), 250, 2;
+    naive_post, NUTS(1000, 0.9; adtype = adt), MCMCThreads(), 180, 2;
     progress = false)
 
 rt_obs = RightTruncate(error, ReportingCDF(reporting_delay; D = 10))
 rt_model = IDModel(renewal, rt_obs)
 rt_post = as_turing_model(rt_model, observed_so_far, n)
 rt_chain = sample(
-    rt_post, NUTS(1000, 0.9; adtype = adt), MCMCThreads(), 250, 2;
+    rt_post, NUTS(1000, 0.9; adtype = adt), MCMCThreads(), 180, 2;
     progress = false)
 
 tri_obs = ReportTriangle(error, delay_pmf)
@@ -178,18 +178,7 @@ tri_data = define_y_t(tri_obs, reported_triangle, eventual)
 tri_model = IDModel(renewal, tri_obs)
 tri_post = as_turing_model(tri_model, tri_data, n)
 tri_chain = sample(
-    tri_post, NUTS(1000, 0.9; adtype = adt), MCMCThreads(), 250, 2;
-    progress = false)
-nothing # hide
-```
-
-As a reference we also fit the plain model to the **complete** (untruncated)
-series, what the analyst would eventually see.
-
-```@example nowcast
-complete_post = as_turing_model(naive_model, eventual, n)
-complete_chain = sample(
-    complete_post, NUTS(1000, 0.9; adtype = adt), MCMCThreads(), 250, 2;
+    tri_post, NUTS(1000, 0.9; adtype = adt), MCMCThreads(), 180, 2;
     progress = false)
 nothing # hide
 ```
@@ -200,8 +189,7 @@ nothing # hide
 fitted model over the chain with [`generated_observables`](@ref).
 Averaging it over the most recent window shows the bias and its removal.
 Right-truncation biases the naive recent ``R_t`` *downward*, so the naive value
-sits below the two corrections, which lift it back up towards the complete-data
-reference.
+sits below the two corrections, which lift it back up off that spurious decline.
 The exact numbers carry Monte Carlo noise on this short run, but the direction is
 the robust, repeatable signal.
 
@@ -214,8 +202,7 @@ function recent_Rt(post, chain; window = 7)
     round(mean(Rt_mean[(end - window + 1):end]), digits = 2)
 end
 
-(complete = recent_Rt(complete_post, complete_chain),
-    naive = recent_Rt(naive_post, naive_chain),
+(naive = recent_Rt(naive_post, naive_chain),
     right_truncate = recent_Rt(rt_post, rt_chain),
     report_triangle = recent_Rt(tri_post, tri_chain))
 ```
@@ -224,7 +211,7 @@ end
 
 Three views of the fits share the reference-day axis with the recent window
 shaded.
-The **``R_t``** panel plots the ``\exp(Z_t)`` bands of all four fits.
+The **``R_t``** panel plots the ``\exp(Z_t)`` bands of all three fits.
 The **nowcast** panel plots the reconstructed eventual totals ``Y_t = I_t`` for
 the two corrections against the true eventual totals and the truncated
 observed-so-far.
@@ -276,7 +263,6 @@ end
 
 ```@example nowcast
 ts = 1:n
-Rt_complete = gen_bands(complete_post, complete_chain, g -> exp.(g.Z_t))
 Rt_naive = gen_bands(naive_post, naive_chain, g -> exp.(g.Z_t))
 Rt_rt = gen_bands(rt_post, rt_chain, g -> exp.(g.Z_t))
 Rt_tri = gen_bands(tri_post, tri_chain, g -> exp.(g.Z_t))
@@ -290,12 +276,11 @@ yt = predictive_bands(rt_pred, n)
 fig = Figure(; size = (780, 820))
 ax1 = Axis(fig[1, 1]; ylabel = "Reproduction number Rₜ")
 vspan!(ax1, n - 6, n; color = (:grey, 0.15))
-ci_ribbon!(ax1, ts, Rt_complete; color = :black, label = "complete (reference)")
 ci_ribbon!(ax1, ts, Rt_naive; color = :crimson, label = "naive")
 ci_ribbon!(ax1, ts, Rt_rt; color = :seagreen, label = "right-truncate")
 ci_ribbon!(ax1, ts, Rt_tri; color = :steelblue, label = "report-triangle")
 hlines!(ax1, [1.0]; color = :grey, linestyle = :dash)
-axislegend(ax1; position = :lb, nbanks = 2)
+axislegend(ax1; position = :lb)
 
 ax2 = Axis(fig[2, 1]; ylabel = "Eventual cases (nowcast)")
 vspan!(ax2, n - 6, n; color = (:grey, 0.15))
@@ -316,9 +301,9 @@ axislegend(ax3; position = :lt)
 fig
 ```
 
-In the shaded recent window the naive ``R_t`` (crimson) dips below the
-complete-data reference (black), while the two corrections lift the recent
-``R_t`` back up off that spurious decline.
+In the shaded recent window the naive ``R_t`` (crimson) turns down, the
+artefactual late decline, while the two corrections lift the recent ``R_t`` back
+up off that spurious drop.
 The nowcast panel shows the same story on the count scale, the corrections lifting
 the reconstructed eventual totals above the truncated observed-so-far towards the
 true eventual line.
