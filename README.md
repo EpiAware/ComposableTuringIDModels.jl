@@ -25,7 +25,7 @@
 - **One interface**: Every part becomes a [Turing](https://turinglang.org) /
   [DynamicPPL](https://github.com/TuringLang/DynamicPPL.jl) model through the
   single `as_turing_model` constructor, so parts nest freely as submodels. The
-  full Turing inference toolbox (NUTS, Pathfinder, prior simulation) applies.
+  full Turing inference toolbox (NUTS, prior simulation) applies.
 - **Simulate and infer**: Generate synthetic data from any model, then run
   Bayesian inference on the same model with real data.
 - **A library of parts**: Random walks, AR/MA/ARIMA latent processes, renewal
@@ -116,6 +116,24 @@ ComposableTuringIDModels is a modified, derived work: it has been renamed, re-ar
 around the generic `as_turing_model` constructor, and upgraded to build against
 the latest Turing.jl. See the [`NOTICE`](NOTICE) file for full attribution and a
 summary of the changes, and [`LICENSE`](LICENSE) for the Apache-2.0 terms.
+
+<!-- standard-sections:start -->
+<!-- MANAGED by EpiAwarePackageTools.scaffold — do not edit between the
+     markers. These standard sections are re-rendered on every scaffold_update;
+     edit the package-owned sections outside them, or CITATION.cff. -->
+
+## Contributing
+
+We welcome contributions and new contributors! Please open an issue or pull request on [GitHub](https://github.com/EpiAware/ComposableTuringIDModels.jl). This package follows [ColPrac](https://github.com/SciML/ColPrac) and the [SciML style](https://github.com/SciML/SciMLStyle).
+
+## How to cite
+
+If you use ComposableTuringIDModels in your work, please cite it. Citation metadata lives in [`CITATION.cff`](https://github.com/EpiAware/ComposableTuringIDModels.jl/blob/main/CITATION.cff), which GitHub renders as a "Cite this repository" button on the repository page.
+
+## Code of conduct
+
+Please note that the ComposableTuringIDModels project is released with a [Contributor Code of Conduct](https://github.com/EpiAware/.github/blob/main/CODE_OF_CONDUCT.md). By contributing, you agree to abide by its terms.
+<!-- standard-sections:end -->
 
 ## License
 

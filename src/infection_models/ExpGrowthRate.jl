@@ -19,7 +19,8 @@ so `as_turing_model` takes only the series length `n` and returns the named tupl
 `(; I_t, Z_t)` with `Z_t` the growth-rate path.
 
 This model carries no generation interval — it never uses one — so it takes a
-`transformation` directly instead of an [`IDData`](@ref) object.
+`transformation` directly ([`Renewal`](@ref) is the only infection model that
+carries a generation interval).
 
 ## Fields
 

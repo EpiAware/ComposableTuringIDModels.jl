@@ -64,9 +64,8 @@ latent = AR(
     damp_priors = [truncated(Normal(0.8, 0.05), 0, 1)],
     init_priors = [Normal(0.0, 0.25)],
     ϵ_t = HierarchicalNormal(std_prior = HalfNormal(0.1)))
-gen_data = IDData(gen_distribution = Gamma(1.4, 1 / 0.38))
-renewal = Renewal(
-    gen_data; rt = latent, initialisation_prior = Normal(log(1.0), 1.0))
+renewal = Renewal(gen_distribution = Gamma(1.4, 1 / 0.38);
+    rt = latent, initialisation_prior = Normal(log(1.0), 1.0))
 error = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1))
 nothing # hide
 ```

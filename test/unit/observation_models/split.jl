@@ -179,7 +179,7 @@ end
 @testitem "Split composes with a renewal model and samples under NUTS" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Random, Turing
     Random.seed!(88)
-    data = IDData([0.2, 0.3, 0.5], exp)
+    gen_int = [0.2, 0.3, 0.5]
     n = 25
 
     # Parallel cases + deaths off one shared renewal infection trajectory.
@@ -190,7 +190,7 @@ end
             Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.05))),
             truncated(Normal(7.0, 2.0), 0.0, Inf))))
     model = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()), obs)
+        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()), obs)
 
     sim = as_turing_model(model, missing, n)()
     @test keys(sim.generated_y_t) == (:cases, :deaths)
@@ -210,7 +210,7 @@ end
 @testitem "Split cascade composes with a renewal model and samples under NUTS" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Random, Turing
     Random.seed!(90)
-    data = IDData([0.2, 0.3, 0.5], exp)
+    gen_int = [0.2, 0.3, 0.5]
     n = 25
 
     # Cascade: deaths downstream of the delayed expected cases (placement, no flag).
@@ -222,7 +222,7 @@ end
                 truncated(Normal(5.0, 1.5), 0.0, Inf)))),
         truncated(Normal(3.0, 1.0), 0.0, Inf))
     model = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()), cascade)
+        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()), cascade)
 
     sim = as_turing_model(model, (cases = missing, deaths = missing), n)()
     @test keys(sim.generated_y_t) == (:cases, :deaths)
@@ -235,7 +235,7 @@ end
 @testitem "Split strata composes with a renewal model and samples under NUTS" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Random, Turing
     Random.seed!(91)
-    data = IDData([0.2, 0.3, 0.5], exp)
+    gen_int = [0.2, 0.3, 0.5]
     n = 25
 
     # Strata: one full stream per band off the shared renewal infections.
@@ -247,7 +247,7 @@ end
             Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.4))),
             truncated(Normal(3.0, 1.0), 0.0, Inf))))
     model = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()), strata)
+        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()), strata)
 
     sim = as_turing_model(model, (young = missing, old = missing), n)()
     @test keys(sim.generated_y_t) == (:young, :old)
