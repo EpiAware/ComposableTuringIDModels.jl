@@ -33,14 +33,16 @@ concrete model struct implements exactly one
 end
 ```
 
-method, and components are composed by sampling submodels of one another:
+method, and components are composed by sampling submodels of one another through
+the [`as_turing_submodel`](@ref) seam:
 
 ```julia
-z ~ to_submodel(as_turing_model(inner_model, n), false)
+z ~ as_turing_submodel(inner_model, n)
 ```
 
-The trailing `false` to `to_submodel` disables automatic variable prefixing so
-that parameter names stay flat unless prefixing is explicitly requested.
+`as_turing_submodel` disables automatic variable prefixing by default so that
+parameter names stay flat unless prefixing is explicitly requested
+(`prefix = true`).
 
 The fallback method below errors with a clear message when a struct does not yet
 implement `as_turing_model`, which keeps the public surface honest.

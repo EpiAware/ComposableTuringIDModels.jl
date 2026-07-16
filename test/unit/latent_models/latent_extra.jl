@@ -10,37 +10,36 @@
     @test length(as_turing_model(rec, 5)()) == 5
 end
 
-@testitem "latent modifiers coerce a bare-Distribution member" begin
+@testitem "latent modifiers accept a raw bare-Distribution member" begin
     using ComposableTuringIDModels, Distributions, Random
-    using ComposableTuringIDModels: BroadcastPrior
     Random.seed!(310)
     n = 5
 
-    # Each @kwdef / modifier struct wraps a bare `Distribution` member via
-    # `as_prior`, matching the top-level slots and Combine/Concat members.
+    # Each @kwdef / modifier struct stores a bare `Distribution` member raw; it
+    # composes through `as_turing_submodel` (n i.i.d. draws) like a model.
     trans = TransformLatentModel(Normal(), x -> exp.(x))
-    @test trans.model isa BroadcastPrior
+    @test trans.model isa Distribution
     @test length(as_turing_model(trans, n)()) == n
 
     rec = RecordExpectedLatent(Normal())
-    @test rec.model isa BroadcastPrior
+    @test rec.model isa Distribution
     @test length(as_turing_model(rec, n)()) == n
 
     pref = PrefixLatentModel(Normal(), "Test")
-    @test pref.model isa BroadcastPrior
+    @test pref.model isa Distribution
     pref_kw = PrefixLatentModel(; model = Normal(), prefix = "Test")
-    @test pref_kw.model isa BroadcastPrior
+    @test pref_kw.model isa Distribution
 
     bcast = BroadcastLatentModel(Normal(), 7, RepeatEach())
-    @test bcast.model isa BroadcastPrior
+    @test bcast.model isa Distribution
     bcast_kw = BroadcastLatentModel(Normal(); period = 7,
         broadcast_rule = RepeatEach())
-    @test bcast_kw.model isa BroadcastPrior
+    @test bcast_kw.model isa Distribution
     @test length(as_turing_model(bcast, 10)()) == 10
 
-    # A vector of `Distribution`s coerces to the vector `BroadcastPrior`.
+    # A vector of `Distribution`s is stored as the raw vector.
     vec_member = TransformLatentModel([Normal(), Normal()], identity)
-    @test vec_member.model isa BroadcastPrior
+    @test vec_member.model isa AbstractVector{<:Distribution}
 
     # A richer prior model is stored unchanged (no double-wrapping).
     proc = TransformLatentModel(RandomWalk(), identity)

@@ -15,24 +15,20 @@ rm = RecordExpectedLatent(FixedIntercept(0.1))
 rand(as_turing_model(rm, 1))
 ```
 
-The `model` slot is an [`AbstractPriorModel`](@ref): a bare `Distribution` (or a
-vector of them) is coerced via [`as_prior`](@ref), as at the top-level slots.
+The `model` slot takes a raw component: a latent model, or a `Distribution` (or a
+vector of them), composed through [`as_turing_submodel`](@ref).
 
 ## Fields
 
   - `model`: the latent model whose expected latent vector is recorded.
 "
-struct RecordExpectedLatent{M <: AbstractLatentModel} <: AbstractLatentModel
+struct RecordExpectedLatent{M <: PriorLike} <: AbstractLatentModel
     "The latent model whose expected latent vector is recorded."
     model::M
 end
 
-# Coerce a bare `Distribution` (or vector) member to the prior interface so it is
-# accepted alongside a process, matching the top-level slots and Combine/Concat.
-RecordExpectedLatent(model) = RecordExpectedLatent(as_prior(model))
-
 @model function as_turing_model(model::RecordExpectedLatent, n)
-    latent ~ to_submodel(as_turing_model(model.model, n))
+    latent ~ as_turing_submodel(model.model, n)
     exp_latent := latent
     return latent
 end

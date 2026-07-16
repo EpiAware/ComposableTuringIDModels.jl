@@ -3,9 +3,9 @@
 @doc raw"
 Broadcast a single sampled intercept value to a length-`n` latent process.
 
-The field `intercept` sets the prior the intercept is drawn from (an
-[`AbstractPriorModel`](@ref); a bare `Distribution` is coerced via
-[`as_prior`](@ref)).
+The field `intercept` sets the prior the intercept is drawn from — a
+`Distribution`, drawn with a native tilde (a single scalar draw broadcast to
+length `n`).
 
 # Examples
 ```@example Intercept
@@ -15,18 +15,16 @@ mdl = as_turing_model(int, 10)
 rand(mdl)
 ```
 "
-struct Intercept{D <: AbstractPriorModel} <: AbstractLatentModel
+struct Intercept{D <: Distribution} <: AbstractLatentModel
     "Prior for the intercept."
     intercept::D
-    Intercept(intercept::AbstractPriorModel) = new{typeof(intercept)}(intercept)
 end
 
-Intercept(intercept) = Intercept(as_prior(intercept))
-Intercept(; intercept) = Intercept(as_prior(intercept))
+Intercept(; intercept) = Intercept(intercept)
 
 @model function as_turing_model(model::Intercept, n)
-    intercept ~ to_submodel(as_turing_model(model.intercept, 1))
-    return fill(only(intercept), n)
+    intercept ~ model.intercept
+    return fill(intercept, n)
 end
 
 @doc raw"

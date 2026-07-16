@@ -43,6 +43,6 @@ end
     y_t = data.y_t
     time_steps = idproblem.tspan[end] - idproblem.tspan[1] + 1
     model = IDModel(idproblem.infection, idproblem.observation_model)
-    out ~ to_submodel(as_turing_model(model, y_t, time_steps), false)
+    out ~ as_turing_submodel(model, y_t, time_steps)
     return out
 end

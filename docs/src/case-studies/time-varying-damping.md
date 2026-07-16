@@ -89,7 +89,7 @@ recovered straight from the chain:
 
 ```@example tvdamp
 @model function observe_path(y, n)
-    latent ~ to_submodel(as_turing_model(TimeVaryingAR(), n), false)
+    latent ~ as_turing_submodel(TimeVaryingAR(), n)
     for t in 1:n
         y[t] ~ Normal(latent[t], 0.01)
     end

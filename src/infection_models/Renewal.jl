@@ -25,9 +25,8 @@ keeps an [`IDData`](@ref) object.
   - `data`: the [`IDData`](@ref) object (generation interval + transformation).
   - `rt`: the latent process model (an [`AbstractLatentModel`](@ref)) generating
     the (log) reproduction number.
-  - `initialisation`: prior for the unconstrained initial infections (an
-    [`AbstractPriorModel`](@ref); a bare `Distribution` is coerced via
-    [`as_prior`](@ref)).
+  - `initialisation`: prior for the unconstrained initial infections (a
+    `Distribution` or prior model, sampled through [`as_turing_submodel`](@ref)).
   - `recurrent_step`: the renewal accumulation step (an
     [`AbstractConstantRenewalStep`](@ref)).
 
@@ -39,7 +38,7 @@ renewal = Renewal(data; rt = RandomWalk(), initialisation = Normal())
 rand(as_turing_model(renewal, 20))
 ```
 "
-struct Renewal{E <: IDData, L <: AbstractLatentModel, S <: AbstractPriorModel,
+struct Renewal{E <: IDData, L <: PriorLike, S <: PriorLike,
     A <: AbstractConstantRenewalStep} <: AbstractInfectionModel
     "`IDData` object."
     data::E
@@ -54,8 +53,7 @@ end
 function Renewal(data::IDData; rt = RandomWalk(),
         initialisation = Normal())
     recurrent_step = ConstantRenewalStep(reverse(data.gen_int))
-    return Renewal(data, as_prior(rt), as_prior(initialisation),
-        recurrent_step)
+    return Renewal(data, rt, initialisation, recurrent_step)
 end
 
 function Renewal(; data::IDData, rt = RandomWalk(),
@@ -71,9 +69,9 @@ function _make_renewal_init(infection::Renewal, I₀, Rt₀)
 end
 
 @model function as_turing_model(infection::Renewal, n)
-    Z_t ~ to_submodel(as_turing_model(infection.rt, n))
-    init_incidence ~ to_submodel(
-        as_turing_model(infection.initialisation, 1))
+    Z_t ~ as_turing_submodel(infection.rt, n)
+    init_incidence ~ as_turing_submodel(
+        infection.initialisation, 1; prefix = true)
     I₀ = infection.data.transformation(only(init_incidence))
     Rt = infection.data.transformation.(Z_t)
     init = _make_renewal_init(infection, I₀, Rt[1])

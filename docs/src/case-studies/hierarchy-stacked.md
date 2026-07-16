@@ -51,17 +51,16 @@ apart — this is the group-requirement threading made explicit:
     n_time, n_groups = size(Y)
     # Per-group pooled log-ascertainment levels; namespaced so the group prior's
     # innovations do not collide with the infection process's own latent.
-    group_levels ~ to_submodel(
-        as_turing_model(PrefixLatentModel(hierarchy, "groups"), n_groups), false)
+    group_levels ~ as_turing_submodel(
+        PrefixLatentModel(hierarchy, "groups"), n_groups)
     # One shared infection process (the IDModel's infection component).
-    infections ~ to_submodel(
-        as_turing_model(idmodel.infection_model, n_time), false)
+    infections ~ as_turing_submodel(idmodel.infection_model, n_time)
     I_t = infections.I_t
     ys = Vector{Any}(undef, n_groups)
     for g in 1:n_groups
         expected_g = exp(group_levels[g]) .* I_t            # group-specific level
         og = PrefixObservationModel(idmodel.observation_model, "group$g")
-        y_g ~ to_submodel(as_turing_model(og, Y[:, g], expected_g), false)
+        y_g ~ as_turing_submodel(og, Y[:, g], expected_g)
         ys[g] = y_g
     end
     return (; I_t, group_levels, y = ys)

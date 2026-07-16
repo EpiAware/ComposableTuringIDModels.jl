@@ -24,8 +24,7 @@ rand(as_turing_model(combined, 10))
   - `models`: the vector of latent models (prefix-wrapped where a prefix is set).
   - `prefixes`: the vector of prefixes, one per model.
 "
-struct CombineLatentModels{
-    M <: AbstractVector{<:AbstractLatentModel}, P <: AbstractVector{<:String}} <:
+struct CombineLatentModels{M <: AbstractVector, P <: AbstractVector{<:String}} <:
        AbstractLatentModel
     "A vector of latent models."
     models::M
@@ -36,14 +35,13 @@ struct CombineLatentModels{
             prefixes::P) where {P <: AbstractVector{<:String}}
         @assert length(models)>1 "At least two models are required"
         @assert length(models)==length(prefixes) "The number of models and prefixes must be equal"
-        # Coerce each member to the prior interface so a bare `Distribution` member
-        # is accepted alongside a process.
-        coerced = as_prior.(models)
-        prefix_models = [prefixes[i] == "" ? coerced[i] :
-                         PrefixLatentModel(coerced[i], prefixes[i])
-                         for i in eachindex(coerced)]
-        return new{AbstractVector{<:AbstractPriorModel},
-            AbstractVector{<:String}}(prefix_models, prefixes)
+        # Wrap each named member in a `PrefixLatentModel` so its variables stay
+        # distinct; a raw `Distribution` member composes through the same seam.
+        prefix_models = [prefixes[i] == "" ? models[i] :
+                         PrefixLatentModel(models[i], prefixes[i])
+                         for i in eachindex(models)]
+        return new{AbstractVector, AbstractVector{<:String}}(
+            prefix_models, prefixes)
     end
 end
 
@@ -63,7 +61,7 @@ end
     if index > n_models
         return acc_latent
     else
-        latent ~ to_submodel(as_turing_model(models[index], n), false)
+        latent ~ as_turing_submodel(models[index], n)
         updated_latent ~ to_submodel(
             _accumulate_latents(models, index + 1, acc_latent .+ latent, n,
                 n_models), false)

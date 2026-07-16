@@ -39,8 +39,9 @@ Check that `model` satisfies the [`AbstractPriorModel`](@ref) interface: it is a
 prior model and `as_turing_model(model, n)` returns a `DynamicPPL.Model`.
 
 Every [`AbstractLatentModel`](@ref) is also an `AbstractPriorModel`, so this holds
-for latent models (a latent process used directly as a prior) as well as for the
-[`BroadcastPrior`](@ref) wrapper and any bespoke prior submodel.
+for latent models (a latent process used directly as a prior) as well as for any
+bespoke prior submodel. A bare `Distribution` is not a prior model (it composes
+through [`as_turing_submodel`](@ref) instead), so this returns `false` for one.
 
 # Arguments
 
@@ -52,8 +53,8 @@ for latent models (a latent process used directly as a prior) as well as for the
 
 # Examples
 ```@example
-using ComposableTuringIDModels, Distributions
-implements_prior_interface(BroadcastPrior(Normal()))
+using ComposableTuringIDModels
+implements_prior_interface(RandomWalk())
 ```
 "
 function implements_prior_interface(model; n::Int = 10)

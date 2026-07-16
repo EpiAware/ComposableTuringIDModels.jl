@@ -11,9 +11,8 @@ A non-centred hierarchical normal latent process.
 ## Fields
 
   - `mean`: the mean of the normal process.
-  - `std`: the prior for the standard deviation ``\sigma`` (an
-    [`AbstractPriorModel`](@ref); a bare `Distribution` is coerced via
-    [`as_prior`](@ref)).
+  - `std`: the prior for the standard deviation ``\sigma`` — a `Distribution`,
+    drawn with a native tilde (a plain scalar draw, no submodel).
   - `add_mean`: flag controlling whether `mean` is added (false when
     `mean == 0`).
 
@@ -25,7 +24,7 @@ mdl = as_turing_model(hn, 10)
 rand(mdl)
 ```
 "
-struct HierarchicalNormal{R <: Real, D <: AbstractPriorModel, M <: Bool} <:
+struct HierarchicalNormal{R <: Real, D <: Distribution, M <: Bool} <:
        AbstractLatentModel
     "Mean of the normal distribution."
     mean::R
@@ -37,7 +36,7 @@ end
 
 function HierarchicalNormal(; mean::Real = 0.0,
         std = truncated(Normal(0, 0.1), 0, Inf), add_mean::Bool = mean != 0)
-    return HierarchicalNormal(mean, as_prior(std), add_mean)
+    return HierarchicalNormal(mean, std, add_mean)
 end
 HierarchicalNormal(std::Distribution) = HierarchicalNormal(; std = std)
 function HierarchicalNormal(mean::Real, std::Distribution)
@@ -45,8 +44,8 @@ function HierarchicalNormal(mean::Real, std::Distribution)
 end
 
 @model function as_turing_model(model::HierarchicalNormal, n)
-    std ~ to_submodel(as_turing_model(model.std, 1))
-    ϵ_t ~ to_submodel(as_turing_model(IID(Normal()), n))
-    η_t = model.add_mean ? model.mean .+ only(std) * ϵ_t : only(std) * ϵ_t
+    std ~ model.std
+    ϵ_t ~ as_turing_submodel(IID(Normal()), n)
+    η_t = model.add_mean ? model.mean .+ std * ϵ_t : std * ϵ_t
     return η_t
 end

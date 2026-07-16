@@ -160,7 +160,7 @@ end
     n = length(Y_t)
 
     # Draw the reporting completeness `F` (by age) from the correction submodel.
-    completeness ~ to_submodel(as_turing_model(obs_model.cdf_model, n), false)
+    completeness ~ as_turing_submodel(obs_model.cdf_model, n)
     @assert length(completeness)==n "The reporting-completeness curve must have length $n (the expected-observation series length); got $(length(completeness))"
 
     # `completeness[a + 1]` is the completeness of a reference day of age `a`. The
@@ -169,7 +169,6 @@ end
     # completeness onto the reference-day axis: `scale[t] = completeness(age = n - t)`.
     scaled_Y_t = Y_t .* reverse(completeness)
 
-    inner ~ to_submodel(
-        as_turing_model(obs_model.model, y_t, scaled_Y_t), false)
+    inner ~ as_turing_submodel(obs_model.model, y_t, scaled_Y_t)
     return (; y_t = inner.y_t, expected = inner.expected)
 end

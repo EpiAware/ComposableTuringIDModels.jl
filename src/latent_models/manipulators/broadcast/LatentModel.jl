@@ -64,8 +64,8 @@ each = BroadcastLatentModel(RandomWalk(), 7, RepeatEach())
 rand(as_turing_model(each, 10))
 ```
 
-The `model` slot is an [`AbstractPriorModel`](@ref): a bare `Distribution` (or a
-vector of them) is coerced via [`as_prior`](@ref), as at the top-level slots.
+The `model` slot takes a raw component: a latent model, or a `Distribution` (or a
+vector of them), composed through [`as_turing_submodel`](@ref).
 
 ## Fields
 
@@ -73,9 +73,8 @@ vector of them) is coerced via [`as_prior`](@ref), as at the top-level slots.
   - `period`: the broadcast period.
   - `broadcast_rule`: the [`AbstractBroadcastRule`](@ref) applied.
 "
-struct BroadcastLatentModel{
-    M <: AbstractLatentModel, P <: Integer, B <: AbstractBroadcastRule} <:
-       AbstractLatentModel
+struct BroadcastLatentModel{M <: PriorLike, P <: Integer,
+    B <: AbstractBroadcastRule} <: AbstractLatentModel
     "The underlying latent model."
     model::M
     "The period of the broadcast."
@@ -83,21 +82,12 @@ struct BroadcastLatentModel{
     "The broadcast rule applied."
     broadcast_rule::B
 
-    function BroadcastLatentModel(model::M,
-            period::Integer,
-            broadcast_rule::B) where {
-            M <: AbstractLatentModel, B <: AbstractBroadcastRule}
+    function BroadcastLatentModel(model, period::Integer,
+            broadcast_rule::B) where {B <: AbstractBroadcastRule}
         @assert period>0 "period must be greater than 0"
         new{typeof(model), typeof(period), typeof(broadcast_rule)}(
             model, period, broadcast_rule)
     end
-end
-
-# Coerce a bare `Distribution` (or vector) member to the prior interface so it is
-# accepted alongside a process, matching the top-level slots and Combine/Concat.
-function BroadcastLatentModel(model,
-        period::Integer, broadcast_rule::AbstractBroadcastRule)
-    return BroadcastLatentModel(as_prior(model), period, broadcast_rule)
 end
 
 function BroadcastLatentModel(model; period::Integer,
@@ -107,6 +97,6 @@ end
 
 @model function as_turing_model(model::BroadcastLatentModel, n)
     m = broadcast_n(model.broadcast_rule, n, model.period)
-    latent_period ~ to_submodel(as_turing_model(model.model, m))
+    latent_period ~ as_turing_submodel(model.model, m)
     return broadcast_rule(model.broadcast_rule, latent_period, n, model.period)
 end

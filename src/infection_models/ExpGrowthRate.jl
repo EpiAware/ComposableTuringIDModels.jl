@@ -28,9 +28,8 @@ This model carries no generation interval — it never uses one — so it takes 
   - `transformation`: the link mapping the unconstrained cumulative sum to
     non-negative infections (default: numerically equivalent to `exp`,
     implemented via `LogExpFunctions.xexpy` for numerical stability).
-  - `initialisation`: prior for the unconstrained initial infections (an
-    [`AbstractPriorModel`](@ref); a bare `Distribution` is coerced via
-    [`as_prior`](@ref)).
+  - `initialisation`: prior for the unconstrained initial infections (a
+    `Distribution` or prior model, sampled through [`as_turing_submodel`](@ref)).
 
 # Examples
 ```@example ExpGrowthRate
@@ -39,8 +38,8 @@ egr = ExpGrowthRate(; rt = RandomWalk(), initialisation = Normal())
 rand(as_turing_model(egr, 10))
 ```
 "
-struct ExpGrowthRate{L <: AbstractLatentModel, F <: Function,
-    S <: AbstractPriorModel} <: AbstractInfectionModel
+struct ExpGrowthRate{L <: PriorLike, F <: Function, S <: PriorLike} <:
+       AbstractInfectionModel
     "Latent process model generating the growth-rate path."
     rt::L
     "Link mapping the unconstrained cumulative sum to non-negative infections."
@@ -51,14 +50,12 @@ end
 
 function ExpGrowthRate(; rt = RandomWalk(),
         transformation::Function = _oneexpy, initialisation = Normal())
-    return ExpGrowthRate(
-        as_prior(rt), transformation, as_prior(initialisation))
+    return ExpGrowthRate(rt, transformation, initialisation)
 end
 
 @model function as_turing_model(model::ExpGrowthRate, n)
-    Z_t ~ to_submodel(as_turing_model(model.rt, n))
-    init_incidence ~ to_submodel(
-        as_turing_model(model.initialisation, 1))
+    Z_t ~ as_turing_submodel(model.rt, n)
+    init_incidence ~ as_turing_submodel(model.initialisation, 1; prefix = true)
     I_t = model.transformation.(only(init_incidence) .+ cumsum(Z_t))
     return (; I_t, Z_t)
 end

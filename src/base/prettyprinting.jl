@@ -4,7 +4,7 @@
 # A composed model is a tree of components: an `IDModel` holds an infection and
 # an observation model, an infection model owns a latent process, a modifier
 # wraps an inner model, and so on. The default Julia `show` renders such a value
-# as its full nested parametric type (`RandomWalk{BroadcastPrior{...}}` — a
+# as its full nested parametric type (`RandomWalk{Normal{...}, ...}` — a
 # screenful), which is unreadable. Here we render the component *tree* instead:
 # each node is the role it plays plus its concrete component name, and we recurse
 # only through the slots that are themselves components, leaving distributions,
@@ -25,12 +25,11 @@ function _role_label(f::Symbol)
 end
 
 # Whether a value is a component the tree should recurse into. Components are
-# `AbstractComposableModel`s, but the default `BroadcastPrior` distribution wrapper
-# is a leaf: it wraps a bare `Distribution` (or vector of them), so showing it adds
-# a `BroadcastPrior` node with nothing beneath it. A richer prior (a latent model
-# used as a prior, e.g. `RandomWalk`) is itself a component and is still recursed
-# into.
-_is_tree_component(v) = v isa AbstractComposableModel && !(v isa BroadcastPrior)
+# `AbstractComposableModel`s. A raw prior slot holds a bare `Distribution` (or a
+# vector of them), which is not a component and so is a leaf automatically; a
+# richer prior (a latent model used as a prior, e.g. `RandomWalk`) is itself a
+# component and is still recursed into.
+_is_tree_component(v) = v isa AbstractComposableModel
 
 # Collect the component children of `model` as `(role, child)` pairs. A field is a
 # child when its value is a tree component (see [`_is_tree_component`](@ref)), or a

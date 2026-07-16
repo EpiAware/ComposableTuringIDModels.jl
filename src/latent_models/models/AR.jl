@@ -12,9 +12,10 @@ with damping coefficients ``\rho`` from the prior in `damp`, initial conditions
 from the prior in `init`, and innovations from the error model `ϵ_t`. The order
 `p` is the length of the damping/initial priors.
 
-Each prior slot is an [`AbstractPriorModel`](@ref): pass a bare `Distribution`
-(or a vector of them, coerced via [`as_prior`](@ref)) as before, or a richer
-prior model (e.g. a latent process for a time-varying coefficient).
+Each prior slot takes a raw prior: pass a bare `Distribution` (order 1), a vector
+of them (order = its length), or a richer prior model (e.g. a latent process for a
+time-varying coefficient). Each slot is sampled through
+[`as_turing_submodel`](@ref).
 
 # Examples
 ```@example AR
@@ -24,8 +25,8 @@ mdl = as_turing_model(ar, 10)
 rand(mdl)
 ```
 "
-struct AR{D <: AbstractPriorModel, I <: AbstractPriorModel, P <: Int,
-    E <: AbstractLatentModel} <: AbstractLatentModel
+struct AR{D <: PriorLike, I <: PriorLike, P <: Int, E <: PriorLike} <:
+       AbstractLatentModel
     "Prior for the damping coefficients."
     damp::D
     "Prior for the initial conditions."
@@ -35,8 +36,7 @@ struct AR{D <: AbstractPriorModel, I <: AbstractPriorModel, P <: Int,
     "Error model for the innovations."
     ϵ_t::E
 
-    function AR(damp::AbstractPriorModel, init::AbstractPriorModel, p::Int,
-            ϵ_t::AbstractLatentModel)
+    function AR(damp, init, p::Int, ϵ_t)
         @assert p>0 "p must be greater than 0"
         _assert_prior_length(damp, p, "damp")
         _assert_prior_length(init, p, "init")
@@ -52,18 +52,16 @@ end
 
 function AR(; damp = [truncated(Normal(0.0, 0.05), 0, 1)], init = [Normal()],
         ϵ_t = HierarchicalNormal())
-    damp_prior = as_prior(damp)
-    init_prior = as_prior(init)
-    p = _prior_order(damp_prior)
-    return AR(damp_prior, init_prior, p, as_prior(ϵ_t))
+    p = _prior_order(damp)
+    return AR(damp, init, p, ϵ_t)
 end
 
 @model function as_turing_model(model::AR, n)
     p = model.p
     @assert n>p "n must be longer than the order of the autoregressive process"
-    ar_init ~ to_submodel(as_turing_model(model.init, p))
-    damp_AR ~ to_submodel(as_turing_model(model.damp, p))
-    ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n - p))
+    ar_init ~ as_turing_submodel(model.init, p; prefix = true)
+    damp_AR ~ as_turing_submodel(model.damp, p; prefix = true)
+    ϵ_t ~ as_turing_submodel(model.ϵ_t, n - p)
     # `ARStep`'s state runs oldest→newest (`[Z_{t-p}, …, Z_{t-1}]`), so reverse
     # the damping coefficients so `damp_AR[i]` multiplies the lag-`i` term
     # `Z_{t-i}`, matching the documented recursion `Z_t = Σ ρ_i Z_{t-i}`. Without
