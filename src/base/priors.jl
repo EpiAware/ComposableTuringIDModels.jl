@@ -134,15 +134,46 @@ as_turing_model([Normal(0, 1), Normal(5, 0.1)], 2)()
     return θ
 end
 
+@doc raw"
+Mark a prior slot as supplying a *time-varying* coefficient path rather than a
+constant.
+
+Wrapping a prior in `TimeVarying` is the opt-in that turns a slot's draw from a
+single constant into a whole length-`(n-1)` path: the inner `prior` is sampled at
+that length and mapped by `transform` before it is threaded through the recursion.
+It is currently understood by [`AR`](@ref)'s `damp` slot — `AR(damp =
+TimeVarying(RandomWalk()))` is a first-order AR whose damping coefficient changes
+over the series (see [`TimeVaryingAR`](@ref) for the named constructor) — whereas a
+bare process in `damp` only enriches the *prior* over a constant coefficient.
+
+# Fields
+
+  - `prior`: the prior process for the raw (pre-`transform`) path (a `Distribution`
+    or a prior model such as a [`RandomWalk`](@ref)).
+  - `transform`: map from the raw path to the coefficient (default `tanh`, giving
+    the stationary band ``(-1, 1)``; pass `identity` to opt out).
+"
+struct TimeVarying{P <: PriorLike, F <: Function}
+    "Prior process for the raw (pre-`transform`) path."
+    prior::P
+    "Map from the raw path to the coefficient (default `tanh`)."
+    transform::F
+end
+
+TimeVarying(prior; transform = tanh) = TimeVarying(prior, transform)
+
 # Order (p / q / d) implied by a prior: a vector fixes it to the vector length; a
-# single distribution or a richer prior model defaults to order 1.
+# single distribution or a richer prior model defaults to order 1. A `TimeVarying`
+# slot is always order 1 (only AR(1) supports a time-varying coefficient; higher
+# orders are tracked in #113).
 _prior_order(p::AbstractVector{<:Distribution}) = length(p)
 _prior_order(::Distribution) = 1
 _prior_order(::AbstractPriorModel) = 1
+_prior_order(::TimeVarying) = 1
 
 # Assert a vector prior's length matches the required order `k`. A single
-# distribution or a richer prior model broadcasts to `k` and imposes no
-# constraint.
+# distribution, a richer prior model, or a `TimeVarying` marker broadcasts to `k`
+# and imposes no constraint.
 function _assert_prior_length(p::AbstractVector{<:Distribution}, k, what)
     @assert length(p)==k "$what prior length $(length(p)) must equal $k"
     return nothing

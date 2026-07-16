@@ -1,4 +1,5 @@
-# Time-varying autoregressive accumulation step (used by `TimeVaryingAR`).
+# Time-varying autoregressive accumulation step. Used by `AR` in its time-varying
+# mode (a `TimeVarying`-marked `damp` slot; see `AR.jl` and `TimeVaryingAR`).
 
 @doc raw"
 Time-varying AR(1) step for use with [`accumulate_scan`](@ref).

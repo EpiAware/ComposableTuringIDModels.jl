@@ -68,8 +68,8 @@ export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial
        NegativeBinomialMeanClust, condition_model
 
 # --- latent models ---
-export IID, HierarchicalNormal, RandomWalk, AR, TimeVaryingAR, MA, Intercept,
-       FixedIntercept,
+export IID, HierarchicalNormal, RandomWalk, AR, TimeVaryingAR, TimeVarying, MA,
+       Intercept, FixedIntercept,
        Null, DiffLatentModel
 
 # --- latent modifiers / manipulators / combinations / broadcasting ---

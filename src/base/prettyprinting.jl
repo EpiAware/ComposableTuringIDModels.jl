@@ -43,6 +43,10 @@ function _component_children(model::AbstractComposableModel)
         role = _role_label(f)
         if _is_tree_component(v)
             push!(children, (role, v))
+        elseif v isa TimeVarying && _is_tree_component(v.prior)
+            # A `TimeVarying`-marked slot is a leaf marker wrapping a prior
+            # process; recurse into that process so the tree still shows it.
+            push!(children, (role, v.prior))
         elseif v isa Union{AbstractVector, Tuple}
             for (i, el) in enumerate(v)
                 _is_tree_component(el) &&

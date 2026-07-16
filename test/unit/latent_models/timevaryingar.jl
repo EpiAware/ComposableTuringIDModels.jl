@@ -1,3 +1,20 @@
+@testitem "TimeVaryingAR is an order-1 AR with a TimeVarying damp slot" begin
+    using ComposableTuringIDModels, Distributions
+    # TimeVaryingAR is not its own type: it composes as an AR of order 1 whose
+    # `damp` slot is wrapped in a TimeVarying marker (AR + a coefficient submodel).
+    tv = TimeVaryingAR()
+    @test tv isa AR
+    @test tv isa AbstractLatentModel
+    @test tv.p == 1
+    @test tv.damp isa TimeVarying
+    @test tv.damp.prior isa RandomWalk
+    @test tv.damp.transform === tanh
+    # The marker can be built directly on AR's damp slot with the same effect.
+    direct = AR(; damp = TimeVarying(RandomWalk()))
+    @test direct.p == 1
+    @test direct.damp isa TimeVarying
+end
+
 @testitem "TimeVaryingAR returns a length-n numeric path" begin
     using ComposableTuringIDModels, Random
     Random.seed!(1)
