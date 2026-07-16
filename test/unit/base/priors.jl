@@ -79,10 +79,15 @@ end
     @test _prior_order(Normal()) == 1
     @test _prior_order([Normal(), Normal()]) == 2
     @test _prior_order(RandomWalk()) == 1
-    # A single (non-vector) damping distribution coerces to an order-1 AR.
+    # A single (non-vector) damping distribution ⇒ order-1 AR.
     @test AR(; damp = Normal()).p == 1
     @test AR(; damp = [truncated(Normal(0, 0.05), 0, 1)]).p == 1
+    # A length-k vector damp prior ⇒ order p = k, with `init` sized to match even
+    # when left at its default (regression: previously threw on the init length).
+    @test AR(; damp = [Normal(), Normal()]).p == 2
+    @test length(as_turing_model(AR(; damp = [Normal(), Normal()]), 8)()) == 8
     @test MA(; θ = [Normal(), Normal()]).q == 2
+    @test MA(; θ = Normal()).q == 1
     # A vector-of-distributions init sets the differencing order.
     @test DiffLatentModel(; model = RandomWalk(), init = [Normal(), Normal()]).d == 2
 end
