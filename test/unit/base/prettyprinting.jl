@@ -5,9 +5,9 @@
 @testitem "show renders a composed model as a component tree" begin
     using ComposableTuringIDModels, Distributions
 
-    data = IDData([0.2, 0.3, 0.5], exp)
+    gen_int = [0.2, 0.3, 0.5]
     model = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()),
         NegativeBinomialError())
     out = sprint(show, MIME"text/plain"(), model)
 
