@@ -1,6 +1,6 @@
 # ComposableTuringIDModels.jl benchmark history
 
-Revisions: c87ef18775c631555e9df36f9c0d43cac2fa03bb
+Revisions: 25949fcea99b5f0f3b0dff319abe61f9c2bdba1f
 
 See `table.md` for the ratio summary and the PNG
 files in this folder for per-benchmark timelines.
