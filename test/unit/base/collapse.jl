@@ -13,8 +13,8 @@ end
     @test RandomWalk(; ϵ_t = Normal()) isa AbstractPriorModel
     @test MA(; ϵ_t = RandomWalk()) isa AbstractPriorModel
     # infection rt / Z slots
-    data = IDData([0.2, 0.3, 0.5], exp)
-    @test Renewal(data; rt = Normal()) isa AbstractInfectionModel
+    gen_int = [0.2, 0.3, 0.5]
+    @test Renewal(gen_int; rt = Normal()) isa AbstractInfectionModel
     @test DirectInfections(; Z = Normal()) isa AbstractInfectionModel
     @test ExpGrowthRate(; rt = RandomWalk()) isa AbstractInfectionModel
     # a fixed vector of per-element distributions still sets the AR order
@@ -30,8 +30,8 @@ end
     # white-noise (iid) innovation: AR(ϵ_t = Normal())
     @test rand(as_turing_model(AR(; ϵ_t = Normal()), 8)) !== nothing
     # iid Rt: Renewal(rt = Normal()) inside a composed model
-    data = IDData([0.2, 0.3, 0.5], exp)
-    idmodel = IDModel(Renewal(data; rt = Normal(), initialisation = Normal()),
+    gen_int = [0.2, 0.3, 0.5]
+    idmodel = IDModel(Renewal(gen_int; rt = Normal(), initialisation = Normal()),
         PoissonError())
     y = as_turing_model(idmodel, missing, 8)().generated_y_t
     @test length(y) == 8
