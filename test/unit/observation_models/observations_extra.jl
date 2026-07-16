@@ -26,9 +26,13 @@ end
     # Pin the "single shared value" semantics: with a multiplicative transform the
     # ascertained expected series is a constant scaling of Y_t (same factor at
     # every t), i.e. one shared draw broadcast — not a per-t iid effect.
+    # Use the exp-scale (default-style) transform so a negative shared draw still
+    # yields a positive expected series (a plain `Y_t .* x` can go negative for a
+    # `Normal` draw and make the inner `PoissonError` throw a DomainError — the
+    # constant-scaling invariant we are pinning holds either way).
     exp_series = as_turing_model(
         Ascertainment(PoissonError(), Normal(0.0, 0.1);
-            transform = (Y_t, x) -> Y_t .* x),
+            transform = (Y_t, x) -> Y_t .* exp.(x)),
         missing, fill(20.0, 6))().expected
     ratio = exp_series ./ 20.0
     @test all(≈(first(ratio)), ratio)
