@@ -6,9 +6,13 @@
 
 - **Priors are now length-`n` submodels and the latent/prior roles are one.**
   Every component parameter (damping, initial conditions, innovation model,
-  reproduction number, ascertainment, …) is now an `AbstractPriorModel`, accepting
-  a bare `Distribution`, a `Vector{<:Distribution}`, or any process (e.g. a
-  `RandomWalk`) uniformly via `as_prior`. This widens the `rt` / `Z` / `ϵ_t` slots
+  reproduction number, ascertainment, …) accepts a bare `Distribution`, a
+  `Vector{<:Distribution}`, or any process (e.g. a `RandomWalk`) uniformly.
+  Components store the raw prior in a parametric field and sample it through the
+  public `as_turing_submodel` seam; scalar slots draw natively (`σ ~ m.std`,
+  zero-allocation), and `as_turing_model` gains `Distribution` /
+  `Vector{<:Distribution}` methods so a bare prior threads through as a length-`n`
+  submodel exactly like a model. This widens the `rt` / `Z` / `ϵ_t` slots
   and the manipulator members (`CombineLatentModels` / `ConcatLatentModels` /
   `DiffLatentModel`), so constant reproduction numbers (`Renewal(data; rt =
   Normal())`), constant innovations (`AR(; ϵ_t = Normal())`) and mixed
@@ -18,11 +22,17 @@
   AbstractPriorModel`); prefer `AbstractPriorModel`. `implements_latent_interface`
   forwards to `implements_prior_interface`.
 - **Chain variable names gain a namespace segment.** Prior variables are
-  namespaced at the component's call site (prefix-on `to_submodel`) instead of by
-  a carried name, so e.g. `damp_AR` becomes `damp_AR.θ` and a process prior nests
-  deeper. Update any code that reads exact flat variable names.
-- **`as_prior(p, name)` and `BroadcastPrior`'s `name` field are removed**, along
-  with the internal `NamedDist`/`_named` naming and the dead `_expand_dist` helper.
+  namespaced at the component's call site (`as_turing_submodel(…; prefix = true)`)
+  instead of by a carried name, so e.g. `damp_AR` becomes `damp_AR.θ` and a process
+  prior nests deeper. Update any code that reads exact flat variable names.
+- **A bare `Distribution` in a length-`n` slot now draws `n` i.i.d. values**
+  (`filldist`), not one shared value repeated. The one load-bearing constant case
+  (`Ascertainment` with a bare `Distribution`) is preserved by wrapping it in an
+  `Intercept` (a single shared draw broadcast across the series).
+- **`as_prior`, `BroadcastPrior`, and `sample_prior` are removed** — components
+  store raw priors in parametric fields and the `as_turing_submodel` seam replaces
+  the coercion — along with the internal `NamedDist`/`_named` naming and the dead
+  `_expand_dist` helper.
 
 ### Removed
 

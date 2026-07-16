@@ -18,7 +18,7 @@ to compose an `as_turing_model` inside their own `@model` body:
 latent ~ as_turing_submodel(inner_model, n)
 ```
 
-Because `as_turing_model` also has [`Distribution`](@ref) and
+Because `as_turing_model` also has `Distribution` and
 `Vector{<:Distribution}` methods, the same call composes a raw prior:
 
 ```julia
