@@ -10,8 +10,6 @@ struct's own constructor with no hand-written recursion:
   - a **genuinely time-varying** coefficient path ``\rho_t``, via
     [`TimeVaryingAR`](@ref).
 
-This is early-stage, actively developed software; the API may change.
-
 ## A structured prior on the constant damping
 
 [`AR`](@ref) applies its damping as a constant length-`p` coefficient, so a prior

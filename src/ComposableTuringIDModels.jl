@@ -9,8 +9,7 @@ sampling one another as submodels, so a full model is assembled rather than
 hand-written.
 
 This package is **ported and adapted** from the open-source, Apache-2.0 licensed
-`EpiAware` package; see the `NOTICE` file for attribution. It is early-stage
-software under active development; expect breaking changes.
+`EpiAware` package; see the `NOTICE` file for attribution.
 
 # Examples
 ```@example
@@ -25,7 +24,7 @@ module ComposableTuringIDModels
 
 # This package does NOT blanket-reexport Distributions/Turing (as the upstream
 # EpiAware also did not): users `using ComposableTuringIDModels, Distributions, Turing`.
-# Only the names the prototype itself uses or extends are imported below, which
+# Only the names the package itself uses or extends are imported below, which
 # keeps the public surface to the package's own exports.
 
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
@@ -45,7 +44,7 @@ using MCMCChains: Chains
 using DataFramesMeta: DataFrame, @rename!
 using Tables: rowtable
 
-# Distributions names used (and, for many, extended) by the prototype, imported
+# Distributions names used (and, for many, extended) by the package, imported
 # explicitly (not reexported).
 using Distributions: Distributions, Distribution, Sampleable,
                      ContinuousUnivariateDistribution, ContinuousDistribution,

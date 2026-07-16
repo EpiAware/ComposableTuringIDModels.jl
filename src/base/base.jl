@@ -4,8 +4,8 @@
 @doc raw"
 The single light supertype for every model component in `ComposableTuringIDModels`.
 
-Unlike the deep abstract hierarchy used by the original `EpiAware` package, the
-prototype keeps a **shallow** tree: one root supertype, and directly beneath it a
+Unlike the deep abstract hierarchy used by the original `EpiAware` package, this
+package keeps a **shallow** tree: one root supertype, and directly beneath it a
 small set of *role* supertypes — [`AbstractLatentModel`](@ref),
 [`AbstractInfectionModel`](@ref), [`AbstractObservationModel`](@ref) (and
 [`AbstractObservationErrorModel`](@ref) under the last) — that encode the role a
@@ -24,7 +24,7 @@ abstract type AbstractComposableModel end
 @doc raw"
 Construct a `DynamicPPL.Model` from an `ComposableTuringIDModels` model component.
 
-`as_turing_model` is the single generic entry point of the prototype. Every
+`as_turing_model` is the single generic entry point of the package. Every
 concrete model struct implements exactly one
 
 ```julia
@@ -43,8 +43,7 @@ The trailing `false` to `to_submodel` disables automatic variable prefixing so
 that parameter names stay flat unless prefixing is explicitly requested.
 
 The fallback method below errors with a clear message when a struct does not yet
-implement `as_turing_model`, which keeps the public surface honest while the
-prototype grows.
+implement `as_turing_model`, which keeps the public surface honest.
 
 # Arguments
 
