@@ -13,8 +13,6 @@ NUTS, recovering the per-group levels.
 It makes explicit how the group dimension threads from the data and how the group
 prior must be namespaced so it composes.
 
-This is early-stage, actively developed software; the API may change.
-
 ## The composed model
 
 The shared epidemic is an [`IDModel`](@ref): a [`DirectInfections`](@ref) process

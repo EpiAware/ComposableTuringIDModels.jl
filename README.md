@@ -12,8 +12,6 @@
 
 *A toolkit for composable probabilistic infectious disease modelling in Julia.*
 
-> This package is in early development. Expect rough edges and breaking changes.
-
 ## Why ComposableTuringIDModels?
 
 - **Composable models**: Assemble a model from interchangeable infection and
