@@ -128,6 +128,7 @@ include("steps/TVARStep.jl")
 include("steps/MAStep.jl")
 include("steps/LDStep.jl")
 include("steps/RenewalSteps.jl")
+include("steps/ComposedRenewalStep.jl")
 
 # --- utilities and distributions ---
 include("utils/HalfNormal.jl")
