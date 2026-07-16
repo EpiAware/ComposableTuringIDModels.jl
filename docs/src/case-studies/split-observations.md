@@ -9,9 +9,8 @@ Fitting them jointly — one infection trajectory, several observation streams �
 propagates uncertainty correctly and lets a sparse stream (deaths) borrow
 strength from a dense one (cases).
 
-This case study uses one construct, [`Split`](@ref), for most multi-stream
-shapes, and a second, [`Chain`](@ref), for the ordered case where a stream must
-inherit an upstream stream's own reporting.
+This case study uses one construct, [`Split`](@ref), for every multi-stream
+shape.
 `Split` observes the expected series arriving at the point where it sits in the
 pipeline through several named streams, so *where you place it* chooses the
 composition:
@@ -21,10 +20,10 @@ composition:
   - **cascade** — placed low, after a shared layer: a later stream is observed
     *downstream* of an earlier one (deaths as a delayed fraction of the
     *expected reported cases*);
-  - **strata** — one stream per data-defined group (an age band);
-  - **ordered chain** — [`Chain`](@ref) threads each stream's expected output
-    into the next, so a later stream inherits an earlier stream's own delay and
-    ascertainment, not just a shared branch point.
+  - **ordered chain** — nested Splits with shared effects hoisted above each
+    split: a chain ``I_t \to A \to B \to C`` where each stream inherits the whole
+    of an earlier stream's own delay and ascertainment;
+  - **strata** — one stream per data-defined group (an age band).
 
 ## How `Split` threads streams
 
@@ -170,41 +169,52 @@ shortened by the case delay.
         sum(cas.expected_y_t.deaths) < sum(cas.expected_y_t.cases))
 ```
 
-## Ordered chains: inheriting an upstream stream's own reporting
+## Ordered chains: a stream inheriting an upstream stream's own reporting
 
-The cascade above branches every stream off the *same* delayed expectation at the
-point where the `Split` sits, so the cases stream is a bare error on that shared
-series.
-When the cases stream carries reporting effects of its *own* — an ascertainment,
-a further delay — a `Split` branch cannot pass them on, because each branch reads
-the shared series at the split point rather than another branch's output.
-[`Chain`](@ref) covers that ordered case.
-It holds an ordered `NamedTuple` of streams and threads each stream's `expected`
-output into the next stream's `expected` input, so a later stream inherits the
-whole of an earlier stream's delay and ascertainment.
+The cascade above kept the cases stream a bare error, so the series the deaths
+stream reads is the shared delay applied to infections.
+Sometimes the *upstream* stream carries reporting effects of its own — a case
+ascertainment, a further delay — that a downstream stream should inherit too.
+`Split` handles that ordered case with the same placement rule.
+Effects that should propagate to later streams go in the shared layers *above* the
+`Split`, and each stream's own terminal error stays in its leaf.
+Because `Split` feeds every stream the expected series reaching it, hoisting the
+case ascertainment above the split makes both streams see the *ascertained* cases,
+and the deaths leaf then adds its own delay and fatality fraction on top.
 
-Here cases are reported at ~60% ascertainment, and deaths are observed off the
-*ascertained expected cases* at a ~2% fatality fraction, so the death expectation
-is ``0.6 \times 0.02`` of infections rather than ``0.02`` of them.
+Here the shared layers apply the infection→case delay and a ~60% case
+ascertainment, so the series entering the split is the expected *reported* cases.
+Cases are a bare error on it, and deaths sit downstream at a ~2% fatality fraction,
+so the death expectation is ``0.6 \times 0.02`` of infections rather than
+``0.02`` of them.
 
 ```@example split
-chained = Chain((
-    cases = Ascertainment(NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
-        FixedIntercept(log(0.6))),                      # cases carry their own ~60%
-    deaths = LatentDelay(                                # case→death delay
-        Ascertainment(NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
-            FixedIntercept(log(0.02))),                 # ~2% of the reported cases
-        LogNormal(2.2, 0.3))))
-chained_model = IDModel(renewal, chained)
-chn = as_turing_model(chained_model, (cases = missing, deaths = missing), n)()
-(mean_case_ascertainment = sum(chn.expected_y_t.cases) / sum(chn.I_t),
-    deaths_inherit_case_ascertainment =
-        sum(chn.expected_y_t.deaths) < 0.02 * sum(chn.expected_y_t.cases))
+sequential = LatentDelay(                               # infection→case delay (shared)
+    Ascertainment(                                      # ~60% case ascertainment (shared)
+        Split((
+            cases = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
+            deaths = LatentDelay(                        # case→death delay (deaths only)
+                Ascertainment(NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
+                    FixedIntercept(log(0.02))),          # ~2% of the reported cases
+                LogNormal(2.2, 0.3)))),
+        FixedIntercept(log(0.6))),
+    LogNormal(1.6, 0.5))
+sequential_model = IDModel(renewal, sequential)
+seq = as_turing_model(sequential_model, (cases = missing, deaths = missing), n)()
+(expected_cases = round(sum(seq.expected_y_t.cases), digits = 1),
+    expected_deaths = round(sum(seq.expected_y_t.deaths), digits = 1),
+    deaths_are_a_small_fraction_of_ascertained_cases =
+        sum(seq.expected_y_t.deaths) < 0.02 * sum(seq.expected_y_t.cases))
 ```
 
 The death expectation is a fraction of the *ascertained* case expectation, so a
-change in case ascertainment now reaches deaths — which a `Split` cascade, reading
+change in case ascertainment reaches deaths — which the earlier cascade, reading
 the pre-ascertainment series, would not carry.
+Longer chains ``I_t \to A \to B \to C`` nest the same way: each stream that has
+dependents becomes a shared layer wrapping the next `Split`, so a three-stream
+chain where every stream ascertains at 0.6, 0.5, and 0.5 gives expected series in
+the ratio ``0.6 : 0.6{\times}0.5 : 0.6{\times}0.5{\times}0.5``, and each stream's
+variables stay namespaced by its branch (`A`, `BC.B`, `BC.C`).
 As with the cascade, the threaded quantity stays the expected series, never a
 realised draw.
 

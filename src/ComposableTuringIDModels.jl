@@ -95,7 +95,7 @@ export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
        PrefixObservationModel, RecordExpectedObs, TransformObservationModel
 
 # --- observation composition ---
-export Split, StrataMap, Chain
+export Split, StrataMap
 
 # --- composition ---
 export IDModel
@@ -184,7 +184,6 @@ include("observation_models/modifiers/PrefixObservationModel.jl")
 include("observation_models/modifiers/RecordExpectedObs.jl")
 include("observation_models/modifiers/TransformObservationModel.jl")
 include("observation_models/Split.jl")
-include("observation_models/Chain.jl")
 
 # --- composition ---
 include("compose.jl")

@@ -256,3 +256,52 @@ end
     chain = sample(as_turing_model(model, ydata, n), NUTS(), 5; progress = false)
     @test size(chain, 1) == 5
 end
+
+@testitem "Split expresses an ordered chain by hoisting shared effects" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(92)
+    # A stream observed DOWNSTREAM of another, inheriting the upstream stream's own
+    # ascertainment, needs no new construct: hoist the shared effect ABOVE the
+    # Split so both streams see the ascertained series, and keep each stream's own
+    # terminal error (and unique downstream effects) in its leaf.
+    #
+    # Two streams: cases carry a shared ×0.6 ascertainment; deaths add a further
+    # ×0.5 in their leaf. So expected cases = 60 and expected deaths = 30 off 100.
+    ordered = Ascertainment(
+        Split((
+            cases = PoissonError(),
+            deaths = Ascertainment(PoissonError(), FixedIntercept(log(0.5))))),
+        FixedIntercept(log(0.6)))
+    out = as_turing_model(
+        ordered, (cases = missing, deaths = missing), fill(100.0, 8))()
+    @test all(≈(60.0), out.expected.cases)
+    @test all(≈(30.0), out.expected.deaths)
+
+    # A parallel Split of the same leaves would feed BOTH the raw infections, so
+    # its deaths expectation would be 100 × 0.5 = 50, not 30: hoisting the shared
+    # ascertainment above the split is what makes deaths inherit it.
+    parallel = Split((
+        cases = Ascertainment(PoissonError(), FixedIntercept(log(0.6))),
+        deaths = Ascertainment(PoissonError(), FixedIntercept(log(0.5)))))
+    par = as_turing_model(
+        parallel, (cases = missing, deaths = missing), fill(100.0, 8))()
+    @test all(≈(50.0), par.expected.deaths)
+
+    # Three streams I_t → A → B → C, each ascertaining and propagating downstream,
+    # via NESTED Splits: A's ×0.6 is shared to B and C, B's ×0.5 is shared to C.
+    # Expected series ratio 0.6 : 0.6×0.5 : 0.6×0.5×0.5 = 60 : 30 : 15.
+    nested = Ascertainment(
+        Split((
+            A = PoissonError(),
+            BC = Ascertainment(
+                Split((
+                    B = PoissonError(),
+                    C = Ascertainment(PoissonError(), FixedIntercept(log(0.5))))),
+                FixedIntercept(log(0.5))))),
+        FixedIntercept(log(0.6)))
+    o3 = as_turing_model(
+        nested, (A = missing, BC = (B = missing, C = missing)), fill(100.0, 6))()
+    @test all(≈(60.0), o3.expected.A)
+    @test all(≈(30.0), o3.expected.BC.B)
+    @test all(≈(15.0), o3.expected.BC.C)
+end
