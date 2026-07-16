@@ -80,6 +80,7 @@ export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
 
 # --- infection models ---
 export IDData, DirectInfections, ExpGrowthRate, Renewal,
+       RenewalStep, SusceptibleDepletion,
        R_to_r, r_to_R, expected_Rt
 
 # --- ODE compartmental models ---
@@ -124,7 +125,7 @@ include("steps/ARStep.jl")
 include("steps/MAStep.jl")
 include("steps/LDStep.jl")
 include("steps/RenewalSteps.jl")
-include("steps/ComposedRenewalStep.jl")
+include("steps/RenewalStep.jl")
 
 # --- utilities and distributions ---
 include("utils/HalfNormal.jl")

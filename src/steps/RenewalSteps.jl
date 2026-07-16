@@ -17,8 +17,8 @@ R_t \sum_{i=1}^{n-1} I_{t-i} g_i.
 ```
 
 This is the raw new-incidence term before any modifier (e.g. susceptible
-depletion) is applied. It is shared by [`ConstantRenewalStep`](@ref) and the
-composable [`ComposedRenewalStep`](@ref) so the two cannot drift.
+depletion) is applied. It is shared by the internal `ConstantRenewalStep` core
+and the composable [`RenewalStep`](@ref) so the two cannot drift.
 "
 function renewal_foi(step::AbstractConstantRenewalStep, recent_incidence, Rt)
     return Rt * dot(recent_incidence, step.rev_gen_int)
@@ -46,7 +46,6 @@ end
 
 get_state(::ConstantRenewalStep, initial_state, state) = last.(state)
 
-# Susceptible depletion (the "with a fixed population" recurrence) is now
-# expressed compositionally: a `ConstantRenewalStep` core plus a
-# `SusceptibleDepletion` modifier, assembled by `ComposedRenewalStep`. See
-# `ComposedRenewalStep.jl`.
+# `ConstantRenewalStep` is the internal force-of-infection primitive. The public
+# renewal step is `RenewalStep` (see `RenewalStep.jl`), which wraps this core and
+# composes modifiers (e.g. `SusceptibleDepletion`) on top.
