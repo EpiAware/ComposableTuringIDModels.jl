@@ -131,7 +131,7 @@ function _models()
     # Reporting delay: convolves the expected observations with a delay PMF
     # (`accumulate_scan(LDStep(rev_pmf), ...)`) before the inner error.
     latdelay = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(gen_int; rt = RandomWalk(), initialisation = Normal()),
         LatentDelay(NegativeBinomialError(), [0.3, 0.4, 0.3]))
     # Uncertain reporting delay: the delay distribution's parameters are prior
     # slots (a `LogNormal` whose meanlog/sdlog carry priors), sampled through the
@@ -140,7 +140,7 @@ function _models()
     # (`_discretised_pmf` / `double_interval_censored` `pdf`) — the AD-sensitive
     # part of an inferred delay.
     udelay = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(gen_int; rt = RandomWalk(), initialisation = Normal()),
         LatentDelay(NegativeBinomialError(),
             UncertainDelay(LogNormal,
                 [Normal(1.0, 0.3), truncated(Normal(0.4, 0.2), 0, Inf)];
