@@ -15,12 +15,23 @@ end
     using ComposableTuringIDModels, Distributions, Random
     using ComposableTuringIDModels: AbstractPriorModel
     Random.seed!(53)
-    # A bare Distribution is coerced to the prior interface (a constant factor).
+    # A bare Distribution is wrapped in an `Intercept`, giving a single constant
+    # factor (one shared draw) — not `n` iid values. `as_prior`/`BroadcastPrior`
+    # are gone; the constant semantics are preserved by the `Intercept` wrapping.
     asc_const = Ascertainment(PoissonError(), Normal(0.0, 0.1))
     @test asc_const.latent_model isa AbstractPriorModel
     sim = as_turing_model(asc_const, missing, fill(50.0, 8))().y_t
     @test length(sim) == 8
     @test all(>=(0), sim)
+    # Pin the "single shared value" semantics: with a multiplicative transform the
+    # ascertained expected series is a constant scaling of Y_t (same factor at
+    # every t), i.e. one shared draw broadcast — not a per-t iid effect.
+    exp_series = as_turing_model(
+        Ascertainment(PoissonError(), Normal(0.0, 0.1);
+            transform = (Y_t, x) -> Y_t .* x),
+        missing, fill(20.0, 6))().expected
+    ratio = exp_series ./ 20.0
+    @test all(≈(first(ratio)), ratio)
     # The constant factor is one shared draw: the underlying expected series is a
     # single global exp(θ) scaling. Recover the scaling with FixedIntercept.
     Y = fill(20.0, 6)

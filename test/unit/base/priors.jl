@@ -38,15 +38,35 @@ end
 @testitem "as_turing_model over a vector gives one draw per element" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(102)
-    # Homogeneous vector: filldist path.
+    # Homogeneous vector: filldist path — two INDEPENDENT draws (not one shared
+    # value repeated). This is the AR/MA per-lag coefficient semantics.
     vh = as_turing_model([Normal(), Normal()], 2)()
     @test length(vh) == 2
+    @test vh[1] != vh[2]
     # Heterogeneous vector: arraydist, element i drawn from distribution i.
     vt = as_turing_model([Normal(0, 1), Normal(5, 0.1)], 2)()
     @test length(vt) == 2
     @test vt[2] > vt[1]                  # second is tight around 5, first around 0
     # Length must match the vector length.
     @test_throws Exception as_turing_model([Normal(), Normal()], 3)()
+end
+
+@testitem "vector damp/θ prior ⇒ independent per-lag AR/MA coefficients" begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(204)
+    # Two identical per-lag priors draw two INDEPENDENT coefficients — a vector
+    # prior is not a single shared coefficient repeated across lags.
+    d = rand(as_turing_model(
+        AR(; damp = [Normal(0.0, 1.0), Normal(0.0, 1.0)], init = Normal()), 8))
+    damp = reduce(vcat, [d[k] for k in keys(d) if occursin("damp_AR", string(k))])
+    @test length(damp) == 2
+    @test damp[1] != damp[2]
+    Random.seed!(205)
+    dm = rand(as_turing_model(
+        MA(; θ = [Normal(0.0, 1.0), Normal(0.0, 1.0)]), 8))
+    θ = reduce(vcat, [dm[k] for k in keys(dm) if occursin("θ", string(k))])
+    @test length(θ) == 2
+    @test θ[1] != θ[2]
 end
 
 @testitem "bare latent-model-as-prior threads under a linked log-density (#80)" begin

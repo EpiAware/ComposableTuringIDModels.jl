@@ -1,7 +1,8 @@
 # [Time-varying damping in an AR process](@id case-study-tvdamp)
 
-Every parameter slot of a component is an [`AbstractPriorModel`](@ref): as well as
-a bare `Distribution`, a slot accepts a *prior model*, including a latent process.
+Every parameter slot of a component takes a raw prior: as well as a bare
+`Distribution` (or a vector of them), a slot accepts a *prior model*, including a
+latent process, composed through [`as_turing_submodel`](@ref).
 On the damping of an autoregressive process this buys two things, both through the
 struct's own constructor with no hand-written recursion:
 
