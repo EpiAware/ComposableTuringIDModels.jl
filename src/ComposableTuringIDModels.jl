@@ -87,7 +87,8 @@ export SIRParams, SEIRParams, ODEProcess, CatalystODEParams
 
 # --- observation models ---
 export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDelay,
-       observation_error, generate_observation_error_priors, define_y_t
+       UncertainDelay, observation_error, generate_observation_error_priors,
+       define_y_t
 
 # --- observation modifiers / manipulators ---
 export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,

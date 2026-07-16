@@ -11,8 +11,8 @@
     @test all(>=(0), data.gen_int)
 
     obs = LatentDelay(PoissonError(), truncated(Normal(5.0, 2.0), 0.0, Inf))
-    @test isapprox(sum(obs.rev_pmf), 1.0)
-    @test all(>=(0), obs.rev_pmf)
+    @test isapprox(sum(obs.delay), 1.0)
+    @test all(>=(0), obs.delay)
 end
 
 @testitem "expected_Rt inverts the renewal relationship" begin

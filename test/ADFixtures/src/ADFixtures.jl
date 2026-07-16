@@ -133,6 +133,18 @@ function _models()
     latdelay = IDModel(
         Renewal(data; rt = RandomWalk(), initialisation = Normal()),
         LatentDelay(NegativeBinomialError(), [0.3, 0.4, 0.3]))
+    # Uncertain reporting delay: the delay distribution's parameters are prior
+    # slots (a `LogNormal` whose meanlog/sdlog carry priors), sampled through the
+    # priors seam and rediscretised into a PMF per draw before the same
+    # convolution. The gradient must flow through the discretisation
+    # (`_discretised_pmf` / `double_interval_censored` `pdf`) — the AD-sensitive
+    # part of an inferred delay.
+    udelay = IDModel(
+        Renewal(data; rt = RandomWalk(), initialisation = Normal()),
+        LatentDelay(NegativeBinomialError(),
+            UncertainDelay(LogNormal,
+                [Normal(1.0, 0.3), truncated(Normal(0.4, 0.2), 0, Inf)];
+                D = 6.0)))
     # Day-of-week ascertainment: scales the expected observations by a broadcast
     # latent (an `Ascertainment` wrapping `broadcast_dayofweek`).
     ascert = IDModel(
@@ -185,6 +197,7 @@ function _models()
     y_nowcast = sim(nowcast, n)
     y_triangle = sim(triangle, n)
     y_latdelay = sim(latdelay, n)
+    y_udelay = sim(udelay, n)
     y_ascert = sim(ascert, 14)
     y_aggregate = sim(aggregate, 14)
     y_transobs = sim(transobs, n)
@@ -222,6 +235,8 @@ function _models()
         # observation modifiers / error families
         ("Renewal+LatentDelay posterior",
             as_turing_model(latdelay, y_latdelay, n)),
+        ("Renewal+UncertainLatentDelay posterior",
+            as_turing_model(udelay, y_udelay, n)),
         ("DirectInfections+Ascertainment day-of-week posterior",
             as_turing_model(ascert, y_ascert, 14)),
         ("DirectInfections+Aggregate posterior",
