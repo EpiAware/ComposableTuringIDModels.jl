@@ -180,10 +180,3 @@ prob_chain = sample(as_turing_model(problem, (; y_t = y_train)),
     NUTS(0.9; adtype = AutoMooncake(; config = nothing)), 150; progress = false)
 size(forecast(problem, y_train, prob_chain, h))
 ```
-
-## References
-
-```@bibliography
-Pages = ["forecasting.md"]
-Canonical = false
-```
