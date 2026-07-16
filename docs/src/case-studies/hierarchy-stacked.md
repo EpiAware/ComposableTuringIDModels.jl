@@ -1,83 +1,69 @@
 # [Partial pooling across groups in a composed model](@id case-study-hierarchy)
 
-[`Hierarchy`](@ref) is a partial-pooling latent process over a grouping dimension.
-Built with `as_turing_model(h, n_groups)` it draws one shared level ``\mu`` and
-`n_groups` deviations and returns the **numeric** per-group vector
-``\ell_g = \mu + \delta_g``.
-Because it returns numbers like any other latent model, it threads into a latent
-slot of a full composed model with no group-axis contract change.
+A multi-group epidemic is a panel: one shared infection process seen by several
+groups, each reporting it at its own level.
+[`GroupedIDModel`](@ref) expresses this panel as a composed model rather than a
+hand-written `@model`.
+It holds a shared infection process, a `group_effect` prior over the grouping
+axis, an observation model, and a combiner mapping a group's effect to its
+expected series.
 
-This page drives a per-group quantity with a [`Hierarchy`](@ref) inside a complete
-infection + observation model, simulates from it and fits it end-to-end under
-NUTS, recovering the per-group levels.
-It makes explicit how the group dimension threads from the data and how the group
-prior must be namespaced so it composes.
+This page drives a per-group reporting level with a [`Hierarchy`](@ref) inside a
+[`GroupedIDModel`](@ref), simulates from it and fits it end-to-end under NUTS,
+recovering the per-group levels.
+The group dimension threads from the data and the group prior is namespaced by the
+component, so the panel composes with no hand-orchestration.
 
 ## The composed model
 
-The shared epidemic is an [`IDModel`](@ref): a [`DirectInfections`](@ref) process
-carrying a [`RandomWalk`](@ref) latent, observed with a [`PoissonError`](@ref).
+The shared epidemic is a [`DirectInfections`](@ref) process carrying a
+[`RandomWalk`](@ref) latent, observed with a [`PoissonError`](@ref).
 Every group sees the *same* infection curve ``I_t`` but reports it at its own
-level: a per-group log-ascertainment ``\ell_g`` scales the expected counts before
-the observation model.
-Those per-group levels are partially pooled with a [`Hierarchy`](@ref).
+level: a per-group log-reporting level ``\ell_g`` scales the expected counts
+before the observation model.
+Those per-group levels are partially pooled with a [`Hierarchy`](@ref), supplied
+as the `group_effect`.
 
 ```@example hier
 using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
-using Turing: to_submodel, returned
+using Turing: returned
 Random.seed!(77)
 
 idmodel = IDModel(
     DirectInfections(; Z = RandomWalk(), initialisation = Normal(log(50.0), 0.2)),
     PoissonError())
 hierarchy = Hierarchy(; mean = Normal(0.0, 0.5), across = IID(Normal(0.0, 0.5)))
-nothing # hide
+model = GroupedIDModel(idmodel, hierarchy)
 ```
 
 The grouping dimension is **not** a field of any component.
-The top-level model reads `n_time` and `n_groups` from the shape of the data
+[`GroupedIDModel`](@ref) reads `n_time` and `n_groups` from the shape of the data
 matrix `Y` (rows are time, columns are groups) and passes `n_groups` to the
-[`Hierarchy`](@ref) and `n_time` to the infection process — the same way a series
+[`Hierarchy`](@ref) and `n_time` to the infection process, the same way a series
 length is passed to `as_turing_model(latent, n)`.
 
 The group prior carries its own innovations (the [`IID`](@ref) `across` process
 samples an `ϵ_t`), which under the prefix-off submodel convention would collide
 with the infection [`RandomWalk`](@ref)'s own `ϵ_t`.
-Namespacing the group prior with a [`PrefixLatentModel`](@ref) keeps the two
-apart — this is the group-requirement threading made explicit:
-
-```@example hier
-@model function grouped_epidemic(idmodel, hierarchy, Y)
-    n_time, n_groups = size(Y)
-    # Per-group pooled log-ascertainment levels; namespaced so the group prior's
-    # innovations do not collide with the infection process's own latent.
-    group_levels ~ as_turing_submodel(
-        PrefixLatentModel(hierarchy, "groups"), n_groups)
-    # One shared infection process (the IDModel's infection component).
-    infections ~ as_turing_submodel(idmodel.infection_model, n_time)
-    I_t = infections.I_t
-    ys = Vector{Any}(undef, n_groups)
-    for g in 1:n_groups
-        expected_g = exp(group_levels[g]) .* I_t            # group-specific level
-        og = PrefixObservationModel(idmodel.observation_model, "group$g")
-        y_g ~ as_turing_submodel(og, Y[:, g], expected_g)
-        ys[g] = y_g
-    end
-    return (; I_t, group_levels, y = ys)
-end
-nothing # hide
-```
+[`GroupedIDModel`](@ref) namespaces the group prior through the prior-slot prefix
+convention so the two never collide, and prefixes each group's observation with
+`group<g>`.
+The mapping from a group's effect to its expected series is the `combiner` field.
+Its default is a multiplicative effect on the exponential scale,
+``\text{expected}_g = e^{\ell_g}\, I_t``, so `exp(ℓ_g)` scales the shared curve.
+Swap `combiner` for a different mapping the way [`Ascertainment`](@ref) swaps its
+`transform`.
 
 ## Simulate
 
 Passing an all-`missing` matrix makes the model a prior simulator; the group
 dimension threads from its column count.
-We simulate four groups over 24 time steps:
+We simulate eight groups over 24 time steps:
 
 ```@example hier
-n_time, n_groups = 24, 4
+n_time, n_groups = 24, 8
 Ymiss = Matrix{Union{Missing, Float64}}(missing, n_time, n_groups)
-sim = grouped_epidemic(idmodel, hierarchy, Ymiss)()
+sim = as_turing_model(model, Ymiss)()
 Ydata = reduce(hcat, [Int.(sim.y[g].y_t) for g in 1:n_groups])
 true_levels = sim.group_levels
 (n_time = n_time, n_groups = n_groups, data_size = size(Ydata),
@@ -91,11 +77,11 @@ only through the per-group level and Poisson noise.
 
 Conditioning on the simulated counts and sampling with NUTS recovers the
 posterior end-to-end.
-`n_groups` again threads from the data matrix — nothing about the group dimension
-is hard-coded in the components:
+`n_groups` again threads from the data matrix, so nothing about the group
+dimension is hard-coded in the components:
 
 ```@example hier
-posterior = grouped_epidemic(idmodel, hierarchy, Float64.(Ydata))
+posterior = as_turing_model(model, Float64.(Ydata))
 chain = sample(posterior, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 300;
     progress = false)
 size(chain, 1)
@@ -134,9 +120,11 @@ fig
 ```
 
 Each group's credible interval covers the ``y = x`` line, so the partially pooled
-per-group levels are recovered inside a full composed model.
-The [`Hierarchy`](@ref) supplied the per-group quantity numerically, the group
-dimension threaded from the data, and namespacing the group prior let it compose
-with the infection process's own latent.
-Swapping `across = RandomWalk()` would instead pool *neighbouring* groups
-(correlated ordered strata) with no other change.
+per-group levels are recovered inside a full composed panel.
+[`GroupedIDModel`](@ref) supplied the panel structure, the [`Hierarchy`](@ref)
+supplied the per-group levels, and the group dimension threaded from the data with
+the group prior namespaced by the component.
+Swapping `across = RandomWalk()` in the [`Hierarchy`](@ref) would instead pool
+*neighbouring* groups (correlated ordered strata), and swapping the `group_effect`
+for a bare [`IID`](@ref) or a `Distribution` would drop the shared level for
+independent per-group levels, each with no other change.
