@@ -9,8 +9,7 @@ sampling one another as submodels, so a full model is assembled rather than
 hand-written.
 
 This package is **ported and adapted** from the open-source, Apache-2.0 licensed
-`EpiAware` package; see the `NOTICE` file for attribution. It is early-stage
-software under active development; expect breaking changes.
+`EpiAware` package; see the `NOTICE` file for attribution.
 
 # Examples
 ```@example
@@ -25,7 +24,7 @@ module ComposableTuringIDModels
 
 # This package does NOT blanket-reexport Distributions/Turing (as the upstream
 # EpiAware also did not): users `using ComposableTuringIDModels, Distributions, Turing`.
-# Only the names the prototype itself uses or extends are imported below, which
+# Only the names the package itself uses or extends are imported below, which
 # keeps the public surface to the package's own exports.
 
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
@@ -43,11 +42,10 @@ using ADTypes: ADTypes, AutoForwardDiff
 using AbstractMCMC: AbstractMCMC
 using AdvancedHMC: DiagEuclideanMetric
 using MCMCChains: Chains
-using Pathfinder: pathfinder, PathfinderResult
 using DataFramesMeta: DataFrame, @rename!
 using Tables: rowtable
 
-# Distributions names used (and, for many, extended) by the prototype, imported
+# Distributions names used (and, for many, extended) by the package, imported
 # explicitly (not reexported).
 using Distributions: Distributions, Distribution, Sampleable,
                      ContinuousUnivariateDistribution, ContinuousDistribution,
@@ -62,7 +60,7 @@ export AbstractPriorModel, AbstractLatentModel, AbstractInfectionModel,
        AbstractObservationModel, AbstractObservationErrorModel
 export implements_prior_interface, implements_latent_interface,
        implements_infection_interface, implements_observation_interface
-export BroadcastPrior, as_prior
+export as_turing_submodel
 
 # --- utilities and distributions ---
 # (double-interval censoring is provided by CensoredDistributions.jl, used
@@ -104,8 +102,8 @@ export Split, StrataMap
 export IDModel
 
 # --- inference orchestration ---
-export IDProblem, IDMethod, NUTSampler, ManyPathfinder, DirectSample,
-       manypathfinder, apply_method, IDObservables, generated_observables,
+export IDProblem, NUTSampler, DirectSample,
+       apply_method, IDObservables, generated_observables,
        spread_draws, get_param_array, forecast
 
 # --- core architecture ---
@@ -202,7 +200,6 @@ include("inference/apply_method.jl")
 include("inference/NUTSampler.jl")
 include("inference/DirectSample.jl")
 include("inference/get_param_array.jl")
-include("inference/ManyPathfinder.jl")
 include("inference/post-inference.jl")
 include("inference/forecast.jl")
 

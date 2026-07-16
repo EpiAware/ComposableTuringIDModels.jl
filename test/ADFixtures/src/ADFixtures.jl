@@ -81,18 +81,19 @@ function _models()
         CombineLatentModels([Intercept(Normal(2, 0.2)), AR()]), 10)
 
     # --- the #76 prior interface -----------------------------------------------
-    # A `BroadcastPrior` over a *vector* of damping distributions (order 2): one
-    # i.i.d. draw per lag through `arraydist`, threaded as a submodel.
+    # A *vector* of damping distributions (order 2): one i.i.d. draw per lag
+    # through `arraydist`, threaded as a submodel via `as_turing_submodel`.
     ar_vec = as_turing_model(
         AR(; damp = [truncated(Normal(0, 0.05), 0, 1),
                 truncated(Normal(0, 0.05), 0, 1)],
             init = [Normal(), Normal()]), 8)
     # A latent MODEL as a prior: the bare `AR(damp = RandomWalk())` form (issue
     # #80). The AR damping coefficient is itself a `RandomWalk` submodel, so the
-    # submodel-threading gradient path is differentiated. `as_prior` auto-prefixes
-    # the latent-model prior (with the `damp_AR` parameter name) inside the
-    # coercion seam, keeping the inner `std`/`ϵ_t`/`rw_init` names from colliding
-    # with the AR innovation's under the prefix-off convention — so this linked
+    # submodel-threading gradient path is differentiated. The prior slot prefixes
+    # the latent-model prior (with the `damp_AR` parameter name) via
+    # `as_turing_submodel(...; prefix = true)`, keeping the inner
+    # `std`/`ϵ_t`/`rw_init` names from colliding with the AR innovation's — so
+    # this linked
     # log-density both evaluates and differentiates without a manual prefix.
     ar_lat = as_turing_model(AR(; damp = RandomWalk()), 8)
 
@@ -204,7 +205,7 @@ function _models()
         ("ConcatLatentModels latent logjoint", concat),
         ("CombineLatentModels latent logjoint", combine),
         # the #76 prior interface
-        ("AR vector BroadcastPrior latent logjoint", ar_vec),
+        ("AR vector-prior latent logjoint", ar_vec),
         ("AR latent-model-as-prior latent logjoint", ar_lat),
         # infection posteriors
         ("DirectInfections+Poisson posterior",
@@ -331,7 +332,7 @@ Result matrix (25 scenarios × 4 backends), Julia 1.12:
 | BroadcastLatentModel weekly latent logjoint           |      ✓      |      ✓      |    ✓    |   ✓   |
 | ConcatLatentModels latent logjoint                    |      ✓      |      ✓      |    ✓    |   ✓   |
 | CombineLatentModels latent logjoint                   |      ✓      |      ✓      |    ✓    |   ✗   |
-| AR vector BroadcastPrior latent logjoint              |      ✓      |      ✓      |    ✓    |   ✗   |
+| AR vector-prior latent logjoint                       |      ✓      |      ✓      |    ✓    |   ✗   |
 | AR latent-model-as-prior latent logjoint              |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Poisson posterior                    |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+NegativeBinomial posterior                    |      ✓      |      ✓      |    ✓    |   ✗   |
@@ -377,7 +378,7 @@ function backend_broken_scenarios()
         "DiffLatentModel(RandomWalk) latent logjoint",
         "ARMA latent logjoint",
         "CombineLatentModels latent logjoint",
-        "AR vector BroadcastPrior latent logjoint",
+        "AR vector-prior latent logjoint",
         "AR latent-model-as-prior latent logjoint",
         "DirectInfections+NormalError posterior",
         "Renewal+NegativeBinomial posterior",

@@ -86,7 +86,7 @@ end
     prob = infection.params.prob
     solver = infection.solver
     solver_options = infection.solver_options
-    params ~ to_submodel(as_turing_model(infection.params, n), false)
+    params ~ as_turing_submodel(infection.params, n)
     u0, p = params
     _prob = remake_ode_problem(infection.params, prob, u0, p)
     sol = solve(_prob, solver; solver_options...)

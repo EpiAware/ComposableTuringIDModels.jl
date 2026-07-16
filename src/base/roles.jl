@@ -16,16 +16,16 @@ same `as_turing_model` protocol every other component speaks:
 as_turing_model(prior::AbstractPriorModel, n)  # ⇒ a length-`n` vector
 ```
 
-The default wrapper [`BroadcastPrior`](@ref) turns a plain `Distribution` (the
-common case) into exactly this, and [`as_prior`](@ref) coerces a user-supplied
-`Distribution` / vector of `Distribution`s into the wrapper so constructors keep
-accepting bare distributions. This is the single role for every parameter and
-process: a latent process (a `RandomWalk` for a time-varying parameter, an
-[`AR`](@ref) process, …) satisfies the same `as_turing_model(m, n) ⇒ length-n`
-contract, so it drops into any prior slot directly. The former
-`AbstractLatentModel` role has been folded into this one (it survives as a
-deprecated alias). A genuinely scalar parameter uses `n == 1` and reads the
-element with `only(...)`, keeping the chain as small as a bare `~ dist`.
+A raw `Distribution` (or vector of them) is *not* a prior model but flows through
+the same [`as_turing_submodel`](@ref) seam: `as_turing_model` has `Distribution`
+and `Vector{<:Distribution}` methods, so a bare distribution composes as a
+length-`n` prior submodel exactly like a model does. This is the single role for
+every parameter *process*: a latent process (a `RandomWalk` for a time-varying
+parameter, an [`AR`](@ref) process, …) satisfies the same
+`as_turing_model(m, n) ⇒ length-n` contract, so it drops into any prior slot
+directly. The former `AbstractLatentModel` role has been folded into this one (it
+survives as a deprecated alias). A genuinely scalar parameter is drawn with a
+native tilde (`σ ~ model.std`), keeping the chain as small as a bare `~ dist`.
 
 This delivers issue #37 (priors as length-`n` submodels).
 "

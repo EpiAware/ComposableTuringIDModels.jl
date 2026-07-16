@@ -13,9 +13,9 @@ then
 and ``Z_t`` is recovered by applying `cumsum` `d` times. The `d` initial terms
 are inferred from the prior in `init`; `d` equals the length of that prior.
 
-The `init` slot is an [`AbstractPriorModel`](@ref): pass a vector of
-`Distribution`s (coerced via [`as_prior`](@ref)) as before, or a richer prior
-model.
+The `init` slot takes a raw prior: pass a vector of `Distribution`s (its length
+sets `d`), or a richer prior model. It is sampled through
+[`as_turing_submodel`](@ref).
 
 Composing `DiffLatentModel` over an `AR` gives an ARIMA-style latent process.
 
@@ -27,8 +27,7 @@ mdl = as_turing_model(diff, 10)
 rand(mdl)
 ```
 "
-struct DiffLatentModel{M <: AbstractLatentModel, P <: AbstractPriorModel} <:
-       AbstractLatentModel
+struct DiffLatentModel{M <: PriorLike, P <: PriorLike} <: AbstractLatentModel
     "Underlying (undifferenced) latent model."
     model::M
     "Prior for the initial latent variables."
@@ -36,8 +35,7 @@ struct DiffLatentModel{M <: AbstractLatentModel, P <: AbstractPriorModel} <:
     "Number of times differenced."
     d::Int
 
-    function DiffLatentModel(
-            model::AbstractLatentModel, init::AbstractPriorModel, d::Int)
+    function DiffLatentModel(model, init, d::Int)
         @assert d>0 "d must be greater than 0"
         _assert_prior_length(init, d, "init")
         new{typeof(model), typeof(init)}(model, init, d)
@@ -49,16 +47,15 @@ function DiffLatentModel(model, init::Distribution; d::Int)
 end
 
 function DiffLatentModel(; model, init = [Normal()])
-    init_prior = as_prior(init)
-    d = _prior_order(init_prior)
-    return DiffLatentModel(as_prior(model), init_prior, d)
+    d = _prior_order(init)
+    return DiffLatentModel(model, init, d)
 end
 
 @model function as_turing_model(model::DiffLatentModel, n)
     d = model.d
     @assert n>d "n must be longer than d"
-    latent_init ~ to_submodel(as_turing_model(model.init, d))
-    diff_latent ~ to_submodel(as_turing_model(model.model, n - d))
+    latent_init ~ as_turing_submodel(model.init, d; prefix = true)
+    diff_latent ~ as_turing_submodel(model.model, n - d)
     return _combine_diff(latent_init, diff_latent, d)
 end
 

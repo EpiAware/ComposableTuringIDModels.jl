@@ -106,7 +106,7 @@ complete.
 naive_model = IDModel(renewal, error)
 naive_post = as_turing_model(naive_model, observed_so_far, n)
 naive_chain = sample(
-    naive_post, NUTS(0.9), MCMCThreads(), 120, 2; progress = false)
+    naive_post, NUTS(0.9), MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
 
@@ -121,7 +121,7 @@ corrected_obs = RightTruncate(error, reporting_delay)
 corrected_model = IDModel(renewal, corrected_obs)
 corrected_post = as_turing_model(corrected_model, observed_so_far, n)
 corrected_chain = sample(
-    corrected_post, NUTS(0.9), MCMCThreads(), 120, 2; progress = false)
+    corrected_post, NUTS(0.9), MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
 
@@ -149,7 +149,7 @@ end
 
 complete_post = as_turing_model(naive_model, eventual, n)
 complete_chain = sample(
-    complete_post, NUTS(0.9), MCMCThreads(), 120, 2; progress = false)
+    complete_post, NUTS(0.9), MCMCThreads(), 250, 2; progress = false)
 
 R_complete_recent = recent_Rt(complete_post, complete_chain)
 R_naive_recent = recent_Rt(naive_post, naive_chain)
@@ -182,8 +182,8 @@ correction still identifies them from the thinned tail.
 using CairoMakie, PairPlots
 
 prior_chain = sample(corrected_post, Prior(), 1000; progress = false)
-pp_keys = [@varname(Z_t.damp_AR.θ), @varname(Z_t.ϵ_t.std.θ),
-    @varname(cluster_factor.θ), @varname(init_incidence.θ)]
+pp_keys = [@varname(damp_AR.θ), @varname(std),
+    @varname(cluster_factor), @varname(init_incidence.θ)]
 pairplot(
     PairPlots.Series(corrected_chain[pp_keys]; label = "posterior"),
     PairPlots.Series(prior_chain[pp_keys]; label = "prior"))
@@ -251,9 +251,9 @@ towards the reference, having accounted for the not-yet-reported counts.
 
 Wrapping the error model in [`RightTruncate`](@ref) does not touch the renewal
 process, so the corrected fit recovers the *same* shared parameters: the
-autoregressive damping ``\rho`` (`Z_t.damp_AR.θ[1]`), the innovation scale
-``\sigma`` (`Z_t.ϵ_t.std.θ`), the observation overdispersion
-(`cluster_factor.θ`), and the initial infections (`init_incidence.θ`). Each is
+autoregressive damping ``\rho`` (`damp_AR.θ[1]`), the innovation scale
+``\sigma`` (`std`), the observation overdispersion
+(`cluster_factor`), and the initial infections (`init_incidence.θ`). Each is
 namespaced by the component slot that samples it, so a prior's inner variables
 never collide across the model.
 

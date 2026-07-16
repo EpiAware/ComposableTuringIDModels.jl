@@ -1,9 +1,5 @@
 # ComposableTuringIDModels
 
-!!! warning "Early development"
-    This package is in early development. Expect rough edges and breaking
-    changes as the design settles.
-
 `ComposableTuringIDModels` builds epidemiological models from small, reusable
 components — infection processes (each owning its own latent process) and
 observation models — and turns each one into a

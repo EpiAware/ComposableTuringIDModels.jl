@@ -29,11 +29,11 @@ that contains another component builds the inner model and samples it as a
 submodel:
 
 ```julia
-z ~ to_submodel(as_turing_model(inner_model, n), false)
+z ~ as_turing_submodel(inner_model, n)
 ```
 
-The trailing `false` disables automatic variable prefixing, so parameter names
-stay flat. Because every component speaks the same `as_turing_model` protocol,
+`as_turing_submodel` disables automatic variable prefixing by default, so
+parameter names stay flat (pass `prefix = true` to namespace a slot). Because every component speaks the same `as_turing_model` protocol,
 components nest freely: an [`AR`](@ref) process can carry a
 [`HierarchicalNormal`](@ref) error model, a [`DiffLatentModel`](@ref) can wrap
 that `AR` to produce an ARIMA-style process, and that whole latent process can be

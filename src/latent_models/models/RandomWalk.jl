@@ -12,8 +12,8 @@ where ``Z_0`` is drawn from the prior in `init` and the increments
 ``\epsilon_i`` come from the error model `ϵ_t` (a `HierarchicalNormal` by
 default, giving an inferred step standard deviation).
 
-The `init` slot is an [`AbstractPriorModel`](@ref): pass a bare `Distribution`
-(coerced via [`as_prior`](@ref)) as before, or a richer prior model.
+The `init` slot takes a raw prior: pass a bare `Distribution`, or a richer prior
+model. It is sampled through [`as_turing_submodel`](@ref).
 
 # Examples
 ```@example RandomWalk
@@ -23,8 +23,7 @@ mdl = as_turing_model(rw, 10)
 rand(mdl)
 ```
 "
-struct RandomWalk{D <: AbstractPriorModel, E <: AbstractLatentModel} <:
-       AbstractLatentModel
+struct RandomWalk{D <: PriorLike, E <: PriorLike} <: AbstractLatentModel
     "Prior for the initial value ``Z_0``."
     init::D
     "Error model for the increments."
@@ -32,13 +31,13 @@ struct RandomWalk{D <: AbstractPriorModel, E <: AbstractLatentModel} <:
 end
 
 function RandomWalk(; init = Normal(), ϵ_t = HierarchicalNormal())
-    return RandomWalk(as_prior(init), as_prior(ϵ_t))
+    return RandomWalk(init, ϵ_t)
 end
 
 @model function as_turing_model(model::RandomWalk, n)
     @assert n>0 "n must be greater than 0"
-    rw_init ~ to_submodel(as_turing_model(model.init, 1))
-    ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n - 1))
+    rw_init ~ as_turing_submodel(model.init, 1; prefix = true)
+    ϵ_t ~ as_turing_submodel(model.ϵ_t, n - 1)
     rw = accumulate_scan(RWStep(), only(rw_init), ϵ_t)
     return rw
 end

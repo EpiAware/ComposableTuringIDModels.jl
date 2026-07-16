@@ -10,6 +10,42 @@
     @test length(as_turing_model(rec, 5)()) == 5
 end
 
+@testitem "latent modifiers accept a raw bare-Distribution member" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(310)
+    n = 5
+
+    # Each @kwdef / modifier struct stores a bare `Distribution` member raw; it
+    # composes through `as_turing_submodel` (n i.i.d. draws) like a model.
+    trans = TransformLatentModel(Normal(), x -> exp.(x))
+    @test trans.model isa Distribution
+    @test length(as_turing_model(trans, n)()) == n
+
+    rec = RecordExpectedLatent(Normal())
+    @test rec.model isa Distribution
+    @test length(as_turing_model(rec, n)()) == n
+
+    pref = PrefixLatentModel(Normal(), "Test")
+    @test pref.model isa Distribution
+    pref_kw = PrefixLatentModel(; model = Normal(), prefix = "Test")
+    @test pref_kw.model isa Distribution
+
+    bcast = BroadcastLatentModel(Normal(), 7, RepeatEach())
+    @test bcast.model isa Distribution
+    bcast_kw = BroadcastLatentModel(Normal(); period = 7,
+        broadcast_rule = RepeatEach())
+    @test bcast_kw.model isa Distribution
+    @test length(as_turing_model(bcast, 10)()) == 10
+
+    # A vector of `Distribution`s is stored as the raw vector.
+    vec_member = TransformLatentModel([Normal(), Normal()], identity)
+    @test vec_member.model isa AbstractVector{<:Distribution}
+
+    # A richer prior model is stored unchanged (no double-wrapping).
+    proc = TransformLatentModel(RandomWalk(), identity)
+    @test proc.model isa RandomWalk
+end
+
 @testitem "PrefixLatentModel prefixes inner variable names" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(32)

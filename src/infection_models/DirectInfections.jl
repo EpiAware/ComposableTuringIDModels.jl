@@ -23,9 +23,8 @@ This model carries no generation interval — it never uses one — so it takes 
     ``Z_t``.
   - `transformation`: the link mapping the unconstrained sum to non-negative
     infections (default `exp`).
-  - `initialisation`: the prior for the unconstrained initial infections (an
-    [`AbstractPriorModel`](@ref); a bare `Distribution` is coerced via
-    [`as_prior`](@ref)).
+  - `initialisation`: the prior for the unconstrained initial infections (a
+    `Distribution` or prior model, sampled through [`as_turing_submodel`](@ref)).
 
 # Examples
 ```@example DirectInfections
@@ -35,8 +34,8 @@ mdl = as_turing_model(inf, 10)
 rand(mdl)
 ```
 "
-struct DirectInfections{L <: AbstractLatentModel, F <: Function,
-    S <: AbstractPriorModel} <: AbstractInfectionModel
+struct DirectInfections{L <: PriorLike, F <: Function, S <: PriorLike} <:
+       AbstractInfectionModel
     "Latent process model generating ``Z_t``."
     Z::L
     "Link mapping the unconstrained sum to non-negative infections."
@@ -47,14 +46,12 @@ end
 
 function DirectInfections(; Z = RandomWalk(),
         transformation::Function = exp, initialisation = Normal())
-    return DirectInfections(
-        as_prior(Z), transformation, as_prior(initialisation))
+    return DirectInfections(Z, transformation, initialisation)
 end
 
 @model function as_turing_model(model::DirectInfections, n)
-    Z_t ~ to_submodel(as_turing_model(model.Z, n))
-    init_incidence ~ to_submodel(
-        as_turing_model(model.initialisation, 1))
+    Z_t ~ as_turing_submodel(model.Z, n)
+    init_incidence ~ as_turing_submodel(model.initialisation, 1; prefix = true)
     I_t = model.transformation.(only(init_incidence) .+ Z_t)
     return (; I_t, Z_t)
 end

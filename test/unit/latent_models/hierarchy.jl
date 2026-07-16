@@ -8,15 +8,16 @@
     h = Hierarchy(Normal(), IID(Normal(0.0, 1.0)))
     @test h isa Hierarchy
     @test h isa AbstractLatentModel
-    # Both slots are coerced to the prior interface.
-    @test h.mean isa AbstractPriorModel
+    # Slots store the raw prior: a bare Distribution stays a Distribution, a
+    # latent model stays a latent model.
+    @test h.mean isa Distribution
     @test h.across isa IID
     # Keyword constructor; across defaults to an iid Normal.
     hk = Hierarchy()
     @test hk isa Hierarchy
     @test hk.across isa IID
-    # A bare Distribution in `mean` is coerced via as_prior.
-    @test Hierarchy(; mean = Normal(0, 2)).mean isa BroadcastPrior
+    # A bare Distribution in `mean` is stored unwrapped.
+    @test Hierarchy(; mean = Normal(0, 2)).mean isa Normal
 end
 
 @testitem "Hierarchy returns a numeric length-n_groups path" begin
@@ -108,13 +109,13 @@ end
         for g in 1:n_groups
             expected_g = exp(group_levels[g]) .* I_t
             og = PrefixObservationModel(idmodel.observation_model, "group$g")
-            y_g ~ to_submodel(as_turing_model(og, Y[:, g], expected_g), false)
+            y_g ~ as_turing_submodel(og, Y[:, g], expected_g)
             ys[g] = y_g
         end
         return (; I_t, group_levels, y = ys)
     end
 
-    n_time, n_groups = 20, 4
+    n_time, n_groups = 20, 8
     # n_groups threads from the number of columns of the (missing) data matrix.
     Ymiss = Matrix{Union{Missing, Float64}}(missing, n_time, n_groups)
     sim = grouped_epidemic(idmodel, hierarchy, Ymiss)()
@@ -143,7 +144,7 @@ end
     h = Hierarchy(Normal(), IID(Normal(0.0, 1.0)))
 
     @model function pooled_counts(h, y, n_groups)
-        levels ~ to_submodel(as_turing_model(h, n_groups), false)
+        levels ~ as_turing_submodel(h, n_groups)
         for g in 1:n_groups
             y[g] ~ Poisson(exp(levels[g]))
         end

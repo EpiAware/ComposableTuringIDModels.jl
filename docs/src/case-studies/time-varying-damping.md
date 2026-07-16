@@ -1,7 +1,8 @@
 # [Time-varying damping in an AR process](@id case-study-tvdamp)
 
-Every parameter slot of a component is an [`AbstractPriorModel`](@ref): as well as
-a bare `Distribution`, a slot accepts a *prior model*, including a latent process.
+Every parameter slot of a component takes a raw prior: as well as a bare
+`Distribution` (or a vector of them), a slot accepts a *prior model*, including a
+latent process, composed through [`as_turing_submodel`](@ref).
 On the damping of an autoregressive process this buys two things, both through the
 struct's own constructor with no hand-written recursion:
 
@@ -9,8 +10,6 @@ struct's own constructor with no hand-written recursion:
     [`AR`](@ref); and
   - a **genuinely time-varying** coefficient path ``\rho_t``, via
     [`TimeVaryingAR`](@ref).
-
-This is early-stage, actively developed software; the API may change.
 
 ## A structured prior on the constant damping
 
@@ -91,14 +90,14 @@ recovered straight from the chain:
 
 ```@example tvdamp
 @model function observe_path(y, n)
-    latent ~ to_submodel(as_turing_model(TimeVaryingAR(), n), false)
+    latent ~ as_turing_submodel(TimeVaryingAR(), n)
     for t in 1:n
         y[t] ~ Normal(latent[t], 0.01)
     end
 end
 
 model = observe_path(z, n)
-fit = sample(model, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 100;
+fit = sample(model, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 300;
     progress = false)
 # ρ is tracked as a generated quantity: `fit[:ρ]` is a per-draw coefficient path
 ρ_draws = reduce(hcat, vec(fit[:ρ]))     # (n-1) × draws

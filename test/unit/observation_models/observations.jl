@@ -28,7 +28,7 @@ end
     @test implements_observation_interface(ne)
 
     # Default std prior is positive (a HalfNormal).
-    @test minimum(ne.std.dist) >= 0
+    @test minimum(ne.std) >= 0
 
     Y_t = fill(10.0, 20)
     # Simulate from the prior: continuous (real) observations. Simulating from a

@@ -24,12 +24,12 @@ end
         init = [Normal(), Normal()]).p == 2
 end
 
-@testitem "degenerate constant configs build and sample" begin
+@testitem "bare-distribution dynamic slots build and sample" begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(11)
-    # constant innovation: AR(ϵ_t = Normal())
+    # white-noise (iid) innovation: AR(ϵ_t = Normal())
     @test rand(as_turing_model(AR(; ϵ_t = Normal()), 8)) !== nothing
-    # constant Rt: Renewal(rt = Normal()) inside a composed model
+    # iid Rt: Renewal(rt = Normal()) inside a composed model
     data = IDData([0.2, 0.3, 0.5], exp)
     idmodel = IDModel(Renewal(data; rt = Normal(), initialisation = Normal()),
         PoissonError())
@@ -43,7 +43,7 @@ end
 @testitem "a mismatched vector prior on a dynamic slot errors clearly" begin
     using ComposableTuringIDModels, Distributions
     # a length-2 vector innovation cannot produce the n-1 = 7 innovations of a
-    # length-8 AR (a repeat-one Distribution or a process would adapt).
+    # length-8 AR (a single Distribution or a process would adapt to length n-1).
     ar = AR(; ϵ_t = [Normal(), Normal()])
     @test_throws Exception as_turing_model(ar, 8)()
 end
@@ -51,7 +51,7 @@ end
 @testitem "manipulators accept a bare-Distribution member" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(12)
-    # a Distribution member is coerced to a constant term alongside a process
+    # a Distribution member composes as iid draws alongside a process
     comb = CombineLatentModels([Normal(2, 0.2), RandomWalk()])
     @test length(as_turing_model(comb, 10)()) == 10
     conc = ConcatLatentModels([Normal(2, 0.2), RandomWalk()])

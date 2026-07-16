@@ -298,7 +298,7 @@ end
 
     # Draw the reporting-delay PMF from the delay submodel (the default
     # `ReportingPMF` returns a fixed PMF; a richer component could sample it).
-    pmf ~ to_submodel(as_turing_model(obs_model.delay_model, n), false)
+    pmf ~ as_turing_submodel(obs_model.delay_model, n)
 
     # Per-cell error priors (e.g. the NegBin cluster factor) are shared across all
     # observed cells, sampled once from the inner error family.

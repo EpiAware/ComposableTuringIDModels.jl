@@ -1,107 +1,150 @@
-# The default prior wrapper and the `as_prior` coercion seam. This is the
-# foundation for issue #37 (priors as length-`n` submodels): it lets every prior
-# join the same `as_turing_model` protocol as the other components, fronted by a
-# wrapper that turns a plain `Distribution` into a length-`n` prior submodel.
+# The composition seam. A component threads its sub-components and its prior
+# slots through Turing submodels; `as_turing_submodel` names that one pattern, and
+# `as_turing_model` gains `Distribution` / vector-of-`Distribution` methods so a
+# raw prior flows through the seam identically to a full model (issue #37: priors
+# as length-`n` submodels).
 
 @doc raw"
-Default [`AbstractPriorModel`](@ref) wrapper: turn a plain `Distribution` (or a
-vector of `Distribution`s) into a length-`n` prior submodel.
+Compose a component as a Turing submodel: `to_submodel(as_turing_model(m,
+args...), prefix)`.
 
-This is the drop-in replacement for a bare-`Distribution` prior field. It has two
-modes, dispatching on what it wraps:
+This is the single public composition seam of the package. Every composition point
+— a manipulator wrapping an inner model, an infection model owning its latent
+process, a component sampling a vector/process-valued prior slot — threads its
+sub-component through here, and third-party component authors use it as *the* way
+to compose an `as_turing_model` inside their own `@model` body:
 
-  - **A single `Distribution` — *repeat-one*.** One value is drawn and repeated to
-    length `n`: `as_turing_model(BroadcastPrior(d), n)` samples a single `θ ~ d`
-    and returns `fill(θ, n)`. A single global coefficient stays a single random
-    variable — it is *not* silently turned into `n` i.i.d. draws. For a genuinely
-    scalar parameter use `n == 1` and read the element with `only(...)`, so the
-    chain stays as small as a bare `~ dist`.
-  - **A vector of `Distribution`s — one i.i.d. draw per element.** The length is
-    fixed by the vector (`n` must match). A homogeneous vector uses `filldist` and
-    a heterogeneous one `arraydist`. This is the explicit way to ask for `n`
-    independent draws.
+```julia
+latent ~ as_turing_submodel(inner_model, n)
+```
 
-Because `BroadcastPrior` is itself an [`AbstractPriorModel`](@ref), anything richer
-a user writes (a partially-pooled prior, a time-varying prior wrapping a
-[`RandomWalk`](@ref)) drops into the same prior slot with no struct changes.
+Because `as_turing_model` also has `Distribution` and
+`Vector{<:Distribution}` methods, the same call composes a raw prior:
 
-The sampled variable is always the generic `θ`; the component that samples the
-prior namespaces it by turning submodel prefixing on at the slot (the left-hand
-name becomes the chain prefix), so two priors in one model never collide.
+```julia
+damp ~ as_turing_submodel(model.damp, p; prefix = true)   # a Distribution or a process
+```
 
-## Fields
+`prefix` defaults to `false` — the package standard, keeping the submodel's
+variable names flat. Two kinds of call site pass `prefix = true`:
 
-  - `dist`: a `Distribution`, or a `Vector{<:Distribution}`.
+  - a **prior slot** (a component's `damp` / `init` / `θ` etc.), so the slot's
+    left-hand name namespaces the whole prior submodel and a process-valued prior
+    can never collide with the host's own variables (issue #80);
+  - the **deliberately-prefixing** components ([`PrefixLatentModel`](@ref),
+    [`Split`](@ref)), which stream their children under an explicit name.
+
+# Arguments
+
+  - `m`: the component (or raw prior) to compose.
+  - `args...`: positional arguments forwarded to `as_turing_model` (e.g. the
+    series length `n`, or the observed/expected series for an observation model).
+
+# Keyword Arguments
+
+  - `prefix`: whether to prefix the submodel's variables with the tilde
+    left-hand name (default `false`).
 
 # Examples
-```@example BroadcastPrior
+
+Inside a component's `@model` body it is used on the right of a `~`:
+
+```julia
+latent ~ as_turing_submodel(inner_model, n)
+damp ~ as_turing_submodel(model.damp, p; prefix = true)
+```
+
+It returns a Turing submodel; the underlying prior submodel returns a length-`n`
+value:
+
+```@example as_turing_submodel
 using ComposableTuringIDModels, Distributions
-# scalar parameter: length-1, read back with `only`
-only(as_turing_model(BroadcastPrior(Normal()), 1)())
+length(as_turing_model(Normal(), 4)())
 ```
 "
-struct BroadcastPrior{D} <: AbstractPriorModel
-    "A `Distribution`, or a `Vector{<:Distribution}`."
-    dist::D
+function as_turing_submodel(m, args...; prefix::Bool = false)
+    return to_submodel(as_turing_model(m, args...), prefix)
 end
 
-@model function as_turing_model(prior::BroadcastPrior{<:Distribution}, n)
-    @assert n>0 "n must be greater than 0"
-    # Repeat-one: a single random variable repeated to length `n`, so a global
-    # parameter is not expanded into `n` i.i.d. draws.
-    θ ~ prior.dist
-    return fill(θ, n)
-end
+@doc raw"
+The types accepted in a prior / process slot: a raw `Distribution`, a vector of
+`Distribution`s, or an [`AbstractPriorModel`](@ref) (a latent process used as a
+prior). Bounding a widened slot to `PriorLike` keeps the fail-fast role guard — a
+wrong-role component (an observation or infection model) is rejected at
+construction — while accepting a bare distribution alongside a process.
+"
+const PriorLike = Union{Distribution, AbstractVector{<:Distribution},
+    AbstractPriorModel}
 
-@model function as_turing_model(prior::BroadcastPrior{<:AbstractVector}, n)
-    @assert length(prior.dist)==n "BroadcastPrior of a length-$(length(prior.dist)) vector cannot produce a length-$n prior"
-    # One i.i.d. draw per element; `filldist` for a homogeneous vector, `arraydist`
-    # otherwise.
-    product_dist = all(first(prior.dist) .== prior.dist) ?
-                   filldist(first(prior.dist), n) : arraydist(prior.dist)
-    θ ~ product_dist
+@doc raw"
+Sample a raw prior `Distribution` as a length-`n` prior submodel.
+
+Giving `as_turing_model` a `Distribution` method lets a **bare distribution** flow
+through [`as_turing_submodel`](@ref) exactly like a full model: a component's prior
+slot samples `θ ~ as_turing_submodel(model.slot, n)` whether the slot holds a bare
+distribution or a latent process. The draw is `n` independent values from `prior`
+(`filldist`); for a genuinely scalar parameter sample the distribution with a
+native tilde instead (`σ ~ model.std`), which is a plain scalar draw with no
+submodel. To broadcast a **single shared** value to length `n` use
+[`Intercept`](@ref).
+
+# Arguments
+
+  - `prior`: the prior distribution.
+  - `n`: the number of independent draws.
+
+# Examples
+```@example as_turing_model_distribution
+using ComposableTuringIDModels, Distributions
+length(as_turing_model(Normal(), 3)())
+```
+"
+@model function as_turing_model(prior::Distribution, n::Int)
+    θ ~ filldist(prior, n)
     return θ
 end
 
 @doc raw"
-Coerce a user-supplied prior into an [`AbstractPriorModel`](@ref).
+Sample a vector of prior `Distribution`s as a length-`n` prior submodel, one
+independent draw per element.
 
-This is the seam that keeps constructors ergonomic: a prior field is typed
-`::AbstractPriorModel` and the constructor calls `as_prior` on whatever the user
-passed, so a bare `Distribution` (or a vector of them) is wrapped in a
-[`BroadcastPrior`](@ref) while a prior submodel — including any latent process,
-e.g. `RandomWalk()` for a time-varying parameter — is accepted unchanged.
-
-Collision-free naming is handled at the call site rather than here: a component
-turns submodel prefixing on when it samples the prior, so the slot's left-hand
-name namespaces the whole prior submodel (a process prior's inner variables can
-never collide with the host's own — issue #80).
+The length is fixed by the vector, so `n` must match it. A homogeneous vector uses
+`filldist` and a heterogeneous one `arraydist`. This is the explicit way a prior
+slot asks for `n` independent draws with per-element priors (e.g. an `AR`'s
+per-lag damping coefficients).
 
 # Arguments
 
-  - `p`: an `AbstractPriorModel`, a `Distribution`, or a `Vector{<:Distribution}`.
+  - `prior`: the vector of prior distributions.
+  - `n`: the required length (must equal `length(prior)`).
 
 # Examples
-```@example as_prior
+```@example as_turing_model_vector
 using ComposableTuringIDModels, Distributions
-as_prior(Normal())        # a BroadcastPrior
-as_prior(RandomWalk())    # a latent model is already a prior model
+as_turing_model([Normal(0, 1), Normal(5, 0.1)], 2)()
 ```
 "
-as_prior(p::AbstractPriorModel) = p
-as_prior(d::Distribution) = BroadcastPrior(d)
-as_prior(v::AbstractVector{<:Distribution}) = BroadcastPrior(v)
+@model function as_turing_model(prior::AbstractVector{<:Distribution}, n::Int)
+    @assert length(prior)==n "a length-$(length(prior)) prior vector cannot produce a length-$n prior"
+    # One i.i.d. draw per element; `filldist` for a homogeneous vector, `arraydist`
+    # otherwise.
+    product_dist = all(first(prior) .== prior) ? filldist(first(prior), n) :
+                   arraydist(prior)
+    θ ~ product_dist
+    return θ
+end
 
-# Order (p / q / d) implied by a prior: a vector wrapper fixes it to the vector
-# length; a single-distribution (repeat-one) or richer prior defaults to order 1.
-_prior_order(p::BroadcastPrior{<:AbstractVector}) = length(p.dist)
+# Order (p / q / d) implied by a prior: a vector fixes it to the vector length; a
+# single distribution or a richer prior model defaults to order 1.
+_prior_order(p::AbstractVector{<:Distribution}) = length(p)
+_prior_order(::Distribution) = 1
 _prior_order(::AbstractPriorModel) = 1
 
-# Assert a vector wrapper's length matches the required order `k`. A
-# single-distribution or richer prior broadcasts to `k` and imposes no
+# Assert a vector prior's length matches the required order `k`. A single
+# distribution or a richer prior model broadcasts to `k` and imposes no
 # constraint.
-function _assert_prior_length(p::BroadcastPrior{<:AbstractVector}, k, what)
-    @assert length(p.dist)==k "$what prior length $(length(p.dist)) must equal $k"
+function _assert_prior_length(p::AbstractVector{<:Distribution}, k, what)
+    @assert length(p)==k "$what prior length $(length(p)) must equal $k"
     return nothing
 end
-_assert_prior_length(::AbstractPriorModel, k, what) = nothing
+_assert_prior_length(_, k, what) = nothing

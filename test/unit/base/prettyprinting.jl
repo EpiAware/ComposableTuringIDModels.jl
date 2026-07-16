@@ -24,7 +24,6 @@
 
     # The raw parametric type signature must NOT leak into the display.
     @test !occursin("{", out)
-    @test !occursin("BroadcastPrior", out)
     @test !occursin("ConstantRenewalStep", out)
 end
 
@@ -41,8 +40,8 @@ end
     @test occursin("models[2]: PrefixLatentModel", out)
     @test occursin("model: Intercept", out)
     @test occursin("model: RandomWalk", out)
-    # The BroadcastPrior wrapper stays a leaf even inside a vector child.
-    @test !occursin("BroadcastPrior", out)
+    # A raw-distribution prior slot stays a leaf even inside a vector child.
+    @test !occursin("Normal{", out)
 end
 
 @testitem "show recurses through nested observation modifiers" begin

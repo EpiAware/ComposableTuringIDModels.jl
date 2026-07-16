@@ -178,7 +178,7 @@ this package (see [Automatic differentiation backend](@ref ad-backend)).
 posterior = as_turing_model(model, y_obs, n)
 chain = sample(
     posterior, NUTS(0.9; adtype = AutoMooncake(; config = nothing)),
-    MCMCThreads(), 150, 2; progress = false)
+    MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
 
@@ -189,8 +189,8 @@ that samples them, so a prior's inner variables never collide across the model.
 `summarystats` summarises directly — no conversion step — giving point estimates
 *and* their uncertainty alongside the effective sample size and ``\hat{R}``
 convergence diagnostic. The autoregressive damping ``\rho``
-(`Z_t.damp_AR.θ[1]`), the innovation scale ``\sigma`` (`Z_t.ϵ_t.std.θ`), and the
-observation cluster factor ``\sqrt{1/\phi}`` (`cluster_factor.θ`) are all
+(`damp_AR.θ[1]`), the innovation scale ``\sigma`` (`std`), and the
+observation cluster factor ``\sqrt{1/\phi}`` (`cluster_factor`) are all
 identified from the observed South Korean series:
 
 ```@example renewal
@@ -213,16 +213,16 @@ extension turns a chain (subset to a few keys with `chain[[...]]`) into a
 using CairoMakie, PairPlots
 
 prior_chain = sample(posterior, Prior(), 1000; progress = false)
-pp_keys = [@varname(Z_t.damp_AR.θ), @varname(Z_t.ϵ_t.std.θ),
-    @varname(cluster_factor.θ), @varname(init_incidence.θ)]
+pp_keys = [@varname(damp_AR.θ), @varname(std),
+    @varname(cluster_factor), @varname(init_incidence.θ)]
 pairplot(
     PairPlots.Series(chain[pp_keys]; label = "posterior"),
     PairPlots.Series(prior_chain[pp_keys]; label = "prior"))
 ```
 
-The innovation scale ``\sigma`` (`Z_t.ϵ_t.std.θ`) is sharply updated away from
+The innovation scale ``\sigma`` (`std`) is sharply updated away from
 its prior — the data are informative about how much ``\log R_t`` wiggles — while
-the autoregressive damping ``\rho`` (`Z_t.damp_AR.θ`), the cluster factor and the
+the autoregressive damping ``\rho`` (`damp_AR.θ`), the cluster factor and the
 initial infections stay closer to their priors on this short window.
 
 ## Posterior trajectories

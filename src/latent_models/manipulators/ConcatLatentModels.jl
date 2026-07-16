@@ -27,7 +27,7 @@ rand(as_turing_model(combined, 10))
   - `prefixes`: the vector of prefixes, one per model.
 "
 struct ConcatLatentModels{
-    M <: AbstractVector{<:AbstractLatentModel}, N <: Int, F <: Function,
+    M <: AbstractVector, N <: Int, F <: Function,
     P <: AbstractVector{<:String}} <: AbstractLatentModel
     "A vector of latent models."
     models::M
@@ -47,12 +47,12 @@ struct ConcatLatentModels{
         @assert typeof(check_dim)<:AbstractVector{Int} "Output of dimension_adaptor must be a vector of integers"
         @assert length(check_dim)==no_models "The vector of dimensions must have the same length as the number of models"
         @assert length(prefixes)==no_models "The number of models and prefixes must be equal"
-        # Coerce each member so a bare `Distribution` member is accepted.
-        coerced = as_prior.(models)
-        prefix_models = [prefixes[i] == "" ? coerced[i] :
-                         PrefixLatentModel(coerced[i], prefixes[i])
-                         for i in eachindex(coerced)]
-        return new{AbstractVector{<:AbstractPriorModel}, Int, Function,
+        # Wrap each named member in a `PrefixLatentModel` so its variables stay
+        # distinct; a raw `Distribution` member composes through the same seam.
+        prefix_models = [prefixes[i] == "" ? models[i] :
+                         PrefixLatentModel(models[i], prefixes[i])
+                         for i in eachindex(models)]
+        return new{AbstractVector, Int, Function,
             AbstractVector{<:String}}(
             prefix_models, no_models, dimension_adaptor, prefixes)
     end
@@ -118,7 +118,7 @@ end
     if index > n_models
         return acc_latent
     else
-        latent ~ to_submodel(as_turing_model(models[index], dims[index]), false)
+        latent ~ as_turing_submodel(models[index], dims[index])
         acc_latent = isnothing(acc_latent) ? latent : vcat(acc_latent, latent)
         updated_latent ~ to_submodel(
             _concat_latents(models, index + 1, acc_latent, dims, n_models), false)

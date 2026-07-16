@@ -12,8 +12,6 @@
 
 *A toolkit for composable probabilistic infectious disease modelling in Julia.*
 
-> This package is in early development. Expect rough edges and breaking changes.
-
 ## Why ComposableTuringIDModels?
 
 - **Composable models**: Assemble a model from interchangeable infection and
@@ -25,7 +23,7 @@
 - **One interface**: Every part becomes a [Turing](https://turinglang.org) /
   [DynamicPPL](https://github.com/TuringLang/DynamicPPL.jl) model through the
   single `as_turing_model` constructor, so parts nest freely as submodels. The
-  full Turing inference toolbox (NUTS, Pathfinder, prior simulation) applies.
+  full Turing inference toolbox (NUTS, prior simulation) applies.
 - **Simulate and infer**: Generate synthetic data from any model, then run
   Bayesian inference on the same model with real data.
 - **A library of parts**: Random walks, AR/MA/ARIMA latent processes, renewal

@@ -31,9 +31,9 @@ prior; a panel of series sharing one ``\rho_t`` draw sharpens it.
 
 ## Fields
 
-  - `damp`: prior process for the raw (pre-`transform`) coefficient path (an
-    [`AbstractPriorModel`](@ref); default [`RandomWalk`](@ref)).
-  - `init`: prior for the initial value ``z_1`` (an [`AbstractPriorModel`](@ref)).
+  - `damp`: prior process for the raw (pre-`transform`) coefficient path (a prior
+    model or `Distribution`; default [`RandomWalk`](@ref)).
+  - `init`: prior for the initial value ``z_1`` (a `Distribution` or prior model).
   - `ϵ_t`: error model for the innovations (default [`HierarchicalNormal`](@ref)).
   - `transform`: map from the raw path to the coefficient (default `tanh`).
 
@@ -50,8 +50,8 @@ tv = TimeVaryingAR()
 length(as_turing_model(tv, 10)())
 ```
 "
-struct TimeVaryingAR{D <: AbstractPriorModel, I <: AbstractPriorModel,
-    E <: AbstractLatentModel, F <: Function} <: AbstractLatentModel
+struct TimeVaryingAR{D <: PriorLike, I <: PriorLike, E <: PriorLike,
+    F <: Function} <: AbstractLatentModel
     "Prior process for the raw (pre-`transform`) coefficient path."
     damp::D
     "Prior for the initial value ``z_1``."
@@ -64,19 +64,18 @@ end
 
 function TimeVaryingAR(; damp = RandomWalk(), init = Normal(),
         ϵ_t = HierarchicalNormal(), transform = tanh)
-    return TimeVaryingAR(
-        as_prior(damp), as_prior(init), ϵ_t, transform)
+    return TimeVaryingAR(damp, init, ϵ_t, transform)
 end
 
 @model function as_turing_model(model::TimeVaryingAR, n)
     @assert n>1 "n must be greater than 1"
-    tvar_init ~ to_submodel(as_turing_model(model.init, 1))
-    damp_tv ~ to_submodel(as_turing_model(model.damp, n - 1))
+    tvar_init ~ as_turing_submodel(model.init, 1; prefix = true)
+    damp_tv ~ as_turing_submodel(model.damp, n - 1; prefix = true)
     # Track the coefficient path as a generated quantity so it is recoverable from
     # the chain, while the model still returns the numeric path (stays a drop-in
     # latent).
     ρ := model.transform.(damp_tv)
-    ϵ_t ~ to_submodel(as_turing_model(model.ϵ_t, n - 1))
+    ϵ_t ~ as_turing_submodel(model.ϵ_t, n - 1)
     z = accumulate_scan(TVARStep(), only(tvar_init), collect(zip(ρ, ϵ_t)))
     return z
 end
