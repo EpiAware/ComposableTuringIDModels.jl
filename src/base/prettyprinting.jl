@@ -27,7 +27,8 @@ end
 # Collect the component children of `model` as `(role, child)` pairs. A field is a
 # child when its value is itself an `AbstractComposableModel`, or a vector/tuple
 # containing components (as combined/stacked models hold); leaf fields (priors,
-# `IDData`, step structs, functions) are skipped so the tree stays compact.
+# generation intervals, step structs, functions) are skipped so the tree stays
+# compact.
 function _component_children(model::AbstractComposableModel)
     children = Tuple{String, AbstractComposableModel}[]
     for f in fieldnames(typeof(model))
