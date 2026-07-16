@@ -78,7 +78,7 @@ delay PMF, the seam an estimated / time-varying delay grows from.
 
   - `ReportingPMF(distribution; D, Δd)` — discretise a continuous reporting-delay
     distribution via double-interval censoring (CensoredDistributions.jl), exactly
-    the released-CD path [`LatentDelay`](@ref) / [`IDData`](@ref) use.
+    the released-CD path [`LatentDelay`](@ref) uses.
   - `ReportingPMF(pmf)` — from a precomputed delay PMF (non-negative, sums to 1).
 
 # Examples
@@ -140,7 +140,7 @@ parameterisation — are the seams this grows from (a later phase of the nowcast
 design).
 
 The default PMF is built with the same released-CD `double_interval_censored` +
-`pdf` discretisation path that [`LatentDelay`](@ref) / [`IDData`](@ref) use, so
+`pdf` discretisation path that [`LatentDelay`](@ref) uses, so
 the triangle's per-cell means and the right-truncation nowcast share one delay
 kernel.
 

@@ -71,8 +71,7 @@ weekly ``\log R_t`` process built above is folded into the renewal model's `rt`
 slot.
 
 ```@example delays
-data = IDData(gen_distribution = Gamma(1.4, 1 / 0.38))
-renewal = Renewal(data;
+renewal = Renewal(gen_distribution = Gamma(1.4, 1 / 0.38);
     rt = weekly_latent, initialisation = Normal(log(1.0), 1.0))
 nothing # hide
 ```
