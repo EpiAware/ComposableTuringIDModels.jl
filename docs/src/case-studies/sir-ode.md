@@ -75,9 +75,18 @@ switches between explicit and implicit methods, which keeps the solve robust
 when the sampler proposes stiff parameter values.
 
 ```@example sir
+# Pull the infected compartment from the ODE solution. A solve that fails under
+# an extreme sampler proposal returns fewer than `n` saved points; map that to a
+# series the observation likelihood rejects, so the sampler steps away rather
+# than erroring on the shortened series.
+function infected(sol)
+    infs = sol[2, :]
+    length(infs) == n ? infs : fill(eltype(infs)(Inf), n)
+end
+
 sir_process = ODEProcess(
     params = sir_params,
-    sol2infs = sol -> sol[2, :],
+    sol2infs = infected,
     solver_options = Dict(:saveat => ts))
 nothing # hide
 ```
@@ -294,7 +303,7 @@ The SIR parameters keep their flat names (`β`, `γ`, `I₀`); the ascertainment
 process contributes its own block, prefixed `Ascertainment.` because modifiers
 that introduce a named sub-process prefix their variables to keep them distinct.
 `summarystats` shows both blocks, including the ascertainment innovation scale
-``\sigma`` (`Ascertainment.ϵ_t.std.θ`), which quantifies how much
+``\sigma`` (`Ascertainment.std`), which quantifies how much
 observation-level noise the latent process absorbed:
 
 ```@example sir
@@ -308,7 +317,7 @@ scale is small:
 ```@example sir
 βs = vec(stochastic_chain[@varname(β)])
 γs = vec(stochastic_chain[@varname(γ)])
-asc_std = vec(stochastic_chain[@varname(Ascertainment.ϵ_t.std.θ)])
+asc_std = vec(stochastic_chain[@varname(Ascertainment.std)])
 (R0 = mean(βs ./ γs), ascertainment_sigma = mean(asc_std))
 ```
 
