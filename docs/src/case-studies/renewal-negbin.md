@@ -53,16 +53,20 @@ latent = AR(
     ϵ_t = HierarchicalNormal(std_prior = HalfNormal(0.1)))
 ```
 
-The infection process needs a discrete generation interval. [`IDData`](@ref)
+The infection process needs a discrete generation interval. [`Renewal`](@ref)
 takes a continuous distribution and discretises it with double interval
 censoring [charniga2024best](@citep), using
 [CensoredDistributions.jl](https://github.com/EpiAware/CensoredDistributions.jl).
 Following [mishra2020derivation](@citet) we use a ``\mathrm{Gamma}(6.5, 0.62)``
-serial interval as a proxy for the generation interval.
+serial interval as a proxy for the generation interval. [`Renewal`](@ref) is the
+only infection model that carries a generation interval, because it is the only
+one that uses one; it couples that interval to the latent ``\log R_t`` process
+(its `rt` slot) and a prior for the initial infections.
 
 ```@example renewal
-data = IDData(gen_distribution = Gamma(6.5, 0.62))
-data.gen_int
+renewal = Renewal(gen_distribution = Gamma(6.5, 0.62);
+    rt = latent, initialisation_prior = Normal(log(1.0), 0.1))
+renewal.gen_int
 ```
 
 The stored `gen_int` is a probability vector — the continuous serial interval
@@ -73,17 +77,7 @@ shifts and spreads the mass relative to the underlying ``\mathrm{Gamma}``
 [charniga2024best](@citep).
 
 ```@example renewal
-sum(data.gen_int), length(data.gen_int)
-```
-
-The [`Renewal`](@ref) process couples that generation interval to the latent
-``\log R_t`` process (its `rt` slot) and a prior for the initial infections.
-[`Renewal`](@ref) is the only infection model that carries an [`IDData`](@ref),
-because it is the only one that uses a generation interval.
-
-```@example renewal
-renewal = Renewal(data; rt = latent, initialisation_prior = Normal(log(1.0), 0.1))
-nothing # hide
+sum(renewal.gen_int), length(renewal.gen_int)
 ```
 
 ## The infection process in isolation
@@ -100,7 +94,7 @@ latent draw `Z_t`.
 
 ```@example renewal
 fixed_logR = log(1.4)
-renewal_fixed = Renewal(data;
+renewal_fixed = Renewal(renewal.gen_int;
     rt = FixedIntercept(fixed_logR), initialisation_prior = Normal())
 demo = fix(as_turing_model(renewal_fixed, 60), (init_incidence = 0.0,))()
 (constant_Rt = round(exp(first(demo.Z_t)), digits = 2),

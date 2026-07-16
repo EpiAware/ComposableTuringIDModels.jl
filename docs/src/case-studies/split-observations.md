@@ -62,13 +62,13 @@ using ComposableTuringIDModels, Distributions, Random, Turing, Mooncake
 using ADTypes: AutoMooncake
 Random.seed!(1234)
 
-data = IDData(gen_distribution = Gamma(6.5, 0.62))
 latent = AR(
     damp_priors = [truncated(Normal(0.8, 0.05), 0, 1),
         truncated(Normal(0.1, 0.05), 0, 1)],
     init_priors = [Normal(0.0, 0.2), Normal(0.0, 0.2)],
     ϵ_t = HierarchicalNormal(std_prior = HalfNormal(0.1)))
-renewal = Renewal(data; rt = latent, initialisation_prior = Normal(log(100.0), 0.1))
+renewal = Renewal(gen_distribution = Gamma(6.5, 0.62);
+    rt = latent, initialisation_prior = Normal(log(100.0), 0.1))
 
 cases = LatentDelay(
     Ascertainment(NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),

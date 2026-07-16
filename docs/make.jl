@@ -92,7 +92,7 @@ makedocs(;
         repo = "github.com/EpiAware/ComposableTuringIDModels.jl",
         devbranch = "main",
         devurl = "dev",
-        deploy_url = "composableturingidmodels.epiaware.org"))
+        deploy_url = "https://composableturingidmodels.epiaware.org"))
 
 DocumenterVitepress.deploydocs(;
     repo = "github.com/EpiAware/ComposableTuringIDModels.jl",

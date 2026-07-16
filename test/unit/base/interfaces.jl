@@ -42,9 +42,9 @@ end
 
 @testitem "infection models are AbstractInfectionModel; ODE params are latent" begin
     using ComposableTuringIDModels, Distributions, OrdinaryDiffEq
-    data = IDData([0.2, 0.3, 0.5], exp)
+    gen_int = [0.2, 0.3, 0.5]
     for m in (DirectInfections(; Z = RandomWalk()), ExpGrowthRate(; rt = RandomWalk()),
-        Renewal(; data = data, rt = RandomWalk()))
+        Renewal(gen_int; rt = RandomWalk()))
         @test m isa AbstractInfectionModel
     end
     # ODE parameter structs play the latent role (they feed an ODEProcess slot).
@@ -103,7 +103,7 @@ end
 
 @testitem "reusable interface checkers confirm role conformance" begin
     using ComposableTuringIDModels, Distributions
-    data = IDData([0.2, 0.3, 0.5], exp)
+    gen_int = [0.2, 0.3, 0.5]
     # Each checker is true for an in-role model implementing its as_turing_model.
     @test implements_latent_interface(RandomWalk())
     @test implements_latent_interface(AR(); n = 12)
@@ -111,7 +111,7 @@ end
     @test implements_latent_interface(HilbertSpaceGP(; kernel = Matern52Kernel()); n = 25)
     @test implements_latent_interface(ExactGP(); n = 25)
     @test implements_infection_interface(DirectInfections(; Z = RandomWalk()))
-    @test implements_infection_interface(Renewal(; data = data, rt = RandomWalk()); n = 20)
+    @test implements_infection_interface(Renewal(gen_int; rt = RandomWalk()); n = 20)
     @test implements_observation_interface(PoissonError())
     @test implements_observation_interface(NegativeBinomialError())
     # A model is NOT in a role it does not belong to.

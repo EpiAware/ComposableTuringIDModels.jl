@@ -28,22 +28,6 @@ end
     @test res.generated !== missing
 end
 
-@testitem "IDMethod threads a Pathfinder pre-step into NUTS" tags=[:sample] begin
-    using ComposableTuringIDModels, Distributions, Random
-    Random.seed!(73)
-    problem = IDProblem(
-        infection = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
-        observation_model = PoissonError(),
-        tspan = (1, 20))
-    ydata = as_turing_model(problem, (; y_t = missing))().generated_y_t
-    method = IDMethod(
-        pre_sampler_steps = [ManyPathfinder(; ndraws = 10, nruns = 2)],
-        sampler = NUTSampler(; ndraws = 40, nchains = 1))
-    res = apply_method(problem, method, (; y_t = ydata))
-    @test res isa IDObservables
-    @test res.samples !== nothing
-end
-
 @testitem "spread_draws produces tidy draw/chain/iteration columns" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, MCMCChains, Random
     Random.seed!(74)

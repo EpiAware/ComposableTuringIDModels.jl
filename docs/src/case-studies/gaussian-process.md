@@ -88,7 +88,7 @@ Fourier transform of exactly this KernelFunctions kernel.
 
 To use a GP as the reproduction number we hand it to a [`Renewal`](@ref)
 infection model as its `rt` latent process. The generation interval is a
-``\mathrm{Gamma}(6.5, 0.62)`` serial interval discretised by [`IDData`](@ref),
+``\mathrm{Gamma}(6.5, 0.62)`` serial interval discretised by [`Renewal`](@ref),
 and reported cases are overdispersed counts via [`NegativeBinomialError`](@ref).
 
 We simulate a ground truth by driving the renewal model with an [`ExactGP`](@ref)
@@ -102,11 +102,11 @@ cases `generated_y_t`, the latent infections `I_t`, and the GP path
 ```@example gp
 using Turing: fix
 
-data = IDData(gen_distribution = Gamma(6.5, 0.62))
+si = Gamma(6.5, 0.62)
 obs = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1))
 n = 70
 
-truth = IDModel(Renewal(data; rt = ExactGP(),
+truth = IDModel(Renewal(gen_distribution = si; rt = ExactGP(),
         initialisation_prior = Normal(log(2.0), 0.1)), obs)
 Random.seed!(10)
 sim = fix(as_turing_model(truth, fill(missing, n), n), (ℓ = 0.55, σ = 0.55))()
@@ -132,7 +132,7 @@ using Turing, Mooncake, Statistics
 using ADTypes: AutoMooncake
 
 function fit_gp(latent)
-    model = IDModel(Renewal(data; rt = latent,
+    model = IDModel(Renewal(gen_distribution = si; rt = latent,
             initialisation_prior = Normal(log(2.0), 0.1)), obs)
     posterior = as_turing_model(model, y_obs, n)
     time = @elapsed chain = sample(posterior,

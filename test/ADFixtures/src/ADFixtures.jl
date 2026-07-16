@@ -45,7 +45,7 @@ const _GEN_INT = [0.2, 0.3, 0.5]
 # Build the registry's models once. Conditioned (posterior) scenarios use data
 # simulated from the prior with a fixed seed so the target is deterministic.
 function _models()
-    data = IDData(_GEN_INT, exp)
+    gen_int = _GEN_INT
     n = 12
 
     rw = as_turing_model(RandomWalk(), n)
@@ -60,7 +60,7 @@ function _models()
         DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
     renewal = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()),
         NegativeBinomialError())
 
     # Nowcasting MARGINAL (right-truncation correction): a renewal model whose
@@ -68,7 +68,7 @@ function _models()
     # supplied as a `ReportingCDF` submodel). This exercises the `reverse`/
     # broadcast scaling the modifier adds on top of the inner error.
     nowcast = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()),
         RightTruncate(NegativeBinomialError(),
             truncated(Normal(4.0, 1.5), 0.0, Inf)))
 
@@ -77,7 +77,7 @@ function _models()
     # Poisson log-likelihood over the masked triangle (`t + d ≤ now`) is what
     # nowcasting under NUTS depends on.
     triangle = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()),
         ReportTriangle(PoissonError(), [0.6, 0.25, 0.15]))
 
     # `Split` observation composition: a renewal model observed through two
@@ -85,7 +85,7 @@ function _models()
     # delay and splitting after it. Exercises the per-stream prefixing and the
     # expected-series threading gradient path.
     split = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()),
         LatentDelay(
             Split((
                 cases = NegativeBinomialError(),

@@ -19,6 +19,6 @@ ComposableTuringIDModels = {path = "../.."}
 
 [compat]
 Distributions = "0.25.128"
-DynamicPPL = "0.41.8"
+DynamicPPL = "0.42.1"
 LogDensityProblems = "2.2.0"
 Random = "1.11.0"
