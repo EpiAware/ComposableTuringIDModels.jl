@@ -26,7 +26,7 @@ a non-monotonic correction — without changing `RightTruncate`.
   - `ReportingCDF(distribution; D, Δd)` — discretise a continuous reporting-delay
     distribution via double-interval censoring (CensoredDistributions.jl) and take
     the cumulative sum of the resulting PMF, exactly the released-CD path
-    [`LatentDelay`](@ref) / [`IDData`](@ref) use.
+    [`LatentDelay`](@ref) uses.
   - `ReportingCDF(cdf)` — from a precomputed completeness vector by age (in
     `[0, 1]`; need not be monotonic).
 
@@ -60,7 +60,7 @@ end
 function ReportingCDF(distribution::C; D = nothing, Δd = 1.0) where {
         C <: ContinuousDistribution}
     # Build the reporting-delay CDF from the released-CD double-interval-censored
-    # PMF (the same path `LatentDelay` / `IDData` use), then accumulate it.
+    # PMF (the same path `LatentDelay` uses), then accumulate it.
     pmf = _discretised_pmf(distribution; Δd = Δd, D = D)
     return ReportingCDF(cumsum(pmf))
 end
