@@ -63,7 +63,7 @@ export as_turing_submodel
 
 # --- utilities and distributions ---
 # (double-interval censoring is provided by CensoredDistributions.jl, used
-# internally by `IDData` / `LatentDelay`; it is not re-exported here.)
+# internally by `Renewal` / `LatentDelay`; it is not re-exported here.)
 export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial,
        NegativeBinomialMeanClust, condition_model
 
@@ -79,7 +79,7 @@ export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
        broadcast_weekly, equal_dimensions, arma, arima, Hierarchy
 
 # --- infection models ---
-export IDData, DirectInfections, ExpGrowthRate, Renewal,
+export DirectInfections, ExpGrowthRate, Renewal,
        R_to_r, r_to_R, expected_Rt
 
 # --- ODE compartmental models ---
@@ -125,6 +125,7 @@ include("steps/TVARStep.jl")
 include("steps/MAStep.jl")
 include("steps/LDStep.jl")
 include("steps/RenewalSteps.jl")
+include("steps/ComposedRenewalStep.jl")
 
 # --- utilities and distributions ---
 include("utils/HalfNormal.jl")
@@ -157,7 +158,6 @@ include("latent_models/combinations/arma.jl")
 include("latent_models/combinations/arima.jl")
 
 # --- infection models ---
-include("infection_models/IDData.jl")
 include("infection_models/DirectInfections.jl")
 include("infection_models/ExpGrowthRate.jl")
 include("infection_models/Renewal.jl")

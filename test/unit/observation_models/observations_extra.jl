@@ -87,7 +87,7 @@ end
     @test as_turing_model(nonmono, 3)() == [0.6, 0.2, 0.9]
 
     # The distribution constructor builds the CDF from the released-CD
-    # double-interval-censored PMF (the LatentDelay / IDData path): cumulative,
+    # double-interval-censored PMF (the LatentDelay path): cumulative,
     # non-decreasing, ending at 1.
     cd = ReportingCDF(truncated(Normal(5.0, 2.0), 0.0, Inf))
     F = as_turing_model(cd, 10)()
@@ -193,10 +193,10 @@ end
 @testitem "RightTruncate composes with a renewal model end-to-end" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(63)
-    data = IDData([0.2, 0.3, 0.5], exp)
+    gen_int = [0.2, 0.3, 0.5]
     n = 25
     model = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(gen_int; rt = RandomWalk(), initialisation = Normal()),
         RightTruncate(NegativeBinomialError(),
             truncated(Normal(4.0, 1.5), 0.0, Inf)))
 
@@ -393,10 +393,10 @@ end
 @testitem "ReportTriangle composes with the renewal infection process" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(75)
-    data = IDData([0.2, 0.3, 0.5], exp)
-    renewal = Renewal(data; rt = RandomWalk(), initialisation = Normal())
+    gen_int = [0.2, 0.3, 0.5]
+    renewal = Renewal(gen_int; rt = RandomWalk(), initialisation = Normal())
 
-    # Released-CD discretised-delay constructor (the LatentDelay / IDData path).
+    # Released-CD discretised-delay constructor (the LatentDelay path).
     obs = ReportTriangle(NegativeBinomialError(),
         truncated(Normal(2.0, 1.0), 0.0, Inf))
     model = IDModel(renewal, obs)

@@ -48,8 +48,8 @@ composer. An infection model takes a latent slot — `Z` for [`DirectInfections`
 process internally before mapping it to infections. So `as_turing_model` for an
 infection model takes only a series length and returns `(; I_t, Z_t)`: the
 infection path and the internal latent draw, kept accessible as a generated
-quantity. Only [`Renewal`](@ref) needs a generation interval, so it alone carries
-an [`IDData`](@ref); the others take a `transformation` directly.
+quantity. Only [`Renewal`](@ref) needs a generation interval, so it alone takes
+one; the others take a `transformation` directly.
 
 ## Swap-in, swap-out
 

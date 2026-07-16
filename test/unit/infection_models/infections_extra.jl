@@ -11,8 +11,8 @@ end
 @testitem "Renewal generates an Rt path and maps it to infections" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(42)
-    data = IDData([0.2, 0.3, 0.5], exp)
-    renewal = Renewal(data; rt = RandomWalk(), initialisation = Normal())
+    gen_int = [0.2, 0.3, 0.5]
+    renewal = Renewal(gen_int; rt = RandomWalk(), initialisation = Normal())
     out = as_turing_model(renewal, 20)()
     @test length(out.I_t) == 20
     @test length(out.Z_t) == 20
@@ -24,12 +24,12 @@ end
     using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: fix
     Random.seed!(421)
-    data = IDData([0.2, 0.3, 0.5], exp)
+    gen_int = [0.2, 0.3, 0.5]
     # Pinning the latent to a known (log) Rt trajectory via a FixedIntercept
     # latent makes the renewal infection path deterministic given I₀ — the
     # standalone-style illustration under the folded interface.
     logR = log(1.5)
-    renewal = Renewal(data; rt = FixedIntercept(logR),
+    renewal = Renewal(gen_int; rt = FixedIntercept(logR),
         initialisation = Normal())
     mdl = fix(as_turing_model(renewal, 30), (init_incidence = 0.0,))
     out = mdl()
@@ -51,9 +51,9 @@ end
 @testitem "composed Renewal model runs a short NUTS sample" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(43)
-    data = IDData([0.2, 0.3, 0.5], exp)
+    gen_int = [0.2, 0.3, 0.5]
     model = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(gen_int; rt = RandomWalk(), initialisation = Normal()),
         PoissonError())
     y = as_turing_model(model, missing, 20)().generated_y_t
     chn = sample(as_turing_model(model, y, 20), NUTS(), 30; progress = false)
