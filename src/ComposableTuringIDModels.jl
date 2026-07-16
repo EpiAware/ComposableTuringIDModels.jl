@@ -41,7 +41,6 @@ using ADTypes: ADTypes, AutoForwardDiff
 using AbstractMCMC: AbstractMCMC
 using AdvancedHMC: DiagEuclideanMetric
 using MCMCChains: Chains
-using Pathfinder: pathfinder, PathfinderResult
 using DataFramesMeta: DataFrame, @rename!
 using Tables: rowtable
 
@@ -101,8 +100,8 @@ export Split, StrataMap
 export IDModel
 
 # --- inference orchestration ---
-export IDProblem, IDMethod, NUTSampler, ManyPathfinder, DirectSample,
-       manypathfinder, apply_method, IDObservables, generated_observables,
+export IDProblem, NUTSampler, DirectSample,
+       apply_method, IDObservables, generated_observables,
        spread_draws, get_param_array
 
 # --- core architecture ---
@@ -196,7 +195,6 @@ include("inference/apply_method.jl")
 include("inference/NUTSampler.jl")
 include("inference/DirectSample.jl")
 include("inference/get_param_array.jl")
-include("inference/ManyPathfinder.jl")
 include("inference/post-inference.jl")
 
 end
