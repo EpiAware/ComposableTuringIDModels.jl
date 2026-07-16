@@ -62,8 +62,7 @@ for models with no exposable latent such as [`ODEProcess`](@ref)). Exposing
 
 Members include [`DirectInfections`](@ref), [`ExpGrowthRate`](@ref),
 [`Renewal`](@ref) and [`ODEProcess`](@ref). Only [`Renewal`](@ref) carries a
-generation interval ([`IDData`](@ref)); the others take a `transformation`
-directly.
+generation interval; the others take a `transformation` directly.
 "
 abstract type AbstractInfectionModel <: AbstractComposableModel end
 

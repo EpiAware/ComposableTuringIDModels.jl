@@ -16,7 +16,6 @@ over `tspan` and conditions it on `data.y_t`.
 # Examples
 ```@example IDProblem
 using ComposableTuringIDModels, Distributions
-data = IDData([0.2, 0.3, 0.5], exp)
 problem = IDProblem(
     infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
     observation_model = PoissonError(),
