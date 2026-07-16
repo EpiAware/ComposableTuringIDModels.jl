@@ -41,7 +41,6 @@ using ADTypes: ADTypes, AutoForwardDiff
 using AbstractMCMC: AbstractMCMC
 using AdvancedHMC: DiagEuclideanMetric
 using MCMCChains: Chains
-using Pathfinder: pathfinder, PathfinderResult
 using DataFramesMeta: DataFrame, @rename!
 using Tables: rowtable
 
@@ -64,7 +63,7 @@ export BroadcastPrior, as_prior
 
 # --- utilities and distributions ---
 # (double-interval censoring is provided by CensoredDistributions.jl, used
-# internally by `IDData` / `LatentDelay`; it is not re-exported here.)
+# internally by `Renewal` / `LatentDelay`; it is not re-exported here.)
 export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial,
        NegativeBinomialMeanClust, condition_model
 
@@ -79,7 +78,7 @@ export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
        broadcast_weekly, equal_dimensions, arma, arima
 
 # --- infection models ---
-export IDData, DirectInfections, ExpGrowthRate, Renewal,
+export DirectInfections, ExpGrowthRate, Renewal,
        RenewalStep, SusceptibleDepletion,
        R_to_r, r_to_R, expected_Rt
 
@@ -102,8 +101,8 @@ export Split, StrataMap
 export IDModel
 
 # --- inference orchestration ---
-export IDProblem, IDMethod, NUTSampler, ManyPathfinder, DirectSample,
-       manypathfinder, apply_method, IDObservables, generated_observables,
+export IDProblem, NUTSampler, DirectSample,
+       apply_method, IDObservables, generated_observables,
        spread_draws, get_param_array
 
 # --- core architecture ---
@@ -157,7 +156,6 @@ include("latent_models/combinations/arma.jl")
 include("latent_models/combinations/arima.jl")
 
 # --- infection models ---
-include("infection_models/IDData.jl")
 include("infection_models/DirectInfections.jl")
 include("infection_models/ExpGrowthRate.jl")
 include("infection_models/Renewal.jl")
@@ -198,7 +196,6 @@ include("inference/apply_method.jl")
 include("inference/NUTSampler.jl")
 include("inference/DirectSample.jl")
 include("inference/get_param_array.jl")
-include("inference/ManyPathfinder.jl")
 include("inference/post-inference.jl")
 
 end

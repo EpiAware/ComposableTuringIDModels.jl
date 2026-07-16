@@ -88,9 +88,10 @@ end
 @testitem "Renewal composes modifiers onto a RenewalStep" begin
     using ComposableTuringIDModels: RenewalStep, ConstantRenewalStep,
                                     SusceptibleDepletion
-    data = IDData([0.2, 0.3, 0.5], exp)
-    plain = Renewal(data; rt = RandomWalk())
-    depleting = Renewal(data, SusceptibleDepletion(1000.0); rt = RandomWalk())
+    gen_int = [0.2, 0.3, 0.5]
+    plain = Renewal(gen_int; rt = RandomWalk())
+    depleting = Renewal(gen_int, SusceptibleDepletion(1000.0);
+        rt = RandomWalk())
     @test plain.recurrent_step isa RenewalStep
     @test isempty(plain.recurrent_step.modifiers)
     @test depleting.recurrent_step isa RenewalStep
@@ -103,11 +104,12 @@ end
     using DynamicPPL: fix
     using Random
     Random.seed!(48)
-    data = IDData([0.2, 0.3, 0.5], exp)
+    gen_int = [0.2, 0.3, 0.5]
     # Pin R_t high and constant so, without depletion, incidence grows unbounded.
     logR = log(2.0)
-    plain = Renewal(data; rt = FixedIntercept(logR))
-    depleting = Renewal(data, SusceptibleDepletion(500.0); rt = FixedIntercept(logR))
+    plain = Renewal(gen_int; rt = FixedIntercept(logR))
+    depleting = Renewal(gen_int, SusceptibleDepletion(500.0);
+        rt = FixedIntercept(logR))
     fixinit = (init_incidence = log(1.0),)
     I_plain = fix(as_turing_model(plain, 40), fixinit)().I_t
     I_dep = fix(as_turing_model(depleting, 40), fixinit)().I_t
@@ -123,9 +125,9 @@ end
 @testitem "Renewal with susceptible depletion samples under NUTS" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(482)
-    data = IDData([0.2, 0.3, 0.5], exp)
+    gen_int = [0.2, 0.3, 0.5]
     model = IDModel(
-        Renewal(data, SusceptibleDepletion(1000.0);
+        Renewal(gen_int, SusceptibleDepletion(1000.0);
             rt = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
     y = as_turing_model(model, missing, 20)().generated_y_t

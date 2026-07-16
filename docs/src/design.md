@@ -48,8 +48,8 @@ composer. An infection model takes a latent slot — `Z` for [`DirectInfections`
 process internally before mapping it to infections. So `as_turing_model` for an
 infection model takes only a series length and returns `(; I_t, Z_t)`: the
 infection path and the internal latent draw, kept accessible as a generated
-quantity. Only [`Renewal`](@ref) needs a generation interval, so it alone carries
-an [`IDData`](@ref); the others take a `transformation` directly.
+quantity. Only [`Renewal`](@ref) needs a generation interval, so it alone takes
+one; the others take a `transformation` directly.
 
 ## Swap-in, swap-out
 
@@ -86,10 +86,10 @@ turning the renewal process into one with a fixed population. [`Renewal`](@ref) 
 a step-composing helper — pass the modifier and it is composed onto the step:
 
 ```@example design
-data = IDData([0.2, 0.3, 0.5], exp)
+gen_int = [0.2, 0.3, 0.5]
 
 # A renewal process with a fixed population of 1000 and susceptible depletion.
-depleting = Renewal(data, SusceptibleDepletion(1000.0); rt = RandomWalk())
+depleting = Renewal(gen_int, SusceptibleDepletion(1000.0); rt = RandomWalk())
 nothing # hide
 ```
 

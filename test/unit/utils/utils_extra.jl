@@ -1,14 +1,14 @@
 @testitem "continuous distributions discretise into valid PMFs (CensoredDistributions)" begin
     using ComposableTuringIDModels, Distributions
-    # IDData and LatentDelay discretise a continuous distribution into a PMF via
+    # Renewal and LatentDelay discretise a continuous distribution into a PMF via
     # CensoredDistributions.double_interval_censored (internal `_discretised_pmf`).
     pmf = ComposableTuringIDModels._discretised_pmf(Gamma(2.0, 1.0); D = 10.0)
     @test isapprox(sum(pmf), 1.0)
     @test all(>=(0), pmf)
 
-    data = IDData(; gen_distribution = Gamma(2.0, 1.0), D_gen = 10.0)
-    @test isapprox(sum(data.gen_int), 1.0)
-    @test all(>=(0), data.gen_int)
+    renewal = Renewal(; gen_distribution = Gamma(2.0, 1.0), D_gen = 10.0)
+    @test isapprox(sum(renewal.gen_int), 1.0)
+    @test all(>=(0), renewal.gen_int)
 
     obs = LatentDelay(PoissonError(), truncated(Normal(5.0, 2.0), 0.0, Inf))
     @test isapprox(sum(obs.rev_pmf), 1.0)
@@ -17,8 +17,8 @@ end
 
 @testitem "expected_Rt inverts the renewal relationship" begin
     using ComposableTuringIDModels
-    data = IDData([0.2, 0.3, 0.5], exp)
-    rt = expected_Rt(data, [100.0, 200, 300, 400, 500])
+    gen_int = [0.2, 0.3, 0.5]
+    rt = expected_Rt(gen_int, [100.0, 200, 300, 400, 500])
     @test length(rt) == 2
     @test all(>(0), rt)
 end

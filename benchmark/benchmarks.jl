@@ -32,17 +32,14 @@ const SUITE = BenchmarkGroup()
 const GEN_INT = [0.2, 0.3, 0.5]
 const N = 30
 
-_data() = IDData(GEN_INT, exp)
-
 # The representative models, each as a Turing model ready to evaluate. Posterior
 # models are conditioned on data simulated from the prior with a fixed seed.
 function _eval_models()
-    data = _data()
     direct = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
         PoissonError())
     renewal = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(GEN_INT; rt = RandomWalk(), initialisation_prior = Normal()),
         NegativeBinomialError())
     y_direct = as_turing_model(direct, missing, N)().generated_y_t
     y_renewal = as_turing_model(renewal, missing, N)().generated_y_t
