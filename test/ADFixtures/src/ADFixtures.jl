@@ -131,7 +131,7 @@ function _models()
     # Reporting delay: convolves the expected observations with a delay PMF
     # (`accumulate_scan(LDStep(rev_pmf), ...)`) before the inner error.
     latdelay = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(gen_int; rt = RandomWalk(), initialisation = Normal()),
         LatentDelay(NegativeBinomialError(), [0.3, 0.4, 0.3]))
     # Day-of-week ascertainment: scales the expected observations by a broadcast
     # latent (an `Ascertainment` wrapping `broadcast_dayofweek`).
