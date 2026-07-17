@@ -25,7 +25,7 @@ jobs:
     secrets: inherit  # pragma: allowlist secret
 
   downgrade-compat:
-    uses: EpiAware/.github/.github/workflows/downgrade.yml@c758269c3e60b7148e9f15d7f0d493aaa4fb8ffc
+    uses: EpiAware/.github/.github/workflows/downgrade.yml@6fcdcde033ec670ac3832b239427fd2ded591bbc
     # Resolve the minimum compat set on the 1.11 floor, not the default 1.10.
     with:
       julia_version: '1.11'
