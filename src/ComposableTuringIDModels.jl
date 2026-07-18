@@ -126,6 +126,7 @@ include("steps/ARStep.jl")
 include("steps/TVARStep.jl")
 include("steps/MAStep.jl")
 include("steps/LDStep.jl")
+include("steps/TimeVaryingLDStep.jl")
 include("steps/RenewalSteps.jl")
 include("steps/ComposedRenewalStep.jl")
 

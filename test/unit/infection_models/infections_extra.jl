@@ -62,6 +62,23 @@ end
     @test any(k -> startswith(string(k), "gen"), keys(draw))
 end
 
+@testitem "R_to_r/expected_Rt reject an inferred generation interval" begin
+    using ComposableTuringIDModels, Distributions
+    # A deterministic summary needs one fixed interval; an inferred interval
+    # varies per draw, so both throw a clear error rather than a MethodError.
+    gen = UncertainDelay(LogNormal,
+        [Normal(1.9, 0.2), truncated(Normal(0.5, 0.2), 0, Inf)]; D = 14.0)
+    r_inf = Renewal(; generation_time = gen, rt = RandomWalk(),
+        initialisation = Normal())
+    @test_throws ArgumentError R_to_r(1.5, r_inf)
+    @test_throws ArgumentError expected_Rt(r_inf, [100.0, 200, 300, 400, 500])
+    # The fixed-interval methods still work.
+    r_fix = Renewal(; generation_time = [0.2, 0.3, 0.5], rt = RandomWalk(),
+        initialisation = Normal())
+    @test R_to_r(1.5, r_fix) isa Real
+    @test length(expected_Rt(r_fix, [100.0, 200, 300, 400, 500])) == 2
+end
+
 @testitem "uncertain generation_time differentiates (ForwardDiff)" begin
     using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: LogDensityFunction, VarInfo, link, getlogjoint

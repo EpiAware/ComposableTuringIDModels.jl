@@ -145,6 +145,19 @@ function _models()
             UncertainDelay(LogNormal,
                 [Normal(1.0, 0.3), truncated(Normal(0.4, 0.2), 0, Inf)];
                 D = 6.0)))
+    # Time-varying reporting delay: the delay distribution's meanlog is a latent
+    # process (a `RandomWalk`), so the delay — and its discretised pmf — varies
+    # with time. Each per-time pmf is built through the priors seam and the
+    # time-indexed convolution (`TimeVaryingLDStep`) is driven by a reversed kernel
+    # per step. The gradient must flow through the per-time discretisation
+    # (`_discretised_pmf`) and the process submodel threading — the time-varying
+    # counterpart of `udelay`.
+    tvdelay = IDModel(
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
+        LatentDelay(NegativeBinomialError(),
+            UncertainDelay(LogNormal,
+                [RandomWalk(), truncated(Normal(0.4, 0.2), 0, Inf)];
+                D = 6.0)))
     # Uncertain generation interval: the renewal generation interval is itself
     # inferred — a `LogNormal` whose meanlog/sdlog carry priors, sampled through
     # the priors seam and discretised into a pmf per draw (lag-0 bin dropped,
@@ -212,6 +225,7 @@ function _models()
     y_triangle = sim(triangle, n)
     y_latdelay = sim(latdelay, n)
     y_udelay = sim(udelay, n)
+    y_tvdelay = sim(tvdelay, n)
     y_ugen = sim(ugen, n)
     y_ascert = sim(ascert, 14)
     y_aggregate = sim(aggregate, 14)
@@ -252,6 +266,8 @@ function _models()
             as_turing_model(latdelay, y_latdelay, n)),
         ("Renewal+UncertainLatentDelay posterior",
             as_turing_model(udelay, y_udelay, n)),
+        ("Renewal+TimeVaryingLatentDelay posterior",
+            as_turing_model(tvdelay, y_tvdelay, n)),
         ("Renewal+UncertainGenInterval posterior",
             as_turing_model(ugen, y_ugen, n)),
         ("DirectInfections+Ascertainment day-of-week posterior",
@@ -349,7 +365,7 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (27 scenarios × 4 backends), Julia 1.12:
+Result matrix (28 scenarios × 4 backends), Julia 1.12:
 
 | scenario                                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
 |-------------------------------------------------------|:-----------:|:-----------:|:--------:|:------:|
@@ -373,6 +389,7 @@ Result matrix (27 scenarios × 4 backends), Julia 1.12:
 | Renewal+ReportTriangle posterior                      |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+LatentDelay posterior                         |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+UncertainLatentDelay posterior                |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+TimeVaryingLatentDelay posterior              |      ✓      |      ✓      |    ✓    |   ✗   |
 | Renewal+UncertainGenInterval posterior                |      ✓      |      ✓      |    ✓    |   ✓   |
 | DirectInfections+Ascertainment day-of-week posterior  |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Aggregate posterior                  |      ✓      |      ✓      |    ✓    |   ✓   |
@@ -382,9 +399,9 @@ Result matrix (27 scenarios × 4 backends), Julia 1.12:
 | Renewal+Split cascade posterior                       |      ✓      |      ✓      |    ✓    |   ✗   |
 
 scenario correctly. Enzyme (configured with `function_annotation = Enzyme.Const`,
-see [`backends`](@ref)) works on sixteen of the twenty-seven but raises
+see [`backends`](@ref)) works on sixteen of the twenty-eight but raises
 `IllegalTypeAnalysisException` / a related type-analysis or shadow error on
-eleven:
+twelve:
 
   - the `AR`-based latent log-densities (`AR`, `ARIMA`, `ARMA`,
     `CombineLatentModels` (which contains an `AR`), and both prior-interface `AR`
@@ -394,7 +411,11 @@ eleven:
   - `DirectInfections+NormalError` (the Gaussian likelihood loop);
   - `DirectInfections+Ascertainment day-of-week` — an `EnzymeNoShadowError`
     through the `PrefixLatentModel`-wrapped day-of-week `BroadcastLatentModel`
-    submodel threading, surfaced by the #76 prefix-on prior collapse; and
+    submodel threading, surfaced by the #76 prefix-on prior collapse;
+  - `Renewal+TimeVaryingLatentDelay` — the process-parameter (time-varying) delay
+    threads a `RandomWalk` submodel through the priors seam per delay parameter,
+    where Enzyme wraps the constant `sdlog` scalar in a `Base.RefValue` its
+    type-analysis cannot resolve against the `_at` accessor; and
   - the deeply-nested `Renewal+Split` cascade, through its per-stream submodel
     threading.
 
@@ -424,7 +445,14 @@ function backend_broken_scenarios()
         # `PrefixLatentModel`-wrapped day-of-week `BroadcastLatentModel`. Enzyme
         # only; ForwardDiff/ReverseDiff/Mooncake differentiate it correctly.
         # Tracked in #97.
-        "DirectInfections+Ascertainment day-of-week posterior"]))
+        "DirectInfections+Ascertainment day-of-week posterior",
+        # The process-parameter (time-varying) reporting delay threads a
+        # `RandomWalk` submodel per delay parameter; Enzyme wraps the constant
+        # `sdlog` scalar in a `Base.RefValue` its type-analysis cannot resolve
+        # against `_at` (`MethodError: no method matching _at(::RefValue, ::Int)`).
+        # Enzyme only; ForwardDiff/ReverseDiff/Mooncake differentiate it correctly.
+        # Tracked in #97.
+        "Renewal+TimeVaryingLatentDelay posterior"]))
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."

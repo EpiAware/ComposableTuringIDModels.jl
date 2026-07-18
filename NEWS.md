@@ -81,6 +81,24 @@
   distribution path), with the renewal step built per draw so the gradient flows
   through the discretisation. The fixed vector/distribution paths are unchanged.
   This mirrors the uncertain [`LatentDelay`](@ref) reporting delay.
+- **`LatentDelay` reporting delays can be time-varying.** The reporting delay now
+  composes through the same constant-vs-process seam as every other parameter, so
+  it can be fixed, uncertain, or time-varying:
+    - a per-time **sequence of delay pmfs** —
+      `LatentDelay(model, pmfs::AbstractVector{<:AbstractVector})` (all the same
+      length) — gives a deterministic time-varying delay; and
+    - an [`UncertainDelay`](@ref) whose parameters may each be a bare
+      `Distribution` (constant → uncertain, as before) **or** a process (an
+      `AbstractPriorModel` → time-varying) gives an inferred time-varying delay:
+      a `LogNormal` delay with `[RandomWalk(), σ_prior]` has a meanlog that drifts
+      with time, its pmf rediscretised per time point through the same
+      `as_turing_submodel` seam.
+  A per-time delay drives a new time-indexed convolution (`TimeVaryingLDStep`,
+  one reversed kernel per step); the fixed and all-constant-uncertain delays keep
+  the original single-kernel `LDStep` fast path untouched (the branch is
+  type-stable — it dispatches on the delay field type, not on sampled values).
+  A time-varying delay with a process parameter forecasts naturally (its extra
+  latent stream is non-centred, so `forecast` continues it like any other).
 - **`forecast(model, y, chain, horizon)`** — out-of-sample forecasting. Fits at
   length `T`, then predicts the observations over a future horizon
   `t = T+1 … T+h`, carrying each posterior draw forward: the fitted parameters and
