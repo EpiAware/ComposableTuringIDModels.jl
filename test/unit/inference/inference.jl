@@ -125,6 +125,28 @@ end
     @test length(vec(fc[@varname(y_t[T + h])])) == 30
 end
 
+@testitem "forecast extends a renewal with an inferred generation interval" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(103)
+    # An INFERRED generation interval (its distribution parameters carry priors)
+    # must not break forecasting: the interval's only RV is the fixed-length
+    # parameter draw `θ`, not a per-time stream, so the non-centred horizon
+    # extension leaves it untouched.
+    gen = UncertainDelay(LogNormal,
+        [Normal(1.9, 0.2), truncated(Normal(0.5, 0.2), 0, Inf)]; D = 10.0)
+    model = IDModel(
+        Renewal(; generation_time = gen, rt = RandomWalk(),
+            initialisation = Normal()),
+        PoissonError())
+    T, h = 18, 5
+    y = as_turing_model(model, fill(missing, T), T)().generated_y_t
+    chain = sample(as_turing_model(model, y, T), Prior(), 30; progress = false)
+    fc = forecast(model, y, chain, h)
+    @test size(fc, 1) == 30
+    @test length(vec(fc[@varname(y_t[T + h])])) == 30
+    @test all(x -> x isa Integer && x ≥ 0, vec(fc[@varname(y_t[T + 1])]))
+end
+
 @testitem "generated_observables leaves non-chain solutions missing" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(76)

@@ -145,6 +145,20 @@ function _models()
             UncertainDelay(LogNormal,
                 [Normal(1.0, 0.3), truncated(Normal(0.4, 0.2), 0, Inf)];
                 D = 6.0)))
+    # Uncertain generation interval: the renewal generation interval is itself
+    # inferred — a `LogNormal` whose meanlog/sdlog carry priors, sampled through
+    # the priors seam and discretised into a pmf per draw (lag-0 bin dropped,
+    # renormalised) before the renewal step is built. The gradient must flow
+    # through the discretisation (`_discretised_pmf`) and the renewal recursion
+    # built from the sampled interval — the AD-sensitive part of an inferred
+    # generation interval, the renewal counterpart of `udelay`.
+    ugen = IDModel(
+        Renewal(;
+            generation_time = UncertainDelay(LogNormal,
+                [Normal(0.7, 0.3), truncated(Normal(0.4, 0.2), 0, Inf)];
+                D = 6.0),
+            rt = RandomWalk(), initialisation = Normal()),
+        PoissonError())
     # Day-of-week ascertainment: scales the expected observations by a broadcast
     # latent (an `Ascertainment` wrapping `broadcast_dayofweek`).
     ascert = IDModel(
@@ -198,6 +212,7 @@ function _models()
     y_triangle = sim(triangle, n)
     y_latdelay = sim(latdelay, n)
     y_udelay = sim(udelay, n)
+    y_ugen = sim(ugen, n)
     y_ascert = sim(ascert, 14)
     y_aggregate = sim(aggregate, 14)
     y_transobs = sim(transobs, n)
@@ -237,6 +252,8 @@ function _models()
             as_turing_model(latdelay, y_latdelay, n)),
         ("Renewal+UncertainLatentDelay posterior",
             as_turing_model(udelay, y_udelay, n)),
+        ("Renewal+UncertainGenInterval posterior",
+            as_turing_model(ugen, y_ugen, n)),
         ("DirectInfections+Ascertainment day-of-week posterior",
             as_turing_model(ascert, y_ascert, 14)),
         ("DirectInfections+Aggregate posterior",
@@ -332,7 +349,7 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (25 scenarios × 4 backends), Julia 1.12:
+Result matrix (27 scenarios × 4 backends), Julia 1.12:
 
 | scenario                                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
 |-------------------------------------------------------|:-----------:|:-----------:|:--------:|:------:|
@@ -355,6 +372,8 @@ Result matrix (25 scenarios × 4 backends), Julia 1.12:
 | Renewal+RightTruncate nowcast posterior               |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior                      |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+LatentDelay posterior                         |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+UncertainLatentDelay posterior                |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+UncertainGenInterval posterior                |      ✓      |      ✓      |    ✓    |   ✓   |
 | DirectInfections+Ascertainment day-of-week posterior  |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Aggregate posterior                  |      ✓      |      ✓      |    ✓    |   ✓   |
 | DirectInfections+TransformObservation posterior       |      ✓      |      ✓      |    ✓    |   ✓   |
@@ -363,7 +382,7 @@ Result matrix (25 scenarios × 4 backends), Julia 1.12:
 | Renewal+Split cascade posterior                       |      ✓      |      ✓      |    ✓    |   ✗   |
 
 scenario correctly. Enzyme (configured with `function_annotation = Enzyme.Const`,
-see [`backends`](@ref)) works on fourteen of the twenty-five but raises
+see [`backends`](@ref)) works on sixteen of the twenty-seven but raises
 `IllegalTypeAnalysisException` / a related type-analysis or shadow error on
 eleven:
 

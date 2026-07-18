@@ -72,6 +72,15 @@
 
 ### Added
 
+- **`Renewal`'s `generation_time` accepts a pmf-producing prior model.** Alongside
+  a fixed pmf vector and a fixed continuous `Distribution`, `generation_time` now
+  takes an [`AbstractPriorModel`](@ref) (e.g. an `UncertainDelay`) so the
+  generation interval is **inferred**: its distribution's parameters carry priors
+  and the interval is rediscretised per draw through the same `as_turing_submodel`
+  seam every component uses (lag-0 bin dropped and renormalised, matching the fixed
+  distribution path), with the renewal step built per draw so the gradient flows
+  through the discretisation. The fixed vector/distribution paths are unchanged.
+  This mirrors the uncertain [`LatentDelay`](@ref) reporting delay.
 - **`forecast(model, y, chain, horizon)`** — out-of-sample forecasting. Fits at
   length `T`, then predicts the observations over a future horizon
   `t = T+1 … T+h`, carrying each posterior draw forward: the fitted parameters and
