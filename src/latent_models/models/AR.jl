@@ -1,5 +1,19 @@
-# Autoregressive (AR) latent process model. Its accumulation step (`ARStep`)
-# lives in `src/steps/`.
+# Autoregressive (AR) latent process model. Its constant higher-order step
+# (`ARStep`) and the order-1 step it uses for a scalar or time-varying coefficient
+# (`TVARStep`) both live in `src/steps/`.
+
+# Default coefficient transform: a process `damp` prior is unbounded, so `tanh`
+# maps its draws into the stationary band ``(-1, 1)``; a `Distribution` prior is
+# already bounded by the user, so it is used as-is. Overridable via the `transform`
+# keyword.
+_default_transform(::Distribution) = identity
+_default_transform(::AbstractVector{<:Distribution}) = identity
+_default_transform(::AbstractPriorModel) = tanh
+
+# Order-1 prior: unwrap a length-1 vector slot to its single element so an order-1
+# `damp` is drawn as a scalar coefficient regardless of how it was written.
+_order1_prior(prior) = prior
+_order1_prior(prior::AbstractVector) = only(prior)
 
 @doc raw"
 An autoregressive AR(`p`) latent process.
@@ -11,12 +25,25 @@ Z_t = \sum_{i=1}^{p} \rho_i Z_{t-i} + \epsilon_t
 with damping coefficients ``\rho`` from the prior in `damp`, initial conditions
 from the prior in `init`, and innovations from the error model `ϵ_t`. The order
 `p` is fixed by the `damp` prior (a length-`k` vector ⇒ order `k`, a single
-distribution ⇒ order 1); the `init` prior is sized to match.
+distribution or a process ⇒ order 1); the `init` prior is sized to match.
 
 Each prior slot takes a raw prior: pass a bare `Distribution` (order 1), a vector
-of them (order = its length), or a richer prior model (e.g. a latent process for a
-time-varying coefficient). Each slot is sampled through
-[`as_turing_submodel`](@ref).
+of them (order = its length), or a process (a latent model). At order 1 the `damp`
+slot decides whether the coefficient is **constant or time-varying**, through the
+same [time-varying-parameter mechanism](@ref as_timevarying_submodel) any component
+can use:
+
+  - `AR(damp = Normal(...))` — a `Distribution` gives a **constant** coefficient,
+    drawn as a single scalar RV (efficient, no length-`n` allocation);
+  - `AR(damp = RandomWalk())` — a process gives a **time-varying** coefficient
+    *path* ``\rho_t``, drawn at length `n-1` and threaded per step.
+
+The coefficient is mapped through `transform` (default `tanh` for a process, so an
+unbounded path stays in the stationary band; `identity` for a bounded
+`Distribution`) and tracked as the generated quantity `ρ`, recoverable from the
+chain (`group(chain, :ρ)`). Higher-order (`p > 1`) coefficients are constant;
+time-varying higher-order AR is tracked in
+[#113](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/113).
 
 # Examples
 ```@example AR
@@ -26,8 +53,8 @@ mdl = as_turing_model(ar, 10)
 rand(mdl)
 ```
 "
-struct AR{D <: PriorLike, I <: PriorLike, P <: Int, E <: PriorLike} <:
-       AbstractLatentModel
+struct AR{D <: PriorLike, I <: PriorLike, P <: Int, E <: PriorLike,
+    F <: Function} <: AbstractLatentModel
     "Prior for the damping coefficients."
     damp::D
     "Prior for the initial conditions."
@@ -36,13 +63,16 @@ struct AR{D <: PriorLike, I <: PriorLike, P <: Int, E <: PriorLike} <:
     p::P
     "Error model for the innovations."
     ϵ_t::E
+    "Map from the raw coefficient to the damping (default `tanh` for a process
+    prior, `identity` for a bounded `Distribution`)."
+    transform::F
 
-    function AR(damp, init, p::Int, ϵ_t)
+    function AR(damp, init, p::Int, ϵ_t, transform)
         @assert p>0 "p must be greater than 0"
         _assert_prior_length(damp, p, "damp")
         _assert_prior_length(init, p, "init")
-        new{typeof(damp), typeof(init), typeof(p), typeof(ϵ_t)}(
-            damp, init, p, ϵ_t)
+        new{typeof(damp), typeof(init), typeof(p), typeof(ϵ_t),
+            typeof(transform)}(damp, init, p, ϵ_t, transform)
     end
 end
 
@@ -52,19 +82,35 @@ function AR(damp::Sampleable, init::Sampleable; p::Int = 1,
 end
 
 function AR(; damp = truncated(Normal(0.0, 0.05), 0, 1), init = Normal(),
-        ϵ_t = HierarchicalNormal())
+        ϵ_t = HierarchicalNormal(), transform = _default_transform(damp))
     # Order `p` is fixed by the damping prior (a length-`k` vector ⇒ order `k`, a
     # single distribution / process ⇒ order 1). The initial-conditions prior is
     # sized to match: a single distribution is sampled at length `p` (`filldist`),
     # while an explicitly-passed vector must already have length `p`.
     p = _prior_order(damp)
-    return AR(damp, init, p, ϵ_t)
+    return AR(damp, init, p, ϵ_t, transform)
 end
 
 @model function as_turing_model(model::AR, n)
     p = model.p
     @assert n>p "n must be longer than the order of the autoregressive process"
     ar_init ~ as_turing_submodel(model.init, p; prefix = true)
+    if p == 1
+        # Order 1: draw the coefficient through the time-varying seam. A
+        # `Distribution` gives a scalar (constant, no length-`n` allocation); a
+        # process gives a length-`(n-1)` path. `TVARStep` reads it per step with
+        # `_at`, so one recursion serves both.
+        damp_AR ~ as_timevarying_submodel(_order1_prior(model.damp), n - 1;
+            prefix = true)
+        # Track the (possibly time-varying) coefficient as a generated quantity so
+        # it is recoverable from the chain; `transform` broadcasts over a scalar or
+        # a path.
+        ρ := model.transform.(damp_AR)
+        ϵ_t ~ as_turing_submodel(model.ϵ_t, n - 1)
+        z = accumulate_scan(TVARStep(ρ), only(ar_init),
+            collect(zip(1:(n - 1), ϵ_t)))
+        return z
+    end
     damp_AR ~ as_turing_submodel(model.damp, p; prefix = true)
     ϵ_t ~ as_turing_submodel(model.ϵ_t, n - p)
     # `ARStep`'s state runs oldest→newest (`[Z_{t-p}, …, Z_{t-1}]`), so reverse

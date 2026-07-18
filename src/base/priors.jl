@@ -134,6 +134,70 @@ as_turing_model([Normal(0, 1), Normal(5, 0.1)], 2)()
     return θ
 end
 
+# --- Time-varying-capable parameters ---------------------------------------
+#
+# A parameter that may vary over time is drawn from its prior slot as EITHER a
+# scalar (a bare `Distribution` ⇒ one native-tilde draw, a constant, no length-n
+# allocation) OR a length-`n` path (an `AbstractPriorModel` process ⇒ drawn
+# through `as_turing_submodel`). A component then reads it per step with `_at`, so
+# a single recursion serves both the constant and the time-varying case with no
+# per-component special-casing and no efficiency loss when the parameter is
+# constant. This mechanism is general: any component with a scalar parameter can
+# widen it to a time-varying one just by drawing the slot through
+# [`as_timevarying_submodel`](@ref) and consuming it with [`_at`](@ref) (see
+# [`AR`](@ref) for the worked example).
+
+@doc raw"
+Read a possibly-time-varying parameter at step `t`.
+
+A scalar (a constant parameter, drawn from a `Distribution` prior) is returned
+unchanged at every step; a vector (a per-step path, drawn from a process prior) is
+indexed at `t`. A component's recursion writes `_at(ρ, t) * …` so the *same* code
+serves a constant and a time-varying parameter — the scalar branch is zero-cost
+(no per-step allocation), matching [`as_timevarying_submodel`](@ref).
+"
+_at(p::Number, t) = p
+_at(p::AbstractVector, t) = p[t]
+
+# The drawing half of the time-varying mechanism. A bare `Distribution` is a
+# single scalar RV (constant, efficient); a process prior is a length-`n` path.
+# Both are exposed through `as_timevarying_submodel` so a component draws the slot
+# uniformly regardless of which was supplied.
+@model function _timevarying_prior(prior::Distribution, n::Int)
+    θ ~ prior
+    return θ
+end
+
+@model function _timevarying_prior(prior::AbstractPriorModel, n::Int)
+    θ ~ as_turing_submodel(prior, n)
+    return θ
+end
+
+@doc raw"
+Draw a possibly-time-varying parameter from its prior slot as a submodel.
+
+The companion of [`_at`](@ref): a bare `Distribution` slot yields ONE scalar RV (a
+constant parameter, no length-`n` allocation) while an [`AbstractPriorModel`](@ref)
+process slot yields a length-`n` path. A component draws its slot through this seam
+and consumes the result per step with [`_at`](@ref), so one recursion serves both
+the constant and the time-varying case. This is the general way any component
+widens a scalar parameter to an optionally-time-varying one; [`AR`](@ref) is the
+worked example (its `damp` coefficient).
+
+# Arguments
+
+  - `prior`: the parameter's prior — a `Distribution` (constant) or a process.
+  - `n`: the path length used when the prior is a process.
+
+# Keyword Arguments
+
+  - `prefix`: whether to namespace the submodel's variables under the tilde's
+    left-hand name (default `false`; a prior slot passes `true`).
+"
+function as_timevarying_submodel(prior, n; prefix::Bool = false)
+    return to_submodel(_timevarying_prior(prior, n), prefix)
+end
+
 # Order (p / q / d) implied by a prior: a vector fixes it to the vector length; a
 # single distribution or a richer prior model defaults to order 1.
 _prior_order(p::AbstractVector{<:Distribution}) = length(p)

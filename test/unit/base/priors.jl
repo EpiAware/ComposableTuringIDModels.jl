@@ -96,11 +96,11 @@ end
     using DynamicPPL: LogDensityFunction, VarInfo, link, getlogjoint
     import LogDensityProblems as LDP
     Random.seed!(180)
-    # The exact #80 repro: a bare `AR(damp = RandomWalk())` used to sample via
-    # `rand` but ERROR as a linked log-density, because the damping RandomWalk's
-    # inner `std`/`ϵ_t`/`rw_init` collided with the AR innovation's. The prior slot
-    # now namespaces the whole submodel (prefix-on `as_turing_submodel`), so they
-    # cannot collide.
+    # The exact #80 repro: a bare `AR(damp = RandomWalk())` (now a time-varying
+    # coefficient path) used to sample via `rand` but ERROR as a linked
+    # log-density, because the damping RandomWalk's inner `std`/`ϵ_t`/`rw_init`
+    # collided with the AR innovation's. The prior slot namespaces the whole
+    # submodel (prefix-on `as_timevarying_submodel`), so they cannot collide.
     m = as_turing_model(AR(; damp = RandomWalk()), 8)
     @test rand(m) !== nothing                        # sampled fine before too
     vi = link(VarInfo(m), m)

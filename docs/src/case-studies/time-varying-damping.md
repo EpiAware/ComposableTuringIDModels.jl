@@ -1,55 +1,55 @@
 # [Time-varying damping in an AR process](@id case-study-tvdamp)
 
-Every parameter slot of a component takes a raw prior: as well as a bare
-`Distribution` (or a vector of them), a slot accepts a *prior model*, including a
-latent process, composed through [`as_turing_submodel`](@ref).
-On the damping of an autoregressive process this buys two things, both through the
-struct's own constructor with no hand-written recursion:
+Every parameter slot of a component takes a raw prior. Which *kind* of prior you
+put in the slot decides whether the parameter is **constant** or **time-varying**,
+through one general mechanism that any component can use:
 
-  - a **structured prior** over the (time-constant) damping coefficient, via
-    [`AR`](@ref); and
-  - a **genuinely time-varying** coefficient path ``\rho_t``, via
-    [`TimeVaryingAR`](@ref).
+  - a bare `Distribution` gives a **constant** parameter — one scalar draw, shared
+    across the series (efficient, no length-`n` allocation); and
+  - a **process** (a latent model such as a [`RandomWalk`](@ref)) gives a
+    **time-varying** parameter — a whole path, one value per step.
 
-## A structured prior on the constant damping
+The component reads the parameter the same way at every step
+(`ComposableTuringIDModels._at(ρ, t)`), so a single recursion serves both cases.
+Here we use the damping coefficient of an autoregressive process as the worked
+example, but the same widening applies to any scalar parameter.
 
-[`AR`](@ref) applies its damping as a constant length-`p` coefficient, so a prior
-model in its `damp` slot enriches the *prior* over that constant rather than making
-it vary. A [`HierarchicalNormal`](@ref) there gives the coefficient an adaptive
-(inferred-scale) prior:
+## Constant versus time-varying damping
+
+[`AR`](@ref) with a `Distribution` damping prior is an ordinary constant-coefficient
+autoregression — the coefficient is one number for the whole series:
 
 ```@example tvdamp
 using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
 using Turing: to_submodel
 Random.seed!(80)
 
-ar = AR(; damp = HierarchicalNormal())
-(order = ar.p, damping_is_constant = true)
+constant = AR(; damp = Normal(0.4, 0.1))
+(order = constant.p, coefficient_is_constant = true)
 ```
 
-The coefficient is one value shared across the series. To let it *change* over the
-series, reach for [`TimeVaryingAR`](@ref).
-
-## A genuinely time-varying damping
-
-[`TimeVaryingAR`](@ref) is a first-order AR whose coefficient is a path:
+Swapping the `Distribution` for a **process** turns the same slot into a
+genuinely time-varying coefficient path ``\rho_t``:
 
 ```math
 z_t = \rho_t\, z_{t-1} + \epsilon_t, \qquad \rho_t = \tanh(u_t),
 ```
 
-where the unconstrained path ``u_t`` is drawn from a latent process (a
-[`RandomWalk`](@ref) by default) and `tanh` maps it into the stationary band
-``(-1, 1)``. The coefficient path is a component you choose: swapping the prior
-over how the damping evolves is a one-line change to the `damp` argument, and the
-AR recursion is untouched.
+where the unconstrained path ``u_t`` is drawn from the process (a
+[`RandomWalk`](@ref) here) and `tanh` maps it into the stationary band
+``(-1, 1)``. This is a one-line change to the `damp` argument — the AR recursion
+is untouched — and the named constructor [`TimeVaryingAR`](@ref) is exactly this:
+
+```@example tvdamp
+tv = AR(; damp = RandomWalk())          # === TimeVaryingAR()
+(order = tv.p, transform = tv.transform)
+```
 
 Built with `as_turing_model(m, n)` it returns the numeric length-`n` path (like
 every other latent model), and tracks the coefficient path ``\rho_t`` as a
 generated quantity `ρ` (recovered from the chain, below):
 
 ```@example tvdamp
-tv = TimeVaryingAR()
 length(as_turing_model(tv, 8)())
 ```
 
@@ -60,7 +60,8 @@ with no glue code:
 ```@example tvdamp
 gen_int = [0.2, 0.3, 0.5]
 nested = IDModel(
-    Renewal(gen_int; rt = TimeVaryingAR(), initialisation = Normal()),
+    Renewal(gen_int; rt = AR(; damp = RandomWalk()),
+        initialisation = Normal()),
     PoissonError())
 length(as_turing_model(nested, missing, 12)().generated_y_t)
 ```
@@ -84,13 +85,13 @@ end
     ρ_end = round(ρ_true[end], digits = 2))
 ```
 
-The model wraps [`TimeVaryingAR`](@ref) in a thin observation of the path and fits
+The model wraps the time-varying `AR` in a thin observation of the path and fits
 under NUTS. The coefficient path is tracked as the generated quantity `ρ`, so it is
 recovered straight from the chain:
 
 ```@example tvdamp
 @model function observe_path(y, n)
-    latent ~ as_turing_submodel(TimeVaryingAR(), n)
+    latent ~ as_turing_submodel(AR(; damp = RandomWalk()), n)
     for t in 1:n
         y[t] ~ Normal(latent[t], 0.01)
     end
@@ -129,7 +130,9 @@ fig
 ```
 
 The band covers the true trajectory across the series, so the time-varying damping
-is recovered from data — through the [`TimeVaryingAR`](@ref) struct, with the
-coefficient's evolution supplied as a component rather than coded by hand. Only the
-order-1 case is built so far; time-varying coefficients for higher-order AR(`p`)
-are tracked in [#113](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/113).
+is recovered from data — with the coefficient's evolution supplied as an ordinary
+prior process rather than coded by hand. The same mechanism widens any scalar
+parameter to a time-varying one: put a process in its slot instead of a
+`Distribution`. Only the order-1 case is built so far; time-varying coefficients
+for higher-order AR(`p`) are tracked in
+[#113](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/113).

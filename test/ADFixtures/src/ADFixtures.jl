@@ -87,14 +87,14 @@ function _models()
         AR(; damp = [truncated(Normal(0, 0.05), 0, 1),
                 truncated(Normal(0, 0.05), 0, 1)],
             init = [Normal(), Normal()]), 8)
-    # A latent MODEL as a prior: the bare `AR(damp = RandomWalk())` form (issue
-    # #80). The AR damping coefficient is itself a `RandomWalk` submodel, so the
-    # submodel-threading gradient path is differentiated. The prior slot prefixes
-    # the latent-model prior (with the `damp_AR` parameter name) via
-    # `as_turing_submodel(...; prefix = true)`, keeping the inner
-    # `std`/`ϵ_t`/`rw_init` names from colliding with the AR innovation's — so
-    # this linked
-    # log-density both evaluates and differentiates without a manual prefix.
+    # A process as the damping prior: the bare `AR(damp = RandomWalk())` form —
+    # now a genuinely TIME-VARYING coefficient path (issue #80 for the threading).
+    # The AR damping coefficient is a length-(n-1) `RandomWalk` submodel mapped
+    # through `tanh`, so the submodel-threading gradient path is differentiated.
+    # The prior slot prefixes the latent-model prior (the `damp_AR` namespace) via
+    # `as_timevarying_submodel(...; prefix = true)`, keeping the inner
+    # `std`/`ϵ_t`/`rw_init` names from colliding with the AR innovation's — so this
+    # linked log-density both evaluates and differentiates without a manual prefix.
     ar_lat = as_turing_model(AR(; damp = RandomWalk()), 8)
 
     # --- infection posteriors ---------------------------------------------------
