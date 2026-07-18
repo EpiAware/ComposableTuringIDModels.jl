@@ -60,6 +60,13 @@
 
 ### Added
 
+- **`forecast(model, y, chain, horizon)`** — out-of-sample forecasting. Fits at
+  length `T`, then predicts the observations over a future horizon
+  `t = T+1 … T+h`, carrying each posterior draw forward: the fitted parameters and
+  in-sample latent path are held fixed while the non-centred latent process is
+  continued over the horizon with fresh prior innovations. Returns a chain of the
+  predicted `y_t[T+1] … y_t[T+h]`; also accepts an `IDProblem`. See the
+  out-of-sample forecasting case study.
 - **`TimeVaryingAR`** — a first-order AR whose damping coefficient is a per-step
   path drawn from a latent process (`ρ_t = tanh.(damp)`), threaded through the new
   `TVARStep`. It returns the numeric path (drops into any latent slot) and tracks

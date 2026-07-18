@@ -29,12 +29,13 @@ module ComposableTuringIDModels
 
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
                   returned
-using Turing: Turing, filldist, arraydist, sample, MCMCSerial
+using Turing: Turing, filldist, arraydist, sample, MCMCSerial, predict
+using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
 using LinearAlgebra: dot
 using LogExpFunctions: softmax, xexpy, log1pexp
 using OrdinaryDiffEq: ODEProblem, ODEFunction, solve, remake, AutoVern7, Rodas5P
-using Random: AbstractRNG, randexp
+using Random: AbstractRNG, randexp, default_rng
 
 # Inference-layer dependencies.
 using ADTypes: ADTypes, AutoForwardDiff
@@ -103,7 +104,7 @@ export IDModel
 # --- inference orchestration ---
 export IDProblem, NUTSampler, DirectSample,
        apply_method, IDObservables, generated_observables,
-       spread_draws, get_param_array
+       spread_draws, get_param_array, forecast
 
 # --- core architecture ---
 include("base/base.jl")
@@ -199,5 +200,6 @@ include("inference/NUTSampler.jl")
 include("inference/DirectSample.jl")
 include("inference/get_param_array.jl")
 include("inference/post-inference.jl")
+include("inference/forecast.jl")
 
 end
