@@ -33,6 +33,12 @@
   store raw priors in parametric fields and the `as_turing_submodel` seam replaces
   the coercion — along with the internal `NamedDist`/`_named` naming and the dead
   `_expand_dist` helper.
+- **`Renewal` takes one `generation_time` keyword.** The positional
+  `Renewal(gen_int; …)` and the keyword `Renewal(; gen_distribution = …)`
+  constructors are replaced by a single `Renewal(; generation_time = …, …)` that
+  dispatches on the value: a discrete probability vector is used directly, and a
+  continuous `Distribution` is discretised internally (double-interval censoring,
+  `D_gen`/`Δd`). Update calls to `Renewal(; generation_time = …)`.
 
 ### Removed
 
@@ -65,9 +71,16 @@
   `t = T+1 … T+h`, carrying each posterior draw forward: the fitted parameters and
   in-sample latent path are held fixed while the non-centred latent process is
   continued over the horizon with fresh prior innovations. Returns a chain of the
-  predicted `y_t[T+1] … y_t[T+h]`; also accepts an `IDProblem`. See the
-  out-of-sample forecasting case study.
-- **`TimeVaryingAR`** — a first-order AR whose damping coefficient is a per-step
-  path drawn from a latent process (`ρ_t = tanh.(damp)`), threaded through the new
-  `TVARStep`. It returns the numeric path (drops into any latent slot) and tracks
-  the coefficient path as the generated quantity `ρ`.
+  predicted `y_t[T+1] … y_t[T+h]`; also accepts an `IDProblem`. Demonstrated in a
+  short section of the renewal case study.
+- **General time-varying parameters.** Any component parameter can be constant or
+  time-varying through *which prior* fills its slot, with no per-component
+  special-casing: a bare `Distribution` draws one scalar RV (constant, no
+  length-`n` allocation) while a process draws a length-`n` path, and the component
+  reads it per step with the accessor `_at(p, t)` (`_at(::Number)` is the constant,
+  `_at(::AbstractVector)` indexes the path). [`AR`](@ref) is the worked example:
+  `AR(; damp = Normal())` is a constant coefficient (unchanged) and
+  `AR(; damp = RandomWalk())` a per-step time-varying path (`ρ_t = tanh.(damp)`),
+  tracked as the generated quantity `ρ`. `TimeVaryingAR` is now a thin alias for
+  `AR(; damp = <process>)` rather than a separate type, and `TVARStep` is the
+  shared order-1 step for both the constant and time-varying cases.
