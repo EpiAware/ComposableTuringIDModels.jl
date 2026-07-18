@@ -287,6 +287,26 @@ latent ``R_t`` parts are untouched. We keep the static pattern here — it is
 identifiable from six weeks of data, where a fully time-varying weekday process
 would not be — and flag the richer variant rather than fit it.
 
+The reporting *delay* can drift in the same way, through the same seam. An
+[`UncertainDelay`](@ref) parameter is a prior slot like any other, so replacing
+its constant log-mean prior with a process — a [`RandomWalk`](@ref) — makes the
+delay distribution itself time-varying: it is rediscretised at each time point and
+applied with a per-time convolution, while the log-scale spread keeps a constant
+prior.
+
+```@example delays
+drifting = UncertainDelay(
+    LogNormal, [RandomWalk(), truncated(Normal(0.47, 0.2), 0, Inf)]; D = 8.0)
+tv_observation = LatentDelay(
+    LatentDelay(dayofweek_negbin, incubation), drifting)
+nothing # hide
+```
+
+Nothing else changes: the infection process, the ``R_t`` prior, and the fitting
+code are identical — only which prior fills the delay's log-mean slot. As with the
+weekday profile we flag rather than fit it here, since a delay that drifts day to
+day asks more of six weeks of data than they can answer.
+
 ## References
 
 ```@bibliography
