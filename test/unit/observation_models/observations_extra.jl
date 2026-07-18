@@ -418,3 +418,67 @@ end
     @test out.tri isa ReportingTriangle
     @test length(out.cases) == 8
 end
+
+@testitem "UncertainDelay builds an inferred-delay LatentDelay" begin
+    using ComposableTuringIDModels, Distributions
+    u = UncertainDelay(LogNormal,
+        [Normal(1.5, 0.4), truncated(Normal(0.4, 0.2), 0, Inf)]; D = 20.0)
+    @test u isa ComposableTuringIDModels.AbstractPriorModel
+    obs = LatentDelay(NegativeBinomialError(), u)
+    @test obs isa AbstractObservationModel
+    # A fixed horizon `D` is required so the PMF length is constant across draws.
+    @test_throws AssertionError UncertainDelay(LogNormal,
+        [Normal(1.5, 0.4), truncated(Normal(0.4, 0.2), 0, Inf)]; D = nothing)
+    # The fixed-PMF constructors are unaffected (no regression).
+    @test LatentDelay(PoissonError(), [0.3, 0.4, 0.3]) isa AbstractObservationModel
+    @test LatentDelay(PoissonError(), truncated(Normal(5, 2), 0, Inf)) isa
+          AbstractObservationModel
+end
+
+@testitem "UncertainDelay samples a valid delay PMF per draw" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(101)
+    u = UncertainDelay(LogNormal,
+        [Normal(1.5, 0.4), truncated(Normal(0.4, 0.2), 0, Inf)]; D = 15.0)
+    # Each prior draw builds a normalised, non-negative PMF of constant length.
+    lens = Int[]
+    for _ in 1:20
+        pmf = as_turing_model(u)()
+        @test isapprox(sum(pmf), 1.0)
+        @test all(>=(0), pmf)
+        push!(lens, length(pmf))
+    end
+    @test all(==(first(lens)), lens)
+
+    obs = LatentDelay(PoissonError(), u)
+    Y = fill(100.0, 40)
+    sim = as_turing_model(obs, missing, Y)().y_t
+    @test length(sim) == length(Y)
+    @test all(>=(0), filter(!ismissing, sim))
+end
+
+@testitem "LatentDelay recovers an uncertain delay's parameters" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
+    Random.seed!(20240716)
+    # Simulate reports from a KNOWN LogNormal reporting delay convolving a smooth
+    # epidemic bump, then infer the delay parameters through the priors seam.
+    n = 60
+    t = 1:n
+    Y_t = 800.0 .* exp.(-((t .- 32) ./ 10.0) .^ 2) .+ 5.0
+    μ0, σ0 = 1.5, 0.40
+    truth = LatentDelay(PoissonError(), LogNormal(μ0, σ0); D = 20.0)
+    y = as_turing_model(truth, missing, Y_t)().y_t
+
+    fit = LatentDelay(PoissonError(),
+        UncertainDelay(LogNormal,
+            [Normal(1.1, 0.4), truncated(Normal(0.6, 0.3), 0, Inf)]; D = 20.0))
+    chain = sample(as_turing_model(fit, y, Y_t),
+        NUTS(0.8; adtype = Turing.AutoForwardDiff()), 1000; progress = false)
+
+    # The delay parameters are namespaced under the `delay` prior slot.
+    dvec = vec(chain[@varname(delay.θ)])
+    meanlog = mean(getindex.(dvec, 1))
+    sdlog = mean(getindex.(dvec, 2))
+    @test isapprox(meanlog, μ0; atol = 0.15)
+    @test isapprox(sdlog, σ0; atol = 0.15)
+end

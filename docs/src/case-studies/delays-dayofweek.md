@@ -92,21 +92,29 @@ nothing # hide
 
 [`LatentDelay`](@ref) convolves the expected observations with a delay
 distribution (discretised by double interval censoring). Two layers compose
-sequentially: an incubation period from infection to symptom onset, then a
-reporting delay from onset to report.
+sequentially: a fixed incubation period from infection to symptom onset, then a
+reporting delay from onset to report whose parameters are *inferred*. The
+reporting delay is an [`UncertainDelay`](@ref): its `LogNormal` log-scale mean and
+standard deviation carry priors, so the delay is rediscretised each draw and
+estimated jointly with the reproduction number rather than fixed from external
+data.
 
 ```@example delays
-incubation = LogNormal(1.6, 0.42)   # infection -> symptom onset
-reporting = LogNormal(0.58, 0.47)   # symptom onset -> report
+incubation = LogNormal(1.6, 0.42)   # infection -> symptom onset (fixed)
+reporting = UncertainDelay(         # symptom onset -> report (inferred)
+    LogNormal, [Normal(0.58, 0.3), truncated(Normal(0.47, 0.2), 0, Inf)];
+    D = 8.0)
 
 observation = LatentDelay(LatentDelay(dayofweek_negbin, incubation), reporting)
 nothing # hide
 ```
 
 That single `observation` object now carries, from the inside out: a negative
-binomial link, a day-of-week ascertainment modifier, an incubation-delay
-convolution, and a reporting-delay convolution — assembled entirely by
-composition.
+binomial link, a day-of-week ascertainment modifier, a fixed incubation-delay
+convolution, and an inferred reporting-delay convolution — assembled entirely by
+composition. The reporting-delay parameters flow through the same priors seam as
+every other parameter, so inferring the delay needs no change to the rest of the
+model.
 
 ## The data
 
@@ -152,9 +160,9 @@ nothing # hide
 
 `sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
 chain, which `summarystats` summarises directly — no conversion step. The
-day-of-week scale (`DayofWeek.std`) and the
-negative-binomial overdispersion (`cluster_factor`) appear alongside the
-latent-process parameters:
+day-of-week scale (`DayofWeek.std`), the negative-binomial overdispersion
+(`cluster_factor`) and the inferred reporting-delay parameters (`delay.θ`, the
+`LogNormal` log-mean and log-sd) appear alongside the latent-process parameters:
 
 ```@example delays
 using MCMCChains
@@ -164,10 +172,10 @@ summarystats(chain)
 `DayofWeek.std` is the scale of the partially
 pooled weekday multipliers (its own block, namespaced because the ascertainment
 modifier introduces a named sub-process); `cluster_factor` is the
-negative-binomial overdispersion. The
-day-of-week effect, the two delay kernels, and the weekly reproduction number
-were all estimated jointly — and any of them can be swapped or removed by
-editing one line of the composition above.
+negative-binomial overdispersion; `delay.θ` are the inferred reporting-delay
+parameters. The day-of-week effect, the reporting delay, and the weekly
+reproduction number were all estimated jointly — and any of them can be swapped,
+fixed, or removed by editing one line of the composition above.
 
 ## Prior versus posterior
 
