@@ -58,7 +58,11 @@ end
         m = as_turing_model(model, y, n)
         vi = link(VarInfo(m), m)
         ldf = LogDensityFunction(m, getlogjoint, vi)
-        θ = zeros(LDP.dimension(ldf))
+        # A representative point, as the package AD harness uses (ADFixtures),
+        # not the all-zeros origin: a squared time-varying `cluster_factor`
+        # is exactly 0 there (the negative binomial's degenerate Poisson
+        # limit), a measure-zero singularity the sampler never visits.
+        θ = 0.3 .* randn(MersenneTwister(1), LDP.dimension(ldf))
         grad = DI.gradient(
             x -> LDP.logdensity(ldf, x), DI.AutoForwardDiff(), θ)
         all(isfinite, grad) && length(grad) == length(θ)
