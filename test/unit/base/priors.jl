@@ -18,9 +18,11 @@ end
         θ ~ as_turing_submodel(prior, n)
         return θ
     end
-    # A bare Distribution flows through identically to a model.
-    @test length(use_prior(Normal(), 4)()) == 4
+    # A bare Distribution flows through the seam as a single scalar RV.
+    @test use_prior(Normal(), 4)() isa Real
+    # A process flows through as a length-n path; IID() gives n i.i.d. draws.
     @test length(use_prior(RandomWalk(), 6)()) == 6
+    @test length(use_prior(IID(Normal()), 6)()) == 6
     @test length(use_prior([Normal(), Normal()], 2)()) == 2
 end
 
@@ -46,15 +48,17 @@ end
     @test any(occursin("rw_init", k) for k in flat_keys)
 end
 
-@testitem "as_turing_model over a Distribution draws n i.i.d. values" begin
+@testitem "as_turing_model over a Distribution draws a single scalar" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(101)
-    v = as_turing_model(Normal(), 5)()
+    # The single seam draws a bare Distribution as ONE scalar RV (a constant, no
+    # length-n allocation); `n` is ignored.
+    @test as_turing_model(Normal(), 5)() isa Real
+    @test as_turing_model(Normal(), 1)() isa Real
+    # For n i.i.d. draws use the explicit IID() component instead.
+    v = as_turing_model(IID(Normal()), 5)()
     @test length(v) == 5
-    # Independent draws, not a single shared value repeated.
     @test !all(==(first(v)), v)
-    # Length 1 is a single draw (the scalar case).
-    @test length(as_turing_model(Normal(), 1)()) == 1
 end
 
 @testitem "as_turing_model over a vector gives one draw per element" begin

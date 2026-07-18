@@ -10,31 +10,29 @@
     @test length(as_turing_model(rec, 5)()) == 5
 end
 
-@testitem "latent modifiers accept a raw bare-Distribution member" begin
+@testitem "latent modifiers accept a raw member (Distribution / IID / process)" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(310)
     n = 5
 
-    # Each @kwdef / modifier struct stores a bare `Distribution` member raw; it
-    # composes through `as_turing_submodel` (n i.i.d. draws) like a model.
-    trans = TransformLatentModel(Normal(), x -> exp.(x))
-    @test trans.model isa Distribution
+    # Each modifier struct stores a bare `Distribution` member raw (it draws a
+    # single scalar through the single seam).
+    @test TransformLatentModel(Normal(), x -> exp.(x)).model isa Distribution
+    @test RecordExpectedLatent(Normal()).model isa Distribution
+    @test PrefixLatentModel(Normal(), "Test").model isa Distribution
+    @test PrefixLatentModel(; model = Normal(), prefix = "Test").model isa
+          Distribution
+    @test BroadcastLatentModel(Normal(), 7, RepeatEach()).model isa Distribution
+    @test BroadcastLatentModel(Normal(); period = 7,
+        broadcast_rule = RepeatEach()).model isa Distribution
+
+    # For a length-n member use IID() (n i.i.d.) or a process; it composes like a
+    # model and produces a length-n path.
+    trans = TransformLatentModel(IID(Normal()), x -> exp.(x))
     @test length(as_turing_model(trans, n)()) == n
-
-    rec = RecordExpectedLatent(Normal())
-    @test rec.model isa Distribution
+    rec = RecordExpectedLatent(IID(Normal()))
     @test length(as_turing_model(rec, n)()) == n
-
-    pref = PrefixLatentModel(Normal(), "Test")
-    @test pref.model isa Distribution
-    pref_kw = PrefixLatentModel(; model = Normal(), prefix = "Test")
-    @test pref_kw.model isa Distribution
-
-    bcast = BroadcastLatentModel(Normal(), 7, RepeatEach())
-    @test bcast.model isa Distribution
-    bcast_kw = BroadcastLatentModel(Normal(); period = 7,
-        broadcast_rule = RepeatEach())
-    @test bcast_kw.model isa Distribution
+    bcast = BroadcastLatentModel(IID(Normal()), 7, RepeatEach())
     @test length(as_turing_model(bcast, 10)()) == 10
 
     # A vector of `Distribution`s is stored as the raw vector.

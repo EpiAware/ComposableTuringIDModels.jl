@@ -96,11 +96,11 @@ end
     @assert n>p "n must be longer than the order of the autoregressive process"
     ar_init ~ as_turing_submodel(model.init, p; prefix = true)
     if p == 1
-        # Order 1: draw the coefficient through the time-varying seam. A
-        # `Distribution` gives a scalar (constant, no length-`n` allocation); a
-        # process gives a length-`(n-1)` path. `TVARStep` reads it per step with
-        # `_at`, so one recursion serves both.
-        damp_AR ~ as_timevarying_submodel(_order1_prior(model.damp), n - 1;
+        # Order 1: draw the coefficient through the single seam. A `Distribution`
+        # gives a scalar (constant, no length-`n` allocation); a process gives a
+        # length-`(n-1)` path. `TVARStep` reads it per step with `_at`, so one
+        # recursion serves both.
+        damp_AR ~ as_turing_submodel(_order1_prior(model.damp), n - 1;
             prefix = true)
         # Track the (possibly time-varying) coefficient as a generated quantity so
         # it is recoverable from the chain; `transform` broadcasts over a scalar or

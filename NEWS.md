@@ -9,14 +9,14 @@
   reproduction number, ascertainment, …) accepts a bare `Distribution`, a
   `Vector{<:Distribution}`, or any process (e.g. a `RandomWalk`) uniformly.
   Components store the raw prior in a parametric field and sample it through the
-  public `as_turing_submodel` seam; scalar slots draw natively (`σ ~ m.std`,
-  zero-allocation), and `as_turing_model` gains `Distribution` /
-  `Vector{<:Distribution}` methods so a bare prior threads through as a length-`n`
-  submodel exactly like a model. This widens the `rt` / `Z` / `ϵ_t` slots
-  and the manipulator members (`CombineLatentModels` / `ConcatLatentModels` /
-  `DiffLatentModel`), so constant reproduction numbers (`Renewal(data; rt =
-  Normal())`), constant innovations (`AR(; ϵ_t = Normal())`) and mixed
-  `[Distribution, process]` collections are now valid.
+  single public `as_turing_submodel` seam, and `as_turing_model` gains
+  `Distribution` (scalar) / `Vector{<:Distribution}` (per-element) methods so a
+  bare prior threads through exactly like a model. This widens the `rt` / `Z` /
+  `ϵ_t` slots and the manipulator members (`CombineLatentModels` /
+  `ConcatLatentModels` / `DiffLatentModel`), so an explicit iid process
+  (`AR(; ϵ_t = IID(Normal()))`), a length-`n` process, and mixed
+  `[IID, process]` collections are all valid (see the scalar-`Distribution` note
+  below for how a bare `Distribution` now behaves).
 - **`AbstractLatentModel` is collapsed into `AbstractPriorModel`.** It remains for
   one release as a deprecated alias (`const AbstractLatentModel =
   AbstractPriorModel`); prefer `AbstractPriorModel`. `implements_latent_interface`
@@ -25,10 +25,16 @@
   namespaced at the component's call site (`as_turing_submodel(…; prefix = true)`)
   instead of by a carried name, so e.g. `damp_AR` becomes `damp_AR.θ` and a process
   prior nests deeper. Update any code that reads exact flat variable names.
-- **A bare `Distribution` in a length-`n` slot now draws `n` i.i.d. values**
-  (`filldist`), not one shared value repeated. The one load-bearing constant case
-  (`Ascertainment` with a bare `Distribution`) is preserved by wrapping it in an
-  `Intercept` (a single shared draw broadcast across the series).
+- **A bare `Distribution` now draws a single scalar RV through the seam** (a
+  constant parameter, no length-`n` allocation), not `n` i.i.d. values. This is the
+  single mechanism behind optionally-time-varying per-step parameters (see
+  *General time-varying parameters* below): a bare `Distribution` stays a scalar
+  constant while a process makes the same parameter a length-`n` path, consumed
+  uniformly via `_at`. For `n` i.i.d. draws use the explicit `IID()` component; for
+  a single shared value broadcast to length `n` use `Intercept`; for per-element
+  priors use a `Vector{<:Distribution}`. Any slot that previously relied on a bare
+  `Distribution` expanding to length `n` (e.g. `AR(; ϵ_t = Normal())`,
+  `Renewal(; generation_time = g, rt = Normal())`) now takes `IID(Normal())`.
 - **`as_prior`, `BroadcastPrior`, and `sample_prior` are removed** — components
   store raw priors in parametric fields and the `as_turing_submodel` seam replaces
   the coercion — along with the internal `NamedDist`/`_named` naming and the dead

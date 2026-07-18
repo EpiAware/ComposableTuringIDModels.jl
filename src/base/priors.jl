@@ -77,30 +77,35 @@ const PriorLike = Union{Distribution, AbstractVector{<:Distribution},
     AbstractPriorModel}
 
 @doc raw"
-Sample a raw prior `Distribution` as a length-`n` prior submodel.
+Sample a raw prior `Distribution` as a **single scalar** RV.
 
 Giving `as_turing_model` a `Distribution` method lets a **bare distribution** flow
-through [`as_turing_submodel`](@ref) exactly like a full model: a component's prior
-slot samples `θ ~ as_turing_submodel(model.slot, n)` whether the slot holds a bare
-distribution or a latent process. The draw is `n` independent values from `prior`
-(`filldist`); for a genuinely scalar parameter sample the distribution with a
-native tilde instead (`σ ~ model.std`), which is a plain scalar draw with no
-submodel. To broadcast a **single shared** value to length `n` use
-[`Intercept`](@ref).
+through [`as_turing_submodel`](@ref) exactly like a full model, so a component's
+parameter slot samples `θ ~ as_turing_submodel(model.slot, n)` uniformly whether
+the slot holds a bare distribution or a process. A bare distribution draws ONE
+scalar value (a constant, no length-`n` allocation); `n` is ignored. A component
+then reads a possibly-time-varying parameter per step with [`_at`](@ref), so the
+scalar stays constant while a process-valued slot varies — this is the single seam
+behind [`AR`](@ref)'s optionally-time-varying damping and the other per-step
+parameters.
+
+For `n` **independent** draws (a white-noise process) use the explicit
+[`IID`](@ref) component; for a **single shared** value broadcast to length `n` use
+[`Intercept`](@ref); for **per-element** priors use a `Vector{<:Distribution}`.
 
 # Arguments
 
   - `prior`: the prior distribution.
-  - `n`: the number of independent draws.
+  - `n`: accepted for a uniform seam signature; ignored (the draw is scalar).
 
 # Examples
 ```@example as_turing_model_distribution
 using ComposableTuringIDModels, Distributions
-length(as_turing_model(Normal(), 3)())
+as_turing_model(Normal(), 3)()   # a single scalar draw
 ```
 "
 @model function as_turing_model(prior::Distribution, n::Int)
-    θ ~ filldist(prior, n)
+    θ ~ prior
     return θ
 end
 
@@ -136,67 +141,28 @@ end
 
 # --- Time-varying-capable parameters ---------------------------------------
 #
-# A parameter that may vary over time is drawn from its prior slot as EITHER a
-# scalar (a bare `Distribution` ⇒ one native-tilde draw, a constant, no length-n
-# allocation) OR a length-`n` path (an `AbstractPriorModel` process ⇒ drawn
-# through `as_turing_submodel`). A component then reads it per step with `_at`, so
-# a single recursion serves both the constant and the time-varying case with no
-# per-component special-casing and no efficiency loss when the parameter is
-# constant. This mechanism is general: any component with a scalar parameter can
-# widen it to a time-varying one just by drawing the slot through
-# [`as_timevarying_submodel`](@ref) and consuming it with [`_at`](@ref) (see
-# [`AR`](@ref) for the worked example).
+# The single seam above draws a parameter slot as EITHER a scalar (a bare
+# `Distribution` ⇒ one RV, a constant, no length-`n` allocation) OR a length-`n`
+# path (an `AbstractPriorModel` process ⇒ the process's own draw). A component
+# reads the result per step with `_at`, so ONE recursion serves both the constant
+# and the time-varying (or hierarchical) case with no per-component special-casing
+# and no efficiency loss when the parameter is constant. This is general: any
+# per-step parameter is widened to optionally-time-varying just by drawing its slot
+# through [`as_turing_submodel`](@ref) and consuming it with [`_at`](@ref) — see
+# [`AR`](@ref)'s damping for the worked example.
 
 @doc raw"
 Read a possibly-time-varying parameter at step `t`.
 
-A scalar (a constant parameter, drawn from a `Distribution` prior) is returned
-unchanged at every step; a vector (a per-step path, drawn from a process prior) is
-indexed at `t`. A component's recursion writes `_at(ρ, t) * …` so the *same* code
-serves a constant and a time-varying parameter — the scalar branch is zero-cost
-(no per-step allocation), matching [`as_timevarying_submodel`](@ref).
+A scalar (a constant parameter, drawn from a `Distribution` prior through the
+single [`as_turing_submodel`](@ref) seam) is returned unchanged at every step; a
+vector (a per-step path, drawn from a process prior) is indexed at `t`. A
+component's recursion writes `_at(ρ, t) * …` so the *same* code serves a constant
+and a time-varying parameter — the scalar branch is zero-cost (no per-step
+allocation).
 "
 _at(p::Number, t) = p
 _at(p::AbstractVector, t) = p[t]
-
-# The drawing half of the time-varying mechanism. A bare `Distribution` is a
-# single scalar RV (constant, efficient); a process prior is a length-`n` path.
-# Both are exposed through `as_timevarying_submodel` so a component draws the slot
-# uniformly regardless of which was supplied.
-@model function _timevarying_prior(prior::Distribution, n::Int)
-    θ ~ prior
-    return θ
-end
-
-@model function _timevarying_prior(prior::AbstractPriorModel, n::Int)
-    θ ~ as_turing_submodel(prior, n)
-    return θ
-end
-
-@doc raw"
-Draw a possibly-time-varying parameter from its prior slot as a submodel.
-
-The companion of [`_at`](@ref): a bare `Distribution` slot yields ONE scalar RV (a
-constant parameter, no length-`n` allocation) while an [`AbstractPriorModel`](@ref)
-process slot yields a length-`n` path. A component draws its slot through this seam
-and consumes the result per step with [`_at`](@ref), so one recursion serves both
-the constant and the time-varying case. This is the general way any component
-widens a scalar parameter to an optionally-time-varying one; [`AR`](@ref) is the
-worked example (its `damp` coefficient).
-
-# Arguments
-
-  - `prior`: the parameter's prior — a `Distribution` (constant) or a process.
-  - `n`: the path length used when the prior is a process.
-
-# Keyword Arguments
-
-  - `prefix`: whether to namespace the submodel's variables under the tilde's
-    left-hand name (default `false`; a prior slot passes `true`).
-"
-function as_timevarying_submodel(prior, n; prefix::Bool = false)
-    return to_submodel(_timevarying_prior(prior, n), prefix)
-end
 
 # Order (p / q / d) implied by a prior: a vector fixes it to the vector length; a
 # single distribution or a richer prior model defaults to order 1.
