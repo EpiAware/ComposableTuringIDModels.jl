@@ -89,4 +89,12 @@
   `AR(; damp = RandomWalk())` a per-step time-varying path (`ρ_t = tanh.(damp)`),
   tracked as the generated quantity `ρ`. `TimeVaryingAR` is now a thin alias for
   `AR(; damp = <process>)` rather than a separate type, and `TVARStep` is the
-  shared order-1 step for both the constant and time-varying cases.
+  shared order-1 step for both the constant and time-varying cases. The same
+  single-seam + `_at` wiring runs through every per-step parameter, so supplying a
+  process makes any of them vary or pool with no rewiring: `AR.damp`, `MA.θ`,
+  `HierarchicalNormal.std` (a time-varying innovation scale — stochastic
+  volatility), `NegativeBinomialError.cluster_factor` (time-varying overdispersion)
+  and `NormalError.std` (time-varying observation noise). A bare `Distribution` in
+  any of these stays a single scalar constant. Because these scalars are now drawn
+  through the one submodel seam, their chain variables gain a `.θ` namespace
+  segment (`std` → `std.θ`, `cluster_factor` → `cluster_factor.θ`, `σ` → `σ.θ`).

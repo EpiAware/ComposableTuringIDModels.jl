@@ -84,10 +84,12 @@ end
 function AR(; damp = truncated(Normal(0.0, 0.05), 0, 1), init = Normal(),
         ϵ_t = HierarchicalNormal(), transform = _default_transform(damp))
     # Order `p` is fixed by the damping prior (a length-`k` vector ⇒ order `k`, a
-    # single distribution / process ⇒ order 1). The initial-conditions prior is
-    # sized to match: a single distribution is sampled at length `p` (`filldist`),
-    # while an explicitly-passed vector must already have length `p`.
+    # single distribution / process ⇒ order 1). The order-`p` initial-conditions
+    # slot needs `p` values, so a bare `Distribution` is sized to a length-`p`
+    # vector (one i.i.d. draw per lag); an explicit vector must already be length
+    # `p`, and a process supplies its own length.
     p = _prior_order(damp)
+    init = (p > 1 && init isa Distribution) ? fill(init, p) : init
     return AR(damp, init, p, ϵ_t, transform)
 end
 

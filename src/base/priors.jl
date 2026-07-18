@@ -66,6 +66,27 @@ function as_turing_submodel(m, args...; prefix::Bool = false)
     return to_submodel(as_turing_model(m, args...), prefix)
 end
 
+# --- Single-seam specialisations (clean names for the constant case) ---------
+#
+# A bare `Distribution` returns the distribution itself, so a component's
+# `θ ~ as_turing_submodel(model.slot, n)` is a plain native scalar draw named `θ`
+# (a single constant RV, zero submodel overhead, no `.θ` namespace). A vector of
+# distributions returns the product distribution (a native, per-element draw). A
+# process (or any other model) returns a namespaced submodel via the generic
+# method above — the length-`n`, e.g. time-varying / hierarchical, path. A
+# component consumes whichever it gets with [`_at`](@ref), so supplying a process
+# makes the parameter vary with no rewiring while a `Distribution` keeps its clean
+# constant name. `n` is ignored for the scalar case.
+
+as_turing_submodel(d::Distribution, ::Int; prefix::Bool = false) = d
+
+function as_turing_submodel(
+        v::AbstractVector{<:Distribution}, n::Int; prefix::Bool = false)
+    @assert length(v)==n "a length-$(length(v)) prior vector cannot produce a length-$n prior"
+    # `filldist` for a homogeneous vector, `arraydist` otherwise.
+    return all(first(v) .== v) ? filldist(first(v), n) : arraydist(v)
+end
+
 @doc raw"
 The types accepted in a prior / process slot: a raw `Distribution`, a vector of
 `Distribution`s, or an [`AbstractPriorModel`](@ref) (a latent process used as a

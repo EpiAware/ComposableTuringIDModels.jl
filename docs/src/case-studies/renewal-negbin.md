@@ -183,7 +183,7 @@ that samples them, so a prior's inner variables never collide across the model.
 `summarystats` summarises directly — no conversion step — giving point estimates
 *and* their uncertainty alongside the effective sample size and ``\hat{R}``
 convergence diagnostic. The autoregressive damping ``\rho``
-(`damp_AR.θ[1]`), the innovation scale ``\sigma`` (`std`), and the
+(`damp_AR[1]`), the innovation scale ``\sigma`` (`std`), and the
 observation cluster factor ``\sqrt{1/\phi}`` (`cluster_factor`) are all
 identified from the observed South Korean series:
 
@@ -207,8 +207,8 @@ extension turns a chain (subset to a few keys with `chain[[...]]`) into a
 using CairoMakie, PairPlots
 
 prior_chain = sample(posterior, Prior(), 1000; progress = false)
-pp_keys = [@varname(damp_AR.θ), @varname(std),
-    @varname(cluster_factor), @varname(init_incidence.θ)]
+pp_keys = [@varname(damp_AR), @varname(std),
+    @varname(cluster_factor), @varname(init_incidence)]
 pairplot(
     PairPlots.Series(chain[pp_keys]; label = "posterior"),
     PairPlots.Series(prior_chain[pp_keys]; label = "prior"))
@@ -216,7 +216,7 @@ pairplot(
 
 The innovation scale ``\sigma`` (`std`) is sharply updated away from
 its prior — the data are informative about how much ``\log R_t`` wiggles — while
-the autoregressive damping ``\rho`` (`damp_AR.θ`), the cluster factor and the
+the autoregressive damping ``\rho`` (`damp_AR`), the cluster factor and the
 initial infections stay closer to their priors on this short window.
 
 ## Posterior trajectories
