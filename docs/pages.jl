@@ -13,8 +13,7 @@ pages = [
         "Declarative compartmental models with Catalyst" => "case-studies/catalyst-ode.md",
         "Multiple observation streams: cases, deaths, and strata" => "case-studies/split-observations.md",
         "Time-varying damping in an AR process" => "case-studies/time-varying-damping.md",
-        "Partial pooling across groups" => "case-studies/hierarchy-stacked.md",
-        "Out-of-sample forecasting" => "case-studies/forecasting.md"
+        "Partial pooling across groups" => "case-studies/hierarchy-stacked.md"
     ],
     "API reference" => [
         "Public API" => "lib/public.md",

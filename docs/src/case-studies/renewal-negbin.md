@@ -296,6 +296,43 @@ and the ``R_t`` path recovers the first-wave turn-over: an early rise well above
 one, a fall through ``R_t = 1`` as the wave peaks, and a decline below one as
 cases drop.
 
+## Forecasting the next weeks
+
+The same fitted model forecasts out of sample in one call. Because the latent
+[`AR`](@ref) process is non-centred, [`forecast`](@ref) carries each posterior draw
+forward — holding the fitted parameters and the in-sample ``\log R_t`` path fixed,
+and continuing the process over the horizon with fresh prior innovations — then
+draws the future reported cases:
+
+```@example renewal
+h = 14
+fc = forecast(model, y_obs, chain, h)
+size(fc)
+```
+
+The returned chain carries the predicted ``y_t`` over ``t = n+1, \dots, n+h``.
+Reducing them to credible bands with the helpers above and plotting against the
+observed series shows the forecast fanning out as the horizon grows:
+
+```@example renewal
+fc_bands = credible_bands(reduce(vcat,
+    (permutedims(vec(fc[@varname(y_t[i])])) for i in (n + 1):(n + h))))
+
+fig_fc = Figure(; size = (760, 360))
+axf = Axis(fig_fc[1, 1]; xlabel = "Day", ylabel = "Reported cases")
+scatter!(axf, 1:n, y_obs; color = :black, markersize = 7, label = "observed")
+ci_ribbon!(axf, (n + 1):(n + h), fc_bands; color = :teal, label = "forecast")
+vlines!(axf, [n + 0.5]; color = :grey, linestyle = :dash)
+axislegend(axf; position = :lt)
+fig_fc
+```
+
+The forecast continues the wave's decline past the fitted window (dashed line),
+its credible interval widening as the autoregressive process reverts towards its
+mean. [`forecast`](@ref) also takes an [`IDProblem`](@ref), and errors rather than
+mis-extrapolating a latent whose stored path is jointly correlated across the
+forecast boundary (e.g. an exact GP).
+
 ## Swap a component
 
 Because the parts share one interface, an alternative observation assumption is
