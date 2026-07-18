@@ -43,7 +43,7 @@ end
     using ComposableTuringIDModels, Distributions, OrdinaryDiffEq
     gen_int = [0.2, 0.3, 0.5]
     for m in (DirectInfections(; Z = RandomWalk()), ExpGrowthRate(; rt = RandomWalk()),
-        Renewal(gen_int; rt = RandomWalk()))
+        Renewal(; generation_time = gen_int, rt = RandomWalk()))
         @test m isa AbstractInfectionModel
     end
     # ODE parameter structs play the latent role (they feed an ODEProcess slot).
@@ -107,7 +107,7 @@ end
     @test implements_latent_interface(RandomWalk())
     @test implements_latent_interface(AR(); n = 12)
     @test implements_infection_interface(DirectInfections(; Z = RandomWalk()))
-    @test implements_infection_interface(Renewal(gen_int; rt = RandomWalk()); n = 20)
+    @test implements_infection_interface(Renewal(; generation_time = gen_int, rt = RandomWalk()); n = 20)
     @test implements_observation_interface(PoissonError())
     @test implements_observation_interface(NegativeBinomialError())
     # A model is NOT in a role it does not belong to.

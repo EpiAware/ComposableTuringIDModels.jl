@@ -18,8 +18,9 @@ the series length `n` and returns the named tuple `(; I_t, Z_t)` with `Z_t` the
 (log) ``R_t`` path.
 
 Renewal is the one infection model that needs a generation interval, so it takes
-one directly (`gen_int`), either as a discrete probability vector or discretised
-from a continuous distribution (see the keyword constructor).
+one directly through the `generation_time` keyword, which dispatches on the value:
+a discrete probability vector is used as-is, while a continuous `Distribution` is
+discretised internally (see the constructor).
 
 ## Fields
 
@@ -33,18 +34,22 @@ from a continuous distribution (see the keyword constructor).
   - `recurrent_step`: the renewal accumulation step (an
     [`AbstractConstantRenewalStep`](@ref)).
 
-## Constructors
+## Constructor
 
-  - `Renewal(gen_int; rt, initialisation, transformation)` — from a
-    discrete generation interval vector (must be non-negative and sum to 1).
-  - `Renewal(; gen_distribution, D_gen = nothing, Δd = 1.0, transformation = exp,
-    rt, initialisation)` — discretise a continuous generation-interval
-    distribution via double-interval censoring (CensoredDistributions.jl).
+  - `Renewal(; generation_time, rt, initialisation, transformation = exp,
+    D_gen = nothing, Δd = 1.0)` — one keyword constructor that dispatches on
+    `generation_time`:
+
+      + a discrete probability **vector** (non-negative, sums to 1) is used
+        directly as the generation interval; and
+      + a continuous **`Distribution`** is discretised via double-interval
+        censoring (CensoredDistributions.jl), using `D_gen`/`Δd`, with the
+        delay-0 bin dropped and the remainder renormalised.
 
 # Examples
 ```@example Renewal
 using ComposableTuringIDModels, Distributions
-renewal = Renewal([0.2, 0.3, 0.5]; rt = RandomWalk(),
+renewal = Renewal(; generation_time = [0.2, 0.3, 0.5], rt = RandomWalk(),
     initialisation = Normal())
 rand(as_turing_model(renewal, 20))
 ```
@@ -63,25 +68,29 @@ struct Renewal{T <: Real, F <: Function, L <: PriorLike, S <: PriorLike,
     recurrent_step::A
 end
 
-function Renewal(gen_int::AbstractVector; rt = RandomWalk(),
-        initialisation = Normal(), transformation::Function = exp)
-    @assert all(gen_int .>= 0) "Generation interval must be non-negative"
-    @assert sum(gen_int)≈1 "Generation interval must sum to 1"
+function Renewal(; generation_time, rt = RandomWalk(),
+        initialisation = Normal(), transformation::Function = exp,
+        D_gen = nothing, Δd = 1.0)
+    gen_int = _renewal_gen_int(generation_time; D_gen = D_gen, Δd = Δd)
     recurrent_step = ConstantRenewalStep(reverse(gen_int))
     return Renewal(gen_int, transformation, rt, initialisation,
         recurrent_step)
 end
 
-function Renewal(; gen_distribution::ContinuousDistribution, D_gen = nothing,
-        Δd = 1.0, transformation::Function = exp,
-        rt = RandomWalk(), initialisation = Normal())
-    # Drop the delay-0 bin (a generation interval has no mass at lag 0) and
-    # renormalise, as the original EpiAware did.
-    gen_int = _discretised_pmf(gen_distribution; Δd = Δd, D = D_gen) |>
-              p -> p[2:end] ./ sum(p[2:end])
-    return Renewal(gen_int; rt = rt,
-        initialisation = initialisation,
-        transformation = transformation)
+# `generation_time` as a discrete PMF: use it directly (must be a valid pmf).
+function _renewal_gen_int(gen_int::AbstractVector; D_gen = nothing, Δd = 1.0)
+    @assert all(gen_int .>= 0) "Generation interval must be non-negative"
+    @assert sum(gen_int)≈1 "Generation interval must sum to 1"
+    return collect(gen_int)
+end
+
+# `generation_time` as a continuous distribution: discretise via double-interval
+# censoring, drop the delay-0 bin (a generation interval has no mass at lag 0) and
+# renormalise, as the original EpiAware did.
+function _renewal_gen_int(gen_distribution::ContinuousDistribution;
+        D_gen = nothing, Δd = 1.0)
+    return _discretised_pmf(gen_distribution; Δd = Δd, D = D_gen) |>
+           p -> p[2:end] ./ sum(p[2:end])
 end
 
 # Initial renewal state from sampled I₀ and R₀, decaying at the implied rate.

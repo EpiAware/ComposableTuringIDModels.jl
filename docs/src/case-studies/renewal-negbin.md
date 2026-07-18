@@ -64,7 +64,7 @@ one that uses one; it couples that interval to the latent ``\log R_t`` process
 (its `rt` slot) and a prior for the initial infections.
 
 ```@example renewal
-renewal = Renewal(gen_distribution = Gamma(6.5, 0.62);
+renewal = Renewal(; generation_time = Gamma(6.5, 0.62),
     rt = latent, initialisation = Normal(log(1.0), 0.1))
 renewal.gen_int
 ```
@@ -94,7 +94,7 @@ latent draw `Z_t`.
 
 ```@example renewal
 fixed_logR = log(1.4)
-renewal_fixed = Renewal(renewal.gen_int;
+renewal_fixed = Renewal(; generation_time = renewal.gen_int,
     rt = FixedIntercept(fixed_logR), initialisation = Normal())
 demo = fix(as_turing_model(renewal_fixed, 60), (init_incidence = 0.0,))()
 (constant_Rt = round(exp(first(demo.Z_t)), digits = 2),

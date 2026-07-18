@@ -6,7 +6,7 @@
     @test isapprox(sum(pmf), 1.0)
     @test all(>=(0), pmf)
 
-    renewal = Renewal(; gen_distribution = Gamma(2.0, 1.0), D_gen = 10.0)
+    renewal = Renewal(; generation_time = Gamma(2.0, 1.0), D_gen = 10.0)
     @test isapprox(sum(renewal.gen_int), 1.0)
     @test all(>=(0), renewal.gen_int)
 

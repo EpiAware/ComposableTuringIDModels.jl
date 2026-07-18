@@ -55,7 +55,7 @@ latent = AR(
     damp = [truncated(Normal(0.8, 0.05), 0, 1)],
     init = [Normal(0.0, 0.25)],
     ϵ_t = HierarchicalNormal(std = HalfNormal(0.1)))
-renewal = Renewal(gen_distribution = Gamma(1.4, 1 / 0.38);
+renewal = Renewal(; generation_time = Gamma(1.4, 1 / 0.38),
     rt = latent, initialisation = Normal(log(1.0), 1.0))
 error = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 nothing # hide

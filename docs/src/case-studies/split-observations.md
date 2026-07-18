@@ -67,7 +67,7 @@ latent = AR(
         truncated(Normal(0.1, 0.05), 0, 1)],
     init = [Normal(0.0, 0.2), Normal(0.0, 0.2)],
     ϵ_t = HierarchicalNormal(std = HalfNormal(0.1)))
-renewal = Renewal(gen_distribution = Gamma(6.5, 0.62);
+renewal = Renewal(; generation_time = Gamma(6.5, 0.62),
     rt = latent, initialisation = Normal(log(100.0), 0.1))
 
 cases = LatentDelay(

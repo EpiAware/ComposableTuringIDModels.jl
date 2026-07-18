@@ -102,7 +102,7 @@ function _models()
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
     renewal = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
     # Exponential-growth-rate infections (the third infection family alongside
     # `DirectInfections` / `Renewal`): a cumulative growth-rate path exponentiated.
@@ -115,7 +115,7 @@ function _models()
     # supplied as a `ReportingCDF` submodel). This exercises the `reverse`/
     # broadcast scaling the modifier adds on top of the inner error.
     nowcast = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         RightTruncate(NegativeBinomialError(),
             truncated(Normal(4.0, 1.5), 0.0, Inf)))
 
@@ -124,14 +124,14 @@ function _models()
     # Poisson log-likelihood over the masked triangle (`t + d ≤ now`) is what
     # nowcasting under NUTS depends on.
     triangle = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         ReportTriangle(PoissonError(), [0.6, 0.25, 0.15]))
 
     # --- observation modifiers / error families over a composed model ----------
     # Reporting delay: convolves the expected observations with a delay PMF
     # (`accumulate_scan(LDStep(rev_pmf), ...)`) before the inner error.
     latdelay = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         LatentDelay(NegativeBinomialError(), [0.3, 0.4, 0.3]))
     # Day-of-week ascertainment: scales the expected observations by a broadcast
     # latent (an `Ascertainment` wrapping `broadcast_dayofweek`).
@@ -170,7 +170,7 @@ function _models()
     # delay and splitting after it. Exercises the per-stream prefixing and the
     # expected-series threading gradient path.
     split = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         LatentDelay(
             Split((
                 cases = NegativeBinomialError(),

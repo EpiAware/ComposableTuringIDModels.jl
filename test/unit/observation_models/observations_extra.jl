@@ -196,7 +196,7 @@ end
     gen_int = [0.2, 0.3, 0.5]
     n = 25
     model = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         RightTruncate(NegativeBinomialError(),
             truncated(Normal(4.0, 1.5), 0.0, Inf)))
 
@@ -394,7 +394,7 @@ end
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(75)
     gen_int = [0.2, 0.3, 0.5]
-    renewal = Renewal(gen_int; rt = RandomWalk(), initialisation = Normal())
+    renewal = Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal())
 
     # Released-CD discretised-delay constructor (the LatentDelay path).
     obs = ReportTriangle(NegativeBinomialError(),

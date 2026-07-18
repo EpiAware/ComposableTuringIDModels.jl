@@ -60,7 +60,7 @@ with no glue code:
 ```@example tvdamp
 gen_int = [0.2, 0.3, 0.5]
 nested = IDModel(
-    Renewal(gen_int; rt = AR(; damp = RandomWalk()),
+    Renewal(; generation_time = gen_int, rt = AR(; damp = RandomWalk()),
         initialisation = Normal()),
     PoissonError())
 length(as_turing_model(nested, missing, 12)().generated_y_t)

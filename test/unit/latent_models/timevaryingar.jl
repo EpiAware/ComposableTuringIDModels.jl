@@ -84,7 +84,7 @@ end
     # It returns a numeric path, so it drops into a bare-vector latent slot such as
     # a Renewal's rt inside a composed IDModel.
     idmodel = IDModel(
-        Renewal([0.2, 0.3, 0.5]; rt = TimeVaryingAR(),
+        Renewal(; generation_time = [0.2, 0.3, 0.5], rt = TimeVaryingAR(),
             initialisation = Normal()),
         PoissonError())
     y = as_turing_model(idmodel, missing, 12)().generated_y_t

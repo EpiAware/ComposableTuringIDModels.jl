@@ -12,7 +12,7 @@ end
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(42)
     gen_int = [0.2, 0.3, 0.5]
-    renewal = Renewal(gen_int; rt = RandomWalk(), initialisation = Normal())
+    renewal = Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal())
     out = as_turing_model(renewal, 20)()
     @test length(out.I_t) == 20
     @test length(out.Z_t) == 20
@@ -29,7 +29,7 @@ end
     # latent makes the renewal infection path deterministic given I₀ — the
     # standalone-style illustration under the folded interface.
     logR = log(1.5)
-    renewal = Renewal(gen_int; rt = FixedIntercept(logR),
+    renewal = Renewal(; generation_time = gen_int, rt = FixedIntercept(logR),
         initialisation = Normal())
     mdl = fix(as_turing_model(renewal, 30), (init_incidence = 0.0,))
     out = mdl()
@@ -53,7 +53,7 @@ end
     Random.seed!(43)
     gen_int = [0.2, 0.3, 0.5]
     model = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         PoissonError())
     y = as_turing_model(model, missing, 20)().generated_y_t
     chn = sample(as_turing_model(model, y, 20), NUTS(), 30; progress = false)

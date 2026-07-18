@@ -39,7 +39,7 @@ function _eval_models()
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
     renewal = IDModel(
-        Renewal(GEN_INT; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(; generation_time = GEN_INT, rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
     y_direct = as_turing_model(direct, missing, N)().generated_y_t
     y_renewal = as_turing_model(renewal, missing, N)().generated_y_t

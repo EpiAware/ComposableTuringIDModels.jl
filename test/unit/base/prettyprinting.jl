@@ -7,7 +7,7 @@
 
     gen_int = [0.2, 0.3, 0.5]
     model = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation = Normal()),
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
     out = sprint(show, MIME"text/plain"(), model)
 
