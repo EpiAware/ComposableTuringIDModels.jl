@@ -92,7 +92,7 @@ function _models()
     # The AR damping coefficient is a length-(n-1) `RandomWalk` submodel mapped
     # through `tanh`, so the submodel-threading gradient path is differentiated.
     # The prior slot prefixes the latent-model prior (the `damp_AR` namespace) via
-    # `as_timevarying_submodel(...; prefix = true)`, keeping the inner
+    # `as_turing_submodel(...; prefix = true)`, keeping the inner
     # `std`/`ϵ_t`/`rw_init` names from colliding with the AR innovation's — so this
     # linked log-density both evaluates and differentiates without a manual prefix.
     ar_lat = as_turing_model(AR(; damp = RandomWalk()), 8)
@@ -372,7 +372,7 @@ Result matrix (28 scenarios × 4 backends), Julia 1.12:
 | RandomWalk latent logjoint                            |      ✓      |      ✓      |    ✓    |   ✓   |
 | AR latent logjoint                                    |      ✓      |      ✓      |    ✓    |   ✗   |
 | ARIMA latent logjoint                                 |      ✓      |      ✓      |    ✓    |   ✗   |
-| MA latent logjoint                                    |      ✓      |      ✓      |    ✓    |   ✓   |
+| MA latent logjoint                                    |      ✓      |      ✓      |    ✓    |   ✗   |
 | HierarchicalNormal latent logjoint                    |      ✓      |      ✓      |    ✓    |   ✓   |
 | DiffLatentModel(RandomWalk) latent logjoint           |      ✓      |      ✓      |    ✓    |   ✗   |
 | ARMA latent logjoint                                  |      ✓      |      ✓      |    ✓    |   ✗   |
@@ -388,9 +388,9 @@ Result matrix (28 scenarios × 4 backends), Julia 1.12:
 | Renewal+RightTruncate nowcast posterior               |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior                      |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+LatentDelay posterior                         |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+UncertainLatentDelay posterior                |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+UncertainLatentDelay posterior                |      ✓      |      ✓      |    ✓    |   ✗   |
 | Renewal+TimeVaryingLatentDelay posterior              |      ✓      |      ✓      |    ✓    |   ✗   |
-| Renewal+UncertainGenInterval posterior                |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+UncertainGenInterval posterior                |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Ascertainment day-of-week posterior  |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Aggregate posterior                  |      ✓      |      ✓      |    ✓    |   ✓   |
 | DirectInfections+TransformObservation posterior       |      ✓      |      ✓      |    ✓    |   ✓   |
@@ -430,6 +430,10 @@ function backend_broken_scenarios()
         "Enzyme reverse" => Set([
         "AR latent logjoint",
         "ARIMA latent logjoint",
+        # Plain `MA` threads its `HierarchicalNormal` innovation (and vector-`θ`)
+        # submodels through the prior seam, the same `EnzymeNoShadowError`
+        # submodel-threading limit as its `AR`/`ARIMA`/`ARMA` siblings above.
+        "MA latent logjoint",
         "DiffLatentModel(RandomWalk) latent logjoint",
         "ARMA latent logjoint",
         "CombineLatentModels latent logjoint",
@@ -452,7 +456,19 @@ function backend_broken_scenarios()
         # against `_at` (`MethodError: no method matching _at(::RefValue, ::Int)`).
         # Enzyme only; ForwardDiff/ReverseDiff/Mooncake differentiate it correctly.
         # Tracked in #97.
-        "Renewal+TimeVaryingLatentDelay posterior"]))
+        "Renewal+TimeVaryingLatentDelay posterior",
+        # An inferred (uncertain) reporting delay draws its distribution
+        # parameters through the prefix-on prior-slot seam
+        # (`as_turing_submodel(delay; prefix = true)`) — the same
+        # `EnzymeNoShadowError` submodel-threading limitation as the day-of-week
+        # ascertainment above. Enzyme only; ForwardDiff/ReverseDiff/Mooncake
+        # differentiate it correctly. Tracked in #97.
+        "Renewal+UncertainLatentDelay posterior",
+        # An inferred (uncertain) generation interval threads its `UncertainDelay`
+        # parameters through the same prefix-on prior-slot seam — the same
+        # `EnzymeNoShadowError` limit. Enzyme only; ForwardDiff/ReverseDiff/
+        # Mooncake differentiate it correctly. Tracked in #97.
+        "Renewal+UncertainGenInterval posterior"]))
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."

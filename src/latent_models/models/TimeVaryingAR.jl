@@ -1,7 +1,7 @@
 # Time-varying AR(1): a thin alias over [`AR`](@ref). Time-varying damping is no
 # longer a bespoke struct — it is what an order-1 [`AR`](@ref) *is* when its `damp`
 # slot holds a process rather than a `Distribution` (see `AR.jl` and the
-# [time-varying-parameter mechanism](@ref as_timevarying_submodel)). This
+# [time-varying-parameter mechanism](@ref as_turing_submodel)). This
 # constructor is kept for discoverability and as the named entry point.
 
 @doc raw"

@@ -30,7 +30,7 @@ distribution or a process ⇒ order 1); the `init` prior is sized to match.
 Each prior slot takes a raw prior: pass a bare `Distribution` (order 1), a vector
 of them (order = its length), or a process (a latent model). At order 1 the `damp`
 slot decides whether the coefficient is **constant or time-varying**, through the
-same [time-varying-parameter mechanism](@ref as_timevarying_submodel) any component
+same [time-varying-parameter mechanism](@ref as_turing_submodel) any component
 can use:
 
   - `AR(damp = Normal(...))` — a `Distribution` gives a **constant** coefficient,
