@@ -93,6 +93,13 @@ negbin_model = IDModel(infections, NegativeBinomialError())
 That is the point: you compare modelling assumptions by swapping parts, not by
 rewriting models.
 
+## Related packages
+
+- [ConvolvedDistributions.jl](https://convolveddistributions.epiaware.org/stable/) and [CensoredDistributions.jl](https://censoreddistributions.epiaware.org/stable/) build the delay and censored-observation distributions that reporting-delay and observation parts draw on.
+- [ComposedDistributions.jl](https://composeddistributions.epiaware.org/dev/), [ModifiedDistributions.jl](https://modifieddistributions.epiaware.org/dev/) and [LoweredDistributions.jl](https://lowereddistributions.epiaware.org/dev/) are the EpiAware distribution-composition layer these models build observations on.
+- [ReparameterisedDistributions.jl](https://reparameteriseddistributions.epiaware.org/dev/) expresses a distribution's moments as its parameters, so a part's priors sit on a mean and standard deviation rather than native parameters.
+- [DistributionsInference.jl](https://github.com/EpiAware/DistributionsInference.jl) is the emerging fit-protocol layer across the EpiAware distribution packages.
+
 ## Where to learn more
 
 - New here? Start with the
