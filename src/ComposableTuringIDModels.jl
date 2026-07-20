@@ -100,7 +100,7 @@ export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
 export Split, StrataMap
 
 # --- composition ---
-export IDModel
+export IDModel, GroupedIDModel
 
 # --- inference orchestration ---
 export IDProblem, NUTSampler, DirectSample,
@@ -192,6 +192,7 @@ include("observation_models/Split.jl")
 
 # --- composition ---
 include("compose.jl")
+include("grouped.jl")
 
 # --- inference orchestration ---
 include("inference/types.jl")
