@@ -119,8 +119,7 @@ parameter is **constant** — uncertain but time-invariant) or a process (an
 [`AbstractPriorModel`](@ref), e.g. a `RandomWalk`, so the parameter is
 **time-varying**), through the same constant-vs-process seam every other component
 uses. Each draw builds the right-truncated, double-interval-censored delay PMF
-(the same [`_discretised_pmf`](@ref ComposableTuringIDModels._discretised_pmf)
-path the fixed delay uses):
+(the same `_discretised_pmf` path the fixed delay uses):
 
   - if every parameter is a `Distribution`, one time-invariant PMF is built and
     `as_turing_model(u::UncertainDelay)` returns it (drawing the parameters as one
