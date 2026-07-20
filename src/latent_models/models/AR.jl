@@ -28,10 +28,14 @@ from the prior in `init`, and innovations from the error model `ϵ_t`. The order
 distribution or a process ⇒ order 1); the `init` prior is sized to match.
 
 Each prior slot takes a raw prior: pass a bare `Distribution` (order 1), a vector
-of them (order = its length), or a process (a latent model). At order 1 the `damp`
-slot decides whether the coefficient is **constant or time-varying**, through the
-same [time-varying-parameter mechanism](@ref as_turing_submodel) any component
-can use:
+of them (order = its length), or a process (a latent model). The `ϵ_t`
+innovations are a length-`n` PATH slot, so a bare `Distribution` there is
+auto-wrapped in an [`Intercept`](@ref) — a **constant** innovation path (one
+shared draw broadcast to every step); use [`IID`](@ref) for `n` independent
+innovations. At order 1 the `damp` slot decides whether the coefficient is
+**constant or time-varying**, through the same
+[time-varying-parameter mechanism](@ref as_turing_submodel) any component can
+use:
 
   - `AR(damp = Normal(...))` — a `Distribution` gives a **constant** coefficient,
     drawn as a single scalar RV (efficient, no length-`n` allocation);
@@ -90,7 +94,7 @@ function AR(; damp = truncated(Normal(0.0, 0.05), 0, 1), init = Normal(),
     # `p`, and a process supplies its own length.
     p = _prior_order(damp)
     init = (p > 1 && init isa Distribution) ? fill(init, p) : init
-    return AR(damp, init, p, ϵ_t, transform)
+    return AR(damp, init, p, _path_prior(ϵ_t), transform)
 end
 
 @model function as_turing_model(model::AR, n)

@@ -21,7 +21,9 @@ carries a generation interval).
 ## Fields
 
   - `Z`: the latent process model (an [`AbstractLatentModel`](@ref)) generating
-    ``Z_t``.
+    ``Z_t``. A length-`n` PATH slot: a bare `Distribution` here is auto-wrapped
+    in an [`Intercept`](@ref), giving a constant path (one shared draw broadcast
+    to length `n`); use [`IID`](@ref) for `n` independent draws.
   - `transformation`: the link mapping the unconstrained sum to non-negative
     infections (default `exp`).
   - `initialisation`: the prior for the unconstrained initial infections (a
@@ -47,7 +49,7 @@ end
 
 function DirectInfections(; Z = RandomWalk(),
         transformation::Function = exp, initialisation = Normal())
-    return DirectInfections(Z, transformation, initialisation)
+    return DirectInfections(_path_prior(Z), transformation, initialisation)
 end
 
 @model function as_turing_model(model::DirectInfections, n)

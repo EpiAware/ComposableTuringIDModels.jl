@@ -25,16 +25,20 @@
   namespaced at the component's call site (`as_turing_submodel(…; prefix = true)`)
   instead of by a carried name, so e.g. `damp_AR` becomes `damp_AR.θ` and a process
   prior nests deeper. Update any code that reads exact flat variable names.
-- **A bare `Distribution` now draws a single scalar RV through the seam** (a
-  constant parameter, no length-`n` allocation), not `n` i.i.d. values. This is the
-  single mechanism behind optionally-time-varying per-step parameters (see
-  *General time-varying parameters* below): a bare `Distribution` stays a scalar
-  constant while a process makes the same parameter a length-`n` path, consumed
-  uniformly via `_at`. For `n` i.i.d. draws use the explicit `IID()` component; for
-  a single shared value broadcast to length `n` use `Intercept`; for per-element
-  priors use a `Vector{<:Distribution}`. Any slot that previously relied on a bare
-  `Distribution` expanding to length `n` (e.g. `AR(; ϵ_t = Normal())`,
-  `Renewal(; generation_time = g, rt = Normal())`) now takes `IID(Normal())`.
+- **A bare `Distribution` now means "constant" everywhere.** In a per-step
+  PARAMETER slot (damping, coefficient, std, …) it draws a single scalar RV (a
+  constant, no length-`n` allocation), not `n` i.i.d. values; this is the single
+  mechanism behind optionally-time-varying per-step parameters (see *General
+  time-varying parameters* below), where a process instead makes the same
+  parameter a length-`n` path, consumed uniformly via `_at`. In a length-`n`
+  PATH slot (an innovation `ϵ_t`, or a latent process `Z` / `rt`, or a
+  manipulator's inner model) a bare `Distribution` is **auto-wrapped in an
+  `Intercept`** at construction, giving a well-defined **constant path** — one
+  shared draw broadcast to length `n` — rather than a silent scalar/length-1
+  value. So `AR(; ϵ_t = Normal())`, `Renewal(; rt = Normal())` and
+  `DirectInfections(; Z = Normal())` now build a constant path; use `IID()` for
+  `n` i.i.d. draws, an explicit `Intercept` to be explicit about the constant,
+  and a `Vector{<:Distribution}` for per-element priors.
 - **`as_prior`, `BroadcastPrior`, and `sample_prior` are removed** — components
   store raw priors in parametric fields and the `as_turing_submodel` seam replaces
   the coercion — along with the internal `NamedDist`/`_named` naming and the dead

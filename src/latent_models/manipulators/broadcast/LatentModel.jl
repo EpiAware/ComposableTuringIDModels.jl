@@ -64,8 +64,10 @@ each = BroadcastLatentModel(RandomWalk(), 7, RepeatEach())
 rand(as_turing_model(each, 10))
 ```
 
-The `model` slot takes a raw component: a latent model, or a `Distribution` (or a
-vector of them), composed through [`as_turing_submodel`](@ref).
+The `model` slot is a length-`n` PATH slot: a bare `Distribution` there is
+auto-wrapped in an [`Intercept`](@ref), giving a constant inner path; a process,
+an [`IID`](@ref), or a vector passes through. Use [`IID`](@ref) for `n`
+independent draws. It is composed through [`as_turing_submodel`](@ref).
 
 ## Fields
 
@@ -85,8 +87,11 @@ struct BroadcastLatentModel{M <: PriorLike, P <: Integer,
     function BroadcastLatentModel(model, period::Integer,
             broadcast_rule::B) where {B <: AbstractBroadcastRule}
         @assert period>0 "period must be greater than 0"
-        new{typeof(model), typeof(period), typeof(broadcast_rule)}(
-            model, period, broadcast_rule)
+        # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
+        # an `Intercept` (a constant inner path), never left as a scalar.
+        wrapped = _path_prior(model)
+        new{typeof(wrapped), typeof(period), typeof(broadcast_rule)}(
+            wrapped, period, broadcast_rule)
     end
 end
 

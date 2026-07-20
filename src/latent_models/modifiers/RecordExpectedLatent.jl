@@ -15,8 +15,10 @@ rm = RecordExpectedLatent(FixedIntercept(0.1))
 rand(as_turing_model(rm, 1))
 ```
 
-The `model` slot takes a raw component: a latent model, or a `Distribution` (or a
-vector of them), composed through [`as_turing_submodel`](@ref).
+The `model` slot is a length-`n` PATH slot: a bare `Distribution` there is
+auto-wrapped in an [`Intercept`](@ref), giving a constant inner path; a process,
+an [`IID`](@ref), or a vector passes through. Use [`IID`](@ref) for `n`
+independent draws. It is composed through [`as_turing_submodel`](@ref).
 
 ## Fields
 
@@ -25,6 +27,13 @@ vector of them), composed through [`as_turing_submodel`](@ref).
 struct RecordExpectedLatent{M <: PriorLike} <: AbstractLatentModel
     "The latent model whose expected latent vector is recorded."
     model::M
+
+    function RecordExpectedLatent(model)
+        # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
+        # an `Intercept` (a constant inner path), never left as a scalar.
+        wrapped = _path_prior(model)
+        new{typeof(wrapped)}(wrapped)
+    end
 end
 
 @model function as_turing_model(model::RecordExpectedLatent, n)

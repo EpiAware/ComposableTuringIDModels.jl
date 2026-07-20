@@ -11,6 +11,11 @@ Z_t = \epsilon_t + \sum_{i=1}^{q} \theta_i \epsilon_{t-i}
 with coefficients ``\theta`` from the prior in `θ` and innovations from the
 error model `ϵ_t`. The order `q` is the length of the coefficient prior.
 
+`ϵ_t` is a length-`n` PATH slot: a process gives time-varying innovations, while
+a bare `Distribution` is auto-wrapped in an [`Intercept`](@ref), giving a
+**constant** innovation path (one shared draw broadcast to every step). Use
+[`IID`](@ref) for `n` independent innovations.
+
 At order 1 the `θ` slot decides whether the coefficient is **constant or
 time-varying**, through the same single-seam mechanism as [`AR`](@ref)'s damping:
 `MA(θ = Normal(...))` is a constant coefficient (one scalar RV) while
@@ -47,7 +52,7 @@ end
 function MA(; θ = [truncated(Normal(0.0, 0.05), -1, 1)],
         ϵ_t = HierarchicalNormal())
     q = _prior_order(θ)
-    return MA(θ, q, ϵ_t)
+    return MA(θ, q, _path_prior(ϵ_t))
 end
 
 @model function as_turing_model(model::MA, n)

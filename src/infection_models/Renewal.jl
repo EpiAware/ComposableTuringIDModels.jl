@@ -32,7 +32,10 @@ rediscretised per draw through the [`as_turing_submodel`](@ref) seam.
   - `transformation`: the transformation between the unconstrained and
     constrained domains (default `exp`).
   - `rt`: the latent process model (an [`AbstractLatentModel`](@ref)) generating
-    the (log) reproduction number.
+    the (log) reproduction number. A length-`n` PATH slot: a bare `Distribution`
+    here is auto-wrapped in an [`Intercept`](@ref), giving a constant path (one
+    shared draw broadcast to length `n`); use [`IID`](@ref) for `n` independent
+    draws.
   - `initialisation`: prior for the unconstrained initial infections (a
     `Distribution` or prior model, sampled through [`as_turing_submodel`](@ref)).
   - `recurrent_step`: the renewal accumulation step (an
@@ -98,7 +101,7 @@ function Renewal(; generation_time, rt = RandomWalk(),
         D_gen = nothing, Δd = 1.0)
     gen_int, recurrent_step = _renewal_fields(
         generation_time; D_gen = D_gen, Δd = Δd)
-    return Renewal(gen_int, transformation, rt, initialisation,
+    return Renewal(gen_int, transformation, _path_prior(rt), initialisation,
         recurrent_step)
 end
 

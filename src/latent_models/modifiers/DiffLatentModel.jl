@@ -17,6 +17,10 @@ The `init` slot takes a raw prior: pass a vector of `Distribution`s (its length
 sets `d`), or a richer prior model. It is sampled through
 [`as_turing_submodel`](@ref).
 
+The `model` slot is a length-`n` PATH slot: a bare `Distribution` there is
+auto-wrapped in an [`Intercept`](@ref), giving a constant inner path; use
+[`IID`](@ref) for `n` independent draws.
+
 Composing `DiffLatentModel` over an `AR` gives an ARIMA-style latent process.
 
 # Examples
@@ -38,7 +42,10 @@ struct DiffLatentModel{M <: PriorLike, P <: PriorLike} <: AbstractLatentModel
     function DiffLatentModel(model, init, d::Int)
         @assert d>0 "d must be greater than 0"
         _assert_prior_length(init, d, "init")
-        new{typeof(model), typeof(init)}(model, init, d)
+        # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
+        # an `Intercept` (a constant inner path), never left as a scalar.
+        wrapped = _path_prior(model)
+        new{typeof(wrapped), typeof(init)}(wrapped, init, d)
     end
 end
 

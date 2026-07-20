@@ -35,10 +35,12 @@ struct CombineLatentModels{M <: AbstractVector, P <: AbstractVector{<:String}} <
             prefixes::P) where {P <: AbstractVector{<:String}}
         @assert length(models)>1 "At least two models are required"
         @assert length(models)==length(prefixes) "The number of models and prefixes must be equal"
-        # Wrap each named member in a `PrefixLatentModel` so its variables stay
-        # distinct; a raw `Distribution` member composes through the same seam.
-        prefix_models = [prefixes[i] == "" ? models[i] :
-                         PrefixLatentModel(models[i], prefixes[i])
+        # Each member is a length-`n` PATH slot, so a bare `Distribution` is
+        # wrapped in an `Intercept` (a constant path) before it is namespaced;
+        # then non-empty prefixes get a `PrefixLatentModel` so variables stay
+        # distinct. A process / `IID` / vector member passes through unchanged.
+        prefix_models = [prefixes[i] == "" ? _path_prior(models[i]) :
+                         PrefixLatentModel(_path_prior(models[i]), prefixes[i])
                          for i in eachindex(models)]
         return new{AbstractVector, AbstractVector{<:String}}(
             prefix_models, prefixes)

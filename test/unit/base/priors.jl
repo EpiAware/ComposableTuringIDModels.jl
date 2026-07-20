@@ -161,6 +161,52 @@ end
     end
 end
 
+@testitem "bare Distribution in a PATH slot auto-wraps as a constant Intercept" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(210)
+    # A length-`n` PATH slot (an innovation `ϵ_t`, or a latent `Z` / `rt`) given a
+    # bare `Distribution` is wrapped in an `Intercept` at construction, so the
+    # stored field is a constant path — never a scalar that would silently produce
+    # a length-1 result.
+    @test RandomWalk(; ϵ_t = Normal()).ϵ_t isa Intercept
+    @test AR(; ϵ_t = Normal()).ϵ_t isa Intercept
+    @test MA(; ϵ_t = Normal()).ϵ_t isa Intercept
+    @test DirectInfections(; Z = Normal()).Z isa Intercept
+    @test ExpGrowthRate(; rt = Normal()).rt isa Intercept
+    @test Renewal(; generation_time = [0.2, 0.3, 0.5], rt = Normal()).rt isa
+          Intercept
+    # And the resulting model yields a length-`n` path, not a scalar.
+    @test length(as_turing_model(RandomWalk(; ϵ_t = Normal()), 6)()) == 6
+    @test length(as_turing_model(AR(; ϵ_t = Normal()), 6)()) == 6
+    @test length(as_turing_model(MA(; ϵ_t = Normal()), 6)()) == 6
+    @test length(as_turing_model(DirectInfections(; Z = Normal()), 6)().I_t) == 6
+    @test length(as_turing_model(
+        Renewal(; generation_time = [0.2, 0.3, 0.5], rt = Normal()), 8)().I_t) ==
+          8
+    # A process, an explicit `IID`, or an explicit `Intercept` passes through
+    # unchanged (no double-wrapping).
+    @test RandomWalk(; ϵ_t = RandomWalk()).ϵ_t isa RandomWalk
+    @test RandomWalk(; ϵ_t = IID(Normal())).ϵ_t isa IID
+    @test RandomWalk(; ϵ_t = Intercept(Normal())).ϵ_t isa Intercept
+    # A per-step PARAMETER slot is UNAFFECTED: a bare `Distribution` stays a scalar
+    # constant (drawn with a native tilde), not an `Intercept`.
+    @test AR(; damp = Normal()).damp isa Distribution
+    @test !(AR(; damp = Normal()).damp isa Intercept)
+    @test NormalError(truncated(Normal(0, 1), 0, Inf)).std isa Distribution
+    # Manipulators that thread an inner LATENT path wrap a bare `Distribution` too.
+    @test DiffLatentModel(; model = Normal(), init = [Normal()]).model isa Intercept
+    @test TransformLatentModel(Normal(), x -> x).model isa Intercept
+    @test BroadcastLatentModel(
+        Normal(); period = 7, broadcast_rule = RepeatEach()).model isa Intercept
+    @test RecordExpectedLatent(Normal()).model isa Intercept
+    @test Hierarchy(; across = Normal()).across isa Intercept
+    @test Hierarchy(; across = IID(Normal())).across isa IID   # process passes through
+    # Combine/Concat members are namespaced (prefix-wrapped) around the wrapped
+    # constant, and still generate a length-`n` series with a bare member.
+    @test length(as_turing_model(ConcatLatentModels([Normal(), AR()]), 10)()) == 10
+    @test length(as_turing_model(CombineLatentModels([Normal(), AR()]), 10)()) == 10
+end
+
 @testitem "priors compose as submodels (distribution and latent)" begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(103)

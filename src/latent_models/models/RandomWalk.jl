@@ -15,6 +15,11 @@ default, giving an inferred step standard deviation).
 The `init` slot takes a raw prior: pass a bare `Distribution`, or a richer prior
 model. It is sampled through [`as_turing_submodel`](@ref).
 
+`ϵ_t` is a length-`n` PATH slot: a process gives time-varying increments, while
+a bare `Distribution` is auto-wrapped in an [`Intercept`](@ref), giving a
+**constant** increment path (one shared draw broadcast to every step). Use
+[`IID`](@ref) for `n` independent increments.
+
 # Examples
 ```@example RandomWalk
 using ComposableTuringIDModels, Distributions
@@ -31,7 +36,7 @@ struct RandomWalk{D <: PriorLike, E <: PriorLike} <: AbstractLatentModel
 end
 
 function RandomWalk(; init = Normal(), ϵ_t = HierarchicalNormal())
-    return RandomWalk(init, ϵ_t)
+    return RandomWalk(init, _path_prior(ϵ_t))
 end
 
 @model function as_turing_model(model::RandomWalk, n)

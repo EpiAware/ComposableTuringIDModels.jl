@@ -25,7 +25,9 @@ carries a generation interval).
 ## Fields
 
   - `rt`: the latent process model (an [`AbstractLatentModel`](@ref)) generating
-    the growth-rate path.
+    the growth-rate path. A length-`n` PATH slot: a bare `Distribution` here is
+    auto-wrapped in an [`Intercept`](@ref), giving a constant path (one shared
+    draw broadcast to length `n`); use [`IID`](@ref) for `n` independent draws.
   - `transformation`: the link mapping the unconstrained cumulative sum to
     non-negative infections (default: numerically equivalent to `exp`,
     implemented via `LogExpFunctions.xexpy` for numerical stability).
@@ -51,7 +53,7 @@ end
 
 function ExpGrowthRate(; rt = RandomWalk(),
         transformation::Function = _oneexpy, initialisation = Normal())
-    return ExpGrowthRate(rt, transformation, initialisation)
+    return ExpGrowthRate(_path_prior(rt), transformation, initialisation)
 end
 
 @model function as_turing_model(model::ExpGrowthRate, n)

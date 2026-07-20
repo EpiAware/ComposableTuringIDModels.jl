@@ -87,6 +87,17 @@ function as_turing_submodel(
     return all(first(v) .== v) ? filldist(first(v), n) : arraydist(v)
 end
 
+# A bare `Distribution` in a length-`n` PATH slot (an innovation or a latent
+# process) is wrapped in an `Intercept` so it is a well-defined CONSTANT path
+# (one shared draw broadcast to length `n`), not a scalar. A process, an
+# explicit `IID`/`Intercept`, or a vector passes through unchanged. Per-step
+# PARAMETER slots (damp, θ, std, …) keep the bare `Distribution` — a scalar
+# constant — and must NOT use this. Use `IID` for `n` independent draws.
+# (`Intercept` is defined later in the module; the reference resolves by late
+# binding when the wrapped path slot is first constructed.)
+_path_prior(p::Distribution) = Intercept(p)
+_path_prior(p) = p
+
 @doc raw"
 The types accepted in a prior / process slot: a raw `Distribution`, a vector of
 `Distribution`s, or an [`AbstractPriorModel`](@ref) (a latent process used as a

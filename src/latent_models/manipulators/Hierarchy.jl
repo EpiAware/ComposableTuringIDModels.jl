@@ -42,8 +42,11 @@ cross-group relationship through the prior interface.
 ## Fields
 
   - `mean`: prior for the shared level ``\mu`` (a `Distribution` or prior model).
-  - `across`: the cross-group relationship generating the group deviations (a
-    prior model or `Distribution`; default `IID(Normal())`).
+  - `across`: the cross-group relationship generating the group deviations
+    (default `IID(Normal())`). A length-`n_groups` PATH slot: a bare
+    `Distribution` here is auto-wrapped in an [`Intercept`](@ref) — a constant
+    deviation shared across groups — so use [`IID`](@ref) for exchangeable
+    (independent) group deviations.
 
 # Examples
 ```@example Hierarchy
@@ -59,6 +62,15 @@ struct Hierarchy{M <: PriorLike, A <: PriorLike} <: AbstractLatentModel
     mean::M
     "Cross-group relationship generating the group deviations."
     across::A
+
+    function Hierarchy(mean, across)
+        # `across` is a length-`n_groups` PATH slot (one deviation per group), so
+        # a bare `Distribution` is wrapped in an `Intercept` (a constant, shared
+        # deviation broadcast across groups), never left as a scalar. `mean` is a
+        # single shared level, so it stays a bare scalar prior.
+        wrapped = _path_prior(across)
+        new{typeof(mean), typeof(wrapped)}(mean, wrapped)
+    end
 end
 
 function Hierarchy(; mean = Normal(), across = IID(Normal()))

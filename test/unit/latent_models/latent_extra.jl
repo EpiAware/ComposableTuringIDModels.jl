@@ -10,21 +10,24 @@
     @test length(as_turing_model(rec, 5)()) == 5
 end
 
-@testitem "latent modifiers accept a raw member (Distribution / IID / process)" begin
+@testitem "latent modifiers accept a Distribution / IID / process member" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(310)
     n = 5
 
-    # Each modifier struct stores a bare `Distribution` member raw (it draws a
-    # single scalar through the single seam).
-    @test TransformLatentModel(Normal(), x -> exp.(x)).model isa Distribution
-    @test RecordExpectedLatent(Normal()).model isa Distribution
+    # A modifier consumes its member as a length-`n` path, so a bare `Distribution`
+    # given there is auto-wrapped in an `Intercept` (a constant path, one shared
+    # draw broadcast to length `n`) — use `IID`/a process for a varying member.
+    @test TransformLatentModel(Normal(), x -> exp.(x)).model isa Intercept
+    @test RecordExpectedLatent(Normal()).model isa Intercept
+    @test BroadcastLatentModel(Normal(), 7, RepeatEach()).model isa Intercept
+    @test BroadcastLatentModel(Normal(); period = 7,
+        broadcast_rule = RepeatEach()).model isa Intercept
+    # `PrefixLatentModel` is a transparent naming wrapper (it only renames its
+    # member's variables), so it stores a bare `Distribution` member raw.
     @test PrefixLatentModel(Normal(), "Test").model isa Distribution
     @test PrefixLatentModel(; model = Normal(), prefix = "Test").model isa
           Distribution
-    @test BroadcastLatentModel(Normal(), 7, RepeatEach()).model isa Distribution
-    @test BroadcastLatentModel(Normal(); period = 7,
-        broadcast_rule = RepeatEach()).model isa Distribution
 
     # For a length-n member use IID() (n i.i.d.) or a process; it composes like a
     # model and produces a length-n path.
