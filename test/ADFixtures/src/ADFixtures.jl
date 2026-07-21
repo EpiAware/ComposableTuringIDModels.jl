@@ -48,27 +48,83 @@ function _models()
     gen_int = _GEN_INT
     n = 12
 
+    # Simulate observations from a composed model's prior (its `generated_y_t`).
+    sim(m, nn) = as_turing_model(m, missing, nn)().generated_y_t
+
+    # --- latent-process log-joints (prior only) ---------------------------------
     rw = as_turing_model(RandomWalk(), n)
     ar = as_turing_model(AR(), n)
     arima = as_turing_model(
+<<<<<<< HEAD
         DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]), n)
     hsgp = as_turing_model(HilbertSpaceGP(; m = 8), n)
     hsgp_matern = as_turing_model(
         HilbertSpaceGP(; m = 8, kernel = Matern52Kernel()), n)
+||||||| 25949fc
+        DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]), n)
+=======
+        DiffLatentModel(; model = AR(), init = [Normal(), Normal()]), n)
+    # Moving-average: exercises `accumulate_scan(MAStep(θ), ...)` and its
+    # `dot(θ, state)` innovation buffer (the MA counterpart of `AR`).
+    ma = as_turing_model(MA(), 8)
+    # Non-centred hierarchical normal: `σ ~ prior`, `η = σ ⋅ ϵ` — the simplest
+    # scale-mixture latent (and the default innovation model everything reuses).
+    hier = as_turing_model(HierarchicalNormal(), 8)
+    # A random walk wrapped in a `d = 2` `DiffLatentModel` (the differencing
+    # modifier over a non-`AR` inner process, distinct from the `AR`-based ARIMA).
+    diffrw = as_turing_model(
+        DiffLatentModel(; model = RandomWalk(), init = [Normal(), Normal()]), 8)
+    # ARMA(p, q): an `AR` whose innovations are an `MA` (double accumulate-scan).
+    armamdl = as_turing_model(arma(), 8)
+    # Day-of-week broadcast: a `TransformLatentModel` (7·softmax) inner process
+    # repeated across a 7-day period (`RepeatEach`).
+    bdow = as_turing_model(broadcast_dayofweek(RandomWalk()), 14)
+    # Weekly broadcast: a piecewise-constant weekly process (`RepeatBlock`).
+    bweek = as_turing_model(broadcast_weekly(RandomWalk()), 14)
+    # Concatenate an `Intercept` segment and a `RandomWalk` segment along time.
+    concat = as_turing_model(
+        ConcatLatentModels([Intercept(Normal(2, 0.2)), RandomWalk()]), 10)
+    # Sum an `Intercept` and an `AR` over the full length (prefix-separated).
+    combine = as_turing_model(
+        CombineLatentModels([Intercept(Normal(2, 0.2)), AR()]), 10)
+>>>>>>> origin/main
 
+    # --- the #76 prior interface -----------------------------------------------
+    # A *vector* of damping distributions (order 2): one i.i.d. draw per lag
+    # through `arraydist`, threaded as a submodel via `as_turing_submodel`.
+    ar_vec = as_turing_model(
+        AR(; damp = [truncated(Normal(0, 0.05), 0, 1),
+                truncated(Normal(0, 0.05), 0, 1)],
+            init = [Normal(), Normal()]), 8)
+    # A process as the damping prior: the bare `AR(damp = RandomWalk())` form —
+    # now a genuinely TIME-VARYING coefficient path (issue #80 for the threading).
+    # The AR damping coefficient is a length-(n-1) `RandomWalk` submodel mapped
+    # through `tanh`, so the submodel-threading gradient path is differentiated.
+    # The prior slot prefixes the latent-model prior (the `damp_AR` namespace) via
+    # `as_turing_submodel(...; prefix = true)`, keeping the inner
+    # `std`/`ϵ_t`/`rw_init` names from colliding with the AR innovation's — so this
+    # linked log-density both evaluates and differentiates without a manual prefix.
+    ar_lat = as_turing_model(AR(; damp = RandomWalk()), 8)
+
+    # --- infection posteriors ---------------------------------------------------
     direct = IDModel(
-        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
     renewal = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
+    # Exponential-growth-rate infections (the third infection family alongside
+    # `DirectInfections` / `Renewal`): a cumulative growth-rate path exponentiated.
+    egr = IDModel(
+        ExpGrowthRate(; rt = RandomWalk(), initialisation = Normal()),
+        PoissonError())
 
     # Nowcasting MARGINAL (right-truncation correction): a renewal model whose
     # observation error is wrapped in `RightTruncate` (fixed reporting-delay CDF
     # supplied as a `ReportingCDF` submodel). This exercises the `reverse`/
     # broadcast scaling the modifier adds on top of the inner error.
     nowcast = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         RightTruncate(NegativeBinomialError(),
             truncated(Normal(4.0, 1.5), 0.0, Inf)))
 
@@ -77,15 +133,92 @@ function _models()
     # Poisson log-likelihood over the masked triangle (`t + d ≤ now`) is what
     # nowcasting under NUTS depends on.
     triangle = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         ReportTriangle(PoissonError(), [0.6, 0.25, 0.15]))
+
+    # --- observation modifiers / error families over a composed model ----------
+    # Reporting delay: convolves the expected observations with a delay PMF
+    # (`accumulate_scan(LDStep(rev_pmf), ...)`) before the inner error.
+    latdelay = IDModel(
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
+        LatentDelay(NegativeBinomialError(), [0.3, 0.4, 0.3]))
+    # Uncertain reporting delay: the delay distribution's parameters are prior
+    # slots (a `LogNormal` whose meanlog/sdlog carry priors), sampled through the
+    # priors seam and rediscretised into a PMF per draw before the same
+    # convolution. The gradient must flow through the discretisation
+    # (`_discretised_pmf` / `double_interval_censored` `pdf`) — the AD-sensitive
+    # part of an inferred delay.
+    udelay = IDModel(
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
+        LatentDelay(NegativeBinomialError(),
+            UncertainDelay(LogNormal,
+                [Normal(1.0, 0.3), truncated(Normal(0.4, 0.2), 0, Inf)];
+                D = 6.0)))
+    # Time-varying reporting delay: the delay distribution's meanlog is a latent
+    # process (a `RandomWalk`), so the delay — and its discretised pmf — varies
+    # with time. Each per-time pmf is built through the priors seam and the
+    # time-indexed convolution (`TimeVaryingLDStep`) is driven by a reversed kernel
+    # per step. The gradient must flow through the per-time discretisation
+    # (`_discretised_pmf`) and the process submodel threading — the time-varying
+    # counterpart of `udelay`.
+    tvdelay = IDModel(
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
+        LatentDelay(NegativeBinomialError(),
+            UncertainDelay(LogNormal,
+                [RandomWalk(), truncated(Normal(0.4, 0.2), 0, Inf)];
+                D = 6.0)))
+    # Uncertain generation interval: the renewal generation interval is itself
+    # inferred — a `LogNormal` whose meanlog/sdlog carry priors, sampled through
+    # the priors seam and discretised into a pmf per draw (lag-0 bin dropped,
+    # renormalised) before the renewal step is built. The gradient must flow
+    # through the discretisation (`_discretised_pmf`) and the renewal recursion
+    # built from the sampled interval — the AD-sensitive part of an inferred
+    # generation interval, the renewal counterpart of `udelay`.
+    ugen = IDModel(
+        Renewal(;
+            generation_time = UncertainDelay(LogNormal,
+                [Normal(0.7, 0.3), truncated(Normal(0.4, 0.2), 0, Inf)];
+                D = 6.0),
+            rt = RandomWalk(), initialisation = Normal()),
+        PoissonError())
+    # Day-of-week ascertainment: scales the expected observations by a broadcast
+    # latent (an `Ascertainment` wrapping `broadcast_dayofweek`).
+    ascert = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+        ascertainment_dayofweek(PoissonError()))
+    # Aggregation: sum the expected observations over weekly reporting windows
+    # (only the window endpoints are scored).
+    aggregate = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+        Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7]))
+    # Transform-the-expected-observations: softplus applied before the error.
+    transobs = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+        TransformObservationModel(PoissonError()))
+    # Gaussian observation error (continuous, `σ`-inferred) rather than a count
+    # family — the minimal non-count likelihood.
+    normalobs = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+        NormalError())
+
+    # Binomial error: a standalone observation model whose success PROBABILITY is
+    # a latent process (a `HierarchicalNormal` pushed through a logistic link via
+    # `Ascertainment`), with the number of trials supplied as data. This is the
+    # meaningful way to reach a `BinomialError` gradient (its `Y_t` is a
+    # probability, not a count, so it is not fed by an infection model here).
+    binom_obs = Ascertainment(BinomialError(), HierarchicalNormal();
+        transform = (Y_t, x) -> 1 ./ (1 .+ exp.(-x)), latent_prefix = "")
+    n_b = 10
+    N_b = fill(20, n_b)
+    Ybase_b = fill(1.0, n_b)
+    y_binom = as_turing_model(binom_obs, (y = missing, N = N_b), Ybase_b)().y_t
 
     # `Split` observation composition: a renewal model observed through two
     # streams, with `deaths` cascaded downstream of `cases` by sharing the case
     # delay and splitting after it. Exercises the per-stream prefixing and the
     # expected-series threading gradient path.
     split = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         LatentDelay(
             Split((
                 cases = NegativeBinomialError(),
@@ -94,26 +227,75 @@ function _models()
                     [0.2, 0.3, 0.5]))),
             [0.4, 0.3, 0.2, 0.1]))
 
-    y_direct = as_turing_model(direct, missing, n)().generated_y_t
-    y_renewal = as_turing_model(renewal, missing, n)().generated_y_t
-    y_nowcast = as_turing_model(nowcast, missing, n)().generated_y_t
-    y_triangle = as_turing_model(triangle, missing, n)().generated_y_t
-    y_split = as_turing_model(split, missing, n)().generated_y_t
+    y_direct = sim(direct, n)
+    y_renewal = sim(renewal, n)
+    y_egr = sim(egr, n)
+    y_nowcast = sim(nowcast, n)
+    y_triangle = sim(triangle, n)
+    y_latdelay = sim(latdelay, n)
+    y_udelay = sim(udelay, n)
+    y_tvdelay = sim(tvdelay, n)
+    y_ugen = sim(ugen, n)
+    y_ascert = sim(ascert, 14)
+    y_aggregate = sim(aggregate, 14)
+    y_transobs = sim(transobs, n)
+    y_normalobs = sim(normalobs, n)
+    y_split = sim(split, n)
 
     return [
+        # latent-process log-joints
         ("RandomWalk latent logjoint", rw),
         ("AR latent logjoint", ar),
         ("ARIMA latent logjoint", arima),
+<<<<<<< HEAD
         ("HilbertSpaceGP latent logjoint", hsgp),
         ("HilbertSpaceGP Matern latent logjoint", hsgp_matern),
+||||||| 25949fc
+=======
+        ("MA latent logjoint", ma),
+        ("HierarchicalNormal latent logjoint", hier),
+        ("DiffLatentModel(RandomWalk) latent logjoint", diffrw),
+        ("ARMA latent logjoint", armamdl),
+        ("BroadcastLatentModel day-of-week latent logjoint", bdow),
+        ("BroadcastLatentModel weekly latent logjoint", bweek),
+        ("ConcatLatentModels latent logjoint", concat),
+        ("CombineLatentModels latent logjoint", combine),
+        # the #76 prior interface
+        ("AR vector-prior latent logjoint", ar_vec),
+        ("AR latent-model-as-prior latent logjoint", ar_lat),
+        # infection posteriors
+>>>>>>> origin/main
         ("DirectInfections+Poisson posterior",
             as_turing_model(direct, y_direct, n)),
         ("Renewal+NegativeBinomial posterior",
             as_turing_model(renewal, y_renewal, n)),
+        ("ExpGrowthRate+Poisson posterior",
+            as_turing_model(egr, y_egr, n)),
+        # nowcasting
         ("Renewal+RightTruncate nowcast posterior",
             as_turing_model(nowcast, y_nowcast, n)),
         ("Renewal+ReportTriangle posterior",
             as_turing_model(triangle, y_triangle, n)),
+        # observation modifiers / error families
+        ("Renewal+LatentDelay posterior",
+            as_turing_model(latdelay, y_latdelay, n)),
+        ("Renewal+UncertainLatentDelay posterior",
+            as_turing_model(udelay, y_udelay, n)),
+        ("Renewal+TimeVaryingLatentDelay posterior",
+            as_turing_model(tvdelay, y_tvdelay, n)),
+        ("Renewal+UncertainGenInterval posterior",
+            as_turing_model(ugen, y_ugen, n)),
+        ("DirectInfections+Ascertainment day-of-week posterior",
+            as_turing_model(ascert, y_ascert, 14)),
+        ("DirectInfections+Aggregate posterior",
+            as_turing_model(aggregate, y_aggregate, 14)),
+        ("DirectInfections+TransformObservation posterior",
+            as_turing_model(transobs, y_transobs, n)),
+        ("DirectInfections+NormalError posterior",
+            as_turing_model(normalobs, y_normalobs, n)),
+        ("BinomialError ascertainment posterior",
+            as_turing_model(binom_obs, (y = y_binom, N = N_b), Ybase_b)),
+        # unified Split observation composition
         ("Renewal+Split cascade posterior",
             as_turing_model(split, y_split, n))
     ]
@@ -182,9 +364,17 @@ function _enzyme()
     # `function_annotation = Enzyme.Const`: the log-density closures carry no
     # derivative data, and without this Enzyme raises `EnzymeMutabilityException`
     # ("argument cannot be proven readonly") on every DynamicPPL log-density.
+<<<<<<< HEAD
     # With it, seven of the ten scenarios differentiate correctly; the AR-based
     # two and the `Split` cascade remain genuinely broken (see
     # `backend_broken_scenarios`).
+||||||| 25949fc
+    # With it, three of the five scenarios differentiate correctly; the AR-based
+    # two remain genuinely broken (see `backend_broken_scenarios`).
+=======
+    # With it, most scenarios differentiate correctly; a minority remain
+    # genuinely broken (see `backend_broken_scenarios`).
+>>>>>>> origin/main
     return ADTypes.AutoEnzyme(;
         mode = Enzyme.set_runtime_activity(Enzyme.Reverse),
         function_annotation = Enzyme.Const)
@@ -199,8 +389,15 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
+<<<<<<< HEAD
 Result matrix (10 scenarios × 4 backends), Julia 1.12:
+||||||| 25949fc
+Result matrix (8 scenarios × 4 backends), Julia 1.12:
+=======
+Result matrix (28 scenarios × 4 backends), Julia 1.12:
+>>>>>>> origin/main
 
+<<<<<<< HEAD
 | scenario                                | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
 |-----------------------------------------|:-----------:|:-----------:|:--------:|:------:|
 | RandomWalk latent logjoint              |      ✓      |      ✓      |    ✓    |   ✓   |
@@ -213,7 +410,51 @@ Result matrix (10 scenarios × 4 backends), Julia 1.12:
 | Renewal+RightTruncate nowcast posterior |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior        |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+Split cascade posterior         |      ✓      |      ✓      |    ✓    |   ✗   |
+||||||| 25949fc
+| scenario                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
+|---------------------------------------|:-----------:|:-----------:|:--------:|:------:|
+| RandomWalk latent logjoint            |      ✓      |      ✓      |    ✓    |   ✓   |
+| AR latent logjoint                    |      ✓      |      ✓      |    ✓    |   ✗   |
+| ARIMA latent logjoint                 |      ✓      |      ✓      |    ✓    |   ✗   |
+| DirectInfections+Poisson posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+NegativeBinomial posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+RightTruncate nowcast posterior |    ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+ReportTriangle posterior      |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+Split cascade posterior       |      ✓      |      ✓      |    ✓    |   ✗   |
+=======
+| scenario                                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
+|-------------------------------------------------------|:-----------:|:-----------:|:--------:|:------:|
+| RandomWalk latent logjoint                            |      ✓      |      ✓      |    ✓    |   ✓   |
+| AR latent logjoint                                    |      ✓      |      ✓      |    ✓    |   ✗   |
+| ARIMA latent logjoint                                 |      ✓      |      ✓      |    ✓    |   ✗   |
+| MA latent logjoint                                    |      ✓      |      ✓      |    ✓    |   ✗   |
+| HierarchicalNormal latent logjoint                    |      ✓      |      ✓      |    ✓    |   ✓   |
+| DiffLatentModel(RandomWalk) latent logjoint           |      ✓      |      ✓      |    ✓    |   ✗   |
+| ARMA latent logjoint                                  |      ✓      |      ✓      |    ✓    |   ✗   |
+| BroadcastLatentModel day-of-week latent logjoint      |      ✓      |      ✓      |    ✓    |   ✓   |
+| BroadcastLatentModel weekly latent logjoint           |      ✓      |      ✓      |    ✓    |   ✓   |
+| ConcatLatentModels latent logjoint                    |      ✓      |      ✓      |    ✓    |   ✓   |
+| CombineLatentModels latent logjoint                   |      ✓      |      ✓      |    ✓    |   ✗   |
+| AR vector-prior latent logjoint                       |      ✓      |      ✓      |    ✓    |   ✗   |
+| AR latent-model-as-prior latent logjoint              |      ✓      |      ✓      |    ✓    |   ✗   |
+| DirectInfections+Poisson posterior                    |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+NegativeBinomial posterior                    |      ✓      |      ✓      |    ✓    |   ✗   |
+| ExpGrowthRate+Poisson posterior                       |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+RightTruncate nowcast posterior               |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+ReportTriangle posterior                      |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+LatentDelay posterior                         |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+UncertainLatentDelay posterior                |      ✓      |      ✓      |    ✓    |   ✗   |
+| Renewal+TimeVaryingLatentDelay posterior              |      ✓      |      ✓      |    ✓    |   ✗   |
+| Renewal+UncertainGenInterval posterior                |      ✓      |      ✓      |    ✓    |   ✗   |
+| DirectInfections+Ascertainment day-of-week posterior  |      ✓      |      ✓      |    ✓    |   ✗   |
+| DirectInfections+Aggregate posterior                  |      ✓      |      ✓      |    ✓    |   ✓   |
+| DirectInfections+TransformObservation posterior       |      ✓      |      ✓      |    ✓    |   ✓   |
+| DirectInfections+NormalError posterior                |      ✓      |      ✓      |    ✓    |   ✗   |
+| BinomialError ascertainment posterior                 |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+Split cascade posterior                       |      ✓      |      ✓      |    ✓    |   ✗   |
+>>>>>>> origin/main
 
+<<<<<<< HEAD
 ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
 scenario correctly — including both Hilbert-space GP latents, both nowcasting
 models (the `RightTruncate` marginal and the `ReportTriangle` joint triangle),
@@ -229,12 +470,92 @@ Mooncake). They are recorded as `@test_broken` for Enzyme below rather than
 hidden. Both Hilbert-space GP latents (squared exponential and Matérn) are a
 pure basis-weight matrix product with no such recursion, so they differentiate
 cleanly under every backend.
+||||||| 25949fc
+ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
+scenario correctly — including both nowcasting models (the `RightTruncate`
+marginal and the `ReportTriangle` joint triangle) and the unified `Split`
+observation composition. Enzyme works on five of the eight once configured with
+`function_annotation = Enzyme.Const` (see [`backends`](@ref)). The two AR-based
+latent log-densities raise `IllegalTypeAnalysisException` inside the
+`accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion, and the
+deeply-nested `Split` composition raises the same exception through its
+per-stream submodel threading — real Enzyme type-analysis limitations, not
+defects in the package (all three sample fine under NUTS with ForwardDiff or
+Mooncake). They are recorded as `@test_broken` for Enzyme below rather than
+hidden.
+=======
+scenario correctly. Enzyme (configured with `function_annotation = Enzyme.Const`,
+see [`backends`](@ref)) works on sixteen of the twenty-eight but raises
+`IllegalTypeAnalysisException` / a related type-analysis or shadow error on
+twelve:
+
+  - the `AR`-based latent log-densities (`AR`, `ARIMA`, `ARMA`,
+    `CombineLatentModels` (which contains an `AR`), and both prior-interface `AR`
+    scenarios), inside the `accumulate_scan(ARStep(damp_AR), ...)` /
+    `LinearAlgebra.dot` recursion;
+  - `DiffLatentModel(RandomWalk)` (the repeated `cumsum` reconstruction);
+  - `DirectInfections+NormalError` (the Gaussian likelihood loop);
+  - `DirectInfections+Ascertainment day-of-week` — an `EnzymeNoShadowError`
+    through the `PrefixLatentModel`-wrapped day-of-week `BroadcastLatentModel`
+    submodel threading, surfaced by the #76 prefix-on prior collapse;
+  - `Renewal+TimeVaryingLatentDelay` — the process-parameter (time-varying) delay
+    threads a `RandomWalk` submodel through the priors seam per delay parameter,
+    where Enzyme wraps the constant `sdlog` scalar in a `Base.RefValue` its
+    type-analysis cannot resolve against the `_at` accessor; and
+  - the deeply-nested `Renewal+Split` cascade, through its per-stream submodel
+    threading.
+
+These are real Enzyme type-analysis limitations, not defects in the package (the
+same models sample fine under NUTS with ForwardDiff or Mooncake). They are
+recorded as `@test_broken` for Enzyme below rather than hidden. Notably `MA` —
+whose step also uses `dot` — differentiates under Enzyme, so the brokenness is
+specific to these recursions rather than to `dot` in general.
+>>>>>>> origin/main
 """
 function backend_broken_scenarios()
     return Dict{String, Set{String}}(
         "Enzyme reverse" => Set([
-        "AR latent logjoint", "ARIMA latent logjoint",
-        "Renewal+Split cascade posterior"]))
+        "AR latent logjoint",
+        "ARIMA latent logjoint",
+        # Plain `MA` threads its `HierarchicalNormal` innovation (and vector-`θ`)
+        # submodels through the prior seam, the same `EnzymeNoShadowError`
+        # submodel-threading limit as its `AR`/`ARIMA`/`ARMA` siblings above.
+        "MA latent logjoint",
+        "DiffLatentModel(RandomWalk) latent logjoint",
+        "ARMA latent logjoint",
+        "CombineLatentModels latent logjoint",
+        "AR vector-prior latent logjoint",
+        "AR latent-model-as-prior latent logjoint",
+        "DirectInfections+NormalError posterior",
+        "Renewal+NegativeBinomial posterior",
+        # Enzyme type-analysis brokenness tracked in #97.
+        "Renewal+Split cascade posterior",
+        # `EnzymeNoShadowError` through the `Ascertainment` +
+        # `broadcast_dayofweek` submodel threading after the #76 prior collapse
+        # (prefix-on prior slots): Enzyme cannot find a shadow for the
+        # `PrefixLatentModel`-wrapped day-of-week `BroadcastLatentModel`. Enzyme
+        # only; ForwardDiff/ReverseDiff/Mooncake differentiate it correctly.
+        # Tracked in #97.
+        "DirectInfections+Ascertainment day-of-week posterior",
+        # The process-parameter (time-varying) reporting delay threads a
+        # `RandomWalk` submodel per delay parameter; Enzyme wraps the constant
+        # `sdlog` scalar in a `Base.RefValue` its type-analysis cannot resolve
+        # against `_at` (`MethodError: no method matching _at(::RefValue, ::Int)`).
+        # Enzyme only; ForwardDiff/ReverseDiff/Mooncake differentiate it correctly.
+        # Tracked in #97.
+        "Renewal+TimeVaryingLatentDelay posterior",
+        # An inferred (uncertain) reporting delay draws its distribution
+        # parameters through the prefix-on prior-slot seam
+        # (`as_turing_submodel(delay; prefix = true)`) — the same
+        # `EnzymeNoShadowError` submodel-threading limitation as the day-of-week
+        # ascertainment above. Enzyme only; ForwardDiff/ReverseDiff/Mooncake
+        # differentiate it correctly. Tracked in #97.
+        "Renewal+UncertainLatentDelay posterior",
+        # An inferred (uncertain) generation interval threads its `UncertainDelay`
+        # parameters through the same prefix-on prior-slot seam — the same
+        # `EnzymeNoShadowError` limit. Enzyme only; ForwardDiff/ReverseDiff/
+        # Mooncake differentiate it correctly. Tracked in #97.
+        "Renewal+UncertainGenInterval posterior"]))
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."

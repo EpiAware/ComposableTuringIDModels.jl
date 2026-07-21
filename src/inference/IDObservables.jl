@@ -43,7 +43,7 @@ generated quantities, so `generated` is `missing`.
 using ComposableTuringIDModels, Distributions
 m = as_turing_model(
     IDModel(
-        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError()), missing, 10)
 generated_observables(m, (; y_t = missing), rand(m))
 ```

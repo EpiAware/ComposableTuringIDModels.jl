@@ -6,6 +6,13 @@ recreating published analyses. Each one is self-contained and runs when the
 documentation is built, so the numbers you see are produced by the code on the
 page.
 
+!!! note "Sampling settings"
+    To keep the documentation build to a sensible time, these case studies draw
+    moderate NUTS samples (250 draws across 2 chains for the multi-chain fits,
+    200-300 for the single-chain ones).
+    That is enough to demonstrate the models and produce stable figures; a real
+    analysis would use more draws and check convergence diagnostics carefully.
+
 They progress from a single renewal model to a layered observation process, a
 mechanistic compartmental model, and a flexible Gaussian-process latent:
 

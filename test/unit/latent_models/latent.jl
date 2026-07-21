@@ -15,14 +15,14 @@ end
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(2)
     ar2 = AR(;
-        damp_priors = [truncated(Normal(0, 0.05), 0, 1),
+        damp = [truncated(Normal(0, 0.05), 0, 1),
             truncated(Normal(0, 0.05), 0, 1)],
-        init_priors = [Normal(), Normal()])
+        init = [Normal(), Normal()])
     @test ar2.p == 2
     @test length(as_turing_model(ar2, 10)()) == 10
 
     ma2 = MA(;
-        θ_priors = [truncated(Normal(0, 0.05), -1, 1),
+        θ = [truncated(Normal(0, 0.05), -1, 1),
         truncated(Normal(0, 0.05), -1, 1)])
     @test ma2.q == 2
     @test length(as_turing_model(ma2, 10)()) == 10
@@ -31,7 +31,7 @@ end
 @testitem "DiffLatentModel composes an ARIMA-style latent process" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(3)
-    arima = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()])
+    arima = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
     @test arima.d == 2
     path = as_turing_model(arima, 20)()
     @test length(path) == 20
@@ -48,8 +48,6 @@ end
     path = as_turing_model(gp, n)()
     @test length(path) == n
     @test all(isfinite, path)
-    # The sampled parameters are the length scale, the marginal sd, and the
-    # m basis weights — no inner error-model variables leak through.
     draw = rand(as_turing_model(gp, n))
     pairs_dict = Dict(string(k) => v for (k, v) in pairs(draw))
     @test haskey(pairs_dict, "ℓ")
@@ -63,12 +61,6 @@ end
     using ComposableTuringIDModels: hsgp_basis, se_spectral_density,
                                     _hsgp_standardised_index
     using KernelFunctions: with_lengthscale, kernelmatrix
-    # With enough basis functions the reconstructed covariance
-    # Φ diag(S(√λ)) Φ' converges to the exact SE-kernel Gram matrix. Ground truth
-    # is the KernelFunctions.jl Gram matrix σ² · SqExponentialKernel(ℓ), evaluated
-    # on the same standardised inputs the basis uses (so ℓ is on the standardised
-    # scale). Tying the spectral-density weights to the ecosystem kernel is exactly
-    # the HSGP↔KernelFunctions correspondence the model relies on.
     n, σ, ℓ, c = 20, 1.0, 0.5, 2.0
     x = _hsgp_standardised_index(n)
     K_exact = kernelmatrix(σ^2 * with_lengthscale(SqExponentialKernel(), ℓ), x)
@@ -83,7 +75,6 @@ end
     using ComposableTuringIDModels, Distributions
     @test_throws AssertionError HilbertSpaceGP(; m = 0)
     @test_throws AssertionError HilbertSpaceGP(; c = 1.0)
-    # n must exceed 1 for a meaningful basis.
     @test_throws Exception as_turing_model(HilbertSpaceGP(), 1)()
 end
 
@@ -92,10 +83,7 @@ end
     using KernelFunctions: Kernel
     Random.seed!(6)
     n = 25
-    # Default kernel is the ecosystem-standard squared-exponential kernel.
     @test HilbertSpaceGP().kernel isa SqExponentialKernel
-    # Each kernel is a KernelFunctions.jl `Kernel` and yields a finite length-n
-    # path.
     for K in (SqExponentialKernel(), Matern32Kernel(), Matern52Kernel())
         @test K isa Kernel
         gp = HilbertSpaceGP(; m = 10, kernel = K)
@@ -117,13 +105,10 @@ end
         @test length(S) == length(ω)
         @test all(>(0), S)
         @test all(isfinite, S)
-        # Spectral density decays with frequency.
         @test S[1] > S[end]
     end
-    # se_spectral_density is the squared-exponential convenience wrapper.
     @test se_spectral_density(ω, σ, ℓ) ≈
           spectral_density(SqExponentialKernel(), ω, σ, ℓ)
-    # Different kernels give genuinely different weightings.
     @test spectral_density(Matern32Kernel(), ω, σ, ℓ) !=
           spectral_density(SqExponentialKernel(), ω, σ, ℓ)
 end
@@ -133,11 +118,6 @@ end
     using ComposableTuringIDModels: hsgp_basis, spectral_density,
                                     _hsgp_standardised_index
     using KernelFunctions: with_lengthscale, kernelmatrix
-    # The reconstructed covariance Φ diag(S(√λ)) Φ' should approximate the exact
-    # Matern Gram matrix as the basis count grows. Ground truth is the
-    # KernelFunctions.jl Gram matrix σ² · Matern52Kernel(ℓ) on the same
-    # standardised inputs the basis uses — the spectral density and the ecosystem
-    # kernel must agree.
     n, σ, ℓ, c = 20, 1.0, 0.8, 3.0
     x = _hsgp_standardised_index(n)
     K_exact = kernelmatrix(σ^2 * with_lengthscale(Matern52Kernel(), ℓ), x)
@@ -151,13 +131,9 @@ end
     using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: DynamicPPL
     Random.seed!(7)
-    # as_turing_model returns a plain DynamicPPL.Model (the basis is built in the
-    # constructor, not inside the @model), so repeated evaluation of the SAME
-    # model reuses the cached basis rather than rebuilding it each call.
     gp = HilbertSpaceGP(; m = 12)
     mdl = as_turing_model(gp, 30)
     @test mdl isa DynamicPPL.Model
-    # Two evaluations are valid length-n draws (basis reused, only β/ℓ/σ redrawn).
     @test length(mdl()) == 30
     @test length(mdl()) == 30
 end
@@ -165,20 +141,15 @@ end
 @testitem "HilbertSpaceGP samples in the DEFAULT ℓ/m regime" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(8)
-    # The reconstruction tests use large m; this exercises the *sampled* regime at
-    # the DEFAULT settings (m = 20) where ℓ is a free parameter pushed through the
-    # spectral density and basis product by NUTS. A short prior sample must stay
-    # finite (no gradient blow-up at the short end of the length-scale prior).
     gp = HilbertSpaceGP()
     @test gp.m == 20
-    @test minimum(gp.length_scale_prior) > 0   # positive floor on ℓ
+    @test minimum(gp.length_scale_prior) > 0
     n = 30
     chn = sample(as_turing_model(gp, n), NUTS(), 40; progress = false)
     @test size(chn, 1) == 40
     @test all(isfinite, Array(chn))
     ℓ = vec(chn[:ℓ])
     @test all(>(0), ℓ)
-    # A latent path at the default m is still finite.
     path = as_turing_model(gp, n)()
     @test length(path) == n
     @test all(isfinite, path)
@@ -194,8 +165,6 @@ end
     path = as_turing_model(gp, n)()
     @test length(path) == n
     @test all(isfinite, path)
-    # The sampled parameters are the length scale, the marginal sd, and the
-    # n non-centred weights — no inner variables leak through.
     draw = rand(as_turing_model(gp, n))
     pairs_dict = Dict(string(k) => v for (k, v) in pairs(draw))
     @test haskey(pairs_dict, "ℓ")
@@ -211,12 +180,6 @@ end
     using KernelFunctions: with_lengthscale, kernelmatrix
     using Statistics: cov, mean
     Random.seed!(10)
-    # With ℓ and σ fixed, the returned path is L·z with L the Cholesky factor of
-    # the covariance, so its prior covariance is exactly the KernelFunctions Gram
-    # matrix σ²·SqExponentialKernel(ℓ) on the standardised inputs. Drawing many
-    # paths and comparing the sample covariance is a direct check that the exact
-    # GP reproduces the ecosystem kernel — no approximation error to tolerate
-    # beyond Monte-Carlo noise.
     n, σ, ℓ = 10, 1.0, 0.6
     x = _hsgp_standardised_index(n)
     K_exact = kernelmatrix(σ^2 * with_lengthscale(SqExponentialKernel(), ℓ), x)
@@ -251,9 +214,6 @@ end
 @testitem "ExactGP samples in the DEFAULT regime" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(12)
-    # Exercise the sampled regime: ℓ and σ are free, so the covariance and its
-    # Cholesky factor are rebuilt on every gradient evaluation. A short prior
-    # sample must stay finite with the length scale positive.
     gp = ExactGP()
     @test minimum(gp.length_scale_prior) > 0
     n = 20
@@ -266,15 +226,16 @@ end
     @test all(isfinite, path)
 end
 
-@testitem "rand from a latent model uses flat (unprefixed) names" begin
+@testitem "rand from a latent model namespaces prior variables" begin
     using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: VarName
     Random.seed!(4)
     draw = rand(as_turing_model(RandomWalk(), 10))
     names = string.(collect(keys(draw)))
-    # to_submodel(..., false) keeps inner variable names flat: a RandomWalk
-    # exposes its init and the inner HierarchicalNormal's std/ϵ_t without a
-    # path prefix.
-    @test "rw_init" in names
-    @test any(startswith("std"), names) || "std" in names
+    # The init prior slot is prefixed at the call site (prefix-on
+    # `as_turing_submodel`), so a RandomWalk exposes its init under a namespace
+    # path (e.g. `rw_init.θ`); the inner HierarchicalNormal's `std` is a flat
+    # native-tilde scalar draw.
+    @test any(startswith("rw_init"), names)
+    @test any(contains("std"), names)
 end

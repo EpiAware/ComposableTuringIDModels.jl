@@ -2,7 +2,7 @@
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(71)
     problem = IDProblem(
-        infection = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         observation_model = PoissonError(),
         tspan = (1, 20))
     m = as_turing_model(problem, (; y_t = missing))
@@ -15,7 +15,7 @@ end
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(72)
     problem = IDProblem(
-        infection = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         observation_model = PoissonError(),
         tspan = (1, 20))
     ydata = as_turing_model(problem, (; y_t = missing))().generated_y_t
@@ -43,7 +43,7 @@ end
     Random.seed!(75)
     m = as_turing_model(
         IDModel(
-            DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+            DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
             PoissonError()), missing, 10)
     obs = generated_observables(m, (; y_t = missing), rand(m))
     @test obs isa IDObservables
@@ -54,12 +54,105 @@ end
     @test obs.generated !== missing
 end
 
+@testitem "forecast rejects a non-positive horizon" begin
+    using ComposableTuringIDModels, Distributions
+    model = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+        PoissonError())
+    @test_throws ArgumentError forecast(model, fill(5, 10), :chain, 0)
+end
+
+@testitem "forecast extends a RandomWalk model over the horizon" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(101)
+    model = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal(1.0, 0.5)),
+        PoissonError())
+    T, h = 15, 6
+    y = as_turing_model(model, fill(missing, T), T)().generated_y_t
+    chain = sample(as_turing_model(model, y, T), Prior(), 40; progress = false)
+    fc = forecast(model, y, chain, h)
+    # The horizon points are predicted and integer-valued counts.
+    @test size(fc, 1) == 40
+    fut = vec(fc[@varname(y_t[T + 1])])
+    @test length(fut) == 40
+    @test all(x -> x isa Integer && x ≥ 0, fut)
+    @test vec(fc[@varname(y_t[T + h])]) |> length == 40
+    # The extended latent path continues the fitted trajectory rather than
+    # overwriting it: in-sample Zₜ is unchanged and the path reaches T + h.
+    gens_fit = vec(returned(as_turing_model(model, y, T), chain))
+    gens_fc = vec(returned(as_turing_model(model, vcat(y, fill(missing, h)),
+            T + h), fc))
+    @test length(gens_fc[1].Z_t) == T + h
+    @test all(d -> isapprox(gens_fit[d].Z_t, gens_fc[d].Z_t[1:T]; atol = 1e-8),
+        1:10)
+end
+
+@testitem "forecast refuses a correlated (non-iid) latent stream" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random, LinearAlgebra
+    Random.seed!(104)
+    # A deliberately correlated latent: its stored stream is a smooth MvNormal,
+    # so it does NOT factorise across time. Independent-tail extension would be
+    # statistically wrong, and forecast must refuse rather than mis-forecast.
+    struct CorrLatent <: AbstractPriorModel end
+    @model function ComposableTuringIDModels.as_turing_model(::CorrLatent, n)
+        Σ = [exp(-abs(i - j) / 5) for i in 1:n, j in 1:n] + 1.0e-6 * I
+        z ~ MvNormal(zeros(n), Σ)
+        return z
+    end
+    model = IDModel(
+        DirectInfections(; Z = CorrLatent(), initialisation = Normal()),
+        PoissonError())
+    T, h = 15, 5
+    y = as_turing_model(model, fill(missing, T), T)().generated_y_t
+    chain = sample(as_turing_model(model, y, T), Prior(), 30; progress = false)
+    @test_throws ErrorException forecast(model, y, chain, h)
+end
+
+@testitem "forecast works through an IDProblem and an AR latent" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(102)
+    problem = IDProblem(
+        infection = DirectInfections(; Z = AR(), initialisation = Normal()),
+        observation_model = PoissonError(),
+        tspan = (1, 18))
+    T, h = 18, 5
+    y = as_turing_model(problem, (; y_t = missing))().generated_y_t
+    chain = sample(as_turing_model(problem, (; y_t = y)), Prior(), 30;
+        progress = false)
+    fc = forecast(problem, y, chain, h)
+    @test size(fc, 1) == 30
+    @test length(vec(fc[@varname(y_t[T + h])])) == 30
+end
+
+@testitem "forecast extends a renewal with an inferred generation interval" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(103)
+    # An INFERRED generation interval (its distribution parameters carry priors)
+    # must not break forecasting: the interval's only RV is the fixed-length
+    # parameter draw `θ`, not a per-time stream, so the non-centred horizon
+    # extension leaves it untouched.
+    gen = UncertainDelay(LogNormal,
+        [Normal(1.9, 0.2), truncated(Normal(0.5, 0.2), 0, Inf)]; D = 10.0)
+    model = IDModel(
+        Renewal(; generation_time = gen, rt = RandomWalk(),
+            initialisation = Normal()),
+        PoissonError())
+    T, h = 18, 5
+    y = as_turing_model(model, fill(missing, T), T)().generated_y_t
+    chain = sample(as_turing_model(model, y, T), Prior(), 30; progress = false)
+    fc = forecast(model, y, chain, h)
+    @test size(fc, 1) == 30
+    @test length(vec(fc[@varname(y_t[T + h])])) == 30
+    @test all(x -> x isa Integer && x ≥ 0, vec(fc[@varname(y_t[T + 1])]))
+end
+
 @testitem "generated_observables leaves non-chain solutions missing" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(76)
     m = as_turing_model(
         IDModel(
-            DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+            DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
             PoissonError()), missing, 10)
     # A solution `returned` cannot consume (here a bare marker) has no generated
     # quantities, so the field stays `missing`.
