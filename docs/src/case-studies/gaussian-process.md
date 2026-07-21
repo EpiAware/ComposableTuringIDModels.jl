@@ -106,8 +106,8 @@ si = Gamma(6.5, 0.62)
 obs = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1))
 n = 70
 
-truth = IDModel(Renewal(gen_distribution = si; rt = ExactGP(),
-        initialisation_prior = Normal(log(2.0), 0.1)), obs)
+truth = IDModel(Renewal(; generation_time = si, rt = ExactGP(),
+        initialisation = Normal(log(2.0), 0.1)), obs)
 Random.seed!(10)
 sim = fix(as_turing_model(truth, fill(missing, n), n), (ℓ = 0.55, σ = 0.55))()
 y_obs = sim.generated_y_t
@@ -132,8 +132,8 @@ using Turing, Mooncake, Statistics
 using ADTypes: AutoMooncake
 
 function fit_gp(latent)
-    model = IDModel(Renewal(gen_distribution = si; rt = latent,
-            initialisation_prior = Normal(log(2.0), 0.1)), obs)
+    model = IDModel(Renewal(; generation_time = si, rt = latent,
+            initialisation = Normal(log(2.0), 0.1)), obs)
     posterior = as_turing_model(model, y_obs, n)
     time = @elapsed chain = sample(posterior,
         NUTS(0.9; adtype = AutoMooncake(; config = nothing)), 300;
