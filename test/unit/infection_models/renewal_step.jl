@@ -128,7 +128,7 @@ end
     gen_int = [0.2, 0.3, 0.5]
     model = IDModel(
         Renewal(gen_int, SusceptibleDepletion(1000.0);
-            rt = RandomWalk(), initialisation_prior = Normal()),
+            rt = RandomWalk(), initialisation = Normal()),
         PoissonError())
     y = as_turing_model(model, missing, 20)().generated_y_t
     # A few NUTS steps exercise the composed-step gradient path (ForwardDiff).

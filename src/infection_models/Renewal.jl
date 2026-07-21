@@ -92,7 +92,7 @@ rand(as_turing_model(renewal, 20))
 
 # With a fixed population and susceptible depletion.
 depleting = Renewal([0.2, 0.3, 0.5], SusceptibleDepletion(1000.0);
-    rt = RandomWalk(), initialisation_prior = Normal())
+    rt = RandomWalk(), initialisation = Normal())
 rand(as_turing_model(depleting, 20))
 ```
 "
@@ -115,6 +115,22 @@ function Renewal(; generation_time, rt = RandomWalk(),
         D_gen = nothing, Δd = 1.0)
     gen_int, recurrent_step = _renewal_fields(
         generation_time; D_gen = D_gen, Δd = Δd)
+    return Renewal(gen_int, transformation, _path_prior(rt), initialisation,
+        recurrent_step)
+end
+
+# Positional modifier constructor: a discrete generation interval (a non-negative
+# pmf that sums to 1) with positional [`AbstractRenewalModifier`](@ref)s composed
+# onto the renewal step — e.g.
+# `Renewal([0.2, 0.3, 0.5], SusceptibleDepletion(1000.0); rt = RandomWalk())`.
+function Renewal(gen_int::AbstractVector,
+        modifiers::AbstractRenewalModifier...;
+        rt = RandomWalk(),
+        initialisation = Normal(), transformation::Function = exp)
+    @assert all(gen_int .>= 0) "Generation interval must be non-negative"
+    @assert sum(gen_int)≈1 "Generation interval must sum to 1"
+    core = ConstantRenewalStep(reverse(gen_int))
+    recurrent_step = RenewalStep(core, modifiers)
     return Renewal(gen_int, transformation, _path_prior(rt), initialisation,
         recurrent_step)
 end
