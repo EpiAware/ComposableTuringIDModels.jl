@@ -27,7 +27,7 @@ end
     end
     # A wrapped/combined latent is still a latent (the key compositional contract).
     ar = AR()
-    @test DiffLatentModel(; model = ar, init_priors = [Normal(), Normal()]) isa
+    @test DiffLatentModel(; model = ar, init = [Normal(), Normal()]) isa
           AbstractLatentModel
     @test TransformLatentModel(ar, x -> exp.(x)) isa AbstractLatentModel
     @test PrefixLatentModel(; model = ar, prefix = "P") isa AbstractLatentModel
@@ -43,7 +43,7 @@ end
     using ComposableTuringIDModels, Distributions, OrdinaryDiffEq
     gen_int = [0.2, 0.3, 0.5]
     for m in (DirectInfections(; Z = RandomWalk()), ExpGrowthRate(; rt = RandomWalk()),
-        Renewal(gen_int; rt = RandomWalk()))
+        Renewal(; generation_time = gen_int, rt = RandomWalk()))
         @test m isa AbstractInfectionModel
     end
     # ODE parameter structs play the latent role (they feed an ODEProcess slot).
@@ -94,7 +94,7 @@ end
     # A latent manipulator cannot wrap an observation model (slot is latent;
     # keyword constructor → TypeError).
     @test_throws Union{MethodError, TypeError} DiffLatentModel(; model = obs,
-        init_priors = [Normal(), Normal()])
+        init = [Normal(), Normal()])
     # An observation modifier cannot wrap a latent model (slot is observation;
     # positional constructor → MethodError).
     @test_throws MethodError LatentDelay(latent, [0.5, 0.5])
@@ -107,7 +107,7 @@ end
     @test implements_latent_interface(RandomWalk())
     @test implements_latent_interface(AR(); n = 12)
     @test implements_infection_interface(DirectInfections(; Z = RandomWalk()))
-    @test implements_infection_interface(Renewal(gen_int; rt = RandomWalk()); n = 20)
+    @test implements_infection_interface(Renewal(; generation_time = gen_int, rt = RandomWalk()); n = 20)
     @test implements_observation_interface(PoissonError())
     @test implements_observation_interface(NegativeBinomialError())
     # A model is NOT in a role it does not belong to.
@@ -135,7 +135,7 @@ end
 
     # It slots into an infection model's latent position (the latent is now
     # folded into the infection model) and the composed model runs.
-    infection = DirectInfections(; Z = custom, initialisation_prior = Normal())
+    infection = DirectInfections(; Z = custom, initialisation = Normal())
     model = IDModel(infection, PoissonError())
     @test model isa IDModel
     out = as_turing_model(model, missing, 10)()

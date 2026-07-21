@@ -28,7 +28,7 @@ end
     @test implements_observation_interface(ne)
 
     # Default std prior is positive (a HalfNormal).
-    @test minimum(ne.std_prior) >= 0
+    @test minimum(ne.std) >= 0
 
     Y_t = fill(10.0, 20)
     # Simulate from the prior: continuous (real) observations. Simulating from a
@@ -46,14 +46,14 @@ end
     @test any(k -> occursin("σ", string(k)), keys(draw))
 
     # A custom std prior is honoured.
-    ne2 = NormalError(; std_prior = truncated(Normal(0, 2), 0, Inf))
+    ne2 = NormalError(; std = truncated(Normal(0, 2), 0, Inf))
     @test length(as_turing_model(ne2, missing, fill(5.0, 6))().y_t) == 6
 
     # Expected-mean alignment: conditioning on data with a matching expected
     # series evaluates to that data (the Gaussian likelihood is centred on Y_t).
     μ = 50.0
     obs = μ .+ 0.5 .* randn(200)
-    m = as_turing_model(NormalError(; std_prior = truncated(Normal(0, 1), 0, Inf)),
+    m = as_turing_model(NormalError(; std = truncated(Normal(0, 1), 0, Inf)),
         obs, fill(μ, 200))
     @test m().y_t == obs
 end

@@ -41,6 +41,12 @@ The sampled initial infected proportion is split between the exposed and
 infectious compartments using the constant-incidence equilibrium proportions
 ``\gamma/(\alpha+\gamma)`` and ``\alpha/(\alpha+\gamma)``.
 
+!!! tip \"Declarative alternative\"
+    This model's vector field and Jacobian are hand-coded. To build a new or
+    custom compartmental network without hand-deriving a Jacobian, use
+    [`CatalystODEParams`](@ref): it reads any `Catalyst` reaction network and
+    generates the ODE system and Jacobian symbolically (an opt-in extension).
+
 # Arguments
 
   - `params`: the [`SEIRParams`](@ref) struct.

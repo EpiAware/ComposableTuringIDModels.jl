@@ -10,6 +10,43 @@
     @test length(as_turing_model(rec, 5)()) == 5
 end
 
+@testitem "latent modifiers accept a Distribution / IID / process member" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(310)
+    n = 5
+
+    # A modifier consumes its member as a length-`n` path, so a bare `Distribution`
+    # given there is auto-wrapped in an `Intercept` (a constant path, one shared
+    # draw broadcast to length `n`) — use `IID`/a process for a varying member.
+    @test TransformLatentModel(Normal(), x -> exp.(x)).model isa Intercept
+    @test RecordExpectedLatent(Normal()).model isa Intercept
+    @test BroadcastLatentModel(Normal(), 7, RepeatEach()).model isa Intercept
+    @test BroadcastLatentModel(Normal(); period = 7,
+        broadcast_rule = RepeatEach()).model isa Intercept
+    # `PrefixLatentModel` is a transparent naming wrapper (it only renames its
+    # member's variables), so it stores a bare `Distribution` member raw.
+    @test PrefixLatentModel(Normal(), "Test").model isa Distribution
+    @test PrefixLatentModel(; model = Normal(), prefix = "Test").model isa
+          Distribution
+
+    # For a length-n member use IID() (n i.i.d.) or a process; it composes like a
+    # model and produces a length-n path.
+    trans = TransformLatentModel(IID(Normal()), x -> exp.(x))
+    @test length(as_turing_model(trans, n)()) == n
+    rec = RecordExpectedLatent(IID(Normal()))
+    @test length(as_turing_model(rec, n)()) == n
+    bcast = BroadcastLatentModel(IID(Normal()), 7, RepeatEach())
+    @test length(as_turing_model(bcast, 10)()) == 10
+
+    # A vector of `Distribution`s is stored as the raw vector.
+    vec_member = TransformLatentModel([Normal(), Normal()], identity)
+    @test vec_member.model isa AbstractVector{<:Distribution}
+
+    # A richer prior model is stored unchanged (no double-wrapping).
+    proc = TransformLatentModel(RandomWalk(), identity)
+    @test proc.model isa RandomWalk
+end
+
 @testitem "PrefixLatentModel prefixes inner variable names" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(32)

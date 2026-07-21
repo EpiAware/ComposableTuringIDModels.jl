@@ -20,7 +20,7 @@ an inference `method`.
 ```@example apply_method
 using ComposableTuringIDModels, Distributions
 problem = IDProblem(
-    infection = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+    infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
     observation_model = PoissonError(),
     tspan = (1, 20))
 y = rand(as_turing_model(problem, (; y_t = missing)))

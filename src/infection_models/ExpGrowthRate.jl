@@ -14,9 +14,9 @@ r_t \sim \text{latent}, \qquad I_t = g\!\left(\hat I_0 + \sum_{s \le t} r_s\righ
 
 where the latent model `rt` supplies the (log) growth rates ``r_s``, ``g`` is
 `transformation`, and the unconstrained initial infections ``\hat I_0`` come from
-`initialisation_prior`. The growth-rate process is generated *inside* the model,
-so `as_turing_model` takes only the series length `n` and returns the named tuple
-`(; I_t, Z_t)` with `Z_t` the growth-rate path.
+the prior in `initialisation`. The growth-rate process is generated *inside* the
+model, so `as_turing_model` takes only the series length `n` and returns the
+named tuple `(; I_t, Z_t)` with `Z_t` the growth-rate path.
 
 This model carries no generation interval — it never uses one — so it takes a
 `transformation` directly ([`Renewal`](@ref) is the only infection model that
@@ -25,32 +25,40 @@ carries a generation interval).
 ## Fields
 
   - `rt`: the latent process model (an [`AbstractLatentModel`](@ref)) generating
-    the growth-rate path.
+    the growth-rate path. A length-`n` PATH slot: a bare `Distribution` here is
+    auto-wrapped in an [`Intercept`](@ref), giving a constant path (one shared
+    draw broadcast to length `n`); use [`IID`](@ref) for `n` independent draws.
   - `transformation`: the link mapping the unconstrained cumulative sum to
     non-negative infections (default: numerically equivalent to `exp`,
     implemented via `LogExpFunctions.xexpy` for numerical stability).
-  - `initialisation_prior`: prior for the unconstrained initial infections.
+  - `initialisation`: prior for the unconstrained initial infections (a
+    `Distribution` or prior model, sampled through [`as_turing_submodel`](@ref)).
 
 # Examples
 ```@example ExpGrowthRate
 using ComposableTuringIDModels, Distributions
-egr = ExpGrowthRate(; rt = RandomWalk(), initialisation_prior = Normal())
+egr = ExpGrowthRate(; rt = RandomWalk(), initialisation = Normal())
 rand(as_turing_model(egr, 10))
 ```
 "
-@kwdef struct ExpGrowthRate{L <: AbstractLatentModel, F <: Function, S <: Sampleable} <:
-              AbstractInfectionModel
+struct ExpGrowthRate{L <: PriorLike, F <: Function, S <: PriorLike} <:
+       AbstractInfectionModel
     "Latent process model generating the growth-rate path."
-    rt::L = RandomWalk()
+    rt::L
     "Link mapping the unconstrained cumulative sum to non-negative infections."
-    transformation::F = _oneexpy
+    transformation::F
     "Prior for the unconstrained initial infections."
-    initialisation_prior::S = Normal()
+    initialisation::S
+end
+
+function ExpGrowthRate(; rt = RandomWalk(),
+        transformation::Function = _oneexpy, initialisation = Normal())
+    return ExpGrowthRate(_path_prior(rt), transformation, initialisation)
 end
 
 @model function as_turing_model(model::ExpGrowthRate, n)
-    Z_t ~ to_submodel(as_turing_model(model.rt, n), false)
-    init_incidence ~ model.initialisation_prior
-    I_t = model.transformation.(init_incidence .+ cumsum(Z_t))
+    Z_t ~ as_turing_submodel(model.rt, n)
+    init_incidence ~ as_turing_submodel(model.initialisation, 1; prefix = true)
+    I_t = model.transformation.(only(init_incidence) .+ cumsum(Z_t))
     return (; I_t, Z_t)
 end
