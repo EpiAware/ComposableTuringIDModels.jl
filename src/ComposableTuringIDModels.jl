@@ -29,11 +29,7 @@ module ComposableTuringIDModels
 
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
                   returned
-<<<<<<< ours
-using Turing: Turing, filldist, sample, MCMCSerial, predict
-=======
 using Turing: Turing, filldist, arraydist, sample, MCMCSerial, predict
->>>>>>> theirs
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
 using LinearAlgebra: dot

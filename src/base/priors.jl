@@ -83,7 +83,6 @@ as_turing_submodel(d::Distribution, ::Int; prefix::Bool = false) = d
 function as_turing_submodel(
         v::AbstractVector{<:Distribution}, n::Int; prefix::Bool = false)
     @assert length(v)==n "a length-$(length(v)) prior vector cannot produce a length-$n prior"
-<<<<<<< ours
     # `filldist` for a homogeneous vector, `product_distribution` otherwise.
     # `product_distribution` (not DynamicPPL's `arraydist`, which routes a
     # vector of univariates through the deprecated `Distributions.Product`
@@ -92,10 +91,6 @@ function as_turing_submodel(
     # (`EnzymeNoShadowError`), while `product_distribution` builds the identical
     # `Product` without it. See #97.
     return all(first(v) .== v) ? filldist(first(v), n) : product_distribution(v)
-=======
-    # `filldist` for a homogeneous vector, `arraydist` otherwise.
-    return all(first(v) .== v) ? filldist(first(v), n) : arraydist(v)
->>>>>>> theirs
 end
 
 # A bare `Distribution` in a length-`n` PATH slot (an innovation or a latent
@@ -157,15 +152,9 @@ Sample a vector of prior `Distribution`s as a length-`n` prior submodel, one
 independent draw per element.
 
 The length is fixed by the vector, so `n` must match it. A homogeneous vector uses
-<<<<<<< ours
 `filldist` and a heterogeneous one `product_distribution`. This is the explicit
 way a prior slot asks for `n` independent draws with per-element priors (e.g. an
 `AR`'s per-lag damping coefficients).
-=======
-`filldist` and a heterogeneous one `arraydist`. This is the explicit way a prior
-slot asks for `n` independent draws with per-element priors (e.g. an `AR`'s
-per-lag damping coefficients).
->>>>>>> theirs
 
 # Arguments
 
@@ -180,19 +169,12 @@ as_turing_model([Normal(0, 1), Normal(5, 0.1)], 2)()
 "
 @model function as_turing_model(prior::AbstractVector{<:Distribution}, n::Int)
     @assert length(prior)==n "a length-$(length(prior)) prior vector cannot produce a length-$n prior"
-<<<<<<< ours
     # One i.i.d. draw per element; `filldist` for a homogeneous vector,
     # `product_distribution` otherwise (not `arraydist`, whose deprecated
     # `Distributions.Product` path breaks Enzyme reverse — see the note in
     # `as_turing_submodel`'s vector method and #97).
     product_dist = all(first(prior) .== prior) ? filldist(first(prior), n) :
                    product_distribution(prior)
-=======
-    # One i.i.d. draw per element; `filldist` for a homogeneous vector, `arraydist`
-    # otherwise.
-    product_dist = all(first(prior) .== prior) ? filldist(first(prior), n) :
-                   arraydist(prior)
->>>>>>> theirs
     θ ~ product_dist
     return θ
 end

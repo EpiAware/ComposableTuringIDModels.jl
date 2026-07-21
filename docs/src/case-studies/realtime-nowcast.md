@@ -118,13 +118,6 @@ Plotting it with [AlgebraOfGraphics](https://aog.makie.org), the not-yet-reporte
 cells blanked, shows the staircase of missing counts in the recent corner.
 
 ```@example nowcast
-<<<<<<< ours
-naive_model = IDModel(renewal, error)
-naive_post = as_turing_model(naive_model, observed_so_far, n)
-naive_chain = sample(
-    naive_post, NUTS(0.9), MCMCThreads(), 250, 2; progress = false)
-nothing # hide
-=======
 using AlgebraOfGraphics, CairoMakie, DataFrames
 
 tri_df = DataFrame(
@@ -137,21 +130,12 @@ tri_df.shown = ifelse.(tri_df.reported, Float64.(tri_df.count), NaN)
 draw(data(tri_df) *
      mapping(:reference, :delay, :shown => "Reported cases") * visual(Heatmap);
     axis = (xlabel = "Reference day", ylabel = "Reporting delay (days)"))
->>>>>>> theirs
 ```
 
 The same truncation reads as a shortfall in the tail when the observed-so-far
 row-sums are drawn against the eventual totals.
 
 ```@example nowcast
-<<<<<<< ours
-corrected_obs = RightTruncate(error, reporting_delay)
-corrected_model = IDModel(renewal, corrected_obs)
-corrected_post = as_turing_model(corrected_model, observed_so_far, n)
-corrected_chain = sample(
-    corrected_post, NUTS(0.9), MCMCThreads(), 250, 2; progress = false)
-nothing # hide
-=======
 comp_df = DataFrame(
     reference = repeat(1:n, 2),
     count = vcat(eventual, observed_so_far),
@@ -159,7 +143,6 @@ comp_df = DataFrame(
 
 draw(data(comp_df) * mapping(:reference, :count, color = :series) *
      visual(Lines); axis = (xlabel = "Reference day", ylabel = "Cases"))
->>>>>>> theirs
 ```
 
 ## Three fits
@@ -205,21 +188,9 @@ series, what the analyst would eventually see.
 ```@example nowcast
 complete_post = as_turing_model(naive_model, eventual, n)
 complete_chain = sample(
-<<<<<<< ours
-    complete_post, NUTS(0.9), MCMCThreads(), 250, 2; progress = false)
-
-R_complete_recent = recent_Rt(complete_post, complete_chain)
-R_naive_recent = recent_Rt(naive_post, naive_chain)
-R_corrected_recent = recent_Rt(corrected_post, corrected_chain)
-
-(complete = round(R_complete_recent, digits = 2),
-    naive = round(R_naive_recent, digits = 2),
-    corrected = round(R_corrected_recent, digits = 2))
-=======
     complete_post, NUTS(1000, 0.9; adtype = adt), MCMCThreads(), 250, 2;
     progress = false)
 nothing # hide
->>>>>>> theirs
 ```
 
 ## Recent Rt
@@ -344,23 +315,6 @@ axislegend(ax3; position = :lt)
 fig
 ```
 
-<<<<<<< ours
-In the shaded recent window the naive fit (red) dips below the complete-data
-reference (black) — the artefactual late down-turn — while the
-[`RightTruncate`](@ref) correction (green) pulls the recent ``R_t`` back up
-towards the reference, having accounted for the not-yet-reported counts.
-
-## Reading the shared parameters
-
-Wrapping the error model in [`RightTruncate`](@ref) does not touch the renewal
-process, so the corrected fit recovers the *same* shared parameters: the
-autoregressive damping ``\rho`` (`damp_AR`), the innovation scale
-``\sigma`` (`std`), the observation overdispersion
-(`cluster_factor`), and the initial infections (`init_incidence`). Each is
-namespaced by the component slot that samples it, so a prior's inner variables
-never collide across the model.
-
-=======
 In the shaded recent window the naive ``R_t`` (crimson) dips below the
 complete-data reference (black), while the two corrections lift the recent
 ``R_t`` back up off that spurious decline.
@@ -376,7 +330,6 @@ Neither correction touches the renewal process, so both recover the *same* share
 parameters, the autoregressive damping ``\rho`` (`damp_AR[1]`), the innovation
 scale ``\sigma`` (`std`), the observation overdispersion (`cluster_factor`) and
 the initial infections (`init_incidence`).
->>>>>>> theirs
 `sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
 chain that `summarystats` summarises directly, giving point estimates and their
 uncertainty alongside the effective sample size and ``\hat R``.
