@@ -82,8 +82,13 @@ function _models()
 
     # --- the #76 prior interface -----------------------------------------------
     # A *vector* of damping distributions (order 2): one i.i.d. draw per lag
+<<<<<<< HEAD
     # (identical priors, so the `filldist` branch of the seam), threaded as a
     # submodel via `as_turing_submodel`.
+||||||| 25949fc
+=======
+    # through `arraydist`, threaded as a submodel via `as_turing_submodel`.
+>>>>>>> origin/main
     ar_vec = as_turing_model(
         AR(; damp = [truncated(Normal(0, 0.05), 0, 1),
                 truncated(Normal(0, 0.05), 0, 1)],
@@ -389,9 +394,26 @@ Result matrix (28 scenarios × 4 backends), Julia 1.12:
 | Renewal+RightTruncate nowcast posterior               |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior                      |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+LatentDelay posterior                         |      ✓      |      ✓      |    ✓    |   ✓   |
+<<<<<<< HEAD
 | Renewal+UncertainLatentDelay posterior                |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+TimeVaryingLatentDelay posterior              |      ✓      |      ✓      |    ✓    |   ✗   |
 | Renewal+UncertainGenInterval posterior                |      ✓      |      ✓      |    ✓    |   ✓   |
+||||||| 25949fc
+| scenario                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
+|---------------------------------------|:-----------:|:-----------:|:--------:|:------:|
+| RandomWalk latent logjoint            |      ✓      |      ✓      |    ✓    |   ✓   |
+| AR latent logjoint                    |      ✓      |      ✓      |    ✓    |   ✗   |
+| ARIMA latent logjoint                 |      ✓      |      ✓      |    ✓    |   ✗   |
+| DirectInfections+Poisson posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+NegativeBinomial posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+RightTruncate nowcast posterior |    ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+ReportTriangle posterior      |      ✓      |      ✓      |    ✓    |   ✓   |
+| Renewal+Split cascade posterior       |      ✓      |      ✓      |    ✓    |   ✗   |
+=======
+| Renewal+UncertainLatentDelay posterior                |      ✓      |      ✓      |    ✓    |   ✗   |
+| Renewal+TimeVaryingLatentDelay posterior              |      ✓      |      ✓      |    ✓    |   ✗   |
+| Renewal+UncertainGenInterval posterior                |      ✓      |      ✓      |    ✓    |   ✗   |
+>>>>>>> origin/main
 | DirectInfections+Ascertainment day-of-week posterior  |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Aggregate posterior                  |      ✓      |      ✓      |    ✓    |   ✓   |
 | DirectInfections+TransformObservation posterior       |      ✓      |      ✓      |    ✓    |   ✓   |
@@ -400,6 +422,7 @@ Result matrix (28 scenarios × 4 backends), Julia 1.12:
 | Renewal+Split cascade posterior                       |      ✓      |      ✓      |    ✓    |   ✗   |
 
 scenario correctly. Enzyme (configured with `function_annotation = Enzyme.Const`,
+<<<<<<< HEAD
 see [`backends`](@ref)) works on fifteen of the twenty-eight but raises
 `IllegalTypeAnalysisException` / a related type-analysis or shadow error on
 thirteen:
@@ -431,6 +454,40 @@ under Enzyme reverse. Building the identical product with `product_distribution`
 instead (see
 `ComposableTuringIDModels`'s prior seam) removes the deprecation path, and both
 scenarios now differentiate correctly under Enzyme (#97).
+||||||| 25949fc
+ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
+scenario correctly — including both nowcasting models (the `RightTruncate`
+marginal and the `ReportTriangle` joint triangle) and the unified `Split`
+observation composition. Enzyme works on five of the eight once configured with
+`function_annotation = Enzyme.Const` (see [`backends`](@ref)). The two AR-based
+latent log-densities raise `IllegalTypeAnalysisException` inside the
+`accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion, and the
+deeply-nested `Split` composition raises the same exception through its
+per-stream submodel threading — real Enzyme type-analysis limitations, not
+defects in the package (all three sample fine under NUTS with ForwardDiff or
+Mooncake). They are recorded as `@test_broken` for Enzyme below rather than
+hidden.
+=======
+see [`backends`](@ref)) works on sixteen of the twenty-eight but raises
+`IllegalTypeAnalysisException` / a related type-analysis or shadow error on
+twelve:
+
+  - the `AR`-based latent log-densities (`AR`, `ARIMA`, `ARMA`,
+    `CombineLatentModels` (which contains an `AR`), and both prior-interface `AR`
+    scenarios), inside the `accumulate_scan(ARStep(damp_AR), ...)` /
+    `LinearAlgebra.dot` recursion;
+  - `DiffLatentModel(RandomWalk)` (the repeated `cumsum` reconstruction);
+  - `DirectInfections+NormalError` (the Gaussian likelihood loop);
+  - `DirectInfections+Ascertainment day-of-week` — an `EnzymeNoShadowError`
+    through the `PrefixLatentModel`-wrapped day-of-week `BroadcastLatentModel`
+    submodel threading, surfaced by the #76 prefix-on prior collapse;
+  - `Renewal+TimeVaryingLatentDelay` — the process-parameter (time-varying) delay
+    threads a `RandomWalk` submodel through the priors seam per delay parameter,
+    where Enzyme wraps the constant `sdlog` scalar in a `Base.RefValue` its
+    type-analysis cannot resolve against the `_at` accessor; and
+  - the deeply-nested `Renewal+Split` cascade, through its per-stream submodel
+    threading.
+>>>>>>> origin/main
 
 These are real Enzyme type-analysis limitations, not defects in the package (the
 same models sample fine under NUTS with ForwardDiff or Mooncake). They are
@@ -463,6 +520,7 @@ function backend_broken_scenarios()
         # only; ForwardDiff/ReverseDiff/Mooncake differentiate it correctly.
         # Tracked in #97.
         "DirectInfections+Ascertainment day-of-week posterior",
+<<<<<<< HEAD
         # The process-parameter (time-varying) reporting delay collects its
         # per-parameter submodel returns in a `Vector{Any}` and splats a
         # runtime-length generator into the delay constructor; Enzyme boxes the
@@ -472,6 +530,30 @@ function backend_broken_scenarios()
         # uncertain scenarios; Enzyme only, correct under the other three
         # backends. Tracked in #97.
         "Renewal+TimeVaryingLatentDelay posterior"]))
+||||||| 25949fc
+        "AR latent logjoint", "ARIMA latent logjoint",
+        "Renewal+Split cascade posterior"]))
+=======
+        # The process-parameter (time-varying) reporting delay threads a
+        # `RandomWalk` submodel per delay parameter; Enzyme wraps the constant
+        # `sdlog` scalar in a `Base.RefValue` its type-analysis cannot resolve
+        # against `_at` (`MethodError: no method matching _at(::RefValue, ::Int)`).
+        # Enzyme only; ForwardDiff/ReverseDiff/Mooncake differentiate it correctly.
+        # Tracked in #97.
+        "Renewal+TimeVaryingLatentDelay posterior",
+        # An inferred (uncertain) reporting delay draws its distribution
+        # parameters through the prefix-on prior-slot seam
+        # (`as_turing_submodel(delay; prefix = true)`) — the same
+        # `EnzymeNoShadowError` submodel-threading limitation as the day-of-week
+        # ascertainment above. Enzyme only; ForwardDiff/ReverseDiff/Mooncake
+        # differentiate it correctly. Tracked in #97.
+        "Renewal+UncertainLatentDelay posterior",
+        # An inferred (uncertain) generation interval threads its `UncertainDelay`
+        # parameters through the same prefix-on prior-slot seam — the same
+        # `EnzymeNoShadowError` limit. Enzyme only; ForwardDiff/ReverseDiff/
+        # Mooncake differentiate it correctly. Tracked in #97.
+        "Renewal+UncertainGenInterval posterior"]))
+>>>>>>> origin/main
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."
