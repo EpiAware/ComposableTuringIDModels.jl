@@ -469,8 +469,8 @@ function backend_broken_scenarios()
         # against `_at` (`MethodError: no method matching _at(::RefValue, ::Int)`).
         # Enzyme only; ForwardDiff/ReverseDiff/Mooncake differentiate it correctly.
         # Tracked in #97.
-        "Renewal+TimeVaryingLatentDelay posterior",
-        ]))
+        "Renewal+TimeVaryingLatentDelay posterior"
+    ]))
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."
