@@ -128,7 +128,7 @@ nothing # hide
     Reverse-mode **Mooncake-driven NUTS through the ODE solver is not yet
     supported** for the hand-coded *or* the Catalyst model, a pre-existing
     Turing/`SciMLSensitivity` integration gap (tracked in [issue
-    #46](https://github.com/EpiAware/EpiAwarePrototype.jl/issues/46)) rather
+    #46](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/46)) rather
     than anything introduced by Catalyst. We therefore pass `AutoForwardDiff()`
     to NUTS explicitly.
 

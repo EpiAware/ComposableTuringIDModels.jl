@@ -34,6 +34,12 @@ an [`ODEProcess`](@ref).
 \frac{dR}{dt} = \gamma I
 ```
 
+!!! tip \"Declarative alternative\"
+    This model's vector field and Jacobian are hand-coded. To build a new or
+    custom compartmental network without hand-deriving a Jacobian, use
+    [`CatalystODEParams`](@ref): it reads any `Catalyst` reaction network and
+    generates the ODE system and Jacobian symbolically (an opt-in extension).
+
 # Arguments
 
   - `params`: the [`SIRParams`](@ref) struct.
