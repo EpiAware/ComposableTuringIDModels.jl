@@ -55,15 +55,10 @@ function _models()
     rw = as_turing_model(RandomWalk(), n)
     ar = as_turing_model(AR(), n)
     arima = as_turing_model(
-<<<<<<< HEAD
-        DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]), n)
+        DiffLatentModel(; model = AR(), init = [Normal(), Normal()]), n)
     hsgp = as_turing_model(HilbertSpaceGP(; m = 8), n)
     hsgp_matern = as_turing_model(
         HilbertSpaceGP(; m = 8, kernel = Matern52Kernel()), n)
-||||||| 25949fc
-        DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]), n)
-=======
-        DiffLatentModel(; model = AR(), init = [Normal(), Normal()]), n)
     # Moving-average: exercises `accumulate_scan(MAStep(θ), ...)` and its
     # `dot(θ, state)` innovation buffer (the MA counterpart of `AR`).
     ma = as_turing_model(MA(), 8)
@@ -87,7 +82,6 @@ function _models()
     # Sum an `Intercept` and an `AR` over the full length (prefix-separated).
     combine = as_turing_model(
         CombineLatentModels([Intercept(Normal(2, 0.2)), AR()]), 10)
->>>>>>> origin/main
 
     # --- the #76 prior interface -----------------------------------------------
     # A *vector* of damping distributions (order 2): one i.i.d. draw per lag
@@ -247,11 +241,8 @@ function _models()
         ("RandomWalk latent logjoint", rw),
         ("AR latent logjoint", ar),
         ("ARIMA latent logjoint", arima),
-<<<<<<< HEAD
         ("HilbertSpaceGP latent logjoint", hsgp),
         ("HilbertSpaceGP Matern latent logjoint", hsgp_matern),
-||||||| 25949fc
-=======
         ("MA latent logjoint", ma),
         ("HierarchicalNormal latent logjoint", hier),
         ("DiffLatentModel(RandomWalk) latent logjoint", diffrw),
@@ -264,7 +255,6 @@ function _models()
         ("AR vector-prior latent logjoint", ar_vec),
         ("AR latent-model-as-prior latent logjoint", ar_lat),
         # infection posteriors
->>>>>>> origin/main
         ("DirectInfections+Poisson posterior",
             as_turing_model(direct, y_direct, n)),
         ("Renewal+NegativeBinomial posterior",
@@ -364,17 +354,8 @@ function _enzyme()
     # `function_annotation = Enzyme.Const`: the log-density closures carry no
     # derivative data, and without this Enzyme raises `EnzymeMutabilityException`
     # ("argument cannot be proven readonly") on every DynamicPPL log-density.
-<<<<<<< HEAD
-    # With it, seven of the ten scenarios differentiate correctly; the AR-based
-    # two and the `Split` cascade remain genuinely broken (see
-    # `backend_broken_scenarios`).
-||||||| 25949fc
-    # With it, three of the five scenarios differentiate correctly; the AR-based
-    # two remain genuinely broken (see `backend_broken_scenarios`).
-=======
     # With it, most scenarios differentiate correctly; a minority remain
     # genuinely broken (see `backend_broken_scenarios`).
->>>>>>> origin/main
     return ADTypes.AutoEnzyme(;
         mode = Enzyme.set_runtime_activity(Enzyme.Reverse),
         function_annotation = Enzyme.Const)
@@ -389,39 +370,8 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-<<<<<<< HEAD
-Result matrix (10 scenarios × 4 backends), Julia 1.12:
-||||||| 25949fc
-Result matrix (8 scenarios × 4 backends), Julia 1.12:
-=======
 Result matrix (28 scenarios × 4 backends), Julia 1.12:
->>>>>>> origin/main
 
-<<<<<<< HEAD
-| scenario                                | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
-|-----------------------------------------|:-----------:|:-----------:|:--------:|:------:|
-| RandomWalk latent logjoint              |      ✓      |      ✓      |    ✓    |   ✓   |
-| AR latent logjoint                      |      ✓      |      ✓      |    ✓    |   ✗   |
-| ARIMA latent logjoint                   |      ✓      |      ✓      |    ✓    |   ✗   |
-| HilbertSpaceGP latent logjoint          |      ✓      |      ✓      |    ✓    |   ✓   |
-| HilbertSpaceGP Matern latent logjoint   |      ✓      |      ✓      |    ✓    |   ✓   |
-| DirectInfections+Poisson posterior      |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+NegativeBinomial posterior      |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+RightTruncate nowcast posterior |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+ReportTriangle posterior        |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+Split cascade posterior         |      ✓      |      ✓      |    ✓    |   ✗   |
-||||||| 25949fc
-| scenario                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
-|---------------------------------------|:-----------:|:-----------:|:--------:|:------:|
-| RandomWalk latent logjoint            |      ✓      |      ✓      |    ✓    |   ✓   |
-| AR latent logjoint                    |      ✓      |      ✓      |    ✓    |   ✗   |
-| ARIMA latent logjoint                 |      ✓      |      ✓      |    ✓    |   ✗   |
-| DirectInfections+Poisson posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+NegativeBinomial posterior    |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+RightTruncate nowcast posterior |    ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+ReportTriangle posterior      |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+Split cascade posterior       |      ✓      |      ✓      |    ✓    |   ✗   |
-=======
 | scenario                                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
 |-------------------------------------------------------|:-----------:|:-----------:|:--------:|:------:|
 | RandomWalk latent logjoint                            |      ✓      |      ✓      |    ✓    |   ✓   |
@@ -452,38 +402,7 @@ Result matrix (28 scenarios × 4 backends), Julia 1.12:
 | DirectInfections+NormalError posterior                |      ✓      |      ✓      |    ✓    |   ✗   |
 | BinomialError ascertainment posterior                 |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+Split cascade posterior                       |      ✓      |      ✓      |    ✓    |   ✗   |
->>>>>>> origin/main
 
-<<<<<<< HEAD
-ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
-scenario correctly — including both Hilbert-space GP latents, both nowcasting
-models (the `RightTruncate` marginal and the `ReportTriangle` joint triangle),
-and the unified `Split` observation composition. Enzyme works on seven of the
-ten once configured with `function_annotation = Enzyme.Const` (see
-[`backends`](@ref)). The two AR-based latent log-densities raise
-`IllegalTypeAnalysisException` inside the
-`accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion, and the
-deeply-nested `Split` composition raises the same exception through its
-per-stream submodel threading — real Enzyme type-analysis limitations, not
-defects in the package (all three sample fine under NUTS with ForwardDiff or
-Mooncake). They are recorded as `@test_broken` for Enzyme below rather than
-hidden. Both Hilbert-space GP latents (squared exponential and Matérn) are a
-pure basis-weight matrix product with no such recursion, so they differentiate
-cleanly under every backend.
-||||||| 25949fc
-ForwardDiff (the reference), ReverseDiff, and Mooncake differentiate every
-scenario correctly — including both nowcasting models (the `RightTruncate`
-marginal and the `ReportTriangle` joint triangle) and the unified `Split`
-observation composition. Enzyme works on five of the eight once configured with
-`function_annotation = Enzyme.Const` (see [`backends`](@ref)). The two AR-based
-latent log-densities raise `IllegalTypeAnalysisException` inside the
-`accumulate_scan(ARStep(damp_AR), ...)` / `LinearAlgebra.dot` recursion, and the
-deeply-nested `Split` composition raises the same exception through its
-per-stream submodel threading — real Enzyme type-analysis limitations, not
-defects in the package (all three sample fine under NUTS with ForwardDiff or
-Mooncake). They are recorded as `@test_broken` for Enzyme below rather than
-hidden.
-=======
 scenario correctly. Enzyme (configured with `function_annotation = Enzyme.Const`,
 see [`backends`](@ref)) works on sixteen of the twenty-eight but raises
 `IllegalTypeAnalysisException` / a related type-analysis or shadow error on
@@ -510,7 +429,6 @@ same models sample fine under NUTS with ForwardDiff or Mooncake). They are
 recorded as `@test_broken` for Enzyme below rather than hidden. Notably `MA` —
 whose step also uses `dot` — differentiates under Enzyme, so the brokenness is
 specific to these recursions rather than to `dot` in general.
->>>>>>> origin/main
 """
 function backend_broken_scenarios()
     return Dict{String, Set{String}}(
