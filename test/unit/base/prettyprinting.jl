@@ -5,9 +5,9 @@
 @testitem "show renders a composed model as a component tree" begin
     using ComposableTuringIDModels, Distributions
 
-    data = IDData([0.2, 0.3, 0.5], exp)
+    gen_int = [0.2, 0.3, 0.5]
     model = IDModel(
-        Renewal(data; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
     out = sprint(show, MIME"text/plain"(), model)
 
@@ -24,8 +24,24 @@
 
     # The raw parametric type signature must NOT leak into the display.
     @test !occursin("{", out)
-    @test !occursin("BroadcastPrior", out)
     @test !occursin("ConstantRenewalStep", out)
+end
+
+@testitem "show recurses through a vector of component children" begin
+    using ComposableTuringIDModels, Distributions
+
+    # A manipulator holding a vector of latent models exercises the vector branch
+    # of the child collector: each element is indexed and recursed into.
+    model = ConcatLatentModels([Intercept(Normal(2, 0.2)), RandomWalk()])
+    out = sprint(show, MIME"text/plain"(), model)
+    @test occursin("ConcatLatentModels", out)
+    # Each vector element is indexed and recursed into (the models are prefixed).
+    @test occursin("models[1]: PrefixLatentModel", out)
+    @test occursin("models[2]: PrefixLatentModel", out)
+    @test occursin("model: Intercept", out)
+    @test occursin("model: RandomWalk", out)
+    # A raw-distribution prior slot stays a leaf even inside a vector child.
+    @test !occursin("Normal{", out)
 end
 
 @testitem "show recurses through nested observation modifiers" begin
@@ -102,7 +118,7 @@ end
     using ComposableTuringIDModels, Distributions
 
     model = IDModel(
-        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
     # The compact form (used inside arrays / `repr`) is a single clean line with
     # no nested parametric type dump.

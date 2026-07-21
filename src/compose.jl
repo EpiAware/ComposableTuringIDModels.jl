@@ -38,7 +38,7 @@ vector to condition.
 ```@example IDModel
 using ComposableTuringIDModels, Distributions
 model = IDModel(
-    DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+    DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
     PoissonError())
 mdl = as_turing_model(model, missing, 20)
 rand(mdl)
@@ -53,11 +53,10 @@ struct IDModel{I <: AbstractInfectionModel, O <: AbstractObservationModel} <:
 end
 
 @model function as_turing_model(model::IDModel, y_t, n)
-    infections ~ to_submodel(as_turing_model(model.infection_model, n), false)
+    infections ~ as_turing_submodel(model.infection_model, n)
     I_t = infections.I_t
     Z_t = infections.Z_t
-    obs ~ to_submodel(
-        as_turing_model(model.observation_model, y_t, I_t), false)
+    obs ~ as_turing_submodel(model.observation_model, y_t, I_t)
     # Uniform observation contract: sampled series and pre-error expected.
     generated_y_t = obs.y_t
     expected_y_t = obs.expected

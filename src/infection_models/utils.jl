@@ -50,7 +50,7 @@ using ComposableTuringIDModels
 R_to_r(1.5, [0.2, 0.3, 0.5])
 ```
 "
-function R_to_r(R₀, w::Vector{T}; newton_steps = 2, Δd = 1.0) where {T <: AbstractFloat}
+function R_to_r(R₀, w::AbstractVector{T}; newton_steps = 2, Δd = 1.0) where {T <: Real}
     mean_gen_time = dot(w, 1:length(w)) * Δd
     r_approx = (R₀ - 1) / (R₀ * mean_gen_time)
     for _ in 1:newton_steps
@@ -60,15 +60,27 @@ function R_to_r(R₀, w::Vector{T}; newton_steps = 2, Δd = 1.0) where {T <: Abs
     return r_approx
 end
 
+# The fixed generation interval of a `Renewal`, or a clear error when it is
+# inferred: an uncertain interval (a pmf-producing prior model) varies per draw,
+# so there is no single interval for these deterministic summaries to use.
+function _fixed_gen_int(infection::Renewal)
+    infection.gen_int isa AbstractVector && return infection.gen_int
+    throw(ArgumentError(
+        "`R_to_r`/`expected_Rt` need a fixed generation interval, but this " *
+        "`Renewal` has an inferred (uncertain) generation interval that varies " *
+        "per draw. Summarise the sampled interval per posterior draw instead."))
+end
+
 # Only `Renewal` carries a generation interval, so the model-typed method
 # dispatches on it specifically (the other infection models have no `gen_int`).
 function R_to_r(R₀, infection::Renewal; newton_steps = 2, Δd = 1.0)
-    return R_to_r(R₀, infection.data.gen_int; newton_steps = newton_steps, Δd = Δd)
+    return R_to_r(R₀, _fixed_gen_int(infection); newton_steps = newton_steps,
+        Δd = Δd)
 end
 
 @doc raw"
-Expected reproduction number ``R_t`` from an [`IDData`](@ref) generation
-interval and an infection series.
+Expected reproduction number ``R_t`` from a discrete generation interval and an
+infection series.
 
 ```math
 R_t = \frac{I_t}{\sum_{i=1}^{n} I_{t-i} g_i}
@@ -76,22 +88,26 @@ R_t = \frac{I_t}{\sum_{i=1}^{n} I_{t-i} g_i}
 
 # Arguments
 
-  - `data`: the [`IDData`](@ref) holding the generation interval.
+  - `gen_int`: the discrete generation interval weights (or a [`Renewal`](@ref)
+    model, whose generation interval is used).
   - `infections`: the infection series (longer than the generation interval).
 
 # Examples
 ```@example expected_Rt
 using ComposableTuringIDModels
-data = IDData([0.2, 0.3, 0.5], exp)
-expected_Rt(data, [100.0, 200, 300, 400, 500])
+expected_Rt([0.2, 0.3, 0.5], [100.0, 200, 300, 400, 500])
 ```
 "
-function expected_Rt(data::IDData, infections::Vector{<:Real})
-    n = data.len_gen_int
+function expected_Rt(gen_int::AbstractVector, infections::Vector{<:Real})
+    n = length(gen_int)
     @assert n<length(infections) "Infections vector must be longer than the generation interval"
-    denom_Rt = [dot(reverse(data.gen_int), infections[(t - n):(t - 1)])
+    denom_Rt = [dot(reverse(gen_int), infections[(t - n):(t - 1)])
                 for t in (n + 1):length(infections)]
     return infections[(n + 1):end] ./ denom_Rt
+end
+
+function expected_Rt(infection::Renewal, infections::Vector{<:Real})
+    return expected_Rt(_fixed_gen_int(infection), infections)
 end
 
 @doc raw"

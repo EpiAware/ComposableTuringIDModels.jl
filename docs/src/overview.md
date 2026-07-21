@@ -32,6 +32,7 @@ submodel, so the parts nest through the same interface they expose.
 
 The three roles feed one another and plug into that single interface:
 
+```@raw html
 <figure style="margin:1.5rem 0">
 <svg viewBox="0 0 820 445" role="img" aria-labelledby="ovw-t ovw-d" style="width:100%;height:auto;max-width:820px;font-family:system-ui,Segoe UI,Helvetica,Arial,sans-serif">
 <title id="ovw-t">Composable design of ComposableTuringIDModels</title>
@@ -82,6 +83,7 @@ The three roles feed one another and plug into that single interface:
 </svg>
 <figcaption style="font-size:0.85rem;color:#6b6b72;text-align:center;margin-top:0.4rem">The three roles plug into one <code>as_turing_model</code> interface, and any part can be swapped for a compatible one.</figcaption>
 </figure>
+```
 
 ## Swap a part to change an assumption
 
@@ -92,16 +94,16 @@ swapping one struct for another and leaving the rest untouched.
 using ComposableTuringIDModels, Distributions
 
 # One latent process: an ARIMA-style differenced AR.
-latent = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()])
+latent = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
 
 # Fold it into a direct-infections process, then swap only the observation
 # model. Everything else stays the same.
 poisson_model = IDModel(
-    DirectInfections(; Z = latent, initialisation_prior = Normal()),
+    DirectInfections(; Z = latent, initialisation = Normal()),
     PoissonError())
 
 negbin_model = IDModel(
-    DirectInfections(; Z = latent, initialisation_prior = Normal()),
+    DirectInfections(; Z = latent, initialisation = Normal()),
     NegativeBinomialError())
 
 # Each assembly is turned into one Turing model. `missing` data simulates from

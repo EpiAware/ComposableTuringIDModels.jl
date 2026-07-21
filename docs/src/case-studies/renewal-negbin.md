@@ -47,22 +47,26 @@ using ADTypes: AutoMooncake
 Random.seed!(1234)
 
 latent = AR(
-    damp_priors = [truncated(Normal(0.8, 0.05), 0, 1),
+    damp = [truncated(Normal(0.8, 0.05), 0, 1),
         truncated(Normal(0.1, 0.05), 0, 1)],
-    init_priors = [Normal(0.0, 0.2), Normal(0.0, 0.2)],
-    ϵ_t = HierarchicalNormal(std_prior = HalfNormal(0.1)))
+    init = [Normal(0.0, 0.2), Normal(0.0, 0.2)],
+    ϵ_t = HierarchicalNormal(std = HalfNormal(0.1)))
 ```
 
-The infection process needs a discrete generation interval. [`IDData`](@ref)
+The infection process needs a discrete generation interval. [`Renewal`](@ref)
 takes a continuous distribution and discretises it with double interval
 censoring [charniga2024best](@citep), using
 [CensoredDistributions.jl](https://github.com/EpiAware/CensoredDistributions.jl).
 Following [mishra2020derivation](@citet) we use a ``\mathrm{Gamma}(6.5, 0.62)``
-serial interval as a proxy for the generation interval.
+serial interval as a proxy for the generation interval. [`Renewal`](@ref) is the
+only infection model that carries a generation interval, because it is the only
+one that uses one; it couples that interval to the latent ``\log R_t`` process
+(its `rt` slot) and a prior for the initial infections.
 
 ```@example renewal
-data = IDData(gen_distribution = Gamma(6.5, 0.62))
-data.gen_int
+renewal = Renewal(; generation_time = Gamma(6.5, 0.62),
+    rt = latent, initialisation = Normal(log(1.0), 0.1))
+renewal.gen_int
 ```
 
 The stored `gen_int` is a probability vector — the continuous serial interval
@@ -73,17 +77,7 @@ shifts and spreads the mass relative to the underlying ``\mathrm{Gamma}``
 [charniga2024best](@citep).
 
 ```@example renewal
-sum(data.gen_int), length(data.gen_int)
-```
-
-The [`Renewal`](@ref) process couples that generation interval to the latent
-``\log R_t`` process (its `rt` slot) and a prior for the initial infections.
-[`Renewal`](@ref) is the only infection model that carries an [`IDData`](@ref),
-because it is the only one that uses a generation interval.
-
-```@example renewal
-renewal = Renewal(data; rt = latent, initialisation_prior = Normal(log(1.0), 0.1))
-nothing # hide
+sum(renewal.gen_int), length(renewal.gen_int)
 ```
 
 ## The infection process in isolation
@@ -100,8 +94,8 @@ latent draw `Z_t`.
 
 ```@example renewal
 fixed_logR = log(1.4)
-renewal_fixed = Renewal(data;
-    rt = FixedIntercept(fixed_logR), initialisation_prior = Normal())
+renewal_fixed = Renewal(; generation_time = renewal.gen_int,
+    rt = FixedIntercept(fixed_logR), initialisation = Normal())
 demo = fix(as_turing_model(renewal_fixed, 60), (init_incidence = 0.0,))()
 (constant_Rt = round(exp(first(demo.Z_t)), digits = 2),
     grows = demo.I_t[end] > demo.I_t[1])
@@ -120,7 +114,7 @@ placed on the cluster factor ``\sqrt{1/\phi}``, which is roughly the coefficient
 of variation of the observation noise and so easier to reason about a priori.
 
 ```@example renewal
-obs = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1))
+obs = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 nothing # hide
 ```
 
@@ -178,19 +172,20 @@ this package (see [Automatic differentiation backend](@ref ad-backend)).
 posterior = as_turing_model(model, y_obs, n)
 chain = sample(
     posterior, NUTS(0.9; adtype = AutoMooncake(; config = nothing)),
-    MCMCThreads(), 500, 2; progress = false)
+    MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
 
-Sampling returns a chain whose parameters keep their flat component names
-(prefixing is disabled throughout the package). `sample` returns a
+Sampling returns a chain whose parameters are namespaced by the component slot
+that samples them, so a prior's inner variables never collide across the model.
+`sample` returns a
 [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which
 `summarystats` summarises directly — no conversion step — giving point estimates
 *and* their uncertainty alongside the effective sample size and ``\hat{R}``
-convergence diagnostic. The autoregressive damping ``\rho`` (`damp_AR[1]`), the
-innovation scale ``\sigma`` (`std`), and the observation cluster factor
-``\sqrt{1/\phi}`` (`cluster_factor`) are all identified from the observed South
-Korean series:
+convergence diagnostic. The autoregressive damping ``\rho``
+(`damp_AR[1]`), the innovation scale ``\sigma`` (`std`), and the
+observation cluster factor ``\sqrt{1/\phi}`` (`cluster_factor`) are all
+identified from the observed South Korean series:
 
 ```@example renewal
 using MCMCChains
@@ -219,10 +214,10 @@ pairplot(
     PairPlots.Series(prior_chain[pp_keys]; label = "prior"))
 ```
 
-The innovation scale ``\sigma`` (`std`) is sharply updated away from its prior —
-the data are informative about how much ``\log R_t`` wiggles — while the
-autoregressive damping ``\rho`` (`damp_AR`), the cluster factor and the initial
-infections stay closer to their priors on this short window.
+The innovation scale ``\sigma`` (`std`) is sharply updated away from
+its prior — the data are informative about how much ``\log R_t`` wiggles — while
+the autoregressive damping ``\rho`` (`damp_AR`), the cluster factor and the
+initial infections stay closer to their priors on this short window.
 
 ## Posterior trajectories
 
@@ -300,6 +295,43 @@ The posterior-predictive band tracks the observed South Korean series closely,
 and the ``R_t`` path recovers the first-wave turn-over: an early rise well above
 one, a fall through ``R_t = 1`` as the wave peaks, and a decline below one as
 cases drop.
+
+## Forecasting the next weeks
+
+The same fitted model forecasts out of sample in one call. Because the latent
+[`AR`](@ref) process is non-centred, [`forecast`](@ref) carries each posterior draw
+forward — holding the fitted parameters and the in-sample ``\log R_t`` path fixed,
+and continuing the process over the horizon with fresh prior innovations — then
+draws the future reported cases:
+
+```@example renewal
+h = 14
+fc = forecast(model, y_obs, chain, h)
+size(fc)
+```
+
+The returned chain carries the predicted ``y_t`` over ``t = n+1, \dots, n+h``.
+Reducing them to credible bands with the helpers above and plotting against the
+observed series shows the forecast fanning out as the horizon grows:
+
+```@example renewal
+fc_bands = credible_bands(reduce(vcat,
+    (permutedims(vec(fc[@varname(y_t[i])])) for i in (n + 1):(n + h))))
+
+fig_fc = Figure(; size = (760, 360))
+axf = Axis(fig_fc[1, 1]; xlabel = "Day", ylabel = "Reported cases")
+scatter!(axf, 1:n, y_obs; color = :black, markersize = 7, label = "observed")
+ci_ribbon!(axf, (n + 1):(n + h), fc_bands; color = :teal, label = "forecast")
+vlines!(axf, [n + 0.5]; color = :grey, linestyle = :dash)
+axislegend(axf; position = :lt)
+fig_fc
+```
+
+The forecast continues the wave's decline past the fitted window (dashed line),
+its credible interval widening as the autoregressive process reverts towards its
+mean. [`forecast`](@ref) also takes an [`IDProblem`](@ref), and errors rather than
+mis-extrapolating a latent whose stored path is jointly correlated across the
+forecast boundary (e.g. an exact GP).
 
 ## Swap a component
 

@@ -21,5 +21,5 @@ permissions:
 
 jobs:
   cancel-on-close:
-    uses: EpiAware/.github/.github/workflows/cancel-on-close.yml@c758269c3e60b7148e9f15d7f0d493aaa4fb8ffc
+    uses: EpiAware/.github/.github/workflows/cancel-on-close.yml@6fcdcde033ec670ac3832b239427fd2ded591bbc
     secrets: inherit  # pragma: allowlist secret

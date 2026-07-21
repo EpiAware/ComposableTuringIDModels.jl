@@ -24,30 +24,30 @@ rand(as_turing_model(combined, 10))
   - `models`: the vector of latent models (prefix-wrapped where a prefix is set).
   - `prefixes`: the vector of prefixes, one per model.
 "
-struct CombineLatentModels{
-    M <: AbstractVector{<:AbstractLatentModel}, P <: AbstractVector{<:String}} <:
+struct CombineLatentModels{M <: AbstractVector, P <: AbstractVector{<:String}} <:
        AbstractLatentModel
     "A vector of latent models."
     models::M
     "A vector of prefixes for the latent models."
     prefixes::P
 
-    function CombineLatentModels(models::M,
-            prefixes::P) where {
-            M <: AbstractVector{<:AbstractLatentModel},
-            P <: AbstractVector{<:String}}
+    function CombineLatentModels(models::AbstractVector,
+            prefixes::P) where {P <: AbstractVector{<:String}}
         @assert length(models)>1 "At least two models are required"
         @assert length(models)==length(prefixes) "The number of models and prefixes must be equal"
-        prefix_models = [prefixes[i] == "" ? models[i] :
-                         PrefixLatentModel(models[i], prefixes[i])
+        # Each member is a length-`n` PATH slot, so a bare `Distribution` is
+        # wrapped in an `Intercept` (a constant path) before it is namespaced;
+        # then non-empty prefixes get a `PrefixLatentModel` so variables stay
+        # distinct. A process / `IID` / vector member passes through unchanged.
+        prefix_models = [prefixes[i] == "" ? _path_prior(models[i]) :
+                         PrefixLatentModel(_path_prior(models[i]), prefixes[i])
                          for i in eachindex(models)]
-        return new{AbstractVector{<:AbstractLatentModel},
-            AbstractVector{<:String}}(prefix_models, prefixes)
+        return new{AbstractVector, AbstractVector{<:String}}(
+            prefix_models, prefixes)
     end
 end
 
-function CombineLatentModels(models::M) where {
-        M <: AbstractVector{<:AbstractLatentModel}}
+function CombineLatentModels(models::AbstractVector)
     prefixes = "Combine." .* string.(1:length(models))
     return CombineLatentModels(models, prefixes)
 end
@@ -63,7 +63,7 @@ end
     if index > n_models
         return acc_latent
     else
-        latent ~ to_submodel(as_turing_model(models[index], n), false)
+        latent ~ as_turing_submodel(models[index], n)
         updated_latent ~ to_submodel(
             _accumulate_latents(models, index + 1, acc_latent .+ latent, n,
                 n_models), false)

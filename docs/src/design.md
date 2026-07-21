@@ -29,11 +29,11 @@ that contains another component builds the inner model and samples it as a
 submodel:
 
 ```julia
-z ~ to_submodel(as_turing_model(inner_model, n), false)
+z ~ as_turing_submodel(inner_model, n)
 ```
 
-The trailing `false` disables automatic variable prefixing, so parameter names
-stay flat. Because every component speaks the same `as_turing_model` protocol,
+`as_turing_submodel` disables automatic variable prefixing by default, so
+parameter names stay flat (pass `prefix = true` to namespace a slot). Because every component speaks the same `as_turing_model` protocol,
 components nest freely: an [`AR`](@ref) process can carry a
 [`HierarchicalNormal`](@ref) error model, a [`DiffLatentModel`](@ref) can wrap
 that `AR` to produce an ARIMA-style process, and that whole latent process can be
@@ -48,8 +48,8 @@ composer. An infection model takes a latent slot — `Z` for [`DirectInfections`
 process internally before mapping it to infections. So `as_turing_model` for an
 infection model takes only a series length and returns `(; I_t, Z_t)`: the
 infection path and the internal latent draw, kept accessible as a generated
-quantity. Only [`Renewal`](@ref) needs a generation interval, so it alone carries
-an [`IDData`](@ref); the others take a `transformation` directly.
+quantity. Only [`Renewal`](@ref) needs a generation interval, so it alone takes
+one; the others take a `transformation` directly.
 
 ## Swap-in, swap-out
 
@@ -60,16 +60,16 @@ swapping one struct for another, leaving the rest untouched:
 using ComposableTuringIDModels, Distributions
 
 # An ARIMA-style latent process: a differenced AR.
-latent = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()])
+latent = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
 
 # Fold the latent into a direct-infections process, then swap the observation
 # model without touching the rest.
 poisson_model = IDModel(
-    DirectInfections(; Z = latent, initialisation_prior = Normal()),
+    DirectInfections(; Z = latent, initialisation = Normal()),
     PoissonError())
 
 negbin_model = IDModel(
-    DirectInfections(; Z = latent, initialisation_prior = Normal()),
+    DirectInfections(; Z = latent, initialisation = Normal()),
     NegativeBinomialError())
 nothing # hide
 ```

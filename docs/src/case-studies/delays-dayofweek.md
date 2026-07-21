@@ -47,9 +47,9 @@ arma21 = arma(
     init = [Normal(0, 0.2), Normal(0, 0.2)],
     damp = [truncated(Normal(0.1, 0.2), 0, 1), truncated(Normal(0.1, 0.05), 0, 1)],
     θ = [truncated(Normal(0.0, 0.2), -1, 1)],
-    ϵ_t = HierarchicalNormal(std_prior = HalfNormal(0.1)))
+    ϵ_t = HierarchicalNormal(std = HalfNormal(0.1)))
 
-arima211 = DiffLatentModel(; model = arma21, init_priors = [Normal(0.3, 0.3)])
+arima211 = DiffLatentModel(; model = arma21, init = [Normal(0.3, 0.3)])
 nothing # hide
 ```
 
@@ -71,9 +71,8 @@ weekly ``\log R_t`` process built above is folded into the renewal model's `rt`
 slot.
 
 ```@example delays
-data = IDData(gen_distribution = Gamma(1.4, 1 / 0.38))
-renewal = Renewal(data;
-    rt = weekly_latent, initialisation_prior = Normal(log(1.0), 1.0))
+renewal = Renewal(; generation_time = Gamma(1.4, 1 / 0.38),
+    rt = weekly_latent, initialisation = Normal(log(1.0), 1.0))
 nothing # hide
 ```
 
@@ -85,29 +84,37 @@ multiplier, so reporting can be systematically higher or lower on particular
 weekdays.
 
 ```@example delays
-negbin = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1))
+negbin = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 dayofweek_negbin = ascertainment_dayofweek(
-    negbin; latent_model = HierarchicalNormal(std_prior = HalfNormal(1.0)))
+    negbin; latent_model = HierarchicalNormal(std = HalfNormal(1.0)))
 nothing # hide
 ```
 
 [`LatentDelay`](@ref) convolves the expected observations with a delay
 distribution (discretised by double interval censoring). Two layers compose
-sequentially: an incubation period from infection to symptom onset, then a
-reporting delay from onset to report.
+sequentially: a fixed incubation period from infection to symptom onset, then a
+reporting delay from onset to report whose parameters are *inferred*. The
+reporting delay is an [`UncertainDelay`](@ref): its `LogNormal` log-scale mean and
+standard deviation carry priors, so the delay is rediscretised each draw and
+estimated jointly with the reproduction number rather than fixed from external
+data.
 
 ```@example delays
-incubation = LogNormal(1.6, 0.42)   # infection -> symptom onset
-reporting = LogNormal(0.58, 0.47)   # symptom onset -> report
+incubation = LogNormal(1.6, 0.42)   # infection -> symptom onset (fixed)
+reporting = UncertainDelay(         # symptom onset -> report (inferred)
+    LogNormal, [Normal(0.58, 0.3), truncated(Normal(0.47, 0.2), 0, Inf)];
+    D = 8.0)
 
 observation = LatentDelay(LatentDelay(dayofweek_negbin, incubation), reporting)
 nothing # hide
 ```
 
 That single `observation` object now carries, from the inside out: a negative
-binomial link, a day-of-week ascertainment modifier, an incubation-delay
-convolution, and a reporting-delay convolution — assembled entirely by
-composition.
+binomial link, a day-of-week ascertainment modifier, a fixed incubation-delay
+convolution, and an inferred reporting-delay convolution — assembled entirely by
+composition. The reporting-delay parameters flow through the same priors seam as
+every other parameter, so inferring the delay needs no change to the rest of the
+model.
 
 ## The data
 
@@ -147,26 +154,28 @@ parallel with `MCMCThreads()`, which gives a cross-chain ``\hat R``:
 posterior = as_turing_model(problem, (y_t = y_obs,))
 chain = sample(
     posterior, NUTS(0.9; adtype = AutoMooncake(; config = nothing)),
-    MCMCThreads(), 500, 2; progress = false)
+    MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
 
 `sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
 chain, which `summarystats` summarises directly — no conversion step. The
-day-of-week scale (`DayofWeek.std`) and the negative-binomial overdispersion
-(`cluster_factor`) appear alongside the latent-process parameters:
+day-of-week scale (`DayofWeek.std`), the negative-binomial overdispersion
+(`cluster_factor`) and the inferred reporting-delay parameters (`delay.θ`, the
+`LogNormal` log-mean and log-sd) appear alongside the latent-process parameters:
 
 ```@example delays
 using MCMCChains
 summarystats(chain)
 ```
 
-`DayofWeek.std` is the scale of the partially pooled weekday multipliers (its
-own block, prefixed because the ascertainment modifier introduces a named
-sub-process); `cluster_factor` is the negative-binomial overdispersion. The
-day-of-week effect, the two delay kernels, and the weekly reproduction number
-were all estimated jointly — and any of them can be swapped or removed by
-editing one line of the composition above.
+`DayofWeek.std` is the scale of the partially
+pooled weekday multipliers (its own block, namespaced because the ascertainment
+modifier introduces a named sub-process); `cluster_factor` is the
+negative-binomial overdispersion; `delay.θ` are the inferred reporting-delay
+parameters. The day-of-week effect, the reporting delay, and the weekly
+reproduction number were all estimated jointly — and any of them can be swapped,
+fixed, or removed by editing one line of the composition above.
 
 ## Prior versus posterior
 
@@ -180,17 +189,19 @@ shows which parameters the six weeks of Italian data moved.
 using CairoMakie, PairPlots
 
 prior_chain = sample(posterior, Prior(), 1000; progress = false)
-pp_keys = [@varname(damp_AR), @varname(θ), @varname(std),
-    @varname(cluster_factor)]
+pp_keys = [@varname(damp_AR), @varname(θ),
+    @varname(std), @varname(cluster_factor)]
 pairplot(
     PairPlots.Series(chain[pp_keys]; label = "posterior"),
     PairPlots.Series(prior_chain[pp_keys]; label = "prior"))
 ```
 
-The innovation scale ``\sigma`` (`std`) and the negative-binomial overdispersion
-(`cluster_factor`) tighten under the data, while the autoregressive damping
-(`damp_AR`) and moving-average (`θ`) coefficients of the ARIMA process stay close
-to their weakly informative priors.
+The innovation scale ``\sigma`` (`std`)
+and the negative-binomial overdispersion (`cluster_factor`) tighten under the
+data, while the autoregressive damping
+(`damp_AR`) and moving-average
+(`θ`) coefficients of the ARIMA process stay
+close to their weakly informative priors.
 
 ## Posterior trajectories
 
@@ -275,6 +286,26 @@ structural change is again local to the observation model; the infection and
 latent ``R_t`` parts are untouched. We keep the static pattern here — it is
 identifiable from six weeks of data, where a fully time-varying weekday process
 would not be — and flag the richer variant rather than fit it.
+
+The reporting *delay* can drift in the same way, through the same seam. An
+[`UncertainDelay`](@ref) parameter is a prior slot like any other, so replacing
+its constant log-mean prior with a process — a [`RandomWalk`](@ref) — makes the
+delay distribution itself time-varying: it is rediscretised at each time point and
+applied with a per-time convolution, while the log-scale spread keeps a constant
+prior.
+
+```@example delays
+drifting = UncertainDelay(
+    LogNormal, [RandomWalk(), truncated(Normal(0.47, 0.2), 0, Inf)]; D = 8.0)
+tv_observation = LatentDelay(
+    LatentDelay(dayofweek_negbin, incubation), drifting)
+nothing # hide
+```
+
+Nothing else changes: the infection process, the ``R_t`` prior, and the fitting
+code are identical — only which prior fills the delay's log-mean slot. As with the
+weekday profile we flag rather than fit it here, since a delay that drifts day to
+day asks more of six weeks of data than they can answer.
 
 ## References
 

@@ -62,20 +62,20 @@ using ComposableTuringIDModels, Distributions, Random, Turing, Mooncake
 using ADTypes: AutoMooncake
 Random.seed!(1234)
 
-data = IDData(gen_distribution = Gamma(6.5, 0.62))
 latent = AR(
-    damp_priors = [truncated(Normal(0.8, 0.05), 0, 1),
+    damp = [truncated(Normal(0.8, 0.05), 0, 1),
         truncated(Normal(0.1, 0.05), 0, 1)],
-    init_priors = [Normal(0.0, 0.2), Normal(0.0, 0.2)],
-    ϵ_t = HierarchicalNormal(std_prior = HalfNormal(0.1)))
-renewal = Renewal(data; rt = latent, initialisation_prior = Normal(log(100.0), 0.1))
+    init = [Normal(0.0, 0.2), Normal(0.0, 0.2)],
+    ϵ_t = HierarchicalNormal(std = HalfNormal(0.1)))
+renewal = Renewal(; generation_time = Gamma(6.5, 0.62),
+    rt = latent, initialisation = Normal(log(100.0), 0.1))
 
 cases = LatentDelay(
-    Ascertainment(NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
+    Ascertainment(NegativeBinomialError(cluster_factor = HalfNormal(0.1)),
         FixedIntercept(log(0.6))),                     # ~60% case ascertainment
     LogNormal(1.6, 0.5))                                # short infection→report delay
 deaths = LatentDelay(
-    Ascertainment(NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
+    Ascertainment(NegativeBinomialError(cluster_factor = HalfNormal(0.1)),
         Intercept(Normal(log(0.015), 0.25))),          # estimated ~1.5% IFR
     LogNormal(2.8, 0.4))                                # long infection→death delay
 
@@ -111,7 +111,7 @@ ydata = (cases = y.cases, deaths = y.deaths)
 posterior = as_turing_model(model, ydata, n)
 chain = sample(
     posterior, NUTS(0.9; adtype = AutoMooncake(; config = nothing)),
-    MCMCThreads(), 500, 2; progress = false)
+    MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
 
@@ -144,9 +144,9 @@ again by the case-report→death interval and scaled by the fatality fraction.
 ```@example split
 cascade = LatentDelay(                                   # infection→case delay
     Split((
-        cases = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
+        cases = NegativeBinomialError(cluster_factor = HalfNormal(0.1)),
         deaths = LatentDelay(                            # case→death delay
-            Ascertainment(NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
+            Ascertainment(NegativeBinomialError(cluster_factor = HalfNormal(0.1)),
                 FixedIntercept(log(0.02))),
             LogNormal(2.2, 0.3)))),
     LogNormal(1.6, 0.5))
@@ -177,10 +177,10 @@ and its parameters are namespaced by the band name.
 ```@example split
 strata_obs = Split((
     young = LatentDelay(
-        Ascertainment(NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
+        Ascertainment(NegativeBinomialError(cluster_factor = HalfNormal(0.1)),
             FixedIntercept(log(0.7))), LogNormal(1.5, 0.4)),
     old = LatentDelay(
-        Ascertainment(NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1)),
+        Ascertainment(NegativeBinomialError(cluster_factor = HalfNormal(0.1)),
             FixedIntercept(log(0.4))), LogNormal(1.8, 0.4))))
 strata_model = IDModel(renewal, strata_obs)
 strata_sim = as_turing_model(

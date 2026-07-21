@@ -10,7 +10,7 @@ It exists only so that the generic observation-error `as_turing_model` loop —
 which is identical across error families — can be written once and dispatch the
 family-specific pieces ([`observation_error`](@ref) and
 [`generate_observation_error_priors`](@ref)) on the concrete type. It is the
-error sub-role of [`AbstractObservationModel`](@ref); the prototype keeps no
+error sub-role of [`AbstractObservationModel`](@ref); the package keeps no
 deeper hierarchy than this.
 "
 abstract type AbstractObservationErrorModel <: AbstractObservationModel end
@@ -44,7 +44,11 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
 
     pad_Y_t = Y_t .+ 1e-6
     for i in eachindex(Y_t)
-        y_t[i + diff_t] ~ observation_error(obs_model, pad_Y_t[i], priors...)
+        # Read each sampled prior at step `i` via `_at`, so a scalar prior stays
+        # constant while a length-`n` prior (drawn from a process slot) makes the
+        # error parameter time-varying — one loop serves both.
+        y_t[i + diff_t] ~ observation_error(
+            obs_model, pad_Y_t[i], map(p -> _at(p, i), values(priors))...)
     end
     return (; y_t, expected = Y_t)
 end

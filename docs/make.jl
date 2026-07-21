@@ -81,7 +81,7 @@ makedocs(;
     modules = [ComposableTuringIDModels],
     authors = "Sam Abbott and contributors",
     sitename = "ComposableTuringIDModels.jl",
-    # A prototype: keep the build resilient rather than strict. Missing/internal
+    # Keep the build resilient rather than strict. Missing/internal
     # docstrings and "see also" @refs to undocumented helpers warn rather than
     # fail the build.
     warnonly = [:docs_block, :missing_docs, :autodocs_block, :cross_references],
@@ -92,7 +92,7 @@ makedocs(;
         repo = "github.com/EpiAware/ComposableTuringIDModels.jl",
         devbranch = "main",
         devurl = "dev",
-        deploy_url = "composableturingidmodels.epiaware.org"))
+        deploy_url = "https://composableturingidmodels.epiaware.org"))
 
 DocumenterVitepress.deploydocs(;
     repo = "github.com/EpiAware/ComposableTuringIDModels.jl",

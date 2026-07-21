@@ -11,8 +11,11 @@
 # but do not sample it, so they are cheap conformance checks.
 
 @doc raw"
-Check that `model` satisfies the [`AbstractLatentModel`](@ref) interface: it is a
-latent model and `as_turing_model(model, n)` returns a `DynamicPPL.Model`.
+Deprecated alias for [`implements_prior_interface`](@ref).
+
+The latent and prior roles are one ([`AbstractLatentModel`](@ref) `===`
+[`AbstractPriorModel`](@ref)), so this simply forwards to
+[`implements_prior_interface`](@ref).
 
 # Arguments
 
@@ -20,7 +23,8 @@ latent model and `as_turing_model(model, n)` returns a `DynamicPPL.Model`.
 
 # Keyword Arguments
 
-  - `n`: the latent series length used for the construction check (default `10`).
+  - `n`: the prior length used for the construction check (default `10`),
+    forwarded to [`implements_prior_interface`](@ref).
 
 # Examples
 ```@example
@@ -28,18 +32,16 @@ using ComposableTuringIDModels
 implements_latent_interface(RandomWalk())
 ```
 "
-function implements_latent_interface(model; n::Int = 10)
-    model isa AbstractLatentModel || return false
-    return as_turing_model(model, n) isa DynamicPPL.Model
-end
+implements_latent_interface(model; kwargs...) = implements_prior_interface(model; kwargs...)
 
 @doc raw"
 Check that `model` satisfies the [`AbstractPriorModel`](@ref) interface: it is a
 prior model and `as_turing_model(model, n)` returns a `DynamicPPL.Model`.
 
 Every [`AbstractLatentModel`](@ref) is also an `AbstractPriorModel`, so this holds
-for latent models (a latent process used directly as a prior) as well as for the
-[`BroadcastPrior`](@ref) wrapper and any bespoke prior submodel.
+for latent models (a latent process used directly as a prior) as well as for any
+bespoke prior submodel. A bare `Distribution` is not a prior model (it composes
+through [`as_turing_submodel`](@ref) instead), so this returns `false` for one.
 
 # Arguments
 
@@ -51,8 +53,8 @@ for latent models (a latent process used directly as a prior) as well as for the
 
 # Examples
 ```@example
-using ComposableTuringIDModels, Distributions
-implements_prior_interface(BroadcastPrior(Normal()))
+using ComposableTuringIDModels
+implements_prior_interface(RandomWalk())
 ```
 "
 function implements_prior_interface(model; n::Int = 10)
@@ -80,7 +82,7 @@ passes only a series length `n` (no external latent path).
 ```@example
 using ComposableTuringIDModels, Distributions
 implements_infection_interface(
-    DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()))
+    DirectInfections(; Z = RandomWalk(), initialisation = Normal()))
 ```
 "
 function implements_infection_interface(model; n::Int = 10)
