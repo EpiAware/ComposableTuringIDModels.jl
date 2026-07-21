@@ -16,11 +16,7 @@ ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-<<<<<<< HEAD
-||||||| 25949fc
-=======
 LogDensityProblems = "6fdf6af0-433a-55f7-b3ed-c6c6e0b8df7c"
->>>>>>> origin/main
 LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
 MCMCChains = "c7f686f2-ff18-58e9-bc7b-31028e88f75d"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"

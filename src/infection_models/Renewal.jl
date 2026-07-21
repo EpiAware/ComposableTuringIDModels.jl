@@ -41,17 +41,6 @@ S_t = S_{t-1} - I_t.
   - `transformation`: the transformation between the unconstrained and
     constrained domains (default `exp`).
   - `rt`: the latent process model (an [`AbstractLatentModel`](@ref)) generating
-<<<<<<< HEAD
-    the (log) reproduction number.
-  - `initialisation_prior`: prior for the unconstrained initial infections.
-  - `recurrent_step`: the renewal accumulation step, a [`RenewalStep`](@ref)
-    carrying the composed modifiers (none by default).
-||||||| 25949fc
-    the (log) reproduction number.
-  - `initialisation_prior`: prior for the unconstrained initial infections.
-  - `recurrent_step`: the renewal accumulation step (an
-    [`AbstractConstantRenewalStep`](@ref)).
-=======
     the (log) reproduction number. A length-`n` PATH slot: a bare `Distribution`
     here is auto-wrapped in an [`Intercept`](@ref), giving a constant path (one
     shared draw broadcast to length `n`); use [`IID`](@ref) for `n` independent
@@ -61,25 +50,9 @@ S_t = S_{t-1} - I_t.
   - `recurrent_step`: the renewal accumulation step (an
     [`AbstractConstantRenewalStep`](@ref)), or `nothing` when the generation
     interval is inferred and the step is built per draw.
->>>>>>> origin/main
 
 ## Constructor
 
-<<<<<<< HEAD
-  - `Renewal(gen_int, modifiers...; rt, initialisation_prior, transformation)` —
-    from a discrete generation interval vector (must be non-negative and sum to
-    1), with any positional [`AbstractRenewalModifier`](@ref)s composed on top.
-  - `Renewal(; gen_distribution, D_gen = nothing, Δd = 1.0, transformation = exp,
-    rt, initialisation_prior, modifiers = ())` — discretise a continuous
-    generation-interval distribution via double-interval censoring
-    (CensoredDistributions.jl), with an optional tuple of `modifiers`.
-||||||| 25949fc
-  - `Renewal(gen_int; rt, initialisation_prior, transformation)` — from a
-    discrete generation interval vector (must be non-negative and sum to 1).
-  - `Renewal(; gen_distribution, D_gen = nothing, Δd = 1.0, transformation = exp,
-    rt, initialisation_prior)` — discretise a continuous generation-interval
-    distribution via double-interval censoring (CensoredDistributions.jl).
-=======
   - `Renewal(; generation_time, rt, initialisation, transformation = exp,
     D_gen = nothing, Δd = 1.0)` — one keyword constructor that dispatches on
     `generation_time`:
@@ -95,7 +68,6 @@ S_t = S_{t-1} - I_t.
         used as the generation interval). Its fixed horizon keeps the interval
         length constant across draws; the lag-0 bin is dropped and the remainder
         renormalised per draw, exactly as for the fixed distribution.
->>>>>>> origin/main
 
 # Examples
 
@@ -138,65 +110,21 @@ struct Renewal{G, F <: Function, L <: PriorLike, S <: PriorLike, A} <:
     recurrent_step::A
 end
 
-<<<<<<< HEAD
-function Renewal(gen_int::AbstractVector,
-        modifiers::AbstractRenewalModifier...;
-        rt::AbstractLatentModel = RandomWalk(),
-        initialisation_prior = Normal(), transformation::Function = exp)
-    @assert all(gen_int .>= 0) "Generation interval must be non-negative"
-    @assert sum(gen_int)≈1 "Generation interval must sum to 1"
-    core = ConstantRenewalStep(reverse(gen_int))
-    recurrent_step = RenewalStep(core, modifiers)
-    return Renewal(gen_int, transformation, rt, initialisation_prior,
-||||||| 25949fc
-function Renewal(gen_int::AbstractVector; rt::AbstractLatentModel = RandomWalk(),
-        initialisation_prior = Normal(), transformation::Function = exp)
-    @assert all(gen_int .>= 0) "Generation interval must be non-negative"
-    @assert sum(gen_int)≈1 "Generation interval must sum to 1"
-    recurrent_step = ConstantRenewalStep(reverse(gen_int))
-    return Renewal(gen_int, transformation, rt, initialisation_prior,
-=======
 function Renewal(; generation_time, rt = RandomWalk(),
         initialisation = Normal(), transformation::Function = exp,
         D_gen = nothing, Δd = 1.0)
     gen_int, recurrent_step = _renewal_fields(
         generation_time; D_gen = D_gen, Δd = Δd)
     return Renewal(gen_int, transformation, _path_prior(rt), initialisation,
->>>>>>> origin/main
         recurrent_step)
 end
 
-<<<<<<< HEAD
-function Renewal(; gen_distribution::ContinuousDistribution, D_gen = nothing,
-        Δd = 1.0, transformation::Function = exp,
-        rt::AbstractLatentModel = RandomWalk(), initialisation_prior = Normal(),
-        modifiers = ())
-    # Drop the delay-0 bin (a generation interval has no mass at lag 0) and
-    # renormalise, as the original EpiAware did.
-    gen_int = _discretised_pmf(gen_distribution; Δd = Δd, D = D_gen) |>
-              p -> p[2:end] ./ sum(p[2:end])
-    return Renewal(gen_int, modifiers...; rt = rt,
-        initialisation_prior = initialisation_prior,
-        transformation = transformation)
-||||||| 25949fc
-function Renewal(; gen_distribution::ContinuousDistribution, D_gen = nothing,
-        Δd = 1.0, transformation::Function = exp,
-        rt::AbstractLatentModel = RandomWalk(), initialisation_prior = Normal())
-    # Drop the delay-0 bin (a generation interval has no mass at lag 0) and
-    # renormalise, as the original EpiAware did.
-    gen_int = _discretised_pmf(gen_distribution; Δd = Δd, D = D_gen) |>
-              p -> p[2:end] ./ sum(p[2:end])
-    return Renewal(gen_int; rt = rt,
-        initialisation_prior = initialisation_prior,
-        transformation = transformation)
-=======
 # Fixed generation interval (a pmf vector or a continuous distribution): bake the
 # discretised interval and its reversed renewal step at construction, exactly as
 # before.
 function _renewal_fields(generation_time; D_gen = nothing, Δd = 1.0)
     gen_int = _renewal_gen_int(generation_time; D_gen = D_gen, Δd = Δd)
     return gen_int, ConstantRenewalStep(reverse(gen_int))
->>>>>>> origin/main
 end
 
 # Inferred generation interval: hold the pmf-producing prior model and build the
