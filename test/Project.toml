@@ -32,3 +32,4 @@ ComposableTuringIDModels = {path = ".."}
 
 [compat]
 DynamicPPL = "0.42.2"
+TestItems = "1.0.0"
