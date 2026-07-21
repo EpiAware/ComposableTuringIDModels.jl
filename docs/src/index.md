@@ -1,9 +1,5 @@
 # ComposableTuringIDModels
 
-!!! warning "Early development"
-    This package is in early development. Expect rough edges and breaking
-    changes as the design settles.
-
 `ComposableTuringIDModels` builds epidemiological models from small, reusable
 components — infection processes (each owning its own latent process) and
 observation models — and turns each one into a
@@ -21,7 +17,7 @@ using ComposableTuringIDModels, Distributions
 # process (here a random walk in its `Z` slot); the latent is folded in rather
 # than threaded as a separate top-level component.
 model = IDModel(
-    DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+    DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
     PoissonError())
 
 # Build a Turing model; `missing` observations simulate from the prior.

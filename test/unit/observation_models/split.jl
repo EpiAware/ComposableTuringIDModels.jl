@@ -152,7 +152,7 @@ end
     W = reshape([0.7, 0.3, 1.0], 3, 1)          # young, old, and their total
     weighted = Split(PoissonError(), W)
     model = IDModel(
-        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         weighted)
     out = as_turing_model(
         model, (young = missing, old = missing, total = missing), 12)()
@@ -190,7 +190,7 @@ end
             Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.05))),
             truncated(Normal(7.0, 2.0), 0.0, Inf))))
     model = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()), obs)
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()), obs)
 
     sim = as_turing_model(model, missing, n)()
     @test keys(sim.generated_y_t) == (:cases, :deaths)
@@ -222,7 +222,7 @@ end
                 truncated(Normal(5.0, 1.5), 0.0, Inf)))),
         truncated(Normal(3.0, 1.0), 0.0, Inf))
     model = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()), cascade)
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()), cascade)
 
     sim = as_turing_model(model, (cases = missing, deaths = missing), n)()
     @test keys(sim.generated_y_t) == (:cases, :deaths)
@@ -247,7 +247,7 @@ end
             Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.4))),
             truncated(Normal(3.0, 1.0), 0.0, Inf))))
     model = IDModel(
-        Renewal(gen_int; rt = RandomWalk(), initialisation_prior = Normal()), strata)
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()), strata)
 
     sim = as_turing_model(model, (young = missing, old = missing), n)()
     @test keys(sim.generated_y_t) == (:young, :old)

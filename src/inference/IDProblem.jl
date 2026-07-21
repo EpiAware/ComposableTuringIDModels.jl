@@ -17,7 +17,7 @@ over `tspan` and conditions it on `data.y_t`.
 ```@example IDProblem
 using ComposableTuringIDModels, Distributions
 problem = IDProblem(
-    infection = DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+    infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
     observation_model = PoissonError(),
     tspan = (1, 20))
 rand(as_turing_model(problem, (; y_t = missing)))
@@ -42,6 +42,6 @@ end
     y_t = data.y_t
     time_steps = idproblem.tspan[end] - idproblem.tspan[1] + 1
     model = IDModel(idproblem.infection, idproblem.observation_model)
-    out ~ to_submodel(as_turing_model(model, y_t, time_steps), false)
+    out ~ as_turing_submodel(model, y_t, time_steps)
     return out
 end

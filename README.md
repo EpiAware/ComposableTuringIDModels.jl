@@ -12,8 +12,6 @@
 
 *A toolkit for composable probabilistic infectious disease modelling in Julia.*
 
-> This package is in early development. Expect rough edges and breaking changes.
-
 ## Why ComposableTuringIDModels?
 
 - **Composable models**: Assemble a model from interchangeable infection and
@@ -47,8 +45,8 @@ using ComposableTuringIDModels, Distributions, Turing
 # into a direct-infections process, observed with Poisson error.
 model = IDModel(
     DirectInfections(;
-        Z = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()]),
-        initialisation_prior = Normal()),
+        Z = DiffLatentModel(; model = AR(), init = [Normal(), Normal()]),
+        initialisation = Normal()),
     PoissonError())
 
 # Build a Turing model; `missing` observations simulate from the prior.
@@ -83,8 +81,8 @@ the model.
 
 ```julia
 # Same infection process, two observation assumptions.
-latent = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()])
-infections = DirectInfections(; Z = latent, initialisation_prior = Normal())
+latent = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
+infections = DirectInfections(; Z = latent, initialisation = Normal())
 
 poisson_model = IDModel(infections, PoissonError())
 negbin_model = IDModel(infections, NegativeBinomialError())

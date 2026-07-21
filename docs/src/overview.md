@@ -94,16 +94,16 @@ swapping one struct for another and leaving the rest untouched.
 using ComposableTuringIDModels, Distributions
 
 # One latent process: an ARIMA-style differenced AR.
-latent = DiffLatentModel(; model = AR(), init_priors = [Normal(), Normal()])
+latent = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
 
 # Fold it into a direct-infections process, then swap only the observation
 # model. Everything else stays the same.
 poisson_model = IDModel(
-    DirectInfections(; Z = latent, initialisation_prior = Normal()),
+    DirectInfections(; Z = latent, initialisation = Normal()),
     PoissonError())
 
 negbin_model = IDModel(
-    DirectInfections(; Z = latent, initialisation_prior = Normal()),
+    DirectInfections(; Z = latent, initialisation = Normal()),
     NegativeBinomialError())
 
 # Each assembly is turned into one Turing model. `missing` data simulates from
