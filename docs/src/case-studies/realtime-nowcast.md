@@ -52,12 +52,12 @@ using CSV, DataFrames
 Random.seed!(20240625)
 
 latent = AR(
-    damp_priors = [truncated(Normal(0.8, 0.05), 0, 1)],
-    init_priors = [Normal(0.0, 0.25)],
-    ϵ_t = HierarchicalNormal(std_prior = HalfNormal(0.1)))
-renewal = Renewal(gen_distribution = Gamma(1.4, 1 / 0.38);
-    rt = latent, initialisation_prior = Normal(log(1.0), 1.0))
-error = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1))
+    damp = [truncated(Normal(0.8, 0.05), 0, 1)],
+    init = [Normal(0.0, 0.25)],
+    ϵ_t = HierarchicalNormal(std = HalfNormal(0.1)))
+renewal = Renewal(; generation_time = Gamma(1.4, 1 / 0.38),
+    rt = latent, initialisation = Normal(log(1.0), 1.0))
+error = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 nothing # hide
 ```
 
@@ -106,7 +106,7 @@ complete.
 naive_model = IDModel(renewal, error)
 naive_post = as_turing_model(naive_model, observed_so_far, n)
 naive_chain = sample(
-    naive_post, NUTS(0.9), MCMCThreads(), 500, 2; progress = false)
+    naive_post, NUTS(0.9), MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
 
@@ -121,7 +121,7 @@ corrected_obs = RightTruncate(error, reporting_delay)
 corrected_model = IDModel(renewal, corrected_obs)
 corrected_post = as_turing_model(corrected_model, observed_so_far, n)
 corrected_chain = sample(
-    corrected_post, NUTS(0.9), MCMCThreads(), 500, 2; progress = false)
+    corrected_post, NUTS(0.9), MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
 
@@ -149,7 +149,7 @@ end
 
 complete_post = as_turing_model(naive_model, eventual, n)
 complete_chain = sample(
-    complete_post, NUTS(0.9), MCMCThreads(), 500, 2; progress = false)
+    complete_post, NUTS(0.9), MCMCThreads(), 250, 2; progress = false)
 
 R_complete_recent = recent_Rt(complete_post, complete_chain)
 R_naive_recent = recent_Rt(naive_post, naive_chain)
@@ -251,10 +251,11 @@ towards the reference, having accounted for the not-yet-reported counts.
 
 Wrapping the error model in [`RightTruncate`](@ref) does not touch the renewal
 process, so the corrected fit recovers the *same* shared parameters: the
-autoregressive damping ``\rho`` (`damp_AR[1]`), the innovation scale ``\sigma``
-(`std`), the observation overdispersion (`cluster_factor`), and the initial
-infections (`init_incidence`). They keep their flat names (prefixing is disabled
-throughout the package).
+autoregressive damping ``\rho`` (`damp_AR`), the innovation scale
+``\sigma`` (`std`), the observation overdispersion
+(`cluster_factor`), and the initial infections (`init_incidence`). Each is
+namespaced by the component slot that samples it, so a prior's inner variables
+never collide across the model.
 
 `sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
 chain, which `summarystats` summarises directly — no conversion step — giving

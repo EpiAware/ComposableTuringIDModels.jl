@@ -136,7 +136,7 @@ nothing # hide
 posterior = as_turing_model(model, y_obs, n)
 chain = sample(
     posterior, NUTS(0.9; adtype = AutoForwardDiff()),
-    MCMCThreads(), 500, 2; progress = false)
+    MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
 

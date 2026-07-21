@@ -9,14 +9,13 @@ sampling one another as submodels, so a full model is assembled rather than
 hand-written.
 
 This package is **ported and adapted** from the open-source, Apache-2.0 licensed
-`EpiAware` package; see the `NOTICE` file for attribution. It is early-stage
-software under active development; expect breaking changes.
+`EpiAware` package; see the `NOTICE` file for attribution.
 
 # Examples
 ```@example
 using ComposableTuringIDModels, Distributions
 model = IDModel(
-    DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+    DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
     PoissonError())
 rand(as_turing_model(model, missing, 20))
 ```
@@ -25,16 +24,18 @@ module ComposableTuringIDModels
 
 # This package does NOT blanket-reexport Distributions/Turing (as the upstream
 # EpiAware also did not): users `using ComposableTuringIDModels, Distributions, Turing`.
-# Only the names the prototype itself uses or extends are imported below, which
+# Only the names the package itself uses or extends are imported below, which
 # keeps the public surface to the package's own exports.
 
-using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix, returned
-using Turing: Turing, filldist, arraydist, sample, MCMCSerial
+using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
+                  returned
+using Turing: Turing, filldist, arraydist, sample, MCMCSerial, predict
+using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
 using LinearAlgebra: dot
 using LogExpFunctions: softmax, xexpy, log1pexp
 using OrdinaryDiffEq: ODEProblem, ODEFunction, solve, remake, AutoVern7, Rodas5P
-using Random: AbstractRNG, randexp
+using Random: AbstractRNG, randexp, default_rng
 
 # Inference-layer dependencies.
 using ADTypes: ADTypes, AutoForwardDiff
@@ -44,7 +45,7 @@ using MCMCChains: Chains
 using DataFramesMeta: DataFrame, @rename!
 using Tables: rowtable
 
-# Distributions names used (and, for many, extended) by the prototype, imported
+# Distributions names used (and, for many, extended) by the package, imported
 # explicitly (not reexported).
 using Distributions: Distributions, Distribution, Sampleable,
                      ContinuousUnivariateDistribution, ContinuousDistribution,
@@ -59,7 +60,7 @@ export AbstractPriorModel, AbstractLatentModel, AbstractInfectionModel,
        AbstractObservationModel, AbstractObservationErrorModel
 export implements_prior_interface, implements_latent_interface,
        implements_infection_interface, implements_observation_interface
-export BroadcastPrior, as_prior
+export as_turing_submodel
 
 # --- utilities and distributions ---
 # (double-interval censoring is provided by CensoredDistributions.jl, used
@@ -68,14 +69,15 @@ export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial
        NegativeBinomialMeanClust, condition_model
 
 # --- latent models ---
-export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept, FixedIntercept,
+export IID, HierarchicalNormal, RandomWalk, AR, TimeVaryingAR, MA, Intercept,
+       FixedIntercept,
        Null, DiffLatentModel
 
 # --- latent modifiers / manipulators / combinations / broadcasting ---
 export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
        CombineLatentModels, ConcatLatentModels, BroadcastLatentModel,
        RepeatEach, RepeatBlock, broadcast_rule, broadcast_n, broadcast_dayofweek,
-       broadcast_weekly, equal_dimensions, arma, arima
+       broadcast_weekly, equal_dimensions, arma, arima, Hierarchy
 
 # --- infection models ---
 export DirectInfections, ExpGrowthRate, Renewal,
@@ -86,7 +88,8 @@ export SIRParams, SEIRParams, ODEProcess, CatalystODEParams
 
 # --- observation models ---
 export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDelay,
-       observation_error, generate_observation_error_priors, define_y_t
+       UncertainDelay, observation_error, generate_observation_error_priors,
+       define_y_t
 
 # --- observation modifiers / manipulators ---
 export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
@@ -97,12 +100,12 @@ export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
 export Split, StrataMap
 
 # --- composition ---
-export IDModel
+export IDModel, GroupedIDModel
 
 # --- inference orchestration ---
 export IDProblem, NUTSampler, DirectSample,
        apply_method, IDObservables, generated_observables,
-       spread_draws, get_param_array
+       spread_draws, get_param_array, forecast
 
 # --- core architecture ---
 include("base/base.jl")
@@ -120,8 +123,10 @@ include("steps/AbstractAccumulationStep.jl")
 include("steps/accumulate_scan.jl")
 include("steps/RWStep.jl")
 include("steps/ARStep.jl")
+include("steps/TVARStep.jl")
 include("steps/MAStep.jl")
 include("steps/LDStep.jl")
+include("steps/TimeVaryingLDStep.jl")
 include("steps/RenewalSteps.jl")
 include("steps/ComposedRenewalStep.jl")
 
@@ -134,11 +139,11 @@ include("utils/censored_pmf.jl")
 include("utils/turing-methods.jl")
 
 # --- latent models ---
-include("latent_models/utils.jl")
 include("latent_models/models/IID.jl")
 include("latent_models/models/HierarchicalNormal.jl")
 include("latent_models/models/RandomWalk.jl")
 include("latent_models/models/AR.jl")
+include("latent_models/models/TimeVaryingAR.jl")
 include("latent_models/models/MA.jl")
 include("latent_models/models/Intercept.jl")
 include("latent_models/models/Null.jl")
@@ -148,6 +153,7 @@ include("latent_models/modifiers/PrefixLatentModel.jl")
 include("latent_models/modifiers/RecordExpectedLatent.jl")
 include("latent_models/manipulators/CombineLatentModels.jl")
 include("latent_models/manipulators/ConcatLatentModels.jl")
+include("latent_models/manipulators/Hierarchy.jl")
 include("latent_models/manipulators/broadcast/LatentModel.jl")
 include("latent_models/manipulators/broadcast/rules.jl")
 include("latent_models/manipulators/broadcast/helpers.jl")
@@ -186,6 +192,7 @@ include("observation_models/Split.jl")
 
 # --- composition ---
 include("compose.jl")
+include("grouped.jl")
 
 # --- inference orchestration ---
 include("inference/types.jl")
@@ -196,5 +203,6 @@ include("inference/NUTSampler.jl")
 include("inference/DirectSample.jl")
 include("inference/get_param_array.jl")
 include("inference/post-inference.jl")
+include("inference/forecast.jl")
 
 end

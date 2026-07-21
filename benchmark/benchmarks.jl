@@ -36,10 +36,10 @@ const N = 30
 # models are conditioned on data simulated from the prior with a fixed seed.
 function _eval_models()
     direct = IDModel(
-        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
     renewal = IDModel(
-        Renewal(GEN_INT; rt = RandomWalk(), initialisation_prior = Normal()),
+        Renewal(; generation_time = GEN_INT, rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
     y_direct = as_turing_model(direct, missing, N)().generated_y_t
     y_renewal = as_turing_model(renewal, missing, N)().generated_y_t
@@ -67,7 +67,7 @@ end
 
 let samp_grp = SUITE["Sampling"] = BenchmarkGroup()
     model = IDModel(
-        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
     y = as_turing_model(model, missing, N)().generated_y_t
     cond = as_turing_model(model, y, N)
@@ -104,7 +104,7 @@ const _AD_BACKENDS = [
 # (scenario name, model, is_AR_based?)
 function _ad_scenarios()
     direct = IDModel(
-        DirectInfections(; Z = RandomWalk(), initialisation_prior = Normal()),
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
     y = as_turing_model(direct, missing, N)().generated_y_t
     return [
