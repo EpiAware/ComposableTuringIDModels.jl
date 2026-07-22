@@ -85,7 +85,8 @@ function _models()
 
     # --- the #76 prior interface -----------------------------------------------
     # A *vector* of damping distributions (order 2): one i.i.d. draw per lag
-    # through `arraydist`, threaded as a submodel via `as_turing_submodel`.
+    # (identical priors, so the `filldist` branch of the seam), threaded as a
+    # submodel via `as_turing_submodel`.
     ar_vec = as_turing_model(
         AR(; damp = [truncated(Normal(0, 0.05), 0, 1),
                 truncated(Normal(0, 0.05), 0, 1)],
@@ -393,9 +394,9 @@ Result matrix (28 scenarios × 4 backends), Julia 1.12:
 | Renewal+RightTruncate nowcast posterior               |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior                      |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+LatentDelay posterior                         |      ✓      |      ✓      |    ✓    |   ✓   |
-| Renewal+UncertainLatentDelay posterior                |      ✓      |      ✓      |    ✓    |   ✗   |
+| Renewal+UncertainLatentDelay posterior                |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+TimeVaryingLatentDelay posterior              |      ✓      |      ✓      |    ✓    |   ✗   |
-| Renewal+UncertainGenInterval posterior                |      ✓      |      ✓      |    ✓    |   ✗   |
+| Renewal+UncertainGenInterval posterior                |      ✓      |      ✓      |    ✓    |   ✓   |
 | DirectInfections+Ascertainment day-of-week posterior  |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Aggregate posterior                  |      ✓      |      ✓      |    ✓    |   ✓   |
 | DirectInfections+TransformObservation posterior       |      ✓      |      ✓      |    ✓    |   ✓   |
@@ -404,9 +405,9 @@ Result matrix (28 scenarios × 4 backends), Julia 1.12:
 | Renewal+Split cascade posterior                       |      ✓      |      ✓      |    ✓    |   ✗   |
 
 scenario correctly. Enzyme (configured with `function_annotation = Enzyme.Const`,
-see [`backends`](@ref)) works on sixteen of the twenty-eight but raises
+see [`backends`](@ref)) works on fifteen of the twenty-eight but raises
 `IllegalTypeAnalysisException` / a related type-analysis or shadow error on
-twelve:
+thirteen:
 
   - the `AR`-based latent log-densities (`AR`, `ARIMA`, `ARMA`,
     `CombineLatentModels` (which contains an `AR`), and both prior-interface `AR`
@@ -416,13 +417,25 @@ twelve:
   - `DirectInfections+NormalError` (the Gaussian likelihood loop);
   - `DirectInfections+Ascertainment day-of-week` — an `EnzymeNoShadowError`
     through the `PrefixLatentModel`-wrapped day-of-week `BroadcastLatentModel`
-    submodel threading, surfaced by the #76 prefix-on prior collapse;
+    submodel threading;
   - `Renewal+TimeVaryingLatentDelay` — the process-parameter (time-varying) delay
-    threads a `RandomWalk` submodel through the priors seam per delay parameter,
-    where Enzyme wraps the constant `sdlog` scalar in a `Base.RefValue` its
-    type-analysis cannot resolve against the `_at` accessor; and
+    collects its per-parameter submodel returns in a `Vector{Any}` and splats a
+    runtime-length generator into the delay constructor, so Enzyme boxes the
+    elements in a `Base.RefValue` the `_at` accessor cannot index; and
   - the deeply-nested `Renewal+Split` cascade, through its per-stream submodel
     threading.
+
+The uncertain-delay / uncertain-generation-interval scenarios
+(`Renewal+UncertainLatentDelay`, `Renewal+UncertainGenInterval`) previously
+raised an `EnzymeNoShadowError` here. That was **not** the prefix seam: a
+heterogeneous prior vector (e.g. a `LogNormal` delay's `[meanlog, sdlog]`
+priors) was drawn through DynamicPPL's `arraydist`, which routes a vector of
+univariate distributions through the **deprecated** `Distributions.Product`
+constructor. Its `Base.depwarn`/`invokelatest` world-age machinery has no shadow
+under Enzyme reverse. Building the identical product with `product_distribution`
+instead (see
+`ComposableTuringIDModels`'s prior seam) removes the deprecation path, and both
+scenarios now differentiate correctly under Enzyme (#97).
 
 These are real Enzyme type-analysis limitations, not defects in the package (the
 same models sample fine under NUTS with ForwardDiff or Mooncake). They are
@@ -461,19 +474,8 @@ function backend_broken_scenarios()
         # against `_at` (`MethodError: no method matching _at(::RefValue, ::Int)`).
         # Enzyme only; ForwardDiff/ReverseDiff/Mooncake differentiate it correctly.
         # Tracked in #97.
-        "Renewal+TimeVaryingLatentDelay posterior",
-        # An inferred (uncertain) reporting delay draws its distribution
-        # parameters through the prefix-on prior-slot seam
-        # (`as_turing_submodel(delay; prefix = true)`) — the same
-        # `EnzymeNoShadowError` submodel-threading limitation as the day-of-week
-        # ascertainment above. Enzyme only; ForwardDiff/ReverseDiff/Mooncake
-        # differentiate it correctly. Tracked in #97.
-        "Renewal+UncertainLatentDelay posterior",
-        # An inferred (uncertain) generation interval threads its `UncertainDelay`
-        # parameters through the same prefix-on prior-slot seam — the same
-        # `EnzymeNoShadowError` limit. Enzyme only; ForwardDiff/ReverseDiff/
-        # Mooncake differentiate it correctly. Tracked in #97.
-        "Renewal+UncertainGenInterval posterior"]))
+        "Renewal+TimeVaryingLatentDelay posterior"
+    ]))
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."

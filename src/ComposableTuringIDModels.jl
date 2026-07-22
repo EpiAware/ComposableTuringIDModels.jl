@@ -29,7 +29,7 @@ module ComposableTuringIDModels
 
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
                   returned
-using Turing: Turing, filldist, arraydist, sample, MCMCSerial, predict
+using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
 using LinearAlgebra: dot, cholesky, Symmetric, I
@@ -57,7 +57,8 @@ using Distributions: Distributions, Distribution, Sampleable,
                      ContinuousUnivariateDistribution, ContinuousDistribution,
                      Normal, Poisson, NegativeBinomial, Binomial, Gamma, truncated,
                      cdf, ccdf, logcdf, logccdf, invlogcdf, pdf, logpdf, quantile,
-                     params, mean, var, std, mode, skewness, kurtosis
+                     params, mean, var, std, mode, skewness, kurtosis,
+                     product_distribution
 using Statistics: Statistics
 
 # --- core architecture ---
@@ -90,6 +91,7 @@ export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
 
 # --- infection models ---
 export DirectInfections, ExpGrowthRate, Renewal,
+       RenewalStep, SusceptibleDepletion,
        R_to_r, r_to_R, expected_Rt
 
 # --- ODE compartmental models ---
@@ -137,7 +139,7 @@ include("steps/MAStep.jl")
 include("steps/LDStep.jl")
 include("steps/TimeVaryingLDStep.jl")
 include("steps/RenewalSteps.jl")
-include("steps/ComposedRenewalStep.jl")
+include("steps/RenewalStep.jl")
 
 # --- utilities and distributions ---
 include("utils/HalfNormal.jl")
