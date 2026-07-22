@@ -311,25 +311,64 @@ size(fc)
 ```
 
 The returned chain carries the predicted ``y_t`` over ``t = n+1, \dots, n+h``.
-Reducing them to credible bands with the helpers above and plotting against the
-observed series shows the forecast fanning out as the horizon grows:
+The forecast plot uses a log10 y-axis to show the full dynamic range, draws
+three credible-interval bands — 30%, 60%, and 90% — at increasing transparencies
+so the narrowing toward the median is visible, and overlays 100 random sample
+trajectories from the posterior forecast to give a sense of the individual-path
+variation:
 
 ```@example renewal
+# Multi-level CI band quantiles: 90%, 60%, 30% + median
+FC_CI_QS = [0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95]
+
+# Draw three nested CI ribbons with the median line
+function multi_ci_ribbon!(ax, ts, bands; color, label)
+    keep = findall(!ismissing, view(bands, :, 4))
+    x, b = ts[keep], Float64.(bands[keep, :])
+    # 90% CI (cols 1, 7)
+    band!(ax, x, b[:, 1], b[:, 7]; color = (color, 0.1))
+    # 60% CI (cols 2, 6)
+    band!(ax, x, b[:, 2], b[:, 6]; color = (color, 0.25))
+    # 30% CI (cols 3, 5)
+    band!(ax, x, b[:, 3], b[:, 5]; color = (color, 0.5))
+    # median (col 4)
+    lines!(ax, x, b[:, 4]; color = color, linewidth = 2, label = label)
+end
+
+# Multi-level credible bands for the forecast
 fc_bands = credible_bands(reduce(vcat,
-    (permutedims(vec(fc[@varname(y_t[i])])) for i in (n + 1):(n + h))))
+    (permutedims(vec(fc[@varname(y_t[i])])) for i in (n + 1):(n + h)));
+    qs = FC_CI_QS)
+
+# Sample 100 random forecast trajectories
+n_draws = length(vec(fc[@varname(y_t[n + 1])]))
+ntraj = min(100, n_draws)
+sample_idx = rand(1:n_draws, ntraj)
+trajectories = reduce(hcat,
+    [[vec(fc[@varname(y_t[i])])[idx] for i in (n + 1):(n + h)] for idx in sample_idx])
 
 fig_fc = Figure(; size = (760, 360))
-axf = Axis(fig_fc[1, 1]; xlabel = "Day", ylabel = "Reported cases")
+axf = Axis(fig_fc[1, 1]; xlabel = "Day", ylabel = "Reported cases",
+    yscale = log10)
 scatter!(axf, 1:n, y_obs; color = :black, markersize = 7, label = "observed")
-ci_ribbon!(axf, (n + 1):(n + h), fc_bands; color = :teal, label = "forecast")
+# Faint individual forecast trajectories
+for idx in 1:ntraj
+    lines!(axf, (n + 1):(n + h), max.(trajectories[:, idx], 1);
+        color = (:teal, 0.08), linewidth = 0.5)
+end
+# Multi-level CI bands (offset to keep log10 scale safe at zero)
+multi_ci_ribbon!(axf, (n + 1):(n + h), max.(fc_bands, 1); color = :teal,
+    label = "forecast")
 vlines!(axf, [n + 0.5]; color = :grey, linestyle = :dash)
 axislegend(axf; position = :lt)
 fig_fc
 ```
 
 The forecast continues the wave's decline past the fitted window (dashed line),
-its credible interval widening as the autoregressive process reverts towards its
-mean. [`forecast`](@ref) also takes an [`IDProblem`](@ref), and errors rather than
+with all three credible-interval bands widening as the autoregressive process
+reverts towards its mean. The log scale makes the relative uncertainty —
+widening proportionally, not additively — directly visible, and the individual
+trajectories show the range of paths the process can take under the posterior. [`forecast`](@ref) also takes an [`IDProblem`](@ref), and errors rather than
 mis-extrapolating a latent whose stored path is jointly correlated across the
 forecast boundary (e.g. an exact GP).
 
