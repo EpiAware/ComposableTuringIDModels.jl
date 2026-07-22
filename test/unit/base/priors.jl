@@ -69,7 +69,7 @@ end
     vh = as_turing_model([Normal(), Normal()], 2)()
     @test length(vh) == 2
     @test vh[1] != vh[2]
-    # Heterogeneous vector: arraydist, element i drawn from distribution i.
+    # Heterogeneous vector: product_distribution, element i from distribution i.
     vt = as_turing_model([Normal(0, 1), Normal(5, 0.1)], 2)()
     @test length(vt) == 2
     @test vt[2] > vt[1]                  # second is tight around 5, first around 0

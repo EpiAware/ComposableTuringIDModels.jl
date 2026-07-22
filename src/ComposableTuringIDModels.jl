@@ -29,7 +29,7 @@ module ComposableTuringIDModels
 
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
                   returned
-using Turing: Turing, filldist, arraydist, sample, MCMCSerial, predict
+using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
 using LinearAlgebra: dot
@@ -51,7 +51,8 @@ using Distributions: Distributions, Distribution, Sampleable,
                      ContinuousUnivariateDistribution, ContinuousDistribution,
                      Normal, Poisson, NegativeBinomial, Binomial, Gamma, truncated,
                      cdf, ccdf, logcdf, logccdf, invlogcdf, pdf, logpdf, quantile,
-                     params, mean, var, std, mode, skewness, kurtosis
+                     params, mean, var, std, mode, skewness, kurtosis,
+                     product_distribution
 using Statistics: Statistics
 
 # --- core architecture ---
