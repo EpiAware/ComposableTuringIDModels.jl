@@ -26,6 +26,14 @@ Significant changes have been made, including (but not limited to):
   - The components of the original package are ported and adapted to the new
     `as_turing_model` API. This is an early-stage prototype under active
     development.
+  - Re-architected the deep abstract type hierarchy of infection and
+    observation models into a universal prior and latent model framework,
+    unifying model composition under a single constructor.
+  - Simplified and re-composed the renewal infection model to align with the
+    universal prior and latent model architecture, reducing boilerplate and
+    improving composability.
+
+See the NEWS file for each release for a complete list of additional changes.
 
 This product is licensed under the Apache License, Version 2.0. See the LICENSE
 file for the full terms. As required by the License, modified files carry
