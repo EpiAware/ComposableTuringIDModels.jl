@@ -93,9 +93,6 @@ depleting = Renewal(gen_int, SusceptibleDepletion(1000.0); rt = RandomWalk())
 nothing # hide
 ```
 
-Depletion is not baked into the renewal recurrence: it is a separate modifier
-composed onto the core, so further renewal-family mechanisms can be added the same
-way without rewriting the model.
 
 ## Inference
 
