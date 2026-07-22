@@ -130,7 +130,7 @@ available:
 ```@example sir
 posterior = as_turing_model(model, y_obs, n)
 chain = sample(
-    posterior, NUTS(0.9; adtype = AutoForwardDiff()),
+    posterior, NUTS(0.95; adtype = AutoForwardDiff()),
     MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
@@ -294,7 +294,7 @@ sampler stable through the ODE solve.
 ```@example sir
 stochastic_chain = sample(
     as_turing_model(stochastic_model, y_obs, n),
-    NUTS(0.9; adtype = AutoForwardDiff()),
+    NUTS(0.95; adtype = AutoForwardDiff()),
     MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
