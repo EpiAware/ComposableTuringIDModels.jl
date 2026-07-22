@@ -10,17 +10,18 @@ hand.
 
 ## Getting started
 
+Compose infections → observations. The infection model owns its latent process (here a random walk in its `Z` slot); the latent is folded in rather than threaded as a separate top-level component.
+
 ```@example index
 using ComposableTuringIDModels, Distributions
-
-# Compose infections -> observations. The infection model owns its latent
-# process (here a random walk in its `Z` slot); the latent is folded in rather
-# than threaded as a separate top-level component.
 model = IDModel(
     DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
     PoissonError())
+```
 
-# Build a Turing model; `missing` observations simulate from the prior.
+Build a Turing model; `missing` observations simulate from the prior.
+
+```@example index
 turing_model = as_turing_model(model, missing, 20)
 draw = rand(turing_model)
 nothing # hide

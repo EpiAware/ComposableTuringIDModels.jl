@@ -38,26 +38,34 @@ a single Turing model you can simulate from and fit.
 Each part is itself a model, joined through the generic `as_turing_model`
 constructor.
 
+Compose a model: an ARIMA-style latent process (a differenced AR) folded into a direct-infections process, observed with Poisson error.
+
 ```julia
 using ComposableTuringIDModels, Distributions, Turing
-
-# Compose a model: an ARIMA-style latent process (a differenced AR) folded
-# into a direct-infections process, observed with Poisson error.
 model = IDModel(
     DirectInfections(;
         Z = DiffLatentModel(; model = AR(), init = [Normal(), Normal()]),
         initialisation = Normal()),
     PoissonError())
+```
 
-# Build a Turing model; `missing` observations simulate from the prior.
+Build a Turing model; `missing` observations simulate from the prior.
+
+```julia
 n = 30
 prior_model = as_turing_model(model, missing, n)
+```
 
-# Sample from the prior and inspect the generated quantities.
+Sample from the prior and inspect the generated quantities.
+
+```julia
 draw = rand(prior_model)
 (; generated_y_t, I_t, Z_t) = prior_model()
+```
 
-# Condition on data and run inference.
+Condition on data and run inference.
+
+```julia
 posterior_model = as_turing_model(model, generated_y_t, n)
 chain = sample(posterior_model, NUTS(), 1_000)
 ```
@@ -79,8 +87,9 @@ Replace `PoissonError()` with `NegativeBinomialError()`, wrap the observation in
 a `LatentDelay`, or change the latent process — without touching the rest of
 the model.
 
+Same infection process, two observation assumptions.
+
 ```julia
-# Same infection process, two observation assumptions.
 latent = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
 infections = DirectInfections(; Z = latent, initialisation = Normal())
 
