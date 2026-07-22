@@ -25,6 +25,15 @@ discretised internally (see the constructor), and a pmf-producing prior model
 **inferred** — its distribution's parameters carry priors and the interval is
 rediscretised per draw through the [`as_turing_submodel`](@ref) seam.
 
+`Renewal` is a step-composing helper: positional [`AbstractRenewalModifier`](@ref)
+arguments are composed onto the renewal [`RenewalStep`](@ref). Passing a
+[`SusceptibleDepletion`](@ref)`(N)` gives a renewal process with a fixed
+population ``N`` and susceptible depletion
+```math
+I_t = \frac{S_{t-1}}{N} \mathcal R_t \sum_{i=1}^{n-1} I_{t-i} g_i, \qquad
+S_t = S_{t-1} - I_t.
+```
+
 ## Fields
 
   - `gen_int`: the discrete generation interval vector (non-negative, sums to 1),
@@ -80,6 +89,11 @@ gen = UncertainDelay(
 renewal = Renewal(; generation_time = gen, rt = RandomWalk(),
     initialisation = Normal())
 rand(as_turing_model(renewal, 20))
+
+# With a fixed population and susceptible depletion.
+depleting = Renewal([0.2, 0.3, 0.5], SusceptibleDepletion(1000.0);
+    rt = RandomWalk(), initialisation = Normal())
+rand(as_turing_model(depleting, 20))
 ```
 "
 struct Renewal{G, F <: Function, L <: PriorLike, S <: PriorLike, A} <:
@@ -101,6 +115,22 @@ function Renewal(; generation_time, rt = RandomWalk(),
         D_gen = nothing, Δd = 1.0)
     gen_int, recurrent_step = _renewal_fields(
         generation_time; D_gen = D_gen, Δd = Δd)
+    return Renewal(gen_int, transformation, _path_prior(rt), initialisation,
+        recurrent_step)
+end
+
+# Positional modifier constructor: a discrete generation interval (a non-negative
+# pmf that sums to 1) with positional [`AbstractRenewalModifier`](@ref)s composed
+# onto the renewal step — e.g.
+# `Renewal([0.2, 0.3, 0.5], SusceptibleDepletion(1000.0); rt = RandomWalk())`.
+function Renewal(gen_int::AbstractVector,
+        modifiers::AbstractRenewalModifier...;
+        rt = RandomWalk(),
+        initialisation = Normal(), transformation::Function = exp)
+    @assert all(gen_int .>= 0) "Generation interval must be non-negative"
+    @assert sum(gen_int)≈1 "Generation interval must sum to 1"
+    core = ConstantRenewalStep(reverse(gen_int))
+    recurrent_step = RenewalStep(core, modifiers)
     return Renewal(gen_int, transformation, _path_prior(rt), initialisation,
         recurrent_step)
 end
