@@ -56,6 +56,9 @@ function _models()
     ar = as_turing_model(AR(), n)
     arima = as_turing_model(
         DiffLatentModel(; model = AR(), init = [Normal(), Normal()]), n)
+    hsgp = as_turing_model(HilbertSpaceGP(; m = 8), n)
+    hsgp_matern = as_turing_model(
+        HilbertSpaceGP(; m = 8, kernel = Matern52Kernel()), n)
     # Moving-average: exercises `accumulate_scan(MAStep(θ), ...)` and its
     # `dot(θ, state)` innovation buffer (the MA counterpart of `AR`).
     ma = as_turing_model(MA(), 8)
@@ -239,6 +242,8 @@ function _models()
         ("RandomWalk latent logjoint", rw),
         ("AR latent logjoint", ar),
         ("ARIMA latent logjoint", arima),
+        ("HilbertSpaceGP latent logjoint", hsgp),
+        ("HilbertSpaceGP Matern latent logjoint", hsgp_matern),
         ("MA latent logjoint", ma),
         ("HierarchicalNormal latent logjoint", hier),
         ("DiffLatentModel(RandomWalk) latent logjoint", diffrw),

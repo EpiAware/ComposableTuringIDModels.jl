@@ -12,6 +12,7 @@ pages = [
         "An SIR compartmental model" => "case-studies/sir-ode.md",
         "Declarative compartmental models with Catalyst" => "case-studies/catalyst-ode.md",
         "Multiple observation streams: cases, deaths, and strata" => "case-studies/split-observations.md",
+        "A Gaussian-process latent process" => "case-studies/gaussian-process.md",
         "Time-varying damping in an AR process" => "case-studies/time-varying-damping.md",
         "Partial pooling across groups" => "case-studies/hierarchy-stacked.md"
     ],

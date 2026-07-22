@@ -22,7 +22,8 @@ end
     using ComposableTuringIDModels, Distributions
     # Concrete latent models.
     for m in (IID(Normal()), HierarchicalNormal(), RandomWalk(), AR(), MA(),
-        Intercept(Normal()), FixedIntercept(0.1), Null())
+        Intercept(Normal()), FixedIntercept(0.1), Null(), HilbertSpaceGP(),
+        ExactGP())
         @test m isa AbstractLatentModel
     end
     # A wrapped/combined latent is still a latent (the key compositional contract).
@@ -106,6 +107,9 @@ end
     # Each checker is true for an in-role model implementing its as_turing_model.
     @test implements_latent_interface(RandomWalk())
     @test implements_latent_interface(AR(); n = 12)
+    @test implements_latent_interface(HilbertSpaceGP(); n = 25)
+    @test implements_latent_interface(HilbertSpaceGP(; kernel = Matern52Kernel()); n = 25)
+    @test implements_latent_interface(ExactGP(); n = 25)
     @test implements_infection_interface(DirectInfections(; Z = RandomWalk()))
     @test implements_infection_interface(Renewal(; generation_time = gen_int, rt = RandomWalk()); n = 20)
     @test implements_observation_interface(PoissonError())
