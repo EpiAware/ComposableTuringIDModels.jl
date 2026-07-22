@@ -10,8 +10,10 @@ page.
     To keep the documentation build to a sensible time, these case studies draw
     moderate NUTS samples (250 draws across 2 chains for the multi-chain fits,
     200-300 for the single-chain ones).
-    That is enough to demonstrate the models and produce stable figures; a real
-    analysis would use more draws and check convergence diagnostics carefully.
+    The target acceptance rate (`adapt_delta`) has been raised across these case studies
+    to avoid divergent transitions. That is enough to demonstrate the models and produce
+    stable figures; a real analysis would use more draws and check convergence diagnostics
+    carefully.
 
 They progress from a single renewal model to a layered observation process and
 then to a mechanistic compartmental model:

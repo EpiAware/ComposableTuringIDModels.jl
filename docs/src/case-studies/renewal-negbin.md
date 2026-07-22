@@ -171,7 +171,7 @@ this package (see [Automatic differentiation backend](@ref ad-backend)).
 ```@example renewal
 posterior = as_turing_model(model, y_obs, n)
 chain = sample(
-    posterior, NUTS(0.9; adtype = AutoMooncake(; config = nothing)),
+    posterior, NUTS(0.95; adtype = AutoMooncake(; config = nothing)),
     MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
