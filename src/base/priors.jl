@@ -1,8 +1,8 @@
 # The composition seam. A component threads its sub-components and its prior
 # slots through Turing submodels; `as_turing_submodel` names that one pattern, and
 # `as_turing_model` gains `Distribution` / vector-of-`Distribution` methods so a
-# raw prior flows through the seam identically to a full model (issue #37: priors
-# as length-`n` submodels).
+# raw prior flows through the seam identically to a full model (priors as
+# length-`n` submodels).
 
 @doc raw"
 Compose a component as a Turing submodel: `to_submodel(as_turing_model(m,
@@ -89,7 +89,7 @@ function as_turing_submodel(
     # constructor): the deprecation path pulls in `Base.depwarn`/`invokelatest`
     # world-age machinery that Enzyme reverse cannot shadow
     # (`EnzymeNoShadowError`), while `product_distribution` builds the identical
-    # `Product` without it. See #97.
+    # `Product` without it.
     return all(first(v) .== v) ? filldist(first(v), n) : product_distribution(v)
 end
 
@@ -172,7 +172,7 @@ as_turing_model([Normal(0, 1), Normal(5, 0.1)], 2)()
     # One i.i.d. draw per element; `filldist` for a homogeneous vector,
     # `product_distribution` otherwise (not `arraydist`, whose deprecated
     # `Distributions.Product` path breaks Enzyme reverse — see the note in
-    # `as_turing_submodel`'s vector method and #97).
+    # `as_turing_submodel`'s vector method).
     product_dist = all(first(prior) .== prior) ? filldist(first(prior), n) :
                    product_distribution(prior)
     θ ~ product_dist

@@ -11,9 +11,9 @@ Z_t = \epsilon_t + \sum_{i=1}^{q} \theta_i \epsilon_{t-i}
 with coefficients ``\theta`` from the prior in `θ` and innovations from the
 error model `ϵ_t`. The order `q` is the length of the coefficient prior.
 
-`ϵ_t` is a length-`n` PATH slot: a process gives time-varying innovations, while
+`ϵ_t` is a length-`n` path slot: a process gives time-varying innovations, while
 a bare `Distribution` is auto-wrapped in an [`Intercept`](@ref), giving a
-**constant** innovation path (one shared draw broadcast to every step). Use
+constant innovation path (one shared draw broadcast to every step). Use
 [`IID`](@ref) for `n` independent innovations.
 
 At order 1 the `θ` slot decides whether the coefficient is **constant or
@@ -69,11 +69,9 @@ end
     end
     θ ~ as_turing_submodel(model.θ, q; prefix = true)
     ϵ_t ~ as_turing_submodel(model.ϵ_t, n)
-    # `MAStep` keeps its innovation buffer newest-first (see `MAStep.jl`), so the
-    # warm-up seed must be reversed: `reverse(ϵ_t[1:q]) = [ϵ_q, …, ϵ_1]` puts the
-    # most recent innovation first, so `dot(θ, state)` pairs `θ[1]` with the most
-    # recent innovation. Seeding oldest-first silently mis-ordered the first `q`
-    # outputs for `q ≥ 2`. `get_state` reverses the seed back to natural order.
+    # `MAStep`'s buffer is newest-first, so the seed must be reversed:
+    # `reverse(ϵ_t[1:q])` puts `ϵ_q` first, pairing `θ[1]` with the most recent
+    # innovation. `get_state` reverses the output back to natural order.
     ma = accumulate_scan(
         MAStep(θ), (; val = 0.0, state = reverse(ϵ_t[1:q])), ϵ_t[(q + 1):end])
     return ma
