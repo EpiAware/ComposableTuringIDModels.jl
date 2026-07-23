@@ -79,7 +79,8 @@ end
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(1893)
     gen_int = [0.2, 0.3, 0.5]
-    ic = ImportedCases(Normal(0.0, 0.1))
+    # Use a non-negative prior so the sampler never drives incidence negative.
+    ic = ImportedCases(truncated(Normal(0.0, 0.1), 0, Inf))
     model = IDModel(
         Renewal(gen_int, ic; rt = RandomWalk(),
             initialisation = Normal()),

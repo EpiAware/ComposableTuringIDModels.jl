@@ -127,7 +127,7 @@ function (step::RenewalStep)(state, input::Tuple)
     substates = ntuple(i -> state[i + 1], length(step.modifiers))
     foi = renewal_foi(step.core, window, Rt)
     new_incidence, new_substates = _thread_modifiers(step.modifiers, foi, substates)
-    new_incidence = new_incidence + import_rate
+    new_incidence = max(new_incidence + import_rate, 1e-6)
     new_window = vcat(window[2:end], new_incidence)
     return [new_window, new_substates...]
 end
