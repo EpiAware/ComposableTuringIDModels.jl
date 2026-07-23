@@ -38,7 +38,7 @@ end
     using EpiAwarePackageTools
     include(joinpath(@__DIR__, "qa_config.jl"))
     # `readme` is a newer package-owned `QA_CONFIG` field; `qa_config.jl` is
-    # package-owned (not re-applied by `scaffold_update`), so an adopter predating it has
+    # package-owned (not re-applied by `update`), so an adopter predating it has
     # no `readme` key. Default to the repo-root README with the standard section
     # requirements (#163) rather than erroring on the missing field. Warn, so a
     # typoed key does not quietly revert to the defaults (#188).
