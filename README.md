@@ -68,6 +68,7 @@ Condition on data and run inference.
 ```julia
 posterior_model = as_turing_model(model, generated_y_t, n)
 chain = sample(posterior_model, NUTS(), 1_000)
+summarystats(chain)
 ```
 
 ## Installation
@@ -126,7 +127,7 @@ summary of the changes, and [`LICENSE`](LICENSE) for the Apache-2.0 terms.
 
 <!-- standard-sections:start -->
 <!-- MANAGED by EpiAwarePackageTools.scaffold — do not edit between the
-     markers. These standard sections are re-rendered on every scaffold_update;
+     markers. These standard sections are re-rendered on every update;
      edit the package-owned sections outside them, or CITATION.cff. -->
 
 ## Contributing

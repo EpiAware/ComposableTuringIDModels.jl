@@ -46,31 +46,48 @@ runs:
         CURRENT_VERSION=$(grep '^version = ' Project.toml | sed 's/version = "\(.*\)"/\1/')
         echo "Current version: $CURRENT_VERSION"
 
-        # Parse version parts
-        IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+        # Strip any pre-release/build suffix before parsing. A version like
+        # "0.1.0-DEV" (everything the kit scaffolds starts life pre-release,
+        # unregistered) has never been published, so the correct transition is
+        # to RELEASE what the number already says — drop the suffix — not to
+        # increment past it. Without this, `IFS='.'` leaves PATCH as "0-DEV" and
+        # `$(( PATCH + 1 ))` coerces the "-DEV" to 0 and yields 1, so the maiden
+        # published version would be 0.1.1 and 0.1.0 would be silently skipped
+        # (#255).
+        BASE_VERSION="${CURRENT_VERSION%%[-+]*}"
+
+        # Parse version parts from the released base, so PATCH is a clean number.
+        IFS='.' read -ra VERSION_PARTS <<< "$BASE_VERSION"
         MAJOR=${VERSION_PARTS[0]}
         MINOR=${VERSION_PARTS[1]}
         PATCH=${VERSION_PARTS[2]}
 
-        # Increment based on type
-        case "${{ inputs.increment-type }}" in
-          "major")
-            NEW_MAJOR=$((MAJOR + 1))
-            NEW_VERSION="${NEW_MAJOR}.0.0"
-            ;;
-          "minor")
-            NEW_MINOR=$((MINOR + 1))
-            NEW_VERSION="${MAJOR}.${NEW_MINOR}.0"
-            ;;
-          "patch")
-            NEW_PATCH=$((PATCH + 1))
-            NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
-            ;;
-          *)
-            echo "Error: Invalid increment type '${{ inputs.increment-type }}'. Must be major, minor, or patch."
-            exit 1
-            ;;
-        esac
+        if [ "$BASE_VERSION" != "$CURRENT_VERSION" ]; then
+          # Pre-release/build suffix present: publish the base version as-is.
+          NEW_VERSION="$BASE_VERSION"
+          echo "Pre-release version '$CURRENT_VERSION' detected: releasing" \
+               "$NEW_VERSION (suffix stripped, no increment)."
+        else
+          # A plain released version: apply the requested increment.
+          case "${{ inputs.increment-type }}" in
+            "major")
+              NEW_MAJOR=$((MAJOR + 1))
+              NEW_VERSION="${NEW_MAJOR}.0.0"
+              ;;
+            "minor")
+              NEW_MINOR=$((MINOR + 1))
+              NEW_VERSION="${MAJOR}.${NEW_MINOR}.0"
+              ;;
+            "patch")
+              NEW_PATCH=$((PATCH + 1))
+              NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+              ;;
+            *)
+              echo "Error: Invalid increment type '${{ inputs.increment-type }}'. Must be major, minor, or patch."
+              exit 1
+              ;;
+          esac
+        fi
 
         echo "New version: $NEW_VERSION"
         echo "old-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT

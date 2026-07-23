@@ -1,16 +1,22 @@
 # MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 #
 # Scheduled template-sync. Re-applies the managed EpiAware standard
-# (`scaffold_update("."; ad = true, benchmarks = true, downgrade_compat = true)`) and, when the
+# (`update("."; ad = true, benchmarks = true, downgrade_compat = true)`) and, when the
 # committed infra has drifted from
 # the kit, opens (or refreshes) a PR with the refresh. This is the auto-refresh
 # half of the self-sync loop: the `self-drift` check guards every push/PR, and
-# this workflow proactively pulls the newest standard on a schedule and reacts
-# to Dependabot action bumps so a repo never silently falls behind.
+# this workflow proactively pulls the newest standard on a schedule so a repo
+# never silently falls behind.
 #
-# Refs are preserved: `scaffold_update` keeps whatever reusable-workflow SHA Dependabot
+# Refs are preserved: `update` keeps whatever reusable-workflow SHA Dependabot
 # has pinned in this repo, so a sync never reverts a Dependabot bump — it only
 # re-applies the rest of the managed standard.
+#
+# The sync only ever pushes to a branch it opened itself (#215), so it does no
+# work on a pull request. The `pull_request` trigger is kept only so the `sync`
+# check still reports on a Dependabot PR — as a clean green no-op, not the red
+# it used to be under Dependabot's restricted token (#256). Drift on a
+# Dependabot bump is caught by the next scheduled run.
 
 name: Template sync
 
@@ -19,8 +25,8 @@ on:
     # Weekly, Monday 04:00 UTC.
     - cron: '0 4 * * 1'
   workflow_dispatch:
-  # React to Dependabot action/package bumps (the job below gates to the
-  # dependabot actor so other PRs do not trigger a sync).
+  # Present only so the `sync` check reports (green) on a Dependabot PR; the job
+  # is a no-op on any pull request (see the job's skip step, #256).
   pull_request:
 
 concurrency:
@@ -33,51 +39,84 @@ permissions:
 
 jobs:
   sync:
-    # Schedule / manual runs always; PR runs only for Dependabot.
-    if: >-
-      github.event_name != 'pull_request' ||
-      github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
-      # For a Dependabot PR, check out its branch so the sync amends that PR;
-      # otherwise check out the triggering ref (the default branch).
+      # On a Dependabot PR this job runs under Dependabot's restricted context
+      # (a read-only token, no access to Actions secrets). Every real step below
+      # — installing the kit, `update`, opening a PR — needs that
+      # access, so the job errored and every Dependabot PR carried a spurious
+      # red `sync` (#256). It also could never have *fixed* anything from a PR:
+      # the sync only pushes to a branch it opened itself (#215). So on a PR the
+      # job is a clean no-op — a green check, no work — and the weekly scheduled
+      # run is what actually detects drift and opens a `chore/template-sync` PR.
+      # Kept as a running (green) job rather than an `if`-skipped one so a
+      # required-check gate on `sync` stays satisfied on Dependabot PRs.
+      - name: Skip on a pull request
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "template-sync does not run on a pull request: it cannot push"
+          echo "to a branch it did not open (#215), and the Dependabot context"
+          echo "cannot access what a sync needs (#256). The weekly scheduled"
+          echo "run detects drift and opens a chore/template-sync PR."
       - uses: actions/checkout@v7
+        if: github.event_name != 'pull_request'
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
       - uses: julia-actions/setup-julia@v3
+        if: github.event_name != 'pull_request'
         with:
           version: '1'
       - uses: julia-actions/cache@v3
+        if: github.event_name != 'pull_request'
+      - name: Fetch gh-pages so the docs custom domain can be reconciled
+        if: github.event_name != 'pull_request'
+        # update reconciles `docs/make.jl`'s deploy_url against the
+        # gh-pages CNAME (a Pages custom domain set out of band): a mismatch
+        # ships a CSS-less site that CI otherwise cannot see. The default
+        # checkout does not fetch gh-pages, so fetch it here. `|| true` keeps a
+        # repo with no gh-pages branch (docs never deployed) from failing.
+        run: git fetch --depth=1 origin gh-pages || true
       - name: Re-apply the managed EpiAware standard
+        if: github.event_name != 'pull_request'
         run: |
           julia --color=yes -e '
               using Pkg
               Pkg.activate(; temp = true); Pkg.add(url = "https://github.com/EpiAware/EpiAwarePackageTools.jl", rev = "main")
               using EpiAwarePackageTools
-              res = scaffold_update("."; ad = true, benchmarks = true, downgrade_compat = true)
+              res = EpiAwarePackageTools.update("."; ad = true, benchmarks = true, downgrade_compat = true)
               println("re-applied ", length(res.updated), " managed files")'
-      # Dependabot PR: commit the refresh onto the PR branch so the action bump
-      # and the infra refresh land together. Needs "Allow GitHub Actions to
-      # create and approve pull requests" enabled and Dependabot write access.
-      - name: Fold the refresh into the Dependabot PR
-        if: github.event_name == 'pull_request'
-        run: |
-          if git diff --quiet; then
-            echo "No drift from the standard."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email \
-            "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "ci: re-apply the managed EpiAware standard"
-          git push
+      # Mint a GitHub App token so the sync PR can carry workflow-file drift.
+      # The default `GITHUB_TOKEN` is forbidden from pushing anything under
+      # `.github/workflows/` (GitHub rejects the push: "refusing to allow a
+      # GitHub App to create or update workflow ... without workflows
+      # permission"), so when the kit changes a managed *workflow* the sync
+      # push failed and the weekly run went red. An App installation token
+      # carrying `workflows: write` can push those files. Configure the org
+      # (or repo) with a `TEMPLATE_SYNC_APP_ID` variable and a
+      # `TEMPLATE_SYNC_APP_PRIVATE_KEY` secret for an App granted contents,
+      # pull-requests and workflows write. When the App is not configured the
+      # step is skipped and the token falls back to `GITHUB_TOKEN` below —
+      # non-workflow drift still syncs; only workflow drift needs the App.
+      # The `permission-*` inputs cap the minted token at exactly what
+      # `create-pull-request` below needs (commit+push, open a PR, touch
+      # `.github/workflows/`), regardless of what else the App may be
+      # granted at install time.
+      - name: Mint an App token that can push workflow files
+        id: app-token
+        if: ${{ github.event_name != 'pull_request' && vars.TEMPLATE_SYNC_APP_ID != '' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.TEMPLATE_SYNC_APP_ID }}
+          private-key: ${{ secrets.TEMPLATE_SYNC_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
       # Schedule / manual: open or refresh a sync PR when the standard drifted.
       - name: Open a PR if the standard drifted
         if: github.event_name != 'pull_request'
         uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
           branch: chore/template-sync
           delete-branch: true
           commit-message: "ci: sync managed infra to the EpiAware standard"
@@ -86,7 +125,7 @@ jobs:
             ci
           body: |
             Automated re-apply of the managed EpiAwarePackageTools standard
-            (`scaffold_update("."; ad = true, benchmarks = true, downgrade_compat = true)`).
+            (`update("."; ad = true, benchmarks = true, downgrade_compat = true)`).
 
             Merge to bring this repo's managed infra back in line with the kit.
             Package-owned files (unit tests, `qa_config.jl`, AD scenarios,

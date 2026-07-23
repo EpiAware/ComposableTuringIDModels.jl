@@ -1,5 +1,6 @@
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
+EpiAwarePackageTools = "7aaea248-0d11-4a0d-a7dc-86da30abb951"
 AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
@@ -24,6 +25,7 @@ Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [sources]
 ComposableTuringIDModels = {path = ".."}
+EpiAwarePackageTools = {url = "https://github.com/EpiAware/EpiAwarePackageTools.jl.git"}
 
 [compat]
 ADTypes = "1"

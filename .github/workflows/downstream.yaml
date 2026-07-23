@@ -8,7 +8,9 @@ name: Downstream
 #
 # The downstream list below starts empty. Add entries as packages start
 # depending on this one (see the commented example), then label a PR to run
-# them. This list is package-owned: edit `downstreams` to fit the package.
+# them. This list is package-owned: edit `downstreams` to fit the package and
+# `update` keeps what you set, while the rest of this file stays
+# managed.
 
 on:
   pull_request:
