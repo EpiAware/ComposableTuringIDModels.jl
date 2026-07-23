@@ -311,11 +311,7 @@ size(fc)
 ```
 
 The returned chain carries the predicted ``y_t`` over ``t = n+1, \dots, n+h``.
-The forecast plot uses a log10 y-axis to show the full dynamic range, draws
-three credible-interval bands — 30%, 60%, and 90% — at increasing transparencies
-so the narrowing toward the median is visible, and overlays 100 random sample
-trajectories from the posterior forecast to give a sense of the individual-path
-variation:
+We can then plot these forecasts:
 
 ```@example renewal
 # Multi-level CI band quantiles: 90%, 60%, 30% + median
@@ -363,14 +359,6 @@ vlines!(axf, [n + 0.5]; color = :grey, linestyle = :dash)
 axislegend(axf; position = :lt)
 fig_fc
 ```
-
-The forecast continues the wave's decline past the fitted window (dashed line),
-with all three credible-interval bands widening as the autoregressive process
-reverts towards its mean. The log scale makes the relative uncertainty —
-widening proportionally, not additively — directly visible, and the individual
-trajectories show the range of paths the process can take under the posterior. [`forecast`](@ref) also takes an [`IDProblem`](@ref), and errors rather than
-mis-extrapolating a latent whose stored path is jointly correlated across the
-forecast boundary (e.g. an exact GP).
 
 ## Swap a component
 
