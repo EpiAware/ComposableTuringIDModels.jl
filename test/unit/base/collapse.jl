@@ -3,7 +3,7 @@
     @test AbstractLatentModel === AbstractPriorModel
     @test RandomWalk() isa AbstractLatentModel
     @test RandomWalk() isa AbstractPriorModel
-    @test implements_latent_interface(RandomWalk())
+    @test implements_prior_interface(RandomWalk())
 end
 
 @testitem "widened slots accept Distribution / IID / vector / process" begin

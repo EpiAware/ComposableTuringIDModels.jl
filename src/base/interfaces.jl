@@ -11,30 +11,6 @@
 # but do not sample it, so they are cheap conformance checks.
 
 @doc raw"
-Deprecated alias for [`implements_prior_interface`](@ref).
-
-The latent and prior roles are one ([`AbstractLatentModel`](@ref) `===`
-[`AbstractPriorModel`](@ref)), so this simply forwards to
-[`implements_prior_interface`](@ref).
-
-# Arguments
-
-  - `model`: the component to check.
-
-# Keyword Arguments
-
-  - `n`: the prior length used for the construction check (default `10`),
-    forwarded to [`implements_prior_interface`](@ref).
-
-# Examples
-```@example
-using ComposableTuringIDModels
-implements_latent_interface(RandomWalk())
-```
-"
-implements_latent_interface(model; kwargs...) = implements_prior_interface(model; kwargs...)
-
-@doc raw"
 Check that `model` satisfies the [`AbstractPriorModel`](@ref) interface: it is a
 prior model and `as_turing_model(model, n)` returns a `DynamicPPL.Model`.
 
