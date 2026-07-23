@@ -197,6 +197,22 @@ end
     end
 
     init = _make_renewal_init(step, gen_int, I₀, Rt[1])
-    I_t = accumulate_scan(step, init, Rt)
+    if _has_imported_cases(infection.recurrent_step)
+        import_rates ~ as_turing_submodel(
+            _import_model(infection.recurrent_step), n; prefix = true)
+        import_rates_t = [_at(import_rates, t) for t in 1:n]
+        inputs = collect(zip(Rt, import_rates_t))
+        I_t = accumulate_scan(step, init, inputs)
+    else
+        I_t = accumulate_scan(step, init, Rt)
+    end
     return (; I_t, Z_t)
+end
+
+_has_imported_cases(step::RenewalStep) = any(m -> m isa ImportedCases, step.modifiers)
+_has_imported_cases(::Nothing) = false
+_has_imported_cases(::AbstractConstantRenewalStep) = false
+function _import_model(step::RenewalStep)
+    for m in step.modifiers; if m isa ImportedCases; return m.importation_rate; end; end
+    throw(ArgumentError("No ImportedCases modifier found"))
 end
