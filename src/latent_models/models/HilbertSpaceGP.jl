@@ -191,12 +191,22 @@ function HilbertSpaceGP(;
     return HilbertSpaceGP(length_scale_prior, marginal_std_prior, m, c, kernel)
 end
 
-# Standardise the integer index 1:n to zero mean and unit standard deviation so
-# the length scale ℓ is scale-free: the half-range then approaches √3 as n grows
-# rather than scaling like (n-1)/2, keeping a short ℓ representable by a fixed
-# number of basis functions m regardless of series length. Internal, but shared
-# with the reconstruction tests so they build the exact kernel on the same
-# coordinates the basis uses.
+@doc raw"
+Standardise the integer index ``1:n`` to zero mean and unit standard deviation.
+
+This makes the length scale ``\ell`` scale-free: the half-range approaches
+``\sqrt 3`` as ``n`` grows rather than scaling like ``(n-1)/2``, so a short
+``\ell`` stays representable by a fixed number of basis functions ``m``
+regardless of series length.
+
+Internal, but shared by [`HilbertSpaceGP`](@ref) and [`ExactGP`](@ref) so a
+given length scale means the same thing for both, and by the reconstruction
+tests so they build the exact kernel on the coordinates the basis uses.
+
+# Arguments
+
+  - `n`: the series length.
+"
 function _hsgp_standardised_index(n::Int)
     (collect(1:n) .- Statistics.mean(1:n)) ./ Statistics.std(1:n)
 end
