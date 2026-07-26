@@ -4,12 +4,14 @@
 
 const LIGHT_TUTORIALS = String[]
 
-const HEAVY_TUTORIALS = String["getting-started/tutorials/ad-backends"]
+# Names are relative to `TUTORIALS_SUBDIR`: `HEAVY_TUTORIALS` holds the Literate
+# `.jl` source names, `TUTORIAL_STUBS` is keyed by the rendered `.md` names.
+const HEAVY_TUTORIALS = String["ad-backends.jl"]
 
 const TUTORIALS_SUBDIR = joinpath("getting-started", "tutorials")
 
 const TUTORIAL_STUBS = Pair{String, String}[
-    "getting-started/tutorials/ad-backends" => "# [Automatic differentiation backends](@id ad-backends)"
+    "ad-backends.md" => "# [Automatic differentiation backends](@id ad-backends)"
 ]
 
 const FORCE_STUB_TUTORIALS = String[]
@@ -24,7 +26,9 @@ const README_EXECUTE = true
 
 const INDEX_STRIP_SECTIONS = String[]
 
-const BENCHMARK_PAGE = false
+# The package benchmarks and publishes a timeline to the `benchmarks` branch,
+# so the generated page (heading + `docs/benchmarks.md` prose + history) is on.
+const BENCHMARK_PAGE = true
 
 const HISTORY_SUITES = String[]
 

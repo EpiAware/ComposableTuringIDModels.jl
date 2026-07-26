@@ -1,5 +1,3 @@
-# [Benchmarks](@id benchmarks)
-
 `ComposableTuringIDModels` tracks the performance of representative modelling
 operations over time.
 The suite is a prototype: it covers a small set of representative models rather
