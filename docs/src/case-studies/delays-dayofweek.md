@@ -147,7 +147,7 @@ nothing # hide
 
 Fitting conditions on the observed reports, differentiating with the recommended
 [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) backend (see
-[Automatic differentiation backend](@ref ad-backend)). We draw two chains in
+[Automatic differentiation backend](@ref ad-backends)). We draw two chains in
 parallel with `MCMCThreads()`, which gives a cross-chain ``\hat R``:
 
 ```@example delays

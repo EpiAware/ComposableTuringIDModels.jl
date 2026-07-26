@@ -22,7 +22,12 @@ const LINKCHECK_IGNORE = Regex[]
 
 const INDEX_REWRITES = Pair{String, String}[]
 
-const README_EXECUTE = true
+# The README's ```julia fences are illustrative, and the managed build converts
+# EVERY one of them to an executed `@example readme` block. Executing them would
+# run `Pkg.add("ComposableTuringIDModels")` from the Installation section against
+# the registry, add a 1000-draw NUTS fit to every docs build, and call
+# `summarystats`, which the README never brings into scope.
+const README_EXECUTE = false
 
 const INDEX_STRIP_SECTIONS = String[]
 
