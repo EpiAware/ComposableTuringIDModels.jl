@@ -76,6 +76,20 @@
 
 ### Added
 
+- **`ImportedCases` renewal modifier.** Adds an externally seeded importation
+  rate to the renewal incidence, `I_t = ι_t + R_t Σ I_{t-i} g_i`, so infections
+  can arrive from outside the modelled population — the mechanism behind a
+  renewal process that would otherwise die out from a zero initial incidence,
+  and behind reintroduction after local elimination. The rate is a length-`n`
+  prior slot on the **unconstrained** scale, like `rt` and `initialisation`:
+  `Renewal` maps it through its `transformation` (default `exp`), so importation
+  is positive by construction and any latent process (a bare `Distribution`, a
+  `RandomWalk`, a GP) can drive it without the prior having to be
+  positive-supported. It is added to the committed incidence after the modifier
+  chain, so it composes with `SusceptibleDepletion` without being scaled by it —
+  and, for the same reason, imported infections do not themselves deplete the
+  susceptible pool. At most one `ImportedCases` may be composed onto a step.
+
 - **`Renewal`'s `generation_time` accepts a pmf-producing prior model.** Alongside
   a fixed pmf vector and a fixed continuous `Distribution`, `generation_time` now
   takes an [`AbstractPriorModel`](@ref) (e.g. an `UncertainDelay`) so the

@@ -79,8 +79,9 @@ end
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(1893)
     gen_int = [0.2, 0.3, 0.5]
-    # Use a non-negative prior so the sampler never drives incidence negative.
-    ic = ImportedCases(truncated(Normal(0.0, 0.1), 0, Inf))
+    # An unconstrained prior is fine: `Renewal`'s transformation makes the rate
+    # positive, so the sampler cannot drive incidence negative.
+    ic = ImportedCases(Normal(0.0, 0.1))
     model = IDModel(
         Renewal(gen_int, ic; rt = RandomWalk(),
             initialisation = Normal()),
@@ -118,4 +119,52 @@ end
     # Asking a non-importing step for its rate is a caller error, not a
     # silently-missing prior.
     @test_throws ArgumentError _import_model(RenewalStep(core))
+end
+
+@testitem "a negative unconstrained rate still imports rather than subtracting" begin
+    using ComposableTuringIDModels, Distributions
+    using DynamicPPL: fix
+    gen_int = [0.2, 0.3, 0.5]
+    logR = log(1.0)  # Rt = 1, no growth
+    fixinit = (init_incidence = log(1.0),)
+
+    plain = Renewal(gen_int; rt = FixedIntercept(logR),
+        initialisation = Normal())
+    I_plain = fix(as_turing_model(plain, 30), fixinit)().I_t
+
+    # A strongly negative *unconstrained* rate: the transformation maps it to
+    # exp(-2) ≈ 0.135 imports per step. Untransformed this subtracted 2.0 from
+    # every incidence, driving the series onto the 1e-6 floor.
+    imported = Renewal(gen_int, ImportedCases(FixedIntercept(-2.0));
+        rt = FixedIntercept(logR), initialisation = Normal())
+    I_imported = fix(as_turing_model(imported, 30), fixinit)().I_t
+
+    @test all(>(0), I_imported)
+    @test I_imported[end] > I_plain[end]
+end
+
+@testitem "a second ImportedCases modifier is rejected at construction" begin
+    using ComposableTuringIDModels, Distributions
+    gen_int = [0.2, 0.3, 0.5]
+    ic1 = ImportedCases(Normal(0.0, 0.1))
+    ic2 = ImportedCases(Normal(1.0, 0.1))
+    # Only the first would ever be sampled, so a second is an error rather than
+    # a silent drop.
+    @test_throws AssertionError Renewal(gen_int, ic1, ic2;
+        rt = RandomWalk(), initialisation = Normal())
+    # One remains fine, alongside other modifiers.
+    @test Renewal(gen_int, ic1,
+        ComposableTuringIDModels.SusceptibleDepletion(1000.0);
+        rt = RandomWalk(), initialisation = Normal()) isa Renewal
+end
+
+@testitem "ImportedCases bounds its slot to a prior" begin
+    using ComposableTuringIDModels, Distributions
+    # The slot is `PriorLike`, so a wrong-role value fails at construction
+    # rather than deep inside sampling.
+    @test_throws MethodError ImportedCases(1.0)
+    @test_throws MethodError ImportedCases("constant")
+    @test ImportedCases(Normal(0.0, 0.1)) isa ImportedCases
+    @test ImportedCases([Normal(), Normal()]) isa ImportedCases
+    @test ImportedCases(RandomWalk()) isa ImportedCases
 end
