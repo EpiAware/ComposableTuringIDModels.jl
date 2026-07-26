@@ -34,9 +34,4 @@ EpiAwarePackageTools = {rev = "main", url = "https://github.com/EpiAware/EpiAwar
 ComposableTuringIDModels = {path = ".."}
 
 [compat]
-# Pinned exactly, in step with the `.pre-commit-config.yaml` `rev` and
-# `test/formatter/Project.toml`. Unpinned it floats per job, so the
-# `Quality: formatting` testitem (which resolves JuliaFormatter from this
-# shared env) reformats files that the pinned pre-commit hook left alone.
-JuliaFormatter = "=2.10.1"
 TestItems = "1.0.0"
