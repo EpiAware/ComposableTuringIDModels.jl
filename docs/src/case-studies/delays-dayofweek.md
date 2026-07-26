@@ -153,7 +153,7 @@ parallel with `MCMCThreads()`, which gives a cross-chain ``\hat R``:
 ```@example delays
 posterior = as_turing_model(problem, (y_t = y_obs,))
 chain = sample(
-    posterior, NUTS(0.9; adtype = AutoMooncake(; config = nothing)),
+    posterior, NUTS(0.95; adtype = AutoMooncake(; config = nothing)),
     MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```

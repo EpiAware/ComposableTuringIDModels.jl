@@ -1,11 +1,8 @@
 name = "ComposableTuringIDModels"
 uuid = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
-license = "Apache-2.0"
-version = "0.1.0-DEV"
+version = "0.1.0"
 authors = ["Sam Abbott"]
-
-[workspace]
-projects = ["test", "docs"]
+license = "Apache-2.0"
 
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
@@ -56,3 +53,6 @@ Statistics = "1.11, 1.12"
 Tables = "1.13.0"
 Turing = "0.46"
 julia = "1.11, 1.12"
+
+[workspace]
+projects = ["test", "docs"]

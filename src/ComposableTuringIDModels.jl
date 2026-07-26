@@ -76,12 +76,13 @@ export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial
        NegativeBinomialMeanClust, condition_model
 
 # --- latent models ---
-export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept, FixedIntercept,
+export IID, HierarchicalNormal, RandomWalk, AR, TimeVaryingAR, MA, Intercept,
+       FixedIntercept,
        Null, DiffLatentModel, HilbertSpaceGP, ExactGP
-# Covariance kernels for `HilbertSpaceGP` are re-exported from KernelFunctions.jl
-# (the ecosystem standard); `spectral_density` adds their Hilbert-space weights.
+# Covariance kernels for `HilbertSpaceGP` / `ExactGP` are re-exported from
+# KernelFunctions.jl (the ecosystem standard); `spectral_density` adds the
+# Hilbert-space weights those kernels need.
 export SqExponentialKernel, Matern32Kernel, Matern52Kernel, spectral_density
-export TimeVaryingAR
 
 # --- latent modifiers / manipulators / combinations / broadcasting ---
 export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,

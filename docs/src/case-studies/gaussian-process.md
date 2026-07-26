@@ -103,7 +103,7 @@ cases `generated_y_t`, the latent infections `I_t`, and the GP path
 using Turing: fix
 
 si = Gamma(6.5, 0.62)
-obs = NegativeBinomialError(cluster_factor_prior = HalfNormal(0.1))
+obs = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 n = 70
 
 truth = IDModel(Renewal(; generation_time = si, rt = ExactGP(),

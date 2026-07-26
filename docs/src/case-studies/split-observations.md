@@ -110,7 +110,7 @@ recommended backend for this package (see
 ydata = (cases = y.cases, deaths = y.deaths)
 posterior = as_turing_model(model, ydata, n)
 chain = sample(
-    posterior, NUTS(0.9; adtype = AutoMooncake(; config = nothing)),
+    posterior, NUTS(0.95; adtype = AutoMooncake(; config = nothing)),
     MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```

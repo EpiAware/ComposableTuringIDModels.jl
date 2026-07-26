@@ -162,14 +162,14 @@ built through the shared [`define_y_t`](@ref) hook.
 naive_model = IDModel(renewal, error)
 naive_post = as_turing_model(naive_model, observed_so_far, n)
 naive_chain = sample(
-    naive_post, NUTS(1000, 0.9; adtype = adt), MCMCThreads(), 250, 2;
+    naive_post, NUTS(1000, 0.95; adtype = adt), MCMCThreads(), 250, 2;
     progress = false)
 
 rt_obs = RightTruncate(error, ReportingCDF(reporting_delay; D = 10))
 rt_model = IDModel(renewal, rt_obs)
 rt_post = as_turing_model(rt_model, observed_so_far, n)
 rt_chain = sample(
-    rt_post, NUTS(1000, 0.9; adtype = adt), MCMCThreads(), 250, 2;
+    rt_post, NUTS(1000, 0.95; adtype = adt), MCMCThreads(), 250, 2;
     progress = false)
 
 tri_obs = ReportTriangle(error, delay_pmf)
@@ -177,7 +177,7 @@ tri_data = define_y_t(tri_obs, reported_triangle, eventual)
 tri_model = IDModel(renewal, tri_obs)
 tri_post = as_turing_model(tri_model, tri_data, n)
 tri_chain = sample(
-    tri_post, NUTS(1000, 0.9; adtype = adt), MCMCThreads(), 250, 2;
+    tri_post, NUTS(1000, 0.95; adtype = adt), MCMCThreads(), 250, 2;
     progress = false)
 nothing # hide
 ```
@@ -188,7 +188,7 @@ series, what the analyst would eventually see.
 ```@example nowcast
 complete_post = as_turing_model(naive_model, eventual, n)
 complete_chain = sample(
-    complete_post, NUTS(1000, 0.9; adtype = adt), MCMCThreads(), 250, 2;
+    complete_post, NUTS(1000, 0.95; adtype = adt), MCMCThreads(), 250, 2;
     progress = false)
 nothing # hide
 ```

@@ -101,9 +101,10 @@ and ``S`` is the spectral density of the chosen covariance `kernel`. Kernels are
 types, so the model reuses the ecosystem-standard kernels rather than defining its
 own: `SqExponentialKernel` (the default) gives very smooth paths, while
 `Matern32Kernel` / `Matern52Kernel` give progressively rougher ones. Only the
-[`spectral_density`](@ref) changes between kernels; the basis is shared. See the
-Gaussian-process case study for how this relates to `AbstractGPs.jl` /
-`TemporalGPs.jl` as ecosystem alternatives.
+[`spectral_density`](@ref) changes between kernels; the basis is shared. The
+Gaussian-process case study checks the basis against the Gram matrix
+[AbstractGPs.jl](https://juliagaussianprocesses.github.io/AbstractGPs.jl/) builds
+from the same kernel, and compares this model against [`ExactGP`](@ref).
 
 Only ``\ell``, ``\sigma`` and the ``m`` weights ``\beta`` are sampled; the basis
 ``\phi_j`` and eigenvalues ``\lambda_j`` depend only on `n`, `m` and the boundary

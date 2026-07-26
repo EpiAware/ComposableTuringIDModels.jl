@@ -76,6 +76,22 @@
 
 ### Added
 
+- **Gaussian-process latent models: `HilbertSpaceGP` and `ExactGP`.** A GP is a
+  prior over functions, so a natural latent for a smoothly varying quantity such
+  as ``\log R_t``. `HilbertSpaceGP` is the Hilbert-space basis-function
+  approximation of Riutort-Mayol et al. (2023): the basis depends only on `n`,
+  `m` and the boundary factor `c` — none of the sampled parameters — so it is
+  built once outside the `@model` and each evaluation is an `n × m`
+  matrix–vector product rather than an `O(n³)` factorisation. `ExactGP` forms the
+  full covariance and is the accuracy reference to judge it against. Both take
+  their covariance kernel from
+  [KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/)
+  rather than defining their own — `SqExponentialKernel` (the default),
+  `Matern32Kernel` and `Matern52Kernel` are re-exported — so the kernels are the
+  same ones AbstractGPs.jl builds exact GPs from. A kernel enters the
+  Hilbert-space approximation only through its spectral density, so a new one is
+  a single `spectral_density(::MyKernel, ω, σ, ℓ)` method. See the
+  Gaussian-process case study.
 - **`Renewal`'s `generation_time` accepts a pmf-producing prior model.** Alongside
   a fixed pmf vector and a fixed continuous `Distribution`, `generation_time` now
   takes an [`AbstractPriorModel`](@ref) (e.g. an `UncertainDelay`) so the

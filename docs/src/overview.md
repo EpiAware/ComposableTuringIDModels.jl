@@ -90,14 +90,16 @@ The three roles feed one another and plug into that single interface:
 Because the parts share one interface, you compare modelling assumptions by
 swapping one struct for another and leaving the rest untouched.
 
+One latent process: an ARIMA-style differenced AR.
+
 ```@example overview
 using ComposableTuringIDModels, Distributions
-
-# One latent process: an ARIMA-style differenced AR.
 latent = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
+```
 
-# Fold it into a direct-infections process, then swap only the observation
-# model. Everything else stays the same.
+Fold it into a direct-infections process, then swap only the observation model. Everything else stays the same.
+
+```@example overview
 poisson_model = IDModel(
     DirectInfections(; Z = latent, initialisation = Normal()),
     PoissonError())
@@ -105,9 +107,11 @@ poisson_model = IDModel(
 negbin_model = IDModel(
     DirectInfections(; Z = latent, initialisation = Normal()),
     NegativeBinomialError())
+```
 
-# Each assembly is turned into one Turing model. `missing` data simulates from
-# the prior; the composed model exposes its generated quantities.
+Each assembly is turned into one Turing model. `missing` data simulates from the prior; the composed model exposes its generated quantities.
+
+```@example overview
 turing_model = as_turing_model(poisson_model, missing, 20)
 (; generated_y_t, I_t, Z_t) = turing_model()
 length(generated_y_t), length(I_t), length(Z_t)
