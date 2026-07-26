@@ -140,7 +140,10 @@ function fit_gp(latent)
         progress = false)
     gen = vec(generated_observables(posterior, y_obs, chain).generated)
     Z_mean = mean([g.Z_t for g in gen])
-    (; model, chain, Z_mean, time,
+    # `posterior` (the conditioned Turing model) is returned alongside the
+    # `IDModel`: `generated_observables` re-runs the *conditioned* model over the
+    # draws, while `predict` below needs the unconditioned one built from `model`.
+    (; model, posterior, chain, Z_mean, time,
         cor = cor(Z_mean, Z_true),
         rmse = sqrt(mean((Z_mean .- Z_true) .^ 2)))
 end
@@ -215,7 +218,7 @@ fig = Figure(; size = (760, 620))
 ax1 = Axis(fig[1, 1]; ylabel = "Reproduction number R(t)")
 for (fit, color, label) in
     ((hs, :teal, "HSGP"), (ex, :purple, "exact"))
-    gen = vec(generated_observables(fit.model, y_obs, fit.chain).generated)
+    gen = vec(generated_observables(fit.posterior, y_obs, fit.chain).generated)
     Rt = credible_bands(reduce(hcat, (exp.(g.Z_t) for g in gen)))
     ci_ribbon!(ax1, ts, Rt; color = color, label = label)
 end
