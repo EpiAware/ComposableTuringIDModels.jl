@@ -18,9 +18,24 @@ const FORCE_STUB_TUTORIALS = String[]
 
 const ORG_BRANDING = true
 
-const LINKCHECK_IGNORE = Regex[]
+# `CITATION.cff` is package-owned and seeded only by the kit's `scaffold`, never
+# by `update`, while the managed "How to cite" README section links to it
+# unconditionally. This change adds the file, but linkcheck resolves the link
+# against `main`, so it stays a 404 until this branch lands. Drop this entry
+# once the file is on `main`.
+const LINKCHECK_IGNORE = Regex[
+    r"blob/main/CITATION\.cff$"
+]
 
-const INDEX_REWRITES = Pair{String, String}[]
+const _REPO_BLOB = "https://github.com/EpiAware/ComposableTuringIDModels.jl/blob/main"
+
+# `NOTICE` and `LICENSE` are repo-root files. The README's relative links are
+# right on GitHub, but the generated `index.md` is served from the docs site,
+# where they resolve to nothing — so point the docs copy at the files on `main`.
+const INDEX_REWRITES = Pair{String, String}[
+    "(NOTICE)" => "($(_REPO_BLOB)/NOTICE)",
+    "(LICENSE)" => "($(_REPO_BLOB)/LICENSE)"
+]
 
 # The README's ```julia fences are illustrative, and the managed build converts
 # EVERY one of them to an executed `@example readme` block. Executing them would
