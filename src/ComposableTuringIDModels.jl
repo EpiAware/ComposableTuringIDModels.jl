@@ -57,7 +57,7 @@ using Statistics: Statistics
 
 # --- core architecture ---
 export AbstractComposableModel, as_turing_model
-export AbstractPriorModel, AbstractInfectionModel,
+export AbstractPriorModel, AbstractLatentModel, AbstractInfectionModel,
        AbstractObservationModel, AbstractObservationErrorModel
 export implements_prior_interface,
        implements_infection_interface, implements_observation_interface
