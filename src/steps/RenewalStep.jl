@@ -85,7 +85,9 @@ renewal_foi(step::RenewalStep, window, Rt) = renewal_foi(step.core, window, Rt)
 # state, no per-step overhead), so a modifier-free renewal is unchanged.
 const _PlainRenewalStep = RenewalStep{<:AbstractConstantRenewalStep, Tuple{}}
 
-(step::_PlainRenewalStep)(state, Rt) = step.core(state, Rt)
+# `Rt` is annotated so this fast path stays unambiguous against the tuple-input
+# method below (a plain step carries no modifiers, so it never sees a tuple).
+(step::_PlainRenewalStep)(state, Rt::Real) = step.core(state, Rt)
 
 function _renewal_init_state(step::_PlainRenewalStep, I₀, r_approx, len_gen_int)
     return _renewal_init_state(step.core, I₀, r_approx, len_gen_int)
@@ -115,8 +117,6 @@ function (step::RenewalStep)(state, Rt)
     return [new_window, new_substates...]
 end
 
-
-
 # Tuple-input method: pass `(Rt, import_rate)` through the scan when the step
 # has an `ImportedCases` modifier. The importation rate is added to the
 # incidence after the modifier chain, so the modifier itself stays a no-op (see
@@ -131,6 +131,7 @@ function (step::RenewalStep)(state, input::Tuple)
     new_window = vcat(window[2:end], new_incidence)
     return [new_window, new_substates...]
 end
+
 function _renewal_init_state(step::RenewalStep, I₀, r_approx, len_gen_int)
     window = _renewal_init_state(step.core, I₀, r_approx, len_gen_int)
     return [window, map(modifier_init_state, step.modifiers)...]

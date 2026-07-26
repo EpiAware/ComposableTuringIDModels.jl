@@ -90,3 +90,32 @@ end
         progress = false)
     @test chn !== nothing
 end
+
+@testitem "the modifier itself is a no-op; the rate is added by the step" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: modifier_init_state, apply_modifier
+    ic = ImportedCases(Normal(0.0, 0.1))
+    # The rate is a prior, not a constant on the step, so the modifier carries
+    # no state and leaves the proposed incidence untouched.
+    @test modifier_init_state(ic) == 0.0
+    @test apply_modifier(ic, 3.5, modifier_init_state(ic)) == (3.5, 0.0)
+end
+
+@testitem "renewal steps without an ImportedCases modifier do not import" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
+                                    SusceptibleDepletion, _has_imported_cases,
+                                    _import_model
+    core = ConstantRenewalStep(reverse([0.2, 0.3, 0.5]))
+    # The bare force-of-infection core, a modifier-free step, and a step with
+    # only non-importing modifiers all take the plain (scalar-`Rt`) scan path.
+    @test !_has_imported_cases(core)
+    @test !_has_imported_cases(RenewalStep(core))
+    @test !_has_imported_cases(RenewalStep(core, (SusceptibleDepletion(1000.0),)))
+    # `nothing` is the inferred-generation-interval path, whose step is built
+    # per draw rather than carried on the model.
+    @test !_has_imported_cases(nothing)
+    # Asking a non-importing step for its rate is a caller error, not a
+    # silently-missing prior.
+    @test_throws ArgumentError _import_model(RenewalStep(core))
+end

@@ -209,10 +209,17 @@ end
     return (; I_t, Z_t)
 end
 
+# Whether a renewal step carries an `ImportedCases` modifier, and if so the
+# importation-rate prior it holds. Only a `RenewalStep` has modifiers; the bare
+# force-of-infection cores (and the inferred-generation-interval path, which
+# builds its step per draw) never import.
 _has_imported_cases(step::RenewalStep) = any(m -> m isa ImportedCases, step.modifiers)
 _has_imported_cases(::Nothing) = false
 _has_imported_cases(::AbstractConstantRenewalStep) = false
+
 function _import_model(step::RenewalStep)
-    for m in step.modifiers; if m isa ImportedCases; return m.importation_rate; end; end
-    throw(ArgumentError("No ImportedCases modifier found"))
+    for m in step.modifiers
+        m isa ImportedCases && return m.importation_rate
+    end
+    throw(ArgumentError("no ImportedCases modifier found on this renewal step"))
 end
