@@ -45,15 +45,16 @@ parameterisations are non-centred, which NUTS handles well.
 They differ in how much of their work depends on the sampled parameters. The
 Hilbert-space basis is set by the series length, the number of basis functions
 and the boundary factor alone, so [`as_turing_model`](@ref) builds it before
-returning the model and captures it: it sits outside the `@model` body and is
-never differentiated, leaving one ``n \times m`` matrix–vector product in the
-gradient. The exact GP's covariance and its Cholesky factor depend on ``\ell``
-and ``\sigma``, so both are rebuilt *and* differentiated every time. That is
-where the timing gap below comes from.
+returning the model and captures it: the `@model` body never sees it, and one
+``n \times m`` matrix–vector product is all that is differentiated. The exact
+GP's covariance and its Cholesky factor depend on ``\ell`` and ``\sigma``, so
+both are rebuilt *and* differentiated on every evaluation. That is where the
+timing gap below comes from.
 
 Composed into a [`Renewal`](@ref), the enclosing `@model` reconstructs its
-submodels on every evaluation, so the basis is rebuilt each time — outside the
-gradient, but not for free. That cost is measured below.
+submodels on every evaluation, so the basis is rebuilt inside the traced call.
+It still depends on no sampled parameter, but it is executed and taped along
+with everything else, so it is not free. That cost is measured below.
 
 ## The kernel and the GP ecosystem
 
@@ -69,17 +70,17 @@ Both models are linear in a vector of standard-normal weights (`z` for the exact
 GP, ``\beta`` for the Hilbert-space one), so fixing the hyperparameters and
 feeding in unit vectors traces out that linear map. The Gram matrix of the result
 is the model's implied prior covariance, and we compare it against the covariance
-AbstractGPs builds from the same kernel.
+AbstractGPs builds from the same kernel on the same inputs — both models hand the
+kernel [`standardised_index`](@ref).
 
 ```@example gp
-using LinearAlgebra, Statistics
+using LinearAlgebra
 using AbstractGPs: GP, cov as gp_cov
 using KernelFunctions: with_lengthscale
 using Turing: fix
 
 n0, σ0 = 40, 1.0
-# both models standardise the integer index before the kernel sees it
-x = (collect(1:n0) .- mean(1:n0)) ./ std(1:n0)
+x = standardised_index(n0)
 unit(k, j) = [i == j ? 1.0 : 0.0 for i in 1:k]
 gram(cols) = (M = reduce(hcat, cols); M * M')
 
@@ -129,22 +130,30 @@ observed data — no rejection loop. The returned quantities include the reporte
 cases `generated_y_t`, the latent infections `I_t`, and the GP path
 `Z_t = \log R_t`.
 
+The epidemic is seeded at around fifty infections. That matters for what the
+page can claim: with a handful of cases a day the first fortnight of counts
+carries almost no information about ``R_t``, both fits fall back on the prior
+there, and a comparison against the truth would mostly be measuring the seed
+size rather than either model.
+
 ```@example gp
 si = Gamma(6.5, 0.62)
 obs = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 n = 70
 
-truth = IDModel(Renewal(; generation_time = si, rt = ExactGP(),
-        initialisation = Normal(log(2.0), 0.1)), obs)
+id_model(latent) = IDModel(Renewal(; generation_time = si, rt = latent,
+        initialisation = Normal(log(50), 0.1)), obs)
+
 Random.seed!(10)
-sim = fix(as_turing_model(truth, fill(missing, n), n), (ℓ = 0.55, σ = 0.55))()
+sim = fix(as_turing_model(id_model(ExactGP()), fill(missing, n), n),
+    (ℓ = 0.55, σ = 0.55))()
 y_obs = sim.generated_y_t
 Z_true = sim.Z_t
 (total_cases = sum(y_obs), peak = maximum(y_obs),
     Rt_range = round.(extrema(exp.(Z_true)), digits = 2))
 ```
 
-The simulated ``R_t`` path starts above one, dips, peaks again around day 40 and
+The simulated ``R_t`` path starts around two, dips, peaks again around day 40 and
 falls through one near day 50, so the epidemic grows, turns over and declines —
 the shape the fits have to recover.
 
@@ -193,8 +202,7 @@ using Turing, Mooncake, Statistics
 using ADTypes: AutoMooncake
 
 function fit_gp(latent, n_fit)
-    model = IDModel(Renewal(; generation_time = si, rt = latent,
-            initialisation = Normal(log(2.0), 0.1)), obs)
+    model = id_model(latent)
     y = y_obs[1:n_fit]
     posterior = as_turing_model(model, y, n_fit)
     time = @elapsed chain = sample(posterior,
@@ -214,49 +222,79 @@ hs = fit_gp(HilbertSpaceGP(m = 20), n)
 Random.seed!(1)
 ex = fit_gp(ExactGP(), n_ex)
 
+# the page claims recovery, so it asserts recovery: a fit that had collapsed
+# onto the prior would fail the build rather than render a wrong figure
+@assert hs.cor > 0.9 && ex.cor > 0.9
+@assert hs.rmse < 0.15 && ex.rmse < 0.15
 score(f) = (days = f.n, cor = round(f.cor, digits = 2),
     rmse = round(f.rmse, digits = 3), seconds = round(f.time, digits = 1))
 (hsgp = score(hs), exact = score(ex))
 ```
 
-Both recover the latent reproduction number closely.
+Both posterior means correlate with the simulated ``\log R_t`` above 0.9 on the
+days they cover, and the trajectory figure below shows the two agreeing with
+each other over the days they share — the check the exact GP is here to provide.
+
 The exact GP is fit to the first `n_ex` days rather than all `n`: its ``O(n^3)``
 factorisation is rebuilt and differentiated at every leapfrog step, and at the
-full length it would dominate the cost of building this page. Even on the
-shorter series it is the slower of the two, against a Hilbert-space fit on
-nearly twice as many days whose differentiated work is one ``n \times m``
-matrix–vector product. That gap is the reason the approximation exists, and it
-widens with the series length; at short ``n`` the exact GP is still affordable
-and gives the reference the approximation is judged against. Each timing is a
-single un-warmed run that includes the model's compilation, so read it as
-indicative rather than as a benchmark.
-
-That leaves the basis rebuild the composed model does on every evaluation.
-Timing it against one Mooncake gradient of the same log-density puts a number on
-the overhead:
+full length it would dominate the cost of building this page. The wall-clock
+times above are single un-warmed runs that include the model's compilation and
+cover different series lengths, so read them as indicative. Timing one gradient
+of each composed log-density on the *same* `n_ex` days is the like-for-like
+comparison, and it is what the sampler actually pays per leapfrog step:
 
 ```@example gp
 using Chairmarks: @b
 using DynamicPPL: LogDensityFunction, VarInfo
 using LogDensityProblems: logdensity_and_gradient
 
-gp = HilbertSpaceGP(m = 20)
-posterior = as_turing_model(IDModel(Renewal(; generation_time = si, rt = gp,
-            initialisation = Normal(log(2.0), 0.1)), obs), y_obs, n)
-ldf = LogDensityFunction(posterior; adtype = AutoMooncake(; config = nothing))
-Random.seed!(3)
-θ = VarInfo(posterior)[:]
+composed(latent, n_fit) = as_turing_model(
+    id_model(latent), y_obs[1:n_fit], n_fit)
 
-rebuild = @b as_turing_model(gp, n)                     # what Renewal redoes
-gradient = @b logdensity_and_gradient(ldf, θ)
-share = rebuild.time / gradient.time
-@assert share < 0.25
+function gradient_time(model)
+    ldf = LogDensityFunction(model; adtype = AutoMooncake(; config = nothing))
+    θ = VarInfo(model)[:]
+    return (@b logdensity_and_gradient(ldf, θ)).time
+end
+
+grad = (hsgp = gradient_time(composed(HilbertSpaceGP(m = 20), n_ex)),
+    exact = gradient_time(composed(ExactGP(), n_ex)))
+@assert grad.exact > grad.hsgp
+round(grad.exact / grad.hsgp; sigdigits = 2)
+```
+
+The exact GP costs more per gradient even on the shorter series, and the gap
+widens with the series length: that is the reason the approximation exists. At
+short ``n`` the exact GP is still affordable and gives the reference the
+approximation is judged against.
+
+That leaves the basis rebuild the composed model does on every evaluation. It is
+not differentiated with respect to any sampled parameter, but it does run inside
+the traced call, so it is taped like the rest of the body. The honest measurement
+is therefore a gradient with the basis rebuilt inside against a gradient with it
+captured outside — not a bare call to the constructor:
+
+```@example gp
+using DynamicPPL: to_submodel
+
+# the same GP, but with the basis rebuilt inside the traced body, exactly as the
+# enclosing Renewal does when it reconstructs its submodels
+@model function rebuilt_basis(gp, n)
+    z ~ to_submodel(as_turing_model(gp, n), false)
+    return z
+end
+
+gp = HilbertSpaceGP(m = 20)
+overhead = gradient_time(rebuilt_basis(gp, n)) -
+           gradient_time(as_turing_model(gp, n))
+share = overhead / gradient_time(composed(gp, n))
 round(share; sigdigits = 2)
 ```
 
-A few percent, so the repeat is not worth avoiding. Caching the basis on the
-struct would remove it but would tie a latent model to one series length, which
-is a poor trade for this much.
+That is the fraction of each gradient a cached basis would recover. Caching
+would tie a latent model to one series length, which is the composability the
+rest of the package is built on, so the repeat stands; the number above is what
+it costs, measured rather than assumed.
 
 ## Posterior trajectories
 
@@ -313,10 +351,10 @@ fig
 ```
 
 The share of days on which the 95% band contains the quantity it is estimating
-puts a number on what the figure shows, and would drop sharply if a fit ever
-degenerated.
-Asserting it turns a degenerate fit into a build failure rather than a wrong
-figure sitting under prose that claims otherwise:
+is a calibration check on the bands the figure draws. It is not on its own a
+check on fit quality — a fit that had collapsed onto a wide, near-prior band
+would score well on it — which is why the accuracy of the posterior means is
+asserted separately above.
 
 ```@example gp
 covered(b, x) = round(mean(b[:, 1] .<= x .<= b[:, 5]); digits = 2)
