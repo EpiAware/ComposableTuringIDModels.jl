@@ -166,7 +166,7 @@ is well resolved and the cross-chain ``\hat R`` diagnostic is available; the
 slightly raised target acceptance rate keeps the sampler stable on the
 hierarchical innovation scale. We differentiate with
 [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for
-this package (see [Automatic differentiation backend](@ref ad-backend)).
+this package (see [Automatic differentiation backend](@ref ad-backends)).
 
 ```@example renewal
 posterior = as_turing_model(model, y_obs, n)

@@ -59,7 +59,7 @@ using Statistics: Statistics
 export AbstractComposableModel, as_turing_model
 export AbstractPriorModel, AbstractLatentModel, AbstractInfectionModel,
        AbstractObservationModel, AbstractObservationErrorModel
-export implements_prior_interface, implements_latent_interface,
+export implements_prior_interface,
        implements_infection_interface, implements_observation_interface
 export as_turing_submodel
 

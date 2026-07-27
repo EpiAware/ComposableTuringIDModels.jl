@@ -69,7 +69,7 @@ end
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(385)
     h = Hierarchy(Normal(), IID(Normal(0.0, 1.0)))
-    @test implements_latent_interface(h; n = 4)
+    @test implements_prior_interface(h; n = 4)
     @test !implements_observation_interface(h)
     @test !implements_infection_interface(h)
     # Because it returns numeric values, it threads straight into an infection
