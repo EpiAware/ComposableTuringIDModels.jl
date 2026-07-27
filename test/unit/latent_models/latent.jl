@@ -77,6 +77,24 @@ end
     @test_throws AssertionError as_turing_model(HilbertSpaceGP(), 1)()
 end
 
+@testitem "GP latents reject a hyperprior that strays off its support" begin
+    using ComposableTuringIDModels, Distributions
+    # An unbounded prior is caught at construction. Left to the sampler the
+    # first negative proposal would abort the chain from inside the spectral
+    # density (HSGP) or the Cholesky factorisation (exact), far from the cause.
+    for GP in (HilbertSpaceGP, ExactGP)
+        @test_throws AssertionError GP(; length_scale = Normal())
+        @test_throws AssertionError GP(;
+            length_scale = truncated(Normal(), -1, Inf))
+        @test_throws AssertionError GP(; marginal_std = Normal())
+        # the shipped defaults, and a hand-rolled prior whose support is open
+        # at zero, both pass
+        @test GP() isa GP
+        @test GP(; length_scale = Gamma(2, 0.2),
+            marginal_std = Exponential(1.0)) isa GP
+    end
+end
+
 @testitem "HilbertSpaceGP supports squared-exponential and Matern kernels" begin
     using ComposableTuringIDModels, Distributions, Random
     using KernelFunctions: Kernel

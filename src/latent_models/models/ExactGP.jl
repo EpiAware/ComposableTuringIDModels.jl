@@ -54,8 +54,11 @@ per-evaluation work.
 
 ## Fields
 
-  - `length_scale`: prior for the length scale ``\ell``.
-  - `marginal_std`: prior for the marginal standard deviation ``\sigma``.
+  - `length_scale`: prior for the length scale ``\ell``; it must put no mass
+    below zero, since the covariance is not positive definite at
+    ``\ell \le 0``. Checked at construction.
+  - `marginal_std`: prior for the marginal standard deviation ``\sigma``; it
+    must put no mass below zero. Checked at construction.
   - `kernel`: the covariance kernel, a KernelFunctions.jl `Kernel` (default
     `SqExponentialKernel()`).
   - `jitter`: relative diagonal nugget ``\tau`` for a stable Cholesky factor
@@ -77,9 +80,9 @@ length(as_turing_model(gp_matern, 30)())
 "
 struct ExactGP{L <: Sampleable, S <: Sampleable, K <: Kernel} <:
        AbstractLatentModel
-    "Prior distribution for the length scale ``\\ell``."
+    "Prior for the length scale ``\\ell``; puts no mass below zero."
     length_scale::L
-    "Prior distribution for the marginal standard deviation ``\\sigma``."
+    "Prior for ``\\sigma``; puts no mass below zero."
     marginal_std::S
     "Covariance kernel, a KernelFunctions.jl `Kernel`."
     kernel::K
@@ -89,6 +92,7 @@ struct ExactGP{L <: Sampleable, S <: Sampleable, K <: Kernel} <:
     function ExactGP(length_scale::Sampleable, marginal_std::Sampleable,
             kernel::Kernel, jitter::Real)
         @assert jitter>0 "jitter must be greater than 0"
+        _check_hyperprior_support(length_scale, marginal_std)
         new{typeof(length_scale), typeof(marginal_std), typeof(kernel)}(
             length_scale, marginal_std, kernel, Float64(jitter))
     end

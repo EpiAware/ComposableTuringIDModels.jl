@@ -67,10 +67,29 @@ end
 
 # Shared guard for the `spectral_density` methods. A zero length scale makes the
 # Matérn densities NaN (ν = √(2p+1)/ℓ = Inf, then Inf^p/Inf^p), so reject it
-# with a diagnostic rather than let a NaN basis reach the sampler.
+# with a diagnostic rather than let a NaN basis reach the sampler. The two GP
+# models reject a hyperprior that could reach here at construction (see
+# `_check_hyperprior_support`), so for them this is a backstop for a direct call
+# rather than something a chain can hit.
 function _check_spectral_args(σ, ℓ)
     @assert ℓ>0 "the length scale ℓ must be greater than 0"
     @assert σ>=0 "the marginal standard deviation σ must not be negative"
+    return nothing
+end
+
+# Shared construction-time guard for the two GP latent models. Both need ℓ > 0
+# (no spectral density, and a singular covariance, at ℓ ≤ 0) and σ ≥ 0. Checking
+# the *support* at construction rejects an unusable hyperprior — say
+# `length_scale = Normal()` — up front, rather than letting the first negative
+# proposal abort a chain a long way from its cause. The bound is ≥ 0 rather than
+# > 0 so that a prior with an open lower limit at zero (`Gamma`, `LogNormal`) is
+# accepted: it puts no mass on ℓ = 0, and `_check_spectral_args` is the backstop
+# for the measure-zero case.
+function _check_hyperprior_support(length_scale, marginal_std)
+    ℓ_msg = "the length scale prior must not put mass on ℓ < 0"
+    σ_msg = "the marginal standard deviation prior must not put mass on σ < 0"
+    @assert minimum(length_scale)>=0 ℓ_msg
+    @assert minimum(marginal_std)>=0 σ_msg
     return nothing
 end
 
@@ -153,8 +172,11 @@ ends.
 
 ## Fields
 
-  - `length_scale`: prior for the length scale ``\ell``.
-  - `marginal_std`: prior for the marginal standard deviation ``\sigma``.
+  - `length_scale`: prior for the length scale ``\ell``; it must put no mass
+    below zero, since ``\ell \le 0`` has no spectral density. Checked at
+    construction.
+  - `marginal_std`: prior for the marginal standard deviation ``\sigma``; it
+    must put no mass below zero. Checked at construction.
   - `m`: number of basis functions.
   - `c`: boundary factor; the GP is approximated on ``[-L, L]`` with ``L = c S``.
   - `kernel`: the covariance kernel, a KernelFunctions.jl `Kernel` (default
@@ -176,9 +198,9 @@ length(as_turing_model(gp_matern, 30)())
 "
 struct HilbertSpaceGP{L <: Sampleable, S <: Sampleable, K <: Kernel} <:
        AbstractLatentModel
-    "Prior distribution for the length scale ``\\ell``."
+    "Prior for the length scale ``\\ell``; puts no mass below zero."
     length_scale::L
-    "Prior distribution for the marginal standard deviation ``\\sigma``."
+    "Prior for ``\\sigma``; puts no mass below zero."
     marginal_std::S
     "Number of basis functions."
     m::Int
@@ -191,6 +213,7 @@ struct HilbertSpaceGP{L <: Sampleable, S <: Sampleable, K <: Kernel} <:
             marginal_std::Sampleable, m::Int, c::Real, kernel::Kernel)
         @assert m>0 "m (the number of basis functions) must be greater than 0"
         @assert c>1 "c (the boundary factor) must be greater than 1"
+        _check_hyperprior_support(length_scale, marginal_std)
         new{typeof(length_scale), typeof(marginal_std), typeof(kernel)}(
             length_scale, marginal_std, m, Float64(c), kernel)
     end
