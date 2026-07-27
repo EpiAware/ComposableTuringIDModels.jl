@@ -114,21 +114,23 @@ builds them outside the `@model` body and captures them, so nothing in the basis
 is differentiated and each log-density evaluation only reweights and combines a
 fixed matrix. (Composed inside another model — a [`Renewal`](@ref) whose `rt`
 slot is this GP — the enclosing `@model` reconstructs its submodels on every
-evaluation, so the basis is rebuilt each time: still undifferentiated, and an
-``O(nm)`` set of sinusoids that measures a few percent of one gradient
-evaluation.) The latent path is a cheap matrix–vector product of a fixed basis
-against a small set of standard-normal weights — a non-centred parameterisation
-that is fast and samples well under NUTS, including with
+evaluation, so the basis is rebuilt *inside* the traced call. It still depends
+on no sampled parameter, but it is executed and taped like the rest of the body,
+so it is not free; the Gaussian-process case study measures what that costs.)
+The latent path is a cheap matrix–vector product of a fixed basis against a
+small set of standard-normal weights — a non-centred parameterisation that is
+fast and samples well under NUTS, including with
 [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) reverse-mode AD.
 
 The accuracy/speed trade-off is controlled by two numbers
 [riutortmayol2023practical](@citep): the number of basis functions `m` (more
 basis functions resolve shorter length scales, at linear cost) and the boundary
 factor `c` (the domain is extended to ``L = c\,S`` beyond the half-range ``S`` of
-the standardised inputs, so that boundary effects do not distort the fit). Because
-the inputs are standardised to unit standard deviation (see [`hsgp_basis`](@ref)),
-``\ell`` is scale-free — measured in standard deviations of the inputs, not raw
-time steps — so a fixed `m` stays adequate as the series length changes.
+the standardised inputs, so that boundary effects do not distort the fit).
+Because the inputs are standardised to unit standard deviation (see
+[`standardised_index`](@ref)), ``\ell`` is scale-free — measured in standard
+deviations of the inputs, not raw time steps — so a fixed `m` stays adequate as
+the series length changes.
 
 The two act at opposite ends of the length-scale range, and each sets the floor
 on accuracy where the other cannot help. A **short** ``\ell`` needs a larger `m`:
@@ -205,20 +207,31 @@ end
 @doc raw"
 Standardise the integer index ``1:n`` to zero mean and unit standard deviation.
 
-This makes the length scale ``\ell`` scale-free: the half-range approaches
+This is the input grid both [`HilbertSpaceGP`](@ref) and [`ExactGP`](@ref) hand
+to their covariance kernel, so a given length scale ``\ell`` means the same
+thing for both. It also makes ``\ell`` scale-free: the half-range approaches
 ``\sqrt 3`` as ``n`` grows rather than scaling like ``(n-1)/2``, so a short
 ``\ell`` stays representable by a fixed number of basis functions ``m``
 regardless of series length.
 
-Internal, but shared by [`HilbertSpaceGP`](@ref) and [`ExactGP`](@ref) so a
-given length scale means the same thing for both, and by the reconstruction
-tests so they build the exact kernel on the coordinates the basis uses.
+It is public so that a comparison against another Gaussian-process
+implementation — an [AbstractGPs.jl](https://juliagaussianprocesses.github.io/AbstractGPs.jl/)
+`GP`, say — can be built on the same coordinates rather than on a
+reimplementation of this formula. Requires `n > 1`, since the standard deviation
+of a single point is zero.
 
 # Arguments
 
   - `n`: the series length.
+
+# Examples
+```@example standardised_index
+using ComposableTuringIDModels
+standardised_index(5)
+```
 "
-function _standardised_index(n::Int)
+function standardised_index(n::Int)
+    @assert n>1 "n must be greater than 1 to standardise the index"
     (collect(1:n) .- Statistics.mean(1:n)) ./ Statistics.std(1:n)
 end
 
@@ -235,14 +248,15 @@ approximated on ``[-L, L]`` with ``L = c S``. Standardising keeps a fixed
 ``\ell`` prior (and a fixed `m`) meaningful across series lengths: ``\ell`` is
 measured in standard deviations of the inputs, not raw time steps. Both outputs
 depend only on `n`, `m` and `c` — none of the sampled parameters — so
-[`HilbertSpaceGP`](@ref) calls this once per model construction, outside the
-`@model` body and so outside anything that is differentiated. Requires `n > 1`
-so the standard deviation (and hence ``S``) is positive; `n = 1` would give
-``S = L = 0`` and a basis of `NaN`.
+[`HilbertSpaceGP`](@ref) calls this once per model construction rather than from
+inside the `@model` body; see [`HilbertSpaceGP`](@ref) for what that leaves when
+the GP is composed inside another model. Requires `n > 1` so the standard
+deviation (and hence ``S``) is positive; `n = 1` would give ``S = L = 0`` and a
+basis of `NaN`.
 "
 function hsgp_basis(n::Int, m::Int, c::Real)
     @assert n>1 "n must be greater than 1 for a well-defined basis (S > 0)"
-    x = _standardised_index(n)
+    x = standardised_index(n)
     S = maximum(abs, x)          # half-range of the standardised inputs
     L = c * S
     j = collect(1:m)'

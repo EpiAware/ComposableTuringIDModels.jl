@@ -82,7 +82,8 @@ export IID, HierarchicalNormal, RandomWalk, AR, TimeVaryingAR, MA, Intercept,
 # Covariance kernels for `HilbertSpaceGP` / `ExactGP` are re-exported from
 # KernelFunctions.jl (the ecosystem standard); `spectral_density` adds the
 # Hilbert-space weights those kernels need.
-export SqExponentialKernel, Matern32Kernel, Matern52Kernel, spectral_density
+export SqExponentialKernel, Matern32Kernel, Matern52Kernel, spectral_density,
+       standardised_index
 
 # --- latent modifiers / manipulators / combinations / broadcasting ---
 export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
