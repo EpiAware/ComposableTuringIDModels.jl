@@ -63,17 +63,39 @@ const _PRIOR_LINE = "prior_model = as_turing_model(model, missing, n)"
 #  3. `as_turing_model` returns a `DynamicPPL.Model`, whose display is six lines
 #     of nested type parameters. That is noise on the home page, so the docs
 #     copy adds a `nothing # hide` line: `@example` shows the value of the
-#     block's last expression, so this drops the output while `# hide` keeps
-#     the added line out of the rendered snippet, which stays identical to
-#     `README.md`. A trailing `;` does not work here — unlike the REPL,
-#     `@example` displays the final value regardless. The block's job is to
+#     block's last expression, so this drops the output. The block's job is to
 #     build the model; the blocks that follow carry the output worth reading.
+#     A trailing `;` does not work here — unlike the REPL, `@example` displays
+#     the final value regardless.
+#
+# Both added-line rewrites end their inserted lines with `# hide`, so they run
+# but stay out of the rendered snippet: the code shown on the home page is
+# character-for-character the code in `README.md`, and a reader copying from
+# either place gets the same thing.
+const _SEED_LINES = "\nusing Random # hide\nRandom.seed!(27) # hide"
+
 const INDEX_REWRITES = Pair{String, String}[
     "(NOTICE)" => "($(_REPO_BLOB)/NOTICE)",
     "(LICENSE)" => "($(_REPO_BLOB)/LICENSE)",
-    _USING_LINE => "$(_USING_LINE)\nusing Random\nRandom.seed!(27)",
+    _USING_LINE => _USING_LINE * _SEED_LINES,
     _PRIOR_LINE => "$(_PRIOR_LINE)\nnothing # hide"
 ]
+
+# The rewrites above are exact-string matches, and `build_index` applies them
+# with a bare `replace` that cannot tell a no-match from a match. A README edit
+# that reflows or reorders either keyed line would silently drop the seeding —
+# leaving the home page to build from an arbitrary prior draw, which over seeds
+# 1:60 ranged up to 1e36 cases and an unconverged fit — or the output-hiding.
+# Fail the build here instead of shipping the page. (Appending to a keyed line
+# still matches, and the rewrite still lands where it should.)
+let readme = read(joinpath(@__DIR__, "..", "README.md"), String)
+    for (from, _) in INDEX_REWRITES
+        occursin(from, readme) ||
+            error("docs/docs_config.jl: INDEX_REWRITES no longer matches " *
+                  "README.md, so the generated home page would silently " *
+                  "lose this rewrite: \"$from\"")
+    end
+end
 
 # Run the README's ```julia fences on the home page so every block shows its
 # printed output (#218). The managed build converts EVERY fence into an
