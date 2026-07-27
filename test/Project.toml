@@ -37,13 +37,18 @@ ComposableTuringIDModels = {path = ".."}
 # `Quality: formatting` resolves JuliaFormatter from this shared environment
 # (the managed `quality.jl` calls `test_formatting(QA_CONFIG.mod)` with no
 # `env`), so an unbounded entry lets a new formatter minor turn `main` red.
-# The two tilde ranges are `[2.4, 2.12]` — two closed minor windows, not one
-# span. Write them with `~`: for a 1.x+ package a bare `2.4, 2.12` collapses to
-# the single interval `2.4.0 - 2` (identical to plain `2.4`) and bounds
-# nothing, because caret semantics pin the major. Both windows are needed
-# because JET pins JuliaSyntax: on Julia 1.11 JET is capped at 0.9.x /
-# JuliaSyntax 0.4 and only JuliaFormatter 2.4 resolves, while on 1.12 JET 0.11
-# admits JuliaSyntax 1.0 and 2.12 resolves. Drop the 2.4 window once JET's
-# floor moves past JuliaSyntax 0.4.
-JuliaFormatter = "~2.4, ~2.12"
+# `=2.10.1` is the version that actually runs the check on the `1` matrix leg,
+# and it is the repo's single-sourced formatter version — keep it in step with
+# the `.pre-commit-config.yaml` hook `rev`, the exact pin in
+# `test/formatter/Project.toml` and `juliaformatter_version` in
+# `.github/workflows/pre-commit.yaml`, all of which come from the kit's
+# `_JULIAFORMATTER_VERSION`. Bump all four together or CI asserts a different
+# style from the one `task format` applies.
+# `~2.4` is a second, disjoint window (not one span: for a 1.x+ package a bare
+# `2.4, 2.10.1` collapses to `2.4.0 - 2` and bounds nothing, because caret
+# semantics pin the major). It exists only as a Julia 1.11 escape hatch: JET
+# pins JuliaSyntax, and on 1.11 JET is capped at 0.9.x / JuliaSyntax 0.4 where
+# only JuliaFormatter 2.4 resolves. Drop the 2.4 window once JET's floor moves
+# past JuliaSyntax 0.4.
+JuliaFormatter = "~2.4, =2.10.1"
 TestItems = "1.0.0"
