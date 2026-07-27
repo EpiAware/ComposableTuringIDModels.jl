@@ -371,13 +371,15 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (28 scenarios × 4 backends), Julia 1.12:
+Result matrix (30 scenarios × 4 backends), Julia 1.12:
 
 | scenario                                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
 |-------------------------------------------------------|:-----------:|:-----------:|:--------:|:------:|
 | RandomWalk latent logjoint                            |      ✓      |      ✓      |    ✓    |   ✓   |
 | AR latent logjoint                                    |      ✓      |      ✓      |    ✓    |   ✗   |
 | ARIMA latent logjoint                                 |      ✓      |      ✓      |    ✓    |   ✗   |
+| HilbertSpaceGP latent logjoint                        |      ✓      |      ✓      |    ✓    |   ✓   |
+| HilbertSpaceGP Matern latent logjoint                 |      ✓      |      ✓      |    ✓    |   ✓   |
 | MA latent logjoint                                    |      ✓      |      ✓      |    ✓    |   ✗   |
 | HierarchicalNormal latent logjoint                    |      ✓      |      ✓      |    ✓    |   ✓   |
 | DiffLatentModel(RandomWalk) latent logjoint           |      ✓      |      ✓      |    ✓    |   ✗   |
@@ -404,8 +406,9 @@ Result matrix (28 scenarios × 4 backends), Julia 1.12:
 | BinomialError ascertainment posterior                 |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+Split cascade posterior                       |      ✓      |      ✓      |    ✓    |   ✗   |
 
-scenario correctly. Enzyme (configured with `function_annotation = Enzyme.Const`,
-see [`backends`](@ref)) works on fifteen of the twenty-eight but raises
+ForwardDiff, ReverseDiff and Mooncake differentiate every scenario correctly.
+Enzyme (configured with `function_annotation = Enzyme.Const`, see
+[`backends`](@ref)) works on seventeen of the thirty but raises
 `IllegalTypeAnalysisException` / a related type-analysis or shadow error on
 thirteen:
 
