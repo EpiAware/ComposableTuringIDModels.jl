@@ -66,6 +66,7 @@ models = (
         renewal(SusceptibleDepletion(pop_size),
             ImportedCases(FixedIntercept(log(2.0)))),
         obs))
+nothing # hide
 
 md"""
 Simulating from each model with `missing` observations and the same fixed
@@ -83,7 +84,11 @@ md"""
 
 Counts are plotted on a log scale, floored at one so that zero reports stay
 visible.
+The reporting delay leaves the first `length(delay) - 1` days without a reported
+count, so the lower panel starts on day `length(delay)`.
 """
+
+obs_days = length(delay):n
 
 fig = Figure(; size = (760, 560))
 ax1 = Axis(fig[1, 1]; ylabel = "Infections Iₜ", yscale = log10)
@@ -94,8 +99,8 @@ labels = (plain = "renewal", depleting = "+ susceptible depletion",
 for k in keys(sims)
     lines!(ax1, 1:n, sims[k].I_t; color = colours[k], linewidth = 2,
         label = labels[k])
-    scatter!(ax2, 1:n, max.(sims[k].generated_y_t, 1); color = colours[k],
-        markersize = 7)
+    scatter!(ax2, obs_days, max.(sims[k].generated_y_t[obs_days], 1);
+        color = colours[k], markersize = 7)
 end
 axislegend(ax1; position = :lt)
 fig
@@ -153,9 +158,8 @@ We fit that model to the reported cases simulated above.
 The reproduction number is still held at its simulated value, so the importation
 rate is what is being learned; with ``R_t`` free as well the two compete to
 explain the same growth and the fit is much less sharp.
-The reporting delay also leaves the first `length(delay) - 1` days unobserved,
-so those entries of `y_obs` are `missing` and are sampled rather than
-conditioned on.
+The unobserved days at the start are `missing` entries of `y_obs`, and are
+sampled rather than conditioned on.
 """
 
 model = IDModel(
@@ -182,21 +186,19 @@ The posterior predictive then tracks the simulated series.
 """
 
 pred = predict(as_turing_model(model, fill(missing, n), n), chain)
-## The reporting delay leaves the first `length(delay) - 1` days without a
-## reported count, so band the days from there on.
-scored = length(delay):n
 y_draws(i) = Float64.(vec(pred[@varname(y_t[i])]))
-bands = reduce(hcat, map(i -> quantile(y_draws(i), [0.05, 0.5, 0.95]), scored))
+quantiles(i) = quantile(y_draws(i), [0.05, 0.5, 0.95])
+bands = reduce(hcat, map(quantiles, obs_days))
 
 fig3 = Figure(; size = (760, 300))
 ax4 = Axis(fig3[1, 1]; xlabel = "Day", ylabel = "Reported cases",
     yscale = log10)
-band!(ax4, scored, max.(bands[1, :], 1), max.(bands[3, :], 1);
+band!(ax4, obs_days, max.(bands[1, :], 1), max.(bands[3, :], 1);
     color = (:teal, 0.25))
-lines!(ax4, scored, max.(bands[2, :], 1); color = :teal, linewidth = 2,
+lines!(ax4, obs_days, max.(bands[2, :], 1); color = :teal, linewidth = 2,
     label = "posterior predictive")
-scatter!(ax4, 1:n, max.(y_obs, 1); color = :black, markersize = 7,
-    label = "simulated")
+scatter!(ax4, obs_days, max.(y_obs[obs_days], 1); color = :black,
+    markersize = 7, label = "simulated")
 axislegend(ax4; position = :lt)
 fig3
 
