@@ -37,14 +37,18 @@ const INDEX_REWRITES = Pair{String, String}[
     "(LICENSE)" => "($(_REPO_BLOB)/LICENSE)"
 ]
 
-# The README's ```julia fences are illustrative, and the managed build converts
-# EVERY one of them to an executed `@example readme` block. Executing them would
-# run `Pkg.add("ComposableTuringIDModels")` from the Installation section against
-# the registry, add a 1000-draw NUTS fit to every docs build, and call
-# `summarystats`, which the README never brings into scope.
-const README_EXECUTE = false
+# Run the README's ```julia fences on the home page so every block shows its
+# printed output (#218). The managed build converts EVERY fence into an
+# executed `@example readme` block and has no per-fence opt-out, so the one
+# fence that must not run, `Pkg.add("ComposableTuringIDModels")` under
+# Installation, is handled by stripping that section from the generated index
+# (see `INDEX_STRIP_SECTIONS` below). Executing it would hit the registry and
+# install a second copy of the package into the docs environment. Installation
+# stays in `README.md` for GitHub readers, and the docs site carries it on the
+# Overview page.
+const README_EXECUTE = true
 
-const INDEX_STRIP_SECTIONS = String[]
+const INDEX_STRIP_SECTIONS = String["Installation"]
 
 # The package benchmarks and publishes a timeline to the `benchmarks` branch,
 # so the generated page (heading + `docs/benchmarks.md` prose + history) is on.
