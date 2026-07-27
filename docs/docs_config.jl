@@ -66,15 +66,19 @@ const _INSTALL_POINTER = "- Ready to install? See [Installation](@ref)."
 #     at rhat 2.02 and min ess_bulk 2.6.
 #  3. `as_turing_model` returns a `DynamicPPL.Model`, whose display is six lines
 #     of nested type parameters. That is noise on the home page, so the docs
-#     copy ends the line with `;`. The block's job is to build the model; the
-#     blocks that follow carry the output worth reading.
+#     copy adds a `nothing # hide` line: `@example` shows the value of the
+#     block's last expression, so this drops the output while `# hide` keeps
+#     the added line out of the rendered snippet, which stays identical to
+#     `README.md`. A trailing `;` does not work here — unlike the REPL,
+#     `@example` displays the final value regardless. The block's job is to
+#     build the model; the blocks that follow carry the output worth reading.
 #  4. The Installation section is stripped from the home page (see
 #     `INDEX_STRIP_SECTIONS`), so add a pointer to where it went.
 const INDEX_REWRITES = Pair{String, String}[
     "(NOTICE)" => "($(_REPO_BLOB)/NOTICE)",
     "(LICENSE)" => "($(_REPO_BLOB)/LICENSE)",
     _USING_LINE => "$(_USING_LINE)\nusing Random\nRandom.seed!(27)",
-    _PRIOR_LINE => "$(_PRIOR_LINE);",
+    _PRIOR_LINE => "$(_PRIOR_LINE)\nnothing # hide",
     _GITHUB_LINE => "$(_GITHUB_LINE)\n$(_INSTALL_POINTER)"
 ]
 
