@@ -47,11 +47,13 @@ Hilbert-space basis is set by the series length, the number of basis functions
 and the boundary factor alone, so [`as_turing_model`](@ref) builds it before
 returning the model and captures it: it sits outside the `@model` body and is
 never differentiated, leaving one ``n \times m`` matrix–vector product in the
-gradient. (Composed into a [`Renewal`](@ref), the enclosing model rebuilds its
-submodels each evaluation and the basis is rebuilt with them — still
-undifferentiated, and a few percent of one gradient.) The exact GP's covariance
-and its Cholesky factor depend on ``\ell`` and ``\sigma``, so both are rebuilt
-*and* differentiated every time. That is where the timing gap below comes from.
+gradient. The exact GP's covariance and its Cholesky factor depend on ``\ell``
+and ``\sigma``, so both are rebuilt *and* differentiated every time. That is
+where the timing gap below comes from.
+
+Composed into a [`Renewal`](@ref), the enclosing `@model` reconstructs its
+submodels on every evaluation, so the basis is rebuilt each time — outside the
+gradient, but not for free. That cost is measured below.
 
 ## The kernel and the GP ecosystem
 
@@ -65,9 +67,9 @@ exact GPs from. A kernel enters [`ExactGP`](@ref) through its Gram matrix and
 
 Both models are linear in a vector of standard-normal weights (`z` for the exact
 GP, ``\beta`` for the Hilbert-space one), so fixing the hyperparameters and
-feeding in unit vectors traces out that linear map; the Gram matrix of the
-result is the model's implied prior covariance, which we can compare against the
-covariance AbstractGPs builds from the same kernel.
+feeding in unit vectors traces out that linear map. The Gram matrix of the result
+is the model's implied prior covariance, and we compare it against the covariance
+AbstractGPs builds from the same kernel.
 
 ```@example gp
 using LinearAlgebra, Statistics
@@ -75,35 +77,42 @@ using AbstractGPs: GP, cov as gp_cov
 using KernelFunctions: with_lengthscale
 using Turing: fix
 
-n0, ℓ0, σ0, m0 = 40, 1.0, 1.0, 40
-x = (collect(1:n0) .- mean(1:n0)) ./ std(1:n0)   # models standardise the index
-K_ref = gp_cov(GP(σ0^2 * with_lengthscale(SqExponentialKernel(), ℓ0))(x))
-tol = (exact = 1e-5, hsgp = 5e-3)   # asserted below, so drift fails the build
-
+n0, σ0 = 40, 1.0
+# both models standardise the integer index before the kernel sees it
+x = (collect(1:n0) .- mean(1:n0)) ./ std(1:n0)
 unit(k, j) = [i == j ? 1.0 : 0.0 for i in 1:k]
-relerr(K) = norm(K - K_ref) / norm(K_ref)
+gram(cols) = (M = reduce(hcat, cols); M * M')
 
-function gram(cols)
-    M = reduce(hcat, cols)
-    return M * M'
+exact_cov(ℓ) = gram([fix(as_turing_model(ExactGP(), n0),
+                        (ℓ = ℓ, σ = σ0, z = unit(n0, j)))() for j in 1:n0])
+hsgp_cov(ℓ, m, c) = gram([fix(as_turing_model(HilbertSpaceGP(m = m, c = c), n0),
+                             (ℓ = ℓ, σ = σ0, β = unit(m, j)))() for j in 1:m])
+
+function relerr(K, ℓ)
+    K_ref = gp_cov(GP(σ0^2 * with_lengthscale(SqExponentialKernel(), ℓ))(x))
+    return norm(K - K_ref) / norm(K_ref)
 end
 
-K_exact = gram([fix(as_turing_model(ExactGP(), n0),
-                    (ℓ = ℓ0, σ = σ0, z = unit(n0, j)))() for j in 1:n0])
-K_hsgp = gram([fix(as_turing_model(HilbertSpaceGP(m = m0, c = 2.0), n0),
-                   (ℓ = ℓ0, σ = σ0, β = unit(m0, j)))() for j in 1:m0])
-@assert relerr(K_exact) < tol.exact && relerr(K_hsgp) < tol.hsgp
-(exact = round(relerr(K_exact), sigdigits = 2),
-    hsgp = round(relerr(K_hsgp), sigdigits = 2))
+# ℓ = 0.3 sits in the bulk of the default prior, ℓ = 1.0 far out in its tail
+err = (exact = relerr(exact_cov(0.3), 0.3),
+    default_short = relerr(hsgp_cov(0.3, 20, 1.5), 0.3),
+    default_long = relerr(hsgp_cov(1.0, 20, 1.5), 1.0),
+    more_basis_long = relerr(hsgp_cov(1.0, 40, 1.5), 1.0),
+    wider_domain_long = relerr(hsgp_cov(1.0, 20, 2.0), 1.0))
+
+# asserted, so drift fails the build rather than printing a worse number
+@assert err.exact < 1e-5 && err.default_short < 1e-3
+@assert err.default_long < 0.06 && err.wider_domain_long < 1e-3
+map(e -> round(e, sigdigits = 2), err)
 ```
 
-The exact GP reproduces the ecosystem covariance to the jitter it adds for a
-stable Cholesky factor, and the Hilbert-space basis reproduces it to a fraction
-of a percent.
-The comparison grid `x` reproduces the standardisation both models apply to the
-integer index, and the assertion is what keeps that honest. If either the
-standardisation or the basis changed, the check would fail rather than quietly
-print a worse number.
+The exact GP matches to the jitter it adds for a stable Cholesky factor.
+At its defaults the Hilbert-space basis matches to two parts in ten thousand at
+the shorter length scale, the regime this page fits in.
+At the longer one it is out by a few percent and more basis functions do not
+help: there the boundary factor `c` sets the floor, because the approximation is
+periodic on ``[-L, L]`` and a slowly varying path feels that boundary. Widening
+to `c = 2` recovers two orders of magnitude.
 
 ## Simulate from an exact GP
 
@@ -173,9 +182,9 @@ its curvature enormous, so NUTS shrinks the step size by six or seven orders of
 magnitude and the chain never leaves its starting point. Any GP hyperprior with a
 long tail has this failure mode, and starting from the prior avoids it.
 
-A small helper fits a chosen GP latent, times the run, recovers the per-draw
-``\log R_t`` with [`generated_observables`](@ref), and scores the posterior mean
-against the truth. `sample` returns a
+A small helper fits a chosen GP latent to the first `n_fit` days, times the run,
+recovers the per-draw ``\log R_t`` with [`generated_observables`](@ref), and
+scores the posterior mean against the truth. `sample` returns a
 [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, read directly
 — no conversion.
 
@@ -183,45 +192,79 @@ against the truth. `sample` returns a
 using Turing, Mooncake, Statistics
 using ADTypes: AutoMooncake
 
-function fit_gp(latent)
+function fit_gp(latent, n_fit)
     model = IDModel(Renewal(; generation_time = si, rt = latent,
             initialisation = Normal(log(2.0), 0.1)), obs)
-    posterior = as_turing_model(model, y_obs, n)
+    y = y_obs[1:n_fit]
+    posterior = as_turing_model(model, y, n_fit)
     time = @elapsed chain = sample(posterior,
         NUTS(0.9; adtype = AutoMooncake(; config = nothing)), 300;
         initial_params = InitFromPrior(), progress = false)
-    gen = vec(generated_observables(posterior, y_obs, chain).generated)
+    gen = vec(generated_observables(posterior, y, chain).generated)
     Z = reduce(hcat, (g.Z_t for g in gen))          # time × draw
     Z_mean = vec(mean(Z; dims = 2))
-    (; model, chain, Z, Z_mean, time, cor = cor(Z_mean, Z_true),
-        rmse = sqrt(mean((Z_mean .- Z_true) .^ 2)))
+    Z_ref = Z_true[1:n_fit]
+    (; model, chain, n = n_fit, Z, Z_mean, time, cor = cor(Z_mean, Z_ref),
+        rmse = sqrt(mean((Z_mean .- Z_ref) .^ 2)))
 end
 
+n_ex = 40   # the exact GP is fit to the first n_ex days only
 Random.seed!(1)
-hs = fit_gp(HilbertSpaceGP(m = 20))
+hs = fit_gp(HilbertSpaceGP(m = 20), n)
 Random.seed!(1)
-ex = fit_gp(ExactGP())
+ex = fit_gp(ExactGP(), n_ex)
 
-(hsgp = (cor = round(hs.cor, digits = 2), rmse = round(hs.rmse, digits = 3),
-        seconds = round(hs.time, digits = 1)),
-    exact = (cor = round(ex.cor, digits = 2), rmse = round(ex.rmse, digits = 3),
-        seconds = round(ex.time, digits = 1)))
+score(f) = (days = f.n, cor = round(f.cor, digits = 2),
+    rmse = round(f.rmse, digits = 3), seconds = round(f.time, digits = 1))
+(hsgp = score(hs), exact = score(ex))
 ```
 
-Both recover the latent reproduction number closely, and the approximate model is
-several times the faster: its differentiated work is one ``n \times m``
-matrix–vector product, against an ``O(n^3)`` covariance build and factorisation
-for the exact GP. That gap is the reason the approximation exists, and it widens
-with the series length; at short ``n`` like this the exact GP is still affordable
+Both recover the latent reproduction number closely.
+The exact GP is fit to the first `n_ex` days rather than all `n`: its ``O(n^3)``
+factorisation is rebuilt and differentiated at every leapfrog step, and at the
+full length it would dominate the cost of building this page. Even on the
+shorter series it is the slower of the two, against a Hilbert-space fit on
+nearly twice as many days whose differentiated work is one ``n \times m``
+matrix–vector product. That gap is the reason the approximation exists, and it
+widens with the series length; at short ``n`` the exact GP is still affordable
 and gives the reference the approximation is judged against. Each timing is a
-single un-warmed run that includes the model's compilation, so read the ratio as
+single un-warmed run that includes the model's compilation, so read it as
 indicative rather than as a benchmark.
+
+That leaves the basis rebuild the composed model does on every evaluation.
+Timing it against one Mooncake gradient of the same log-density puts a number on
+the overhead:
+
+```@example gp
+using Chairmarks: @b
+using DynamicPPL: LogDensityFunction, VarInfo
+using LogDensityProblems: logdensity_and_gradient
+
+gp = HilbertSpaceGP(m = 20)
+posterior = as_turing_model(IDModel(Renewal(; generation_time = si, rt = gp,
+            initialisation = Normal(log(2.0), 0.1)), obs), y_obs, n)
+ldf = LogDensityFunction(posterior; adtype = AutoMooncake(; config = nothing))
+Random.seed!(3)
+θ = VarInfo(posterior)[:]
+
+rebuild = @b as_turing_model(gp, n)                     # what Renewal redoes
+gradient = @b logdensity_and_gradient(ldf, θ)
+share = rebuild.time / gradient.time
+@assert share < 0.25
+round(share; sigdigits = 2)
+```
+
+A few percent, so the repeat is not worth avoiding. Caching the basis on the
+struct would remove it but would tie a latent model to one series length, which
+is a poor trade for this much.
 
 ## Posterior trajectories
 
 Following the plotting convention of the other case studies, two small helpers
 reduce the per-draw trajectories to credible bands and draw a median line with
-50% and 95% ribbons.
+50% and 95% ribbons. Neither skips a missing or failed value: nothing here is
+scored on a delayed scale, so a band shorter than the days it is drawn against
+is a bug and raises rather than plotting a truncated ribbon.
 
 ```@example gp
 CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
@@ -249,8 +292,9 @@ simulated truth.
 ts = 1:n
 fig = Figure(; size = (760, 620))
 ax1 = Axis(fig[1, 1]; ylabel = "Reproduction number Rₜ")
-for (fit, color, label) in ((hs, :teal, "HSGP"), (ex, :purple, "exact"))
-    ci_ribbon!(ax1, ts, credible_bands(exp.(fit.Z)); color = color,
+for (fit, color, label) in ((hs, :teal, "HSGP"),
+    (ex, :purple, "exact (first $(n_ex) days)"))
+    ci_ribbon!(ax1, 1:(fit.n), credible_bands(exp.(fit.Z)); color = color,
         label = label)
 end
 lines!(ax1, ts, exp.(Z_true); color = :black, linewidth = 2,
@@ -277,7 +321,7 @@ figure sitting under prose that claims otherwise:
 ```@example gp
 covered(b, x) = round(mean(b[:, 1] .<= x .<= b[:, 5]); digits = 2)
 coverage = (Rt_hsgp = covered(credible_bands(exp.(hs.Z)), exp.(Z_true)),
-    Rt_exact = covered(credible_bands(exp.(ex.Z)), exp.(Z_true)),
+    Rt_exact = covered(credible_bands(exp.(ex.Z)), exp.(Z_true[1:(ex.n)])),
     cases = covered(credible_bands(yt), y_obs))
 @assert all(>=(0.8), coverage) "a 95% band covers under 80% of days: $coverage"
 coverage
