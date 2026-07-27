@@ -9,15 +9,6 @@ constructor, [`as_turing_model`](@ref).
 Because every part speaks that one interface, parts nest inside one another and
 a whole model is *composed* from the pieces.
 
-## Installation
-
-Install the package from the Julia General registry:
-
-```julia
-using Pkg
-Pkg.add("ComposableTuringIDModels")
-```
-
 ## Three roles, one interface
 
 A model is put together from parts filling three roles.

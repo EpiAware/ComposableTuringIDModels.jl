@@ -72,15 +72,6 @@ chain = sample(posterior_model, NUTS(), 1_000)
 summarystats(chain)
 ```
 
-## Installation
-
-Install the package from the Julia General registry:
-
-```julia
-using Pkg
-Pkg.add("ComposableTuringIDModels")
-```
-
 ## Swap a part
 
 Because every part is interchangeable, the same swap-in/swap-out pattern applies
