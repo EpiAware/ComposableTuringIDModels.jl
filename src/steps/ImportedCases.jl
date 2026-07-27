@@ -34,14 +34,15 @@ so infections can arrive from outside the modelled population — the mechanism
 behind a renewal process that would otherwise die out from a zero initial
 incidence, and behind reintroduction after local elimination.
 
-`importation_rate` is a length-`n` prior slot holding the **unconstrained**
-rate ``\tilde\iota_t``, exactly as [`Renewal`](@ref)'s `rt` slot holds the
-unconstrained ``Z_t``. The modifier maps it to the positive rate ``\iota_t``
-through its own `transformation` ``g`` (default `exp`), so importation is
-positive by construction and *any* latent process can drive it — a bare
-`Distribution` gives a constant rate shared across time, and a process (e.g. a
-[`RandomWalk`](@ref)) gives a time-varying ``\iota_t`` that stays positive even
-as the underlying path crosses zero.
+`importation_rate` is a per-step parameter slot holding the **unconstrained**
+rate ``\tilde\iota_t``, read at step ``t`` with [`_at`](@ref): a bare
+`Distribution` is one unknown constant shared across time, a
+`Vector{<:Distribution}` or a latent process (e.g. a [`RandomWalk`](@ref)) is a
+length-`n` path. The modifier maps whatever it gets onto the positive rate
+``\iota_t`` with its own `transformation` ``g`` (default `exp`), so importation
+is positive by construction and *any* latent process can drive it — a
+time-varying ``\iota_t`` stays positive even as the underlying path crosses
+zero.
 
 The rate is drawn before the scan through the modifier seam (see
 [`AbstractRenewalModifier`](@ref)), giving an [`ImportedRate`](@ref) that adds
@@ -50,6 +51,19 @@ how it composes: placed *after* a [`SusceptibleDepletion`](@ref) the imports are
 added to the depleted incidence, so they are not scaled by the susceptible
 fraction and do not themselves deplete the pool; placed *before* it they are
 treated as part of the incidence the pool depletes.
+
+The drawn rate is named `import_rates`, prefixed by the modifier's **position**
+in the renewal step's modifier tuple, so its posterior is read from a chain as
+
+```julia
+model = Renewal(gen_int, SusceptibleDepletion(N), ImportedCases(Normal());
+    rt = RandomWalk(), initialisation = Normal())
+# `modifier_2` because importation is the second modifier; `exp` puts the
+# draws back on the scale of imports per unit time.
+exp.(vec(chain[@varname(modifier_2.import_rates)]))
+```
+
+Inserting or reordering modifiers renames it.
 
 The resulting incidence is floored at a small positive value, keeping the
 renewal recursion well defined for observation models that require a positive

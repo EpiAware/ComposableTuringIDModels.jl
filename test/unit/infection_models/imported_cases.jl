@@ -97,7 +97,11 @@ end
     y = as_turing_model(model, missing, 20)().generated_y_t
     chn = sample(as_turing_model(model, y, 20), NUTS(), 30;
         progress = false)
-    @test chn !== nothing
+    # The importation rate is sampled under the positional name the seam gives
+    # it, and its draws are usable.
+    draws = vec(chn[@varname(modifier_1.import_rates)])
+    @test length(draws) == 30
+    @test all(isfinite, draws)
 end
 
 @testitem "ImportedCases resolves to an ImportedRate before the scan" begin
@@ -149,6 +153,71 @@ end
     # No importation parameters are sampled when no modifier declares any.
     draw = rand(as_turing_model(depleting, 10))
     @test !any(k -> occursin("import", string(k)), keys(draw))
+end
+
+@testitem "the pre-scan seam takes any modifier, not just ImportedCases" begin
+    using ComposableTuringIDModels, Distributions, Random, Turing
+    using ComposableTuringIDModels: AbstractRenewalModifier,
+                                    SusceptibleDepletion, _at
+    using DynamicPPL: fix
+    Random.seed!(1895)
+
+    # A modifier defined here rather than in the package: it carries a prior,
+    # draws it through the seam, and resolves to a plain scan modifier. Nothing
+    # in the renewal model knows what it is.
+    struct ScaledIncidence{P} <: AbstractRenewalModifier
+        log_scale::P
+    end
+    struct FixedScale{T} <: AbstractRenewalModifier
+        scale::T
+    end
+    ComposableTuringIDModels.modifier_init_state(::FixedScale) = 0
+    function ComposableTuringIDModels.apply_modifier(
+            mod::FixedScale, incidence, t)
+        return mod.scale * incidence, t + 1
+    end
+    Turing.@model function ComposableTuringIDModels.as_turing_model(
+            mod::ScaledIncidence, n)
+        log_scale ~ as_turing_submodel(mod.log_scale, n; prefix = true)
+        return FixedScale(exp(_at(log_scale, 1)))
+    end
+
+    gen_int = [0.2, 0.3, 0.5]
+    fixinit = (init_incidence = log(1.0),)
+    args = (; rt = FixedIntercept(log(1.0)), initialisation = Normal())
+    # The scan uses the resolved value: halving each step's incidence leaves
+    # the series below the unscaled one.
+    plain = Renewal(gen_int; args...)
+    scaled = Renewal(gen_int, ScaledIncidence(FixedIntercept(log(0.5)));
+        args...)
+    I_plain = fix(as_turing_model(plain, 30), fixinit)().I_t
+    I_scaled = fix(as_turing_model(scaled, 30), fixinit)().I_t
+    @test all(>(0), I_scaled)
+    @test I_scaled[end] < I_plain[end]
+
+    # Composed alongside the package's own modifiers it is namespaced by its
+    # position like any other, and only the modifiers carrying priors sample.
+    r = Renewal(gen_int, SusceptibleDepletion(500.0),
+        ScaledIncidence(Normal(-0.1, 0.05)),
+        ImportedCases(Normal(-1.0, 0.1)); rt = RandomWalk(),
+        initialisation = Normal())
+    ks = string.(collect(keys(rand(as_turing_model(r, 15)))))
+    @test any(k -> startswith(k, "modifier_2.log_scale"), ks)
+    @test any(k -> startswith(k, "modifier_3.import_rates"), ks)
+    @test !any(k -> startswith(k, "modifier_1."), ks)
+    out = as_turing_model(r, 15)()
+    @test length(out.I_t) == 15
+    @test all(>(0), out.I_t)
+end
+
+@testitem "an unresolved modifier says so instead of a MethodError" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: modifier_init_state, apply_modifier
+    # `ImportedCases` carries priors and has no scan interface of its own, so
+    # scanning a hand-built step that was never resolved names the problem.
+    ic = ImportedCases(Normal(0.0, 0.1))
+    @test_throws "has no scan interface" modifier_init_state(ic)
+    @test_throws "has no scan interface" apply_modifier(ic, 1.0, 0)
 end
 
 @testitem "several sampling modifiers compose without colliding" begin

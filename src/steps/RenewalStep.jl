@@ -19,32 +19,60 @@
 @doc raw"
 Abstract supertype for renewal modifiers composed onto a [`RenewalStep`](@ref).
 
-A modifier transforms the proposed new incidence and carries its own substate
-across the scan. Concrete modifiers implement
+The type covers two shapes. A **scan** modifier is called by the scan itself: it
+transforms the proposed new incidence and carries its own substate. It
+implements
 
   - `modifier_init_state(mod)` — the modifier's initial substate.
   - `apply_modifier(mod, incidence, substate)` — return
     `(new_incidence, new_substate)`.
 
-A modifier may additionally need **parameters sampled before the scan** — a
-per-time importation rate, an uncertain population size — which the scan itself
-cannot draw, because a scan step is a plain deterministic function. That is the
-third, optional part of the interface:
+A **prior-carrying** modifier instead needs parameters sampled *before* the
+scan — a per-time importation rate, an uncertain population size — which the
+scan cannot draw, because a scan step is a plain deterministic function. It
+implements the other part of the interface:
 
   - `as_turing_model(mod, n)` — a `DynamicPPL.Model` returning the modifier
     used in the scan. The default method samples nothing and returns `mod`
     unchanged, so a purely deterministic modifier (e.g.
-    [`SusceptibleDepletion`](@ref)) implements nothing extra. A modifier with
-    priors implements it, draws its slots through
-    [`as_turing_submodel`](@ref), and returns a *resolved* modifier holding the
-    drawn values — e.g. [`ImportedCases`](@ref) returns an
-    [`ImportedRate`](@ref).
+    [`SusceptibleDepletion`](@ref)) is a scan modifier and implements nothing
+    extra. A prior-carrying modifier implements this method, draws its slots
+    through [`as_turing_submodel`](@ref), and returns a *resolved* scan
+    modifier holding the drawn values — e.g. [`ImportedCases`](@ref) resolves
+    to an [`ImportedRate`](@ref) and implements no scan interface of its own.
 
 [`RenewalStep`](@ref) resolves its whole modifier tuple through this one seam
 (see its `as_turing_model` method), so a sampling modifier needs no special
-handling anywhere in the renewal model.
+handling anywhere in the renewal model. A prior-carrying modifier reaching the
+scan means the step was built by hand and never resolved, so the scan interface
+errors with that message rather than a bare `MethodError`.
+
+Each modifier's sampled variables are prefixed by its **position** in the
+modifier tuple, `modifier_<i>`, so two modifiers of the same kind cannot
+collide on a variable name — in
+`Renewal(data, SusceptibleDepletion(N), ImportedCases(Normal()))` the
+importation rate is `modifier_2.import_rates`. Inserting or reordering a
+modifier therefore renames the variables of every modifier after it.
 "
 abstract type AbstractRenewalModifier end
+
+# A prior-carrying modifier resolves to a separate scan modifier and has no
+# scan interface of its own, so reaching the scan with one means the step was
+# never resolved. Name the modifier and point at the seam instead of failing
+# with a bare `MethodError` from inside the recursion.
+function _unresolved_modifier(mod)
+    return error("$(typeof(mod)) has no scan interface. A modifier " *
+                 "carrying priors must be resolved before the scan with " *
+                 "`as_turing_model(step, n)` (what `Renewal` does); a " *
+                 "deterministic modifier must implement " *
+                 "`modifier_init_state` and `apply_modifier`.")
+end
+
+modifier_init_state(mod::AbstractRenewalModifier) = _unresolved_modifier(mod)
+
+function apply_modifier(mod::AbstractRenewalModifier, incidence, substate)
+    return _unresolved_modifier(mod)
+end
 
 # The default pre-scan seam: a modifier with no parameters of its own samples
 # nothing and scans as itself. Kept as a `@model` so every modifier resolves
@@ -166,6 +194,10 @@ The default method samples nothing and returns the step unchanged; a
 their own `as_turing_model` methods and rebuilds itself from the resolved
 modifiers. [`Renewal`](@ref) draws its step through this one seam, so a
 modifier with priors needs no special handling in the infection model.
+
+Each modifier is prefixed by its position in the tuple, so the ``i``th
+modifier's variables are namespaced `modifier_<i>` (see
+[`AbstractRenewalModifier`](@ref)).
 
 # Arguments
 
