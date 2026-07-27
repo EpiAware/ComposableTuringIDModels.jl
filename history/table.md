@@ -1,24 +1,24 @@
-|                                                                    | 7c61e740279838...   |
+|                                                                    | cf1082c78b8100...   |
 |:-------------------------------------------------------------------|:-------------------:|
-| AD gradients/AR latent logjoint/ForwardDiff                        | 14.2 ± 20 μs        |
-| AD gradients/AR latent logjoint/Mooncake reverse                   | 8.89 ± 2.7 μs       |
-| AD gradients/AR latent logjoint/ReverseDiff (tape)                 | 0.0513 ± 0.0092 ms  |
-| AD gradients/DirectInfections+Poisson posterior/Enzyme reverse     | 0.0703 ± 0.00085 ms |
-| AD gradients/DirectInfections+Poisson posterior/ForwardDiff        | 0.211 ± 0.015 ms    |
-| AD gradients/DirectInfections+Poisson posterior/Mooncake reverse   | 0.0793 ± 0.0012 ms  |
-| AD gradients/DirectInfections+Poisson posterior/ReverseDiff (tape) | 0.175 ± 0.022 ms    |
-| Model evaluation/AR latent/forward                                 | 0.642 ± 0.091 μs    |
-| Model evaluation/AR latent/rand                                    | 1.78 ± 1.2 μs       |
-| Model evaluation/DirectInfections+Poisson/forward                  | 0.0672 ± 0.00098 ms |
-| Model evaluation/DirectInfections+Poisson/rand                     | 0.0665 ± 0.00096 ms |
-| Model evaluation/RandomWalk latent/forward                         | 1.25 ± 0.74 μs      |
-| Model evaluation/RandomWalk latent/rand                            | 1.45 ± 0.93 μs      |
-| Model evaluation/Renewal+NegativeBinomial/forward                  | 0.0696 ± 0.0011 ms  |
-| Model evaluation/Renewal+NegativeBinomial/rand                     | 0.0688 ± 0.0014 ms  |
-| Sampling/NUTS (DirectInfections+Poisson, 50 draws)                 | 0.405 ± 0.21 s      |
-| time_to_load                                                       | 4.28 ± 0.034 s      |
+| AD gradients/AR latent logjoint/ForwardDiff                        | 12.9 ± 17 μs        |
+| AD gradients/AR latent logjoint/Mooncake reverse                   | 8.35 ± 2.3 μs       |
+| AD gradients/AR latent logjoint/ReverseDiff (tape)                 | 0.0538 ± 0.01 ms    |
+| AD gradients/DirectInfections+Poisson posterior/Enzyme reverse     | 0.0773 ± 0.00074 ms |
+| AD gradients/DirectInfections+Poisson posterior/ForwardDiff        | 0.232 ± 0.015 ms    |
+| AD gradients/DirectInfections+Poisson posterior/Mooncake reverse   | 0.0866 ± 0.0016 ms  |
+| AD gradients/DirectInfections+Poisson posterior/ReverseDiff (tape) | 0.197 ± 0.028 ms    |
+| Model evaluation/AR latent/forward                                 | 0.617 ± 0.074 μs    |
+| Model evaluation/AR latent/rand                                    | 1.69 ± 1 μs         |
+| Model evaluation/DirectInfections+Poisson/forward                  | 0.0745 ± 0.00086 ms |
+| Model evaluation/DirectInfections+Poisson/rand                     | 0.0733 ± 0.00082 ms |
+| Model evaluation/RandomWalk latent/forward                         | 1.11 ± 0.64 μs      |
+| Model evaluation/RandomWalk latent/rand                            | 1.29 ± 0.79 μs      |
+| Model evaluation/Renewal+NegativeBinomial/forward                  | 0.0763 ± 0.0009 ms  |
+| Model evaluation/Renewal+NegativeBinomial/rand                     | 0.0755 ± 0.001 ms   |
+| Sampling/NUTS (DirectInfections+Poisson, 50 draws)                 | 0.567 ± 0.13 s      |
+| time_to_load                                                       | 4.26 ± 0.14 s       |
 
-|                                                                    | 7c61e740279838...         |
+|                                                                    | cf1082c78b8100...         |
 |:-------------------------------------------------------------------|:-------------------------:|
 | AD gradients/AR latent logjoint/ForwardDiff                        | 0.056 k allocs: 0.0508 MB |
 | AD gradients/AR latent logjoint/Mooncake reverse                   | 0.04 k allocs: 4.98 kB    |
@@ -35,6 +35,6 @@
 | Model evaluation/RandomWalk latent/rand                            | 15  allocs: 2.05 kB       |
 | Model evaluation/Renewal+NegativeBinomial/forward                  | 0.48 k allocs: 22.3 kB    |
 | Model evaluation/Renewal+NegativeBinomial/rand                     | 0.477 k allocs: 21.6 kB   |
-| Sampling/NUTS (DirectInfections+Poisson, 50 draws)                 | 1.05 M allocs: 0.132 GB   |
+| Sampling/NUTS (DirectInfections+Poisson, 50 draws)                 | 1.14 M allocs: 0.143 GB   |
 | time_to_load                                                       | 0.149 k allocs: 11.2 kB   |
 
