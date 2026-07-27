@@ -13,7 +13,6 @@ EpiAwarePackageTools = "7aaea248-0d11-4a0d-a7dc-86da30abb951"
 ComposableTuringIDModels = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
 ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
-JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LogDensityProblems = "6fdf6af0-433a-55f7-b3ed-c6c6e0b8df7c"
@@ -36,19 +35,14 @@ ComposableTuringIDModels = {path = ".."}
 [compat]
 # `Quality: formatting` resolves JuliaFormatter from this shared environment
 # (the managed `quality.jl` calls `test_formatting(QA_CONFIG.mod)` with no
-# `env`), so an unbounded entry lets a new formatter minor turn `main` red.
-# `=2.10.1` is the version that actually runs the check on the `1` matrix leg,
-# and it is the repo's single-sourced formatter version — keep it in step with
-# the `.pre-commit-config.yaml` hook `rev`, the exact pin in
+# `env`), so an unbounded entry lets a new formatter release turn `main` red.
+# Pin exactly to the repo's single-sourced formatter version so the check
+# asserts the style `task format` and pre-commit apply. That version comes from
+# the kit's `_JULIAFORMATTER_VERSION` and reaches this repo through three
+# MANAGED files — the `.pre-commit-config.yaml` hook `rev`, the exact pin in
 # `test/formatter/Project.toml` and `juliaformatter_version` in
-# `.github/workflows/pre-commit.yaml`, all of which come from the kit's
-# `_JULIAFORMATTER_VERSION`. Bump all four together or CI asserts a different
-# style from the one `task format` applies.
-# `~2.4` is a second, disjoint window (not one span: for a 1.x+ package a bare
-# `2.4, 2.10.1` collapses to `2.4.0 - 2` and bounds nothing, because caret
-# semantics pin the major). It exists only as a Julia 1.11 escape hatch: JET
-# pins JuliaSyntax, and on 1.11 JET is capped at 0.9.x / JuliaSyntax 0.4 where
-# only JuliaFormatter 2.4 resolves. Drop the 2.4 window once JET's floor moves
-# past JuliaSyntax 0.4.
-JuliaFormatter = "~2.4, =2.10.1"
+# `.github/workflows/pre-commit.yaml`. This file is package-owned, so
+# template-sync will not move it: `test/package/formatter_pin.jl` fails loudly
+# if the kit bumps the managed pin and this one is left behind.
+JuliaFormatter = "=2.10.1"
 TestItems = "1.0.0"
