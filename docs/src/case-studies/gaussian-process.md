@@ -94,26 +94,35 @@ function relerr(K, ℓ)
     return norm(K - K_ref) / norm(K_ref)
 end
 
-# ℓ = 0.3 sits in the bulk of the default prior, ℓ = 1.0 far out in its tail
+# ℓ = 0.3 is the median of the default prior; 0.1 and 1.0 are its two tails
 err = (exact = relerr(exact_cov(0.3), 0.3),
-    default_short = relerr(hsgp_cov(0.3, 20, 1.5), 0.3),
+    default_mid = relerr(hsgp_cov(0.3, 20, 1.5), 0.3),
+    default_short = relerr(hsgp_cov(0.1, 20, 1.5), 0.1),
+    more_basis_short = relerr(hsgp_cov(0.1, 60, 1.5), 0.1),
     default_long = relerr(hsgp_cov(1.0, 20, 1.5), 1.0),
     more_basis_long = relerr(hsgp_cov(1.0, 40, 1.5), 1.0),
     wider_domain_long = relerr(hsgp_cov(1.0, 20, 2.0), 1.0))
 
 # asserted, so drift fails the build rather than printing a worse number
-@assert err.exact < 1e-5 && err.default_short < 1e-3
-@assert err.default_long < 0.06 && err.wider_domain_long < 1e-3
+@assert err.exact < 1e-5 && err.default_mid < 1e-3
+@assert err.default_short > 0.1 && err.more_basis_short < 1e-3
+@assert err.default_long > 0.01 && err.wider_domain_long < 1e-3
+@assert isapprox(err.more_basis_long, err.default_long; rtol = 1e-3)
 map(e -> round(e, sigdigits = 2), err)
 ```
 
-The exact GP matches to the jitter it adds for a stable Cholesky factor.
-At its defaults the Hilbert-space basis matches to two parts in ten thousand at
-the shorter length scale, the regime this page fits in.
-At the longer one it is out by a few percent and more basis functions do not
-help: there the boundary factor `c` sets the floor, because the approximation is
-periodic on ``[-L, L]`` and a slowly varying path feels that boundary. Widening
-to `c = 2` recovers two orders of magnitude.
+The exact GP matches to the jitter it adds for a stable Cholesky factor. The
+Hilbert-space basis matches to two parts in ten thousand at the prior median, and
+degrades at both ends of the length-scale range with a different fix at each end.
+At the short end the basis cannot resolve wiggles finer than ``2L/m``, so the
+default `m = 20` is 25% out at ``\ell = 0.1`` and raising `m` to 60 recovers it.
+At the long end more basis functions do nothing: the approximation is periodic on
+``[-L, L]`` and a slowly varying path feels that boundary, so the fix is the
+boundary factor `c`, and widening to `c = 2` gains two orders of magnitude.
+
+The default ``\ell`` prior puts about a third of its mass below 0.2, so a series
+whose latent process really is that wiggly needs a larger `m` than the default.
+The Hilbert-space fit below settles inside the accurate middle.
 
 ## Simulate from an exact GP
 
@@ -130,11 +139,11 @@ observed data — no rejection loop. The returned quantities include the reporte
 cases `generated_y_t`, the latent infections `I_t`, and the GP path
 `Z_t = \log R_t`.
 
-The epidemic is seeded at around fifty infections. That matters for what the
-page can claim: with a handful of cases a day the first fortnight of counts
-carries almost no information about ``R_t``, both fits fall back on the prior
-there, and a comparison against the truth would mostly be measuring the seed
-size rather than either model.
+The epidemic is seeded at around fifty infections rather than a handful, which
+matters for what the page can claim. With only a few cases a day the first
+fortnight of counts would carry almost no information about ``R_t``, both fits
+would fall back on the prior there, and a comparison against the truth would
+mostly measure the seed size rather than either model.
 
 ```@example gp
 si = Gamma(6.5, 0.62)
@@ -222,12 +231,17 @@ hs = fit_gp(HilbertSpaceGP(m = 20), n)
 Random.seed!(1)
 ex = fit_gp(ExactGP(), n_ex)
 
-# the page claims recovery, so it asserts recovery: a fit that had collapsed
-# onto the prior would fail the build rather than render a wrong figure
-@assert hs.cor > 0.9 && ex.cor > 0.9
-@assert hs.rmse < 0.15 && ex.rmse < 0.15
 score(f) = (days = f.n, cor = round(f.cor, digits = 2),
     rmse = round(f.rmse, digits = 3), seconds = round(f.time, digits = 1))
+scores() = "$(score(hs)), $(score(ex))"
+
+# the page claims recovery, so it asserts recovery: a fit that had collapsed
+# onto the prior would fail the build rather than render a wrong figure. The
+# thresholds are loose and the message prints the scores, so an RNG-stream
+# change that nudges a chain reports what it saw rather than failing bare. The
+# exact GP scores lower because it sees 40 days against the HSGP's 70.
+@assert hs.cor>0.9 && ex.cor>0.85 "posterior mean lost the latent: $(scores())"
+@assert hs.rmse<0.15 && ex.rmse<0.2 "posterior mean off the truth: $(scores())"
 (hsgp = score(hs), exact = score(ex))
 ```
 
@@ -292,7 +306,7 @@ round(share; sigdigits = 2)
 ```
 
 That is the fraction of each gradient a cached basis would recover. Caching
-would tie a latent model to one series length, which is the composability the
+would tie a latent model to one series length, at odds with the composability the
 rest of the package is built on, so the repeat stands; the number above is what
 it costs, measured rather than assumed.
 

@@ -44,11 +44,11 @@ mechanistic compartmental model, and a flexible Gaussian-process latent:
     process where dynamics come from an ordinary differential equation solved by
     the SciML stack [rackauckas2017differentialequations](@citep), following the
     Bayesian compartmental-inference example of [chatzilena2019contemporary](@citet).
-  - [A Gaussian-process latent process](@ref case-study-gp) — a composability
-    showcase that plugs a Hilbert-space approximate Gaussian process
-    [riutortmayol2023practical](@citep) into the renewal model as the latent
-    ``\log R_t`` process, fits it under NUTS with Mooncake, and recovers the
-    simulated latent.
+  - [A Gaussian-process latent process](@ref case-study-gp) — plugs a
+    Hilbert-space approximate Gaussian process [riutortmayol2023practical](@citep)
+    into the renewal model as the latent ``\log R_t`` process, fits it under NUTS
+    with Mooncake, and checks it against an exact GP and against the simulated
+    latent.
 
 Every example uses the same recipe: assemble components into a model, call
 [`as_turing_model`](@ref) (directly or through [`IDModel`](@ref) /
