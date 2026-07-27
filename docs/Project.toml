@@ -27,7 +27,7 @@ ComposableTuringIDModels = {path = ".."}
 
 [compat]
 ADTypes = "1"
-AlgebraOfGraphics = "0.12"
+AlgebraOfGraphics = "0.12, 0.13"
 CSV = "0.10"
 CairoMakie = "0.15"
 Catalyst = "16"
