@@ -3,8 +3,9 @@
 @doc raw"
 Broadcast a single sampled intercept value to a length-`n` latent process.
 
-The field `intercept_prior` sets the prior distribution the intercept is drawn
-from.
+The field `intercept` sets the prior the intercept is drawn from — a
+`Distribution`, drawn with a native tilde (a single scalar draw broadcast to
+length `n`).
 
 # Examples
 ```@example Intercept
@@ -14,13 +15,15 @@ mdl = as_turing_model(int, 10)
 rand(mdl)
 ```
 "
-@kwdef struct Intercept{D <: Sampleable} <: AbstractLatentModel
-    "Prior distribution for the intercept."
-    intercept_prior::D
+struct Intercept{D <: Distribution} <: AbstractLatentModel
+    "Prior for the intercept."
+    intercept::D
 end
 
+Intercept(; intercept) = Intercept(intercept)
+
 @model function as_turing_model(model::Intercept, n)
-    intercept ~ model.intercept_prior
+    intercept ~ model.intercept
     return fill(intercept, n)
 end
 

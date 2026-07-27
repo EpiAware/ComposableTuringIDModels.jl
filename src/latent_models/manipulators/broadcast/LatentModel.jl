@@ -64,15 +64,19 @@ each = BroadcastLatentModel(RandomWalk(), 7, RepeatEach())
 rand(as_turing_model(each, 10))
 ```
 
+The `model` slot is a length-`n` PATH slot: a bare `Distribution` there is
+auto-wrapped in an [`Intercept`](@ref), giving a constant inner path; a process,
+an [`IID`](@ref), or a vector passes through. Use [`IID`](@ref) for `n`
+independent draws. It is composed through [`as_turing_submodel`](@ref).
+
 ## Fields
 
   - `model`: the underlying latent model.
   - `period`: the broadcast period.
   - `broadcast_rule`: the [`AbstractBroadcastRule`](@ref) applied.
 "
-struct BroadcastLatentModel{
-    M <: AbstractLatentModel, P <: Integer, B <: AbstractBroadcastRule} <:
-       AbstractLatentModel
+struct BroadcastLatentModel{M <: PriorLike, P <: Integer,
+    B <: AbstractBroadcastRule} <: AbstractLatentModel
     "The underlying latent model."
     model::M
     "The period of the broadcast."
@@ -80,24 +84,24 @@ struct BroadcastLatentModel{
     "The broadcast rule applied."
     broadcast_rule::B
 
-    function BroadcastLatentModel(model::M,
-            period::Integer,
-            broadcast_rule::B) where {
-            M <: AbstractLatentModel, B <: AbstractBroadcastRule}
+    function BroadcastLatentModel(model, period::Integer,
+            broadcast_rule::B) where {B <: AbstractBroadcastRule}
         @assert period>0 "period must be greater than 0"
-        new{typeof(model), typeof(period), typeof(broadcast_rule)}(
-            model, period, broadcast_rule)
+        # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
+        # an `Intercept` (a constant inner path), never left as a scalar.
+        wrapped = _path_prior(model)
+        new{typeof(wrapped), typeof(period), typeof(broadcast_rule)}(
+            wrapped, period, broadcast_rule)
     end
 end
 
-function BroadcastLatentModel(model::M; period::Integer,
-        broadcast_rule::B) where {
-        M <: AbstractLatentModel, B <: AbstractBroadcastRule}
+function BroadcastLatentModel(model; period::Integer,
+        broadcast_rule::AbstractBroadcastRule)
     return BroadcastLatentModel(model, period, broadcast_rule)
 end
 
 @model function as_turing_model(model::BroadcastLatentModel, n)
     m = broadcast_n(model.broadcast_rule, n, model.period)
-    latent_period ~ to_submodel(as_turing_model(model.model, m), false)
+    latent_period ~ as_turing_submodel(model.model, m)
     return broadcast_rule(model.broadcast_rule, latent_period, n, model.period)
 end

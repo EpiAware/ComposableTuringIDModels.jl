@@ -58,7 +58,7 @@ jobs:
           - name: main
             ref: ${{ github.event.pull_request.base.sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ matrix.ref }}
       - uses: julia-actions/setup-julia@v3
@@ -88,7 +88,7 @@ jobs:
       # commit) for the scaffolded `benchmark/compare.jl` — unlike the
       # per-revision `benchmark` job above this never runs against an old
       # baseline, so it can safely depend on the kit-shipped script.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
         with:
           version: '1'

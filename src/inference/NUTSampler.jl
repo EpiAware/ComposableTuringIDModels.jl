@@ -58,18 +58,3 @@ function _apply_nuts(model, method, prev_result; kwargs...)
         method.mcmc_parallel, method.ndraws ÷ method.nchains, method.nchains;
         adapt_kwargs..., kwargs...)
 end
-
-function _apply_nuts(model, method, prev_result::PathfinderResult; kwargs...)
-    # A Pathfinder pre-step has run; thread its result through as the NUTS
-    # initialisation. The mechanism by which earlier EpiAware seeded NUTS from a
-    # Pathfinder draw (`init_params = eachrow(draws_transformed.value)`) is gone
-    # in current Turing (`initial_params` now requires an `AbstractInitStrategy`,
-    # not a vector) and Pathfinder (no `draws_transformed.value` array). The
-    # `pathfinder` integration already initialises its own optimisation from the
-    # model, so we run NUTS with the default strategy here. Note the Pathfinder
-    # result is currently *not* threaded into the returned solution — this path
-    # runs the optimisation and then samples from the default init. Warm-starting
-    # NUTS from the draw will be reinstated once the init-strategy API stabilises
-    # (tracked as a follow-up).
-    return _apply_nuts(model, method, nothing; kwargs...)
-end

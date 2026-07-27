@@ -27,7 +27,7 @@ rand(as_turing_model(combined, 10))
   - `prefixes`: the vector of prefixes, one per model.
 "
 struct ConcatLatentModels{
-    M <: AbstractVector{<:AbstractLatentModel}, N <: Int, F <: Function,
+    M <: AbstractVector, N <: Int, F <: Function,
     P <: AbstractVector{<:String}} <: AbstractLatentModel
     "A vector of latent models."
     models::M
@@ -38,8 +38,8 @@ struct ConcatLatentModels{
     "A vector of prefixes for the latent models."
     prefixes::P
 
-    function ConcatLatentModels(models::M, no_models::I, dimension_adaptor::F,
-            prefixes::P) where {M <: AbstractVector{<:AbstractLatentModel},
+    function ConcatLatentModels(models::AbstractVector, no_models::I,
+            dimension_adaptor::F, prefixes::P) where {
             I <: Int, F <: Function, P <: AbstractVector{<:String}}
         @assert length(models)>1 "At least two models are required"
         @assert length(models)==no_models "no_models must be equal to the number of models"
@@ -47,17 +47,22 @@ struct ConcatLatentModels{
         @assert typeof(check_dim)<:AbstractVector{Int} "Output of dimension_adaptor must be a vector of integers"
         @assert length(check_dim)==no_models "The vector of dimensions must have the same length as the number of models"
         @assert length(prefixes)==no_models "The number of models and prefixes must be equal"
-        prefix_models = [prefixes[i] == "" ? models[i] :
-                         PrefixLatentModel(models[i], prefixes[i])
+        # Each member is a length-`n` (segment) PATH slot, so a bare
+        # `Distribution` is wrapped in an `Intercept` (a constant segment) before
+        # it is namespaced; then non-empty prefixes get a `PrefixLatentModel` so
+        # variables stay distinct. A process / `IID` / vector member passes
+        # through unchanged.
+        prefix_models = [prefixes[i] == "" ? _path_prior(models[i]) :
+                         PrefixLatentModel(_path_prior(models[i]), prefixes[i])
                          for i in eachindex(models)]
-        return new{AbstractVector{<:AbstractLatentModel}, Int, Function,
+        return new{AbstractVector, Int, Function,
             AbstractVector{<:String}}(
             prefix_models, no_models, dimension_adaptor, prefixes)
     end
 end
 
-function ConcatLatentModels(models::M, dimension_adaptor::Function;
-        prefixes = nothing) where {M <: AbstractVector{<:AbstractLatentModel}}
+function ConcatLatentModels(models::AbstractVector, dimension_adaptor::Function;
+        prefixes = nothing)
     no_models = length(models)
     if isnothing(prefixes)
         prefixes = "Concat." .* string.(1:no_models)
@@ -65,15 +70,13 @@ function ConcatLatentModels(models::M, dimension_adaptor::Function;
     return ConcatLatentModels(models, no_models, dimension_adaptor, prefixes)
 end
 
-function ConcatLatentModels(models::M;
-        dimension_adaptor::Function = equal_dimensions, prefixes = nothing) where {
-        M <: AbstractVector{<:AbstractLatentModel}}
+function ConcatLatentModels(models::AbstractVector;
+        dimension_adaptor::Function = equal_dimensions, prefixes = nothing)
     return ConcatLatentModels(models, dimension_adaptor; prefixes = prefixes)
 end
 
-function ConcatLatentModels(; models::M,
-        dimension_adaptor::Function = equal_dimensions, prefixes = nothing) where {
-        M <: AbstractVector{<:AbstractLatentModel}}
+function ConcatLatentModels(; models::AbstractVector,
+        dimension_adaptor::Function = equal_dimensions, prefixes = nothing)
     return ConcatLatentModels(models, dimension_adaptor; prefixes = prefixes)
 end
 
@@ -118,7 +121,7 @@ end
     if index > n_models
         return acc_latent
     else
-        latent ~ to_submodel(as_turing_model(models[index], dims[index]), false)
+        latent ~ as_turing_submodel(models[index], dims[index])
         acc_latent = isnothing(acc_latent) ? latent : vcat(acc_latent, latent)
         updated_latent ~ to_submodel(
             _concat_latents(models, index + 1, acc_latent, dims, n_models), false)

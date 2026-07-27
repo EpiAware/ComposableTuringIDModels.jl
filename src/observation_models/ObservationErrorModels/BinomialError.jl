@@ -34,10 +34,9 @@ where `N` is a scalar `Integer` (the same trials at every time point) or an
 `y = missing` while still supplying `N`, e.g.
 `y_t = (y = missing, N = fill(20, n))`.
 
-This follows the same `NamedTuple`-data pattern as
-[`StackObservationModels`](@ref): the shared [`define_y_t`](@ref) hook unpacks the
-`y` field that every error model scores, and `BinomialError` additionally reads
-the `N` field it needs.
+This follows the same `NamedTuple`-data pattern as a [`Split`](@ref) stream: the
+shared [`define_y_t`](@ref) hook unpacks the `y` field that every error model
+scores, and `BinomialError` additionally reads the `N` field it needs.
 
 # Examples
 ```@example BinomialError
@@ -79,7 +78,7 @@ end
     for i in eachindex(Y_t)
         y_t[i + diff_t] ~ observation_error(obs_model, p_t[i], N_t[i])
     end
-    return y_t
+    return (; y_t, expected = Y_t)
 end
 
 observation_error(::BinomialError, p_t, N_t) = Binomial(N_t, p_t)

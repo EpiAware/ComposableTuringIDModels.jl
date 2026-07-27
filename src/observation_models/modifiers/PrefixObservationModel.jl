@@ -37,8 +37,10 @@ rand(mdl)
 end
 
 @model function as_turing_model(observation_model::PrefixObservationModel, y_t, Y_t)
+    # The inner model already returns the uniform `(; y_t, expected)` tuple; the
+    # prefix only renames its sampled variables, so pass the return value through.
     submodel ~ to_submodel(
         prefix(as_turing_model(observation_model.model, y_t, Y_t),
             Symbol(observation_model.prefix)), false)
-    return submodel
+    return (; y_t = submodel.y_t, expected = submodel.expected)
 end

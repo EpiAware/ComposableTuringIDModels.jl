@@ -75,9 +75,10 @@ as_turing_model(model, args...; kwargs...)  # returns a DynamicPPL.Model
   the left-hand name), which differs from upstream's flat `@submodel` behaviour.
   Pass `false` as the standard on *every* submodel conversion to preserve the
   existing variable names/behaviour. The only exceptions are the components that
-  upstream deliberately prefixed (`PrefixLatentModel`, `PrefixObservationModel`,
-  `StackObservationModels`, the old `prefix_submodel` call sites) — implement
-  their prefixing explicitly via `to_submodel`'s prefix argument.
+  deliberately prefix their streams (`PrefixLatentModel`, `PrefixObservationModel`,
+  the `Split` observation composition, the old `prefix_submodel` call sites) —
+  implement their prefixing explicitly via `DynamicPPL.prefix` / `to_submodel`'s
+  prefix argument.
 
 ## Naming
 

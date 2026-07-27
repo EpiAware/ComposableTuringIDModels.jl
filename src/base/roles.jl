@@ -16,42 +16,32 @@ same `as_turing_model` protocol every other component speaks:
 as_turing_model(prior::AbstractPriorModel, n)  # ⇒ a length-`n` vector
 ```
 
-The default wrapper [`BroadcastPrior`](@ref) turns a plain `Distribution` (the
-common case) into exactly this, and [`as_prior`](@ref) coerces a user-supplied
-`Distribution` / vector of `Distribution`s into the wrapper so constructors keep
-accepting bare distributions. Because every [`AbstractLatentModel`](@ref) already
-satisfies `as_turing_model(m, n) ⇒ length-n`, latent models **are** prior models:
-`AbstractLatentModel <: AbstractPriorModel`, so a prior slot accepts a latent
-model (e.g. a `RandomWalk` for a time-varying parameter) wherever it accepts a
-distribution wrapper. A genuinely scalar parameter uses `n == 1` and reads the
-element with `only(...)`, keeping the chain as small as a bare `~ dist`.
+A raw `Distribution` (or vector of them) is *not* a prior model but flows through
+the same [`as_turing_submodel`](@ref) seam: `as_turing_model` has `Distribution`
+and `Vector{<:Distribution}` methods, so a bare distribution composes as a
+length-`n` prior submodel exactly like a model does. This is the single role for
+every parameter *process*: a latent process (a `RandomWalk` for a time-varying
+parameter, an [`AR`](@ref) process, …) satisfies the same
+`as_turing_model(m, n) ⇒ length-n` contract, so it drops into any prior slot
+directly. The former `AbstractLatentModel` role has been folded into this one (it
+survives as a deprecated alias). A genuinely scalar parameter is drawn with a
+native tilde (`σ ~ model.std`), keeping the chain as small as a bare `~ dist`.
 
-This is the foundation for issue #37 (priors as submodels); the migration of the
-existing components' prior fields to this role is a separate, coordinated change.
+This delivers issue #37 (priors as length-`n` submodels).
 "
 abstract type AbstractPriorModel <: AbstractComposableModel end
 
 @doc raw"
-Supertype for **latent process** models.
+Deprecated alias for [`AbstractPriorModel`](@ref).
 
-A latent model maps a series length `n` to a length-`n` latent path. Its role
-interface is
-
-```julia
-as_turing_model(model::AbstractLatentModel, n)  # ⇒ a length-`n` latent path
-```
-
-Latent *modifiers* and *manipulators* (e.g. [`DiffLatentModel`](@ref),
-[`CombineLatentModels`](@ref), [`BroadcastLatentModel`](@ref)) are themselves
-`AbstractLatentModel`s: wrapping a latent model yields another latent model, so
-they compose freely. Their inner-model slots are typed `AbstractLatentModel`, so
-only latent components can be wrapped.
-
-A latent model also satisfies the [`AbstractPriorModel`](@ref) contract (same
-`as_turing_model(m, n) ⇒ length-n` signature), so `AbstractLatentModel <:
-AbstractPriorModel` and any latent model can be used directly as a prior.
+A latent process and a parameter prior share one role — both map a length `n` to a
+length-`n` vector via `as_turing_model(m, n)` — so the separate
+`AbstractLatentModel` type has been collapsed into [`AbstractPriorModel`](@ref).
+`AbstractLatentModel` remains as a `const` alias for one release for backwards
+compatibility (`AbstractLatentModel === AbstractPriorModel`); prefer
+[`AbstractPriorModel`](@ref) in new code.
 "
-abstract type AbstractLatentModel <: AbstractPriorModel end
+const AbstractLatentModel = AbstractPriorModel
 
 @doc raw"
 Supertype for **infection process** models.
@@ -72,8 +62,7 @@ for models with no exposable latent such as [`ODEProcess`](@ref)). Exposing
 
 Members include [`DirectInfections`](@ref), [`ExpGrowthRate`](@ref),
 [`Renewal`](@ref) and [`ODEProcess`](@ref). Only [`Renewal`](@ref) carries a
-generation interval ([`IDData`](@ref)); the others take a `transformation`
-directly.
+generation interval; the others take a `transformation` directly.
 "
 abstract type AbstractInfectionModel <: AbstractComposableModel end
 

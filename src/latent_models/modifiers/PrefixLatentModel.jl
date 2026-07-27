@@ -20,12 +20,15 @@ pm = PrefixLatentModel(; model = HierarchicalNormal(), prefix = \"Test\")
 rand(as_turing_model(pm, 10))
 ```
 
+The `model` slot takes a raw component: a latent model, or a `Distribution` (or a
+vector of them).
+
 ## Fields
 
   - `model`: the latent model to prefix.
   - `prefix`: the string prefix applied to the inner model's variables.
 "
-@kwdef struct PrefixLatentModel{M <: AbstractLatentModel, P <: String} <:
+@kwdef struct PrefixLatentModel{M <: PriorLike, P <: String} <:
               AbstractLatentModel
     "The latent model."
     model::M
