@@ -160,29 +160,43 @@ end
     @test all(isfinite, path)
 end
 
-@testitem "HilbertSpaceGP composes into a renewal and predicts every y_t" tags=[:sample] begin
+@testitem "HilbertSpaceGP composes into a renewal and recovers the latent" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     using DynamicPPL: InitFromPrior
+    using Statistics: cor, mean
     Random.seed!(13)
-    n = 25
+    # An epidemic large enough for the counts to identify the latent path: with
+    # only a handful of cases a day the posterior collapses onto the prior and
+    # nothing about recovery is testable.
+    n, ndraws = 40, 150
     model = IDModel(
         Renewal(; generation_time = Gamma(6.5, 0.62),
-            rt = HilbertSpaceGP(m = 8),
-            initialisation = Normal(log(1.5), 0.1)),
+            rt = HilbertSpaceGP(m = 12),
+            initialisation = Normal(log(50), 0.1)),
         NegativeBinomialError(cluster_factor = HalfNormal(0.1)))
     prior = as_turing_model(model, fill(missing, n), n)
-    y_obs = fix(prior, (ℓ = 0.5, σ = 0.3))().generated_y_t
+    sim = fix(prior, (ℓ = 0.5, σ = 0.5))()
+    y_obs = sim.generated_y_t
     posterior = as_turing_model(model, y_obs, n)
-    chain = sample(posterior, NUTS(0.9), 30;
+    chain = sample(posterior, NUTS(0.9), ndraws;
         initial_params = InitFromPrior(), progress = false)
     gen = vec(generated_observables(posterior, y_obs, chain).generated)
-    @test length(gen) == 30
+    @test length(gen) == ndraws
     @test all(g -> length(g.Z_t) == n && all(isfinite, g.Z_t), gen)
+    # A degenerate fit (σ initialised far out in the prior tail, step size
+    # collapsed, chain stuck) still returns finite paths of the right length,
+    # just wrong ones, so also check the posterior mean tracks the simulated
+    # latent and stays on a plausible scale. Recovery holds well away from these
+    # thresholds; a sweep over seeds gives correlations of 0.86 to 0.98 and a
+    # largest posterior-mean log Rt of about 1.1.
+    Z_mean = vec(mean(reduce(hcat, (g.Z_t for g in gen)); dims = 2))
+    @test cor(Z_mean, sim.Z_t) > 0.7
+    @test maximum(abs, Z_mean) < 3
     # Every reported-count index must come back from `predict`: the credible
     # bands in the Gaussian-process case study read `y_t[i]` for every `i`, and
     # a missing index would otherwise show up as a silently shortened band.
     pred = predict(prior, chain)
-    @test all(i -> length(vec(pred[@varname(y_t[i])])) == 30, 1:n)
+    @test all(i -> length(vec(pred[@varname(y_t[i])])) == ndraws, 1:n)
 end
 
 @testitem "ExactGP draws a length-n path with named GP parameters" begin
