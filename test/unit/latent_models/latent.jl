@@ -58,11 +58,10 @@ end
 
 @testitem "HilbertSpaceGP basis approximates the squared-exponential kernel" begin
     using ComposableTuringIDModels, Distributions, LinearAlgebra
-    using ComposableTuringIDModels: hsgp_basis, spectral_density,
-                                    _standardised_index
+    using ComposableTuringIDModels: hsgp_basis, spectral_density
     using KernelFunctions: with_lengthscale, kernelmatrix
     n, σ, ℓ, c = 20, 1.0, 0.5, 2.0
-    x = _standardised_index(n)
+    x = standardised_index(n)
     K_exact = kernelmatrix(σ^2 * with_lengthscale(SqExponentialKernel(), ℓ), x)
     Φ, sqrt_λ = hsgp_basis(n, 40, c)
     sd = sqrt.(spectral_density(SqExponentialKernel(), sqrt_λ, σ, ℓ))
@@ -125,11 +124,10 @@ end
 
 @testitem "HilbertSpaceGP Matern bases approximate their kernel covariance" begin
     using ComposableTuringIDModels, LinearAlgebra
-    using ComposableTuringIDModels: hsgp_basis, spectral_density,
-                                    _standardised_index
+    using ComposableTuringIDModels: hsgp_basis, spectral_density
     using KernelFunctions: with_lengthscale, kernelmatrix
     n, σ, ℓ, c = 20, 1.0, 0.8, 3.0
-    x = _standardised_index(n)
+    x = standardised_index(n)
     K_exact = kernelmatrix(σ^2 * with_lengthscale(Matern52Kernel(), ℓ), x)
     Φ, sqrt_λ = hsgp_basis(n, 60, c)
     sd = sqrt.(spectral_density(Matern52Kernel(), sqrt_λ, σ, ℓ))
@@ -231,13 +229,12 @@ end
 
 @testitem "ExactGP prior covariance is the exact kernel Gram matrix" begin
     using ComposableTuringIDModels, Distributions, Random, LinearAlgebra
-    using ComposableTuringIDModels: _standardised_index
     using DynamicPPL: fix
     using KernelFunctions: with_lengthscale, kernelmatrix
     using Statistics: cov, mean
     Random.seed!(10)
     n, σ, ℓ = 10, 1.0, 0.6
-    x = _standardised_index(n)
+    x = standardised_index(n)
     K_exact = kernelmatrix(σ^2 * with_lengthscale(SqExponentialKernel(), ℓ), x)
     mdl = fix(as_turing_model(ExactGP(), n), (ℓ = ℓ, σ = σ))
     draws = reduce(hcat, (mdl() for _ in 1:4000))
@@ -280,6 +277,78 @@ end
     path = as_turing_model(gp, n)()
     @test length(path) == n
     @test all(isfinite, path)
+end
+
+@testitem "ExactGP factorises at extreme marginal standard deviations" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: fix
+    Random.seed!(16)
+    # The nugget is relative to σ². With a fixed absolute nugget the Cholesky
+    # factorisation throws a `PosDefException` once σ is large enough that the
+    # covariance is only numerically indefinite — mid-chain, which kills the
+    # sampler rather than returning a bad draw.
+    n = 40
+    for σ in (1e-8, 1.0, 1e3, 1e5), ℓ in (0.05, 0.5, 5.0)
+
+        path = fix(as_turing_model(ExactGP(), n), (ℓ = ℓ, σ = σ))()
+        @test length(path) == n
+        @test all(isfinite, path)
+    end
+end
+
+@testitem "ExactGP captures its input grid as a model argument" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: DynamicPPL
+    Random.seed!(14)
+    n = 30
+    mdl = as_turing_model(ExactGP(), n)
+    @test mdl isa DynamicPPL.Model
+    # The standardised grid depends only on `n`, so `as_turing_model` builds it
+    # once and captures it rather than rebuilding it on every evaluation.
+    @test mdl.args.x == standardised_index(n)
+    @test length(mdl()) == n
+end
+
+@testitem "standardised_index is zero mean, unit sd, and guards n = 1" begin
+    using ComposableTuringIDModels
+    using Statistics: mean, std
+    x = standardised_index(40)
+    @test length(x) == 40
+    @test mean(x)≈0 atol=1e-12
+    @test std(x)≈1 atol=1e-12
+    # The half-range approaches √3 from below as n grows, which is what makes a
+    # fixed length-scale prior meaningful across series lengths.
+    @test maximum(abs, x) < sqrt(3)
+    @test maximum(abs, standardised_index(400)) > maximum(abs, x)
+    # n = 1 has zero standard deviation and would give a NaN grid.
+    @test_throws AssertionError standardised_index(1)
+end
+
+@testitem "ExactGP composes into a renewal and recovers the latent" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    using DynamicPPL: InitFromPrior
+    using Statistics: cor, mean
+    Random.seed!(15)
+    # The exact GP counterpart of the HilbertSpaceGP composed fit above, kept
+    # short because its covariance factorisation is O(n^3) per evaluation. The
+    # Gaussian-process case study drives this same composition under Mooncake.
+    n, ndraws = 30, 150
+    model = IDModel(
+        Renewal(; generation_time = Gamma(6.5, 0.62), rt = ExactGP(),
+            initialisation = Normal(log(50), 0.1)),
+        NegativeBinomialError(cluster_factor = HalfNormal(0.1)))
+    prior = as_turing_model(model, fill(missing, n), n)
+    sim = fix(prior, (ℓ = 0.5, σ = 0.5))()
+    y_obs = sim.generated_y_t
+    posterior = as_turing_model(model, y_obs, n)
+    chain = sample(posterior, NUTS(0.9), ndraws;
+        initial_params = InitFromPrior(), progress = false)
+    gen = vec(generated_observables(posterior, y_obs, chain).generated)
+    @test length(gen) == ndraws
+    @test all(g -> length(g.Z_t) == n && all(isfinite, g.Z_t), gen)
+    Z_mean = vec(mean(reduce(hcat, (g.Z_t for g in gen)); dims = 2))
+    @test cor(Z_mean, sim.Z_t) > 0.7
+    @test maximum(abs, Z_mean) < 3
 end
 
 @testitem "rand from a latent model namespaces prior variables" begin
