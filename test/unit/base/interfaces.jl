@@ -104,15 +104,15 @@ end
     using ComposableTuringIDModels, Distributions
     gen_int = [0.2, 0.3, 0.5]
     # Each checker is true for an in-role model implementing its as_turing_model.
-    @test implements_latent_interface(RandomWalk())
-    @test implements_latent_interface(AR(); n = 12)
+    @test implements_prior_interface(RandomWalk())
+    @test implements_prior_interface(AR(); n = 12)
     @test implements_infection_interface(DirectInfections(; Z = RandomWalk()))
     @test implements_infection_interface(Renewal(; generation_time = gen_int, rt = RandomWalk()); n = 20)
     @test implements_observation_interface(PoissonError())
     @test implements_observation_interface(NegativeBinomialError())
     # A model is NOT in a role it does not belong to.
     @test !implements_observation_interface(RandomWalk())
-    @test !implements_latent_interface(PoissonError())
+    @test !implements_prior_interface(PoissonError())
     @test !implements_infection_interface(RandomWalk())
 end
 
@@ -131,7 +131,7 @@ end
 
     custom = ConstantLatent(0.5)
     @test custom isa AbstractLatentModel
-    @test implements_latent_interface(custom)
+    @test implements_prior_interface(custom)
 
     # It slots into an infection model's latent position (the latent is now
     # folded into the infection model) and the composed model runs.

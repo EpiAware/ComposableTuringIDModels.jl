@@ -69,7 +69,7 @@ end
     # Role + interface conformance: the correction is a latent-role component.
     c = ReportingCDF([0.2, 0.6, 1.0])
     @test c isa AbstractLatentModel
-    @test implements_latent_interface(c)
+    @test implements_prior_interface(c)
 
     # A precomputed curve is padded with ones to the requested length (older
     # reference days are fully reported).
@@ -269,7 +269,7 @@ end
     # ReportingCDF is RightTruncate's correction submodel.
     pm = ReportingPMF([0.5, 0.3, 0.2])
     @test pm isa AbstractLatentModel
-    @test implements_latent_interface(pm)
+    @test implements_prior_interface(pm)
     @test as_turing_model(pm, 10)() == [0.5, 0.3, 0.2]   # n is ignored (PMF by delay)
     # The distribution constructor builds the PMF via the released-CD path.
     pmd = ReportingPMF(truncated(Normal(2.0, 1.0), 0.0, Inf))
