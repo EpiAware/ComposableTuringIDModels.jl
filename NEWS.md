@@ -104,16 +104,6 @@
   the pool — while placing it first makes them part of the incidence the pool
   depletes.
 
-- **`SusceptibleDepletion` takes an unknown population size.** Its `pop_size`
-  slot now accepts a prior (a `Distribution` or a latent process) as well as a
-  number, drawn once before the scan through the seam above and named
-  `pop_size` under the modifier's position. Like `ImportedCases`'s rate the
-  prior is on the **unconstrained** scale and is mapped onto the positive
-  population size by the modifier's own `transformation` (default `exp`), so any
-  latent process can drive it, e.g. `SusceptibleDepletion(Normal(log(1000),
-  0.2))`. Pass `transformation = identity` to give the population size on its
-  own scale instead.
-
 - **Tutorial: renewal modifiers.** A short page building a delayed renewal
   process and adding susceptible depletion and importation to it, showing what
   each contributes and fitting the result.

@@ -94,21 +94,19 @@ nothing # hide
 ```
 
 A scan step is a deterministic function, so a modifier that needs *sampled*
-parameters — an importation rate, an uncertain population size — draws them
-before the scan runs. That is the modifier's optional `as_turing_model(mod, n)`
-method: it samples through the same [`as_turing_submodel`](@ref) seam as
-everything else and returns the modifier the scan uses. Modifiers that sample
-nothing return themselves, so the step resolves its whole modifier tuple through
-one call and nothing in the renewal model tests what a modifier is.
-[`ImportedCases`](@ref) is the worked example, [`SusceptibleDepletion`](@ref)
-takes a prior for its population size the same way, and modifiers apply in the
-order given:
+parameters — an importation rate, say — draws them before the scan runs. That is
+the modifier's optional `as_turing_model(mod, n)` method: it samples through the
+same [`as_turing_submodel`](@ref) seam as everything else and returns the
+modifier the scan uses. Modifiers that sample nothing return themselves, so the
+step resolves its whole modifier tuple through one call and nothing in the
+renewal model tests what a modifier is. [`ImportedCases`](@ref) is the worked
+example, and modifiers apply in the order given:
 
 ```@example design
-# Susceptible depletion with an unknown population, then importation added on
-# top of the depleted incidence with its rate estimated too. Both priors are on
-# the unconstrained scale, mapped onto a positive quantity by the modifier.
-seeded = Renewal(gen_int, SusceptibleDepletion(Normal(log(1000), 0.2)),
+# Susceptible depletion, then importation added on top of the depleted
+# incidence with its rate estimated. The importation prior is on the
+# unconstrained scale, mapped onto a positive rate by the modifier.
+seeded = Renewal(gen_int, SusceptibleDepletion(1000.0),
     ImportedCases(Normal(0.0, 1.0)); rt = RandomWalk())
 nothing # hide
 ```

@@ -28,9 +28,9 @@ implements
     `(new_incidence, new_substate)`.
 
 A **prior-carrying** modifier instead needs parameters sampled *before* the
-scan — a per-time importation rate, an uncertain population size — which the
-scan cannot draw, because a scan step is a plain deterministic function. It
-implements the other part of the interface:
+scan — a per-time importation rate, say — which the scan cannot draw, because a
+scan step is a plain deterministic function. It implements the other part of the
+interface:
 
   - `as_turing_model(mod, n)` — a `DynamicPPL.Model` returning the modifier
     used in the scan. The default method samples nothing and returns `mod`
@@ -39,9 +39,7 @@ implements the other part of the interface:
     extra. A prior-carrying modifier implements this method, draws its slots
     through [`as_turing_submodel`](@ref), and returns a *resolved* scan
     modifier holding the drawn values — e.g. [`ImportedCases`](@ref) resolves
-    to an [`ImportedRate`](@ref) and implements no scan interface of its own,
-    and a [`SusceptibleDepletion`](@ref) given a prior for its population size
-    resolves to one holding the drawn number.
+    to an [`ImportedRate`](@ref) and implements no scan interface of its own.
 
 [`RenewalStep`](@ref) resolves its whole modifier tuple through this one seam
 (see its `as_turing_model` method), so a sampling modifier needs no special
@@ -100,112 +98,26 @@ count ``S``. Adding it to a renewal step gives a renewal process with a fixed
 population and susceptible depletion, e.g.
 `Renewal(gen_int, SusceptibleDepletion(N))`.
 
-`pop_size` is either a **number** — a known population, used as it stands — or a
-**prior**: a `Distribution` or a latent process, in which case the population
-size is an unknown constant drawn once before the scan through the modifier seam
-(see [`AbstractRenewalModifier`](@ref)) and named `pop_size`, prefixed by the
-modifier's position.
-
-A prior in the slot is on the **unconstrained** scale, like `Renewal`'s `rt` and
-`initialisation` slots and [`ImportedCases`](@ref)'s rate, and is mapped onto the
-positive population size by the modifier's own `transformation` (default `exp`).
-A population size cannot be negative, and the slot accepts any latent process, so
-that has to hold structurally: an unconstrained process spends much of its time
-below zero, and a negative population inverts the modifier — the susceptible
-fraction then grows with each infection instead of shrinking. Pass
-`transformation = identity` to give the population size directly on its own
-scale, in which case a positive-supported prior (a `LogNormal`, a `truncated`
-normal) is on you.
-
-The population size is one number, so the slot is drawn at **length 1**: a
-process that cannot produce a single step (an [`AR`](@ref), whose series must be
-longer than its order) does not fit it.
-
-# Arguments
-
-  - `pop_size`: the population size — a number, or an unconstrained prior for an
-    unknown one.
-
-# Keyword Arguments
-
-  - `transformation`: the map from the unconstrained slot onto the positive
-    population size (default `exp`), applied only to a drawn prior.
-
-# Examples
-
-A known population scans as itself, an unknown one resolves to the drawn value:
-
-```@example SusceptibleDepletion
-using ComposableTuringIDModels, Distributions, Random
-Random.seed!(189)
-as_turing_model(SusceptibleDepletion(Normal(log(1000), 0.2)), 5)().pop_size
-```
-
-A latent process in the slot works the same way, and stays a positive population
-however far the walk wanders:
-
-```@example SusceptibleDepletion
-Random.seed!(189)
-rw = RandomWalk(; init = Normal(log(1000), 0.5))
-as_turing_model(SusceptibleDepletion(rw), 5)().pop_size
-```
+It samples nothing, so it is a plain scan modifier: the pre-scan seam (see
+[`AbstractRenewalModifier`](@ref)) returns it unchanged.
 
 ## Fields
 
-  - `pop_size`: the population size, or the prior for an unknown one.
-  - `transformation`: the map onto the positive population size.
+  - `pop_size`: the population size.
 "
-struct SusceptibleDepletion{T, F <: Function} <: AbstractRenewalModifier
-    "The population size, or the unconstrained prior for an unknown one."
+struct SusceptibleDepletion{T} <: AbstractRenewalModifier
+    "The population size."
     pop_size::T
-    "The map from the unconstrained slot onto the positive population size."
-    transformation::F
-
-    function SusceptibleDepletion(pop_size; transformation::Function = exp)
-        return new{typeof(pop_size), typeof(transformation)}(
-            pop_size, transformation)
-    end
 end
 
 modifier_init_state(mod::SusceptibleDepletion) = mod.pop_size
 
 # The susceptible fraction is floored because a large force of infection can
 # take more than the pool holds, leaving `S` negative for the rest of the run.
-# The floor keeps the recursion going there; it is NOT what makes the population
-# size positive, which is the slot's `transformation`.
+# The floor keeps the recursion going there.
 function apply_modifier(mod::SusceptibleDepletion, incidence, S)
     new_incidence = max(S / mod.pop_size, 1e-6) * incidence
     return new_incidence, S - new_incidence
-end
-
-# An unknown population size: a prior in the slot has no scan interface until
-# it is drawn, so say so rather than failing on `S / pop_size` inside the scan.
-const _UncertainDepletion = SusceptibleDepletion{<:PriorLike}
-
-modifier_init_state(mod::_UncertainDepletion) = _unresolved_modifier(mod)
-
-function apply_modifier(mod::_UncertainDepletion, incidence, S)
-    return _unresolved_modifier(mod)
-end
-
-@doc raw"
-Draw an unknown population size ahead of the scan.
-
-The population size is one number, so its slot is drawn at length 1 and read
-with [`_at`](@ref): a `Distribution` gives a scalar, a process its first value.
-The draw is mapped onto the positive scale by the modifier's `transformation`,
-so any unconstrained prior gives a usable population. Returns the
-[`SusceptibleDepletion`](@ref) the scan uses, holding the drawn number.
-
-# Arguments
-
-  - `mod`: a [`SusceptibleDepletion`](@ref) whose `pop_size` is a prior.
-  - `n`: the length of the renewal series (unused; the population size is
-    constant).
-"
-@model function as_turing_model(mod::_UncertainDepletion, n)
-    pop_size ~ as_turing_submodel(mod.pop_size, 1; prefix = true)
-    return SusceptibleDepletion(mod.transformation(_at(pop_size, 1)))
 end
 
 @doc raw"
@@ -279,8 +191,8 @@ get_state(::RenewalStep, initial_state, state) = state .|> st -> last(st[1])
 # --- the pre-scan seam ------------------------------------------------------
 #
 # A scan step is a deterministic function, so a modifier that needs sampled
-# parameters (an importation rate, an uncertain population size) cannot draw
-# them inside the scan. The step is therefore resolved ONCE before the scan:
+# parameters (an importation rate, say) cannot draw them inside the scan. The
+# step is therefore resolved ONCE before the scan:
 # every modifier is sampled through its own `as_turing_model`, and the step is
 # rebuilt from the resolved modifiers. Modifiers that sample nothing return
 # themselves, so the same call covers both kinds and neither the step nor the
