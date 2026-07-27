@@ -65,9 +65,10 @@ exp.(vec(chain[@varname(modifier_2.import_rates)]))
 
 Inserting or reordering modifiers renames it.
 
-The resulting incidence is floored at a small positive value, keeping the
-renewal recursion well defined for observation models that require a positive
-mean.
+Nothing clamps the incidence afterwards: the renewal recursion stays positive
+because ``\iota_t`` is, which is `transformation`'s job. Passing
+`transformation = identity` hands that job to you, and a rate that goes negative
+then subtracts from the incidence.
 
 # Arguments
 
@@ -132,8 +133,7 @@ A resolved [`ImportedCases`](@ref): the drawn importation rate, ready to scan.
 This is what [`ImportedCases`](@ref) returns from its pre-scan
 `as_turing_model` seam — the prior has been sampled and transformed, so the scan
 sees a plain deterministic modifier. Its substate is the step counter, so step
-``t`` adds ``\iota_t`` read with [`_at`](@ref) (a constant rate stays a scalar),
-and the incidence is floored at a small positive value.
+``t`` adds ``\iota_t`` read with [`_at`](@ref) (a constant rate stays a scalar).
 
 ## Fields
 
@@ -149,7 +149,7 @@ end
 modifier_init_state(::ImportedRate) = 0
 
 function apply_modifier(mod::ImportedRate, incidence, t)
-    return max(incidence + _at(mod.rate, t + 1), 1e-6), t + 1
+    return incidence + _at(mod.rate, t + 1), t + 1
 end
 
 @doc raw"

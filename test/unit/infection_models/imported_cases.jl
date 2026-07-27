@@ -168,15 +168,24 @@ end
                                     apply_modifier
     using DynamicPPL: fix
     Random.seed!(1896)
-    # A prior in the slot resolves to a depletion modifier holding the drawn
-    # number, so the scan sees the same deterministic modifier as ever.
-    resolved = as_turing_model(SusceptibleDepletion(Dirac(750.0)), 5)()
+    # A prior in the slot is unconstrained and resolves, through the modifier's
+    # transformation, to a depletion modifier holding the drawn number, so the
+    # scan sees the same deterministic modifier as ever.
+    resolved = as_turing_model(SusceptibleDepletion(Dirac(log(750.0))), 5)()
     @test resolved isa SusceptibleDepletion
     @test resolved.pop_size ≈ 750.0
     @test modifier_init_state(resolved) ≈ 750.0
 
+    # `transformation = identity` takes the slot on its own scale instead.
+    natural = as_turing_model(
+        SusceptibleDepletion(Dirac(750.0); transformation = identity), 5)()
+    @test natural.pop_size ≈ 750.0
+
+    # A known population is used as it stands, whatever the transformation.
+    @test modifier_init_state(SusceptibleDepletion(750.0)) ≈ 750.0
+
     # Unresolved it has no scan interface, and says so.
-    unknown = SusceptibleDepletion(LogNormal(log(1000.0), 0.2))
+    unknown = SusceptibleDepletion(Normal(log(1000.0), 0.2))
     @test_throws "has no scan interface" modifier_init_state(unknown)
     @test_throws "has no scan interface" apply_modifier(unknown, 1.0, 1.0)
 
@@ -188,11 +197,32 @@ end
     ks = string.(collect(keys(rand(as_turing_model(r, 20)))))
     @test any(k -> startswith(k, "modifier_1.pop_size"), ks)
 
-    known = Renewal(gen_int, SusceptibleDepletion(Dirac(800.0));
+    known = Renewal(gen_int, SusceptibleDepletion(Dirac(log(800.0)));
         rt = FixedIntercept(log(1.5)), initialisation = Normal())
     I_t = fix(as_turing_model(known, 40), (init_incidence = 0.0,))().I_t
     @test all(>(0), I_t)
     @test sum(I_t) < 800.0
+end
+
+@testitem "an unconstrained population prior stays positive" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using ComposableTuringIDModels: SusceptibleDepletion
+    # The slot takes any latent process, so positivity has to be structural: an
+    # unconstrained walk spends much of its time below zero, and a negative
+    # population would grow the susceptible fraction with every infection.
+    for seed in 1:20
+        Random.seed!(seed)
+        mod = as_turing_model(SusceptibleDepletion(RandomWalk()), 5)()
+        @test mod.pop_size > 0
+    end
+
+    # And a depleting renewal driven by one is bounded, not amplifying.
+    Random.seed!(1897)
+    r = Renewal([0.2, 0.3, 0.5], SusceptibleDepletion(RandomWalk());
+        rt = FixedIntercept(log(1.5)), initialisation = Normal())
+    I_t = as_turing_model(r, 40)().I_t
+    @test all(>(0), I_t)
+    @test I_t[end] < maximum(I_t)  # the pool turns the epidemic over
 end
 
 @testitem "the pre-scan seam takes any modifier, not just ImportedCases" begin
@@ -312,14 +342,22 @@ end
     I_plain = fix(as_turing_model(plain, 30), fixinit)().I_t
 
     # A strongly negative *unconstrained* rate: the transformation maps it to
-    # exp(-2) ≈ 0.135 imports per step. Untransformed this subtracted 2.0 from
-    # every incidence, driving the series onto the 1e-6 floor.
+    # exp(-2) ≈ 0.135 imports per step, so it still imports.
     imported = Renewal(gen_int, ImportedCases(FixedIntercept(-2.0));
         rt = FixedIntercept(logR), initialisation = Normal())
     I_imported = fix(as_turing_model(imported, 30), fixinit)().I_t
 
     @test all(>(0), I_imported)
     @test I_imported[end] > I_plain[end]
+
+    # Nothing clamps the incidence: taking the same rate on its natural scale
+    # subtracts 2.0 per step, which is a misspecified model and shows as one
+    # rather than being silently floored at a small positive value.
+    negative = Renewal(gen_int,
+        ImportedCases(FixedIntercept(-2.0); transformation = identity);
+        rt = FixedIntercept(logR), initialisation = Normal())
+    I_negative = fix(as_turing_model(negative, 30), fixinit)().I_t
+    @test any(<(0), I_negative)
 end
 
 @testitem "ImportedCases bounds its slot to a prior" begin

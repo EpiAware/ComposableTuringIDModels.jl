@@ -106,8 +106,9 @@ order given:
 
 ```@example design
 # Susceptible depletion with an unknown population, then importation added on
-# top of the depleted incidence with its rate estimated too.
-seeded = Renewal(gen_int, SusceptibleDepletion(LogNormal(log(1000), 0.2)),
+# top of the depleted incidence with its rate estimated too. Both priors are on
+# the unconstrained scale, mapped onto a positive quantity by the modifier.
+seeded = Renewal(gen_int, SusceptibleDepletion(Normal(log(1000), 0.2)),
     ImportedCases(Normal(0.0, 1.0)); rt = RandomWalk())
 nothing # hide
 ```
