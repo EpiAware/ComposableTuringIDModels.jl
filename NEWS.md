@@ -79,9 +79,9 @@
   fitted chain summary all appear on the page. The blocks run under a fixed
   random seed, so the page is reproducible from build to build, and the docs
   build now fails if a README edit stops that seeding from being applied.
-  Installation moved out of `README.md` onto a new Installation page under
-  Getting started, because a `Pkg.add` in the README would have run against the
-  registry on every docs build.
+  Installation moved out of `README.md` onto a new Getting started page,
+  because a `Pkg.add` in the README would have run against the registry on
+  every docs build.
   Resolves
   [#218](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/218).
 

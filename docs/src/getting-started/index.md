@@ -1,4 +1,4 @@
-# [Installation](@id installation)
+# [Getting started](@id getting-started)
 
 `ComposableTuringIDModels` assembles an infectious disease model from
 interchangeable latent, infection, and observation parts, each turned into a
@@ -7,11 +7,15 @@ constructor.
 This package is early-stage and under active development; expect breaking
 changes.
 
-Install the package from the Julia General registry:
+## Installation
+
+Install the package from the Julia General registry, together with
+`MCMCChains`, which supplies `summarystats` and the other chain diagnostics
+used throughout these docs:
 
 ```julia
 using Pkg
-Pkg.add("ComposableTuringIDModels")
+Pkg.add(["ComposableTuringIDModels", "MCMCChains"])
 ```
 
 Then load it alongside `Distributions` and `Turing`, which supply the priors and
