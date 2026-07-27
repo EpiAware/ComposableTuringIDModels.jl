@@ -10,9 +10,9 @@ const HEAVY_TUTORIALS = String["ad-backends.jl"]
 
 const TUTORIALS_SUBDIR = joinpath("getting-started", "tutorials")
 
-const _AD_TITLE = "# [Automatic differentiation backends](@id ad-backends)"
-
-const TUTORIAL_STUBS = Pair{String, String}["ad-backends.md" => _AD_TITLE]
+const TUTORIAL_STUBS = Pair{String, String}[
+    "ad-backends.md" => "# [Automatic differentiation backends](@id ad-backends)"
+]
 
 const FORCE_STUB_TUTORIALS = String[]
 
@@ -23,17 +23,19 @@ const ORG_BRANDING = true
 # unconditionally. This change adds the file, but linkcheck resolves the link
 # against `main`, so it stays a 404 until this branch lands. Drop this entry
 # once the file is on `main`.
-const LINKCHECK_IGNORE = Regex[r"blob/main/CITATION\.cff$"]
+const LINKCHECK_IGNORE = Regex[
+    r"blob/main/CITATION\.cff$"
+]
 
 const _REPO_BLOB = "https://github.com/EpiAware/ComposableTuringIDModels.jl/blob/main"
 
 # `NOTICE` and `LICENSE` are repo-root files. The README's relative links are
 # right on GitHub, but the generated `index.md` is served from the docs site,
 # where they resolve to nothing — so point the docs copy at the files on `main`.
-const _NOTICE_URL = "($(_REPO_BLOB)/NOTICE)"
-const _LICENSE_URL = "($(_REPO_BLOB)/LICENSE)"
-
-const INDEX_REWRITES = ["(NOTICE)" => _NOTICE_URL, "(LICENSE)" => _LICENSE_URL]
+const INDEX_REWRITES = Pair{String, String}[
+    "(NOTICE)" => "($(_REPO_BLOB)/NOTICE)",
+    "(LICENSE)" => "($(_REPO_BLOB)/LICENSE)"
+]
 
 # The README's ```julia fences are illustrative, and the managed build converts
 # EVERY one of them to an executed `@example readme` block. Executing them would
