@@ -110,10 +110,20 @@ The plain renewal grows exponentially without bound.
 Susceptible depletion turns that growth over: as susceptibles are used up the
 effective reproduction number falls below one, so incidence peaks and declines.
 Importation keeps seeding the epidemic instead of leaving it to grow from the
-initial incidence alone, which front-loads it: the peak arrives more than two
-weeks earlier and is nearly twice as high.
-The susceptible pool is spent sooner as a result, so late incidence in the
-seeded run sits *below* the depletion-only run.
+initial incidence alone, which front-loads it, so it peaks earlier and higher
+and spends the susceptible pool sooner.
+"""
+
+function summarise(sim)
+    (; peak_day = argmax(sim.I_t),
+        peak = round(maximum(sim.I_t); digits = 1),
+        final = round(last(sim.I_t); digits = 1))
+end
+map(summarise, (depleting = sims.depleting, seeded = sims.seeded))
+
+md"""
+Late incidence in the seeded run is therefore the lower of the two, its epidemic
+already past.
 
 Importation also stops a process from dying out altogether, which is the other
 thing it is for.
@@ -211,5 +221,6 @@ Each draws whatever it does not know through the same seam every other component
 uses, so an importation rate can equally be a fixed constant, an unknown
 constant, or a time-varying process such as a [`RandomWalk`](@ref), and a
 population size can be a number or a prior — `SusceptibleDepletion(2_000.0)`
-above would become `SusceptibleDepletion(LogNormal(log(2_000), 0.2))`.
+above would become `SusceptibleDepletion(Normal(log(2_000), 0.2))`, the prior
+being on the log scale like every other unknown positive quantity here.
 """
