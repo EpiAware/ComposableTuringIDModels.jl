@@ -18,6 +18,7 @@ using DynamicPPL: fix
 using Statistics: quantile
 
 Random.seed!(20260727)
+nothing # hide
 
 md"""
 ## A delayed renewal process
@@ -37,6 +38,7 @@ function renewal(modifiers...)
     Renewal(gen_int, modifiers...;
         rt = FixedIntercept(log(1.3)), initialisation = Normal())
 end
+nothing # hide
 
 md"""
 Reported cases are the infections convolved with a reporting delay and observed
@@ -45,7 +47,8 @@ with negative-binomial noise — a [`LatentDelay`](@ref) wrapped around a
 """
 
 delay = [0.1, 0.4, 0.3, 0.2]
-obs = LatentDelay(NegativeBinomialError(cluster_factor = HalfNormal(0.1)), delay)
+obs = LatentDelay(
+    NegativeBinomialError(cluster_factor = HalfNormal(0.1)), delay)
 
 md"""
 ## Three models
@@ -73,9 +76,13 @@ simulate(model) = fix(as_turing_model(model, missing, n),
     (init_incidence = log(1.0),))()
 
 sims = map(simulate, models)
+nothing # hide
 
 md"""
 ## What each modifier does
+
+Counts are plotted on a log scale, floored at one so that zero reports stay
+visible.
 """
 
 fig = Figure(; size = (760, 560))
@@ -85,10 +92,10 @@ colours = (plain = :grey30, depleting = :purple, seeded = :teal)
 labels = (plain = "renewal", depleting = "+ susceptible depletion",
     seeded = "+ importation")
 for k in keys(sims)
-    lines!(ax1, 1:n, max.(sims[k].I_t, 1e-1); color = colours[k],
-        linewidth = 2, label = labels[k])
-    scatter!(ax2, 1:n, max.(sims[k].generated_y_t, 1e-1); color = colours[k],
-        markersize = 6, label = labels[k])
+    lines!(ax1, 1:n, sims[k].I_t; color = colours[k], linewidth = 2,
+        label = labels[k])
+    scatter!(ax2, 1:n, max.(sims[k].generated_y_t, 1); color = colours[k],
+        markersize = 7)
 end
 axislegend(ax1; position = :lt)
 fig
@@ -98,14 +105,16 @@ The plain renewal grows exponentially without bound.
 Susceptible depletion turns that growth over: as susceptibles are used up the
 effective reproduction number falls below one, so incidence peaks and declines.
 Importation keeps seeding the epidemic instead of leaving it to grow from the
-initial incidence alone, which brings the peak forward by more than two weeks
-and roughly doubles it.
-Once the susceptible pool is spent, incidence settles at the importation rate
-rather than decaying away.
+initial incidence alone, which front-loads it: the peak arrives more than two
+weeks earlier and is nearly twice as high.
+The susceptible pool is spent sooner as a result, so late incidence in the
+seeded run sits *below* the depletion-only run.
 
-That last point is what importation is mainly for.
-With ``R_t = 0.8`` and no susceptible depletion the plain process dies out,
-while a seeded one levels off where importation and decay balance.
+Importation also stops a process from dying out altogether, which is the other
+thing it is for.
+With ``R_t = 0.8`` and no susceptible depletion the plain process decays away,
+while a seeded one levels off where importation and decay balance — at
+``\iota / (1 - R_t) = 10`` infections per day here.
 """
 
 function subcritical(modifiers...)
@@ -125,9 +134,9 @@ sub_seeded = subcritical(ImportedCases(FixedIntercept(log(2.0))))
 fig2 = Figure(; size = (760, 300))
 ax3 = Axis(fig2[1, 1]; xlabel = "Day", ylabel = "Infections Iₜ",
     yscale = log10)
-lines!(ax3, 1:n, max.(sub_plain.I_t, 1e-3); color = :grey30, linewidth = 2,
+lines!(ax3, 1:n, sub_plain.I_t; color = :grey30, linewidth = 2,
     label = "Rₜ = 0.8")
-lines!(ax3, 1:n, max.(sub_seeded.I_t, 1e-3); color = :teal, linewidth = 2,
+lines!(ax3, 1:n, sub_seeded.I_t; color = :teal, linewidth = 2,
     label = "Rₜ = 0.8 + importation")
 axislegend(ax3; position = :rt)
 fig2
@@ -141,6 +150,12 @@ An [`ImportedCases`](@ref) rate is a prior slot, so it is *estimated* rather tha
 assumed: here it is a single unknown constant on the log scale, drawn once
 before the renewal recursion runs.
 We fit that model to the reported cases simulated above.
+The reproduction number is still held at its simulated value, so the importation
+rate is what is being learned; with ``R_t`` free as well the two compete to
+explain the same growth and the fit is much less sharp.
+The reporting delay also leaves the first `length(delay) - 1` days unobserved,
+so those entries of `y_obs` are `missing` and are sampled rather than
+conditioned on.
 """
 
 model = IDModel(
@@ -149,6 +164,7 @@ model = IDModel(
     obs)
 y_obs = sims.seeded.generated_y_t
 chain = sample(as_turing_model(model, y_obs, n), NUTS(), 250; progress = false)
+nothing # hide
 
 md"""
 The rate is namespaced by the modifier's position on the renewal step, so
@@ -166,25 +182,20 @@ The posterior predictive then tracks the simulated series.
 """
 
 pred = predict(as_turing_model(model, fill(missing, n), n), chain)
-## The reporting delay leaves the first days unscored, so band only the days
-## the predictive chain carries.
-y_draws(i) =
-    try
-        Float64.(vec(pred[@varname(y_t[i])]))
-    catch
-        Float64[]
-    end
-scored = filter(i -> !isempty(y_draws(i)), 1:n)
+## The reporting delay leaves the first `length(delay) - 1` days without a
+## reported count, so band the days from there on.
+scored = length(delay):n
+y_draws(i) = Float64.(vec(pred[@varname(y_t[i])]))
 bands = reduce(hcat, map(i -> quantile(y_draws(i), [0.05, 0.5, 0.95]), scored))
 
 fig3 = Figure(; size = (760, 300))
 ax4 = Axis(fig3[1, 1]; xlabel = "Day", ylabel = "Reported cases",
     yscale = log10)
-band!(ax4, scored, max.(bands[1, :], 1e-1), max.(bands[3, :], 1e-1);
+band!(ax4, scored, max.(bands[1, :], 1), max.(bands[3, :], 1);
     color = (:teal, 0.25))
-lines!(ax4, scored, max.(bands[2, :], 1e-1); color = :teal, linewidth = 2,
+lines!(ax4, scored, max.(bands[2, :], 1); color = :teal, linewidth = 2,
     label = "posterior predictive")
-scatter!(ax4, 1:n, max.(y_obs, 1e-1); color = :black, markersize = 6,
+scatter!(ax4, 1:n, max.(y_obs, 1); color = :black, markersize = 7,
     label = "simulated")
 axislegend(ax4; position = :lt)
 fig3
