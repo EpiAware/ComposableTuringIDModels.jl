@@ -5,7 +5,7 @@
 # same ecosystem-standard [KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/)
 # kernel and factorises it. It is the reference an approximation is judged
 # against — accurate but ``O(n^3)`` per evaluation. The two share the standardised
-# input grid (`_standardised_index`), so a given length scale means the same
+# input grid (`standardised_index`), so a given length scale means the same
 # thing for both.
 
 @doc raw"
@@ -19,8 +19,16 @@ Hilbert-space model approximates:
 
 ```math
 K_{ij} = \sigma^2\, k(x_i, x_j; \ell), \qquad
-f = L z, \quad L L^\top = K + \tau I, \quad z_i \sim \mathrm{Normal}(0, 1).
+f = L z, \quad L L^\top = K + \tau(\sigma^2 + 1) I,
+\quad z_i \sim \mathrm{Normal}(0, 1).
 ```
+
+The nugget ``\tau`` is *relative*: it is scaled by ``\sigma^2 + 1`` rather than
+added as a fixed amount. The diagonal of ``K`` is ``\sigma^2``, so a fixed
+nugget is swamped once the sampler visits a large ``\sigma`` and the Cholesky
+factorisation throws on a matrix that is only numerically indefinite — which
+ends the chain. The ``+1`` keeps the guard in place at ``\sigma \approx 0``,
+where ``K`` itself vanishes.
 
 The path is drawn non-centred: standard-normal weights ``z`` are pushed through
 the Cholesky factor ``L`` of the covariance. As with [`HilbertSpaceGP`](@ref)
@@ -36,10 +44,13 @@ Kernels are [KernelFunctions.jl](https://juliagaussianprocesses.github.io/Kernel
 types (`SqExponentialKernel`, `Matern32Kernel`, `Matern52Kernel`, ...) — the same
 kernels [`HilbertSpaceGP`](@ref) uses, and the ones
 [AbstractGPs.jl](https://juliagaussianprocesses.github.io/AbstractGPs.jl/) builds
-exact GPs from. The integer index ``1, \ldots, n`` is standardised to zero mean
-and unit standard deviation before the kernel sees it, exactly as in
-[`HilbertSpaceGP`](@ref), so the length scale ``\ell`` is scale-free and means
-the same thing for both models.
+exact GPs from. The kernel sees the standardised index
+[`standardised_index`](@ref), exactly as in [`HilbertSpaceGP`](@ref), so the
+length scale ``\ell`` is scale-free and means the same thing for both models.
+That grid depends only on `n`, so — again as in [`HilbertSpaceGP`](@ref) —
+[`as_turing_model`](@ref) builds it once and captures it rather than rebuilding
+it inside the `@model` body; only the covariance and its factorisation are
+per-evaluation work.
 
 ## Fields
 
@@ -47,8 +58,8 @@ the same thing for both models.
   - `marginal_std`: prior for the marginal standard deviation ``\sigma``.
   - `kernel`: the covariance kernel, a KernelFunctions.jl `Kernel` (default
     `SqExponentialKernel()`).
-  - `jitter`: diagonal ``\tau`` added to ``K`` for a stable Cholesky factor
-    (default `1e-6`).
+  - `jitter`: relative diagonal nugget ``\tau`` for a stable Cholesky factor
+    (default `1e-6`); the amount added is ``\tau(\sigma^2 + 1)``.
 
 # Examples
 ```@example ExactGP
@@ -72,7 +83,7 @@ struct ExactGP{L <: Sampleable, S <: Sampleable, K <: Kernel} <:
     marginal_std::S
     "Covariance kernel, a KernelFunctions.jl `Kernel`."
     kernel::K
-    "Diagonal jitter added to the covariance for a stable Cholesky factor."
+    "Relative Cholesky nugget: the amount added is ``\\tau(\\sigma^2 + 1)``."
     jitter::Float64
 
     function ExactGP(length_scale::Sampleable, marginal_std::Sampleable,
@@ -91,14 +102,32 @@ function ExactGP(;
     return ExactGP(length_scale, marginal_std, kernel, jitter)
 end
 
-@model function as_turing_model(model::ExactGP, n)
-    @assert n>1 "n must be greater than 1"
-    ℓ ~ model.length_scale
-    σ ~ model.marginal_std
-    z ~ filldist(Normal(), n)
-    x = _standardised_index(n)
-    K = kernelmatrix(σ^2 * with_lengthscale(model.kernel, ℓ), x)
-    L = cholesky(Symmetric(K + model.jitter * I)).L
+# Inner Turing model over a PREBUILT input grid. The grid depends only on `n`,
+# so it is computed once in `as_turing_model` below rather than on every
+# log-density / gradient evaluation, exactly as `HilbertSpaceGP` does with its
+# basis. What is left inside the differentiated path is the part that genuinely
+# depends on the sampled parameters: the covariance and its Cholesky factor.
+@model function _exact_gp_model(kernel::Kernel, x, jitter,
+        length_scale, marginal_std)
+    ℓ ~ length_scale
+    σ ~ marginal_std
+    z ~ filldist(Normal(), length(x))
+    K = kernelmatrix(σ^2 * with_lengthscale(kernel, ℓ), x)
+    # The nugget is scaled by σ² + 1, not added as a fixed absolute amount: the
+    # diagonal of K is σ², so a fixed nugget is swamped once σ is large and the
+    # factorisation fails on a matrix that is only numerically indefinite. The
+    # + 1 keeps the guard at σ ≈ 0, where K itself vanishes.
+    L = cholesky(Symmetric(K + (jitter * (σ^2 + 1)) * I)).L
     gp = L * z
     return gp
+end
+
+# See the architecture note in HilbertSpaceGP.jl: `as_turing_model` is a plain
+# function that hoists the parameter-independent work and delegates to a single
+# inner `@model`, keeping the one `as_turing_model(model, n)` entry point.
+function as_turing_model(model::ExactGP, n)
+    @assert n>1 "n must be greater than 1"
+    x = standardised_index(n)
+    return _exact_gp_model(model.kernel, x, model.jitter,
+        model.length_scale, model.marginal_std)
 end
