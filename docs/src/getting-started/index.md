@@ -1,4 +1,4 @@
-# [Getting started](@id getting-started)
+# [Installation](@id installation)
 
 `ComposableTuringIDModels` assembles an infectious disease model from
 interchangeable latent, infection, and observation parts, each turned into a
@@ -6,8 +6,6 @@ interchangeable latent, infection, and observation parts, each turned into a
 constructor.
 This package is early-stage and under active development; expect breaking
 changes.
-
-## Installation
 
 Install the package from the Julia General registry:
 

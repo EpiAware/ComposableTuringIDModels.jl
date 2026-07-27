@@ -5,7 +5,7 @@ pages = [
     # Authored quickstart pages, distinct from the README-derived home page:
     # installation lives here, so the home page's ```julia blocks can all run.
     "Getting started" => [
-        "Overview" => "getting-started/index.md",
+        "Installation" => "getting-started/index.md",
         "Tutorials" => [
             "Automatic differentiation backends" => "getting-started/tutorials/ad-backends.md"
         ]
