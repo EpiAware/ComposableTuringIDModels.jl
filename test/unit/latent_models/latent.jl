@@ -43,7 +43,7 @@ end
     Random.seed!(5)
     gp = HilbertSpaceGP(; m = 8)
     @test gp isa AbstractLatentModel
-    @test implements_latent_interface(gp; n = 25)
+    @test implements_prior_interface(gp; n = 25)
     n = 25
     path = as_turing_model(gp, n)()
     @test length(path) == n
@@ -88,7 +88,7 @@ end
         @test K isa Kernel
         gp = HilbertSpaceGP(; m = 10, kernel = K)
         @test gp.kernel === K
-        @test implements_latent_interface(gp; n = n)
+        @test implements_prior_interface(gp; n = n)
         path = as_turing_model(gp, n)()
         @test length(path) == n
         @test all(isfinite, path)
@@ -160,7 +160,7 @@ end
     Random.seed!(9)
     gp = ExactGP()
     @test gp isa AbstractLatentModel
-    @test implements_latent_interface(gp; n = 25)
+    @test implements_prior_interface(gp; n = 25)
     n = 25
     path = as_turing_model(gp, n)()
     @test length(path) == n
@@ -204,7 +204,7 @@ end
     for K in (SqExponentialKernel(), Matern32Kernel(), Matern52Kernel())
         gp = ExactGP(; kernel = K)
         @test gp.kernel === K
-        @test implements_latent_interface(gp; n = n)
+        @test implements_prior_interface(gp; n = n)
         path = as_turing_model(gp, n)()
         @test length(path) == n
         @test all(isfinite, path)
