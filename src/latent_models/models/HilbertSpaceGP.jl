@@ -33,8 +33,8 @@ S_{5/2}(\omega) = \sigma^2 \frac{16}{3}\frac{\nu_\ell^5}{(\nu_\ell^2 + \omega^2)
 with ``\nu_\ell = \sqrt{2p+1}/\ell`` for Matérn order ``p``. The
 squared-exponential (`SqExponentialKernel`) gives infinitely differentiable, very
 smooth paths; `Matern32Kernel` (once-differentiable) and `Matern52Kernel`
-(twice-differentiable) give progressively rougher ones. These three cover the
-kernels offered by the EpiNow2 Gaussian-process implementation.
+(twice-differentiable) give progressively rougher ones — the three choices most
+often used for a smooth epidemiological latent process.
 [`HilbertSpaceGP`](@ref) weights each basis function by ``\sqrt{S(\sqrt{\lambda_j})}``.
 
 # Examples
@@ -108,14 +108,17 @@ from the same kernel, and compares this model against [`ExactGP`](@ref).
 
 Only ``\ell``, ``\sigma`` and the ``m`` weights ``\beta`` are sampled; the basis
 ``\phi_j`` and eigenvalues ``\lambda_j`` depend only on `n`, `m` and the boundary
-factor `c`, **not** on any sampled parameter. They are therefore built **once**
-when [`as_turing_model`](@ref) is called (outside the `@model`, so outside the
-per-gradient-evaluation path) and captured by the model; each log-density
-evaluation only reweights and combines them. The latent path is a cheap
-matrix–vector product of a fixed basis against a small set of standard-normal
-weights — a non-centred parameterisation that is fast and samples well under
-NUTS, including with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/)
-reverse-mode AD.
+factor `c`, **not** on any sampled parameter. [`as_turing_model`](@ref) therefore
+builds them outside the `@model` body and captures them, so nothing in the basis
+is differentiated and each log-density evaluation only reweights and combines a
+fixed matrix. (Composed inside another model — a [`Renewal`](@ref) whose `rt`
+slot is this GP — the enclosing `@model` reconstructs its submodels on every
+evaluation, so the basis is rebuilt each time: still undifferentiated, and an
+``O(nm)`` set of sinusoids that measures a few percent of one gradient
+evaluation.) The latent path is a cheap matrix–vector product of a fixed basis
+against a small set of standard-normal weights — a non-centred parameterisation
+that is fast and samples well under NUTS, including with
+[Mooncake](https://chalk-lab.github.io/Mooncake.jl/) reverse-mode AD.
 
 The accuracy/speed trade-off is controlled by two numbers
 [riutortmayol2023practical](@citep): the number of basis functions `m` (more
@@ -225,8 +228,9 @@ approximated on ``[-L, L]`` with ``L = c S``. Standardising keeps a fixed
 measured in standard deviations of the inputs, not raw time steps. Both outputs
 depend only on `n`, `m` and `c` — none of the sampled parameters — so
 [`HilbertSpaceGP`](@ref) calls this once per model construction, outside the
-differentiated per-evaluation path. Requires `n > 1` so the standard deviation
-(and hence ``S``) is positive.
+`@model` body and so outside anything that is differentiated. Requires `n > 1`
+so the standard deviation (and hence ``S``) is positive; `n = 1` would give
+``S = L = 0`` and a basis of `NaN`.
 "
 function hsgp_basis(n::Int, m::Int, c::Real)
     @assert n>1 "n must be greater than 1 for a well-defined basis (S > 0)"
