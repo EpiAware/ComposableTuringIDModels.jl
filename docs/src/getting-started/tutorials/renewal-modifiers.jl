@@ -15,7 +15,7 @@ Only the modifier list changes.
 
 using ComposableTuringIDModels, Distributions, Random, Turing, CairoMakie
 using DynamicPPL: fix
-using Statistics: median, quantile
+using Statistics: quantile
 
 Random.seed!(20260727)
 
