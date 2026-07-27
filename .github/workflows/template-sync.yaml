@@ -104,7 +104,7 @@ jobs:
       - name: Mint an App token that can push workflow files
         id: app-token
         if: ${{ github.event_name != 'pull_request' && vars.TEMPLATE_SYNC_APP_ID != '' }}
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.TEMPLATE_SYNC_APP_ID }}
           private-key: ${{ secrets.TEMPLATE_SYNC_APP_PRIVATE_KEY }}
