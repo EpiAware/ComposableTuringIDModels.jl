@@ -44,45 +44,49 @@ parameterisations are non-centred, which NUTS handles well.
 
 ## The kernel and the GP ecosystem
 
-The kernels are the standard
+The kernels are
 [KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/)
-types — the same ones
+types — the ones
 [AbstractGPs.jl](https://juliagaussianprocesses.github.io/AbstractGPs.jl/) builds
-exact GPs from — so the model reuses the ecosystem's kernels rather than defining
-its own. The default `SqExponentialKernel` gives very smooth paths;
-`Matern32Kernel` and `Matern52Kernel` give progressively rougher ones. A kernel
-enters [`HilbertSpaceGP`](@ref) only through its spectral density, so adding one
-is a single `ComposableTuringIDModels.spectral_density(::MyKernel, ω, σ, ℓ)`
-method; [`ExactGP`](@ref) uses the kernel's Gram matrix directly.
+exact GPs from. A kernel enters [`ExactGP`](@ref) through its Gram matrix and
+[`HilbertSpaceGP`](@ref) only through its spectral density, so either model takes
+`SqExponentialKernel` (the default), `Matern32Kernel` or `Matern52Kernel`.
 
-Because both models are built on the same kernel, we can check them against
-AbstractGPs. On standardised inputs, [`ExactGP`](@ref)'s prior covariance *is* the
-AbstractGPs Gram matrix by construction, and the [`HilbertSpaceGP`](@ref) basis
-reconstructs it to a fraction of a percent with enough basis functions:
+Both models are linear in a vector of standard-normal weights (`z` for the exact
+GP, ``\beta`` for the Hilbert-space one), so fixing the hyperparameters and
+feeding in unit vectors traces out that linear map; the Gram matrix of the
+result is the model's implied prior covariance, which we can compare against the
+covariance AbstractGPs builds from the same kernel.
 
 ```@example gp
-using LinearAlgebra
-using KernelFunctions: with_lengthscale, kernelmatrix
+using LinearAlgebra, Statistics
 using AbstractGPs: GP, cov as gp_cov
-using ComposableTuringIDModels: hsgp_basis, se_spectral_density,
-    _hsgp_standardised_index
+using KernelFunctions: with_lengthscale
+using Turing: fix
 
-n0, σ0, ℓ0, c0 = 40, 1.0, 1.0, 2.0
-x = _hsgp_standardised_index(n0)
-k = σ0^2 * with_lengthscale(SqExponentialKernel(), ℓ0)
-K_ecosystem = gp_cov(GP(k)(x))          # AbstractGPs' own Gram matrix
+n0, ℓ0, σ0, m0 = 40, 1.0, 1.0, 40
+x = (collect(1:n0) .- mean(1:n0)) ./ std(1:n0)   # models standardise the index
+K_ref = gp_cov(GP(σ0^2 * with_lengthscale(SqExponentialKernel(), ℓ0))(x))
 
-Φ, sqrt_λ = hsgp_basis(n0, 40, c0)
-sd = sqrt.(se_spectral_density(sqrt_λ, σ0, ℓ0))
-K_hsgp = Φ * Diagonal(sd .^ 2) * Φ'
+unit(k, j) = [i == j ? 1.0 : 0.0 for i in 1:k]
+relerr(K) = norm(K - K_ref) / norm(K_ref)
 
-(exact = norm(kernelmatrix(k, x) - K_ecosystem) / norm(K_ecosystem),
-    hsgp = round(norm(K_hsgp - K_ecosystem) / norm(K_ecosystem), digits = 4))
+function gram(cols)
+    M = reduce(hcat, cols)
+    return M * M'
+end
+
+K_exact = gram([fix(as_turing_model(ExactGP(), n0),
+                    (ℓ = ℓ0, σ = σ0, z = unit(n0, j)))() for j in 1:n0])
+K_hsgp = gram([fix(as_turing_model(HilbertSpaceGP(m = m0, c = 2.0), n0),
+                   (ℓ = ℓ0, σ = σ0, β = unit(m0, j)))() for j in 1:m0])
+(exact = round(relerr(K_exact), sigdigits = 2),
+    hsgp = round(relerr(K_hsgp), sigdigits = 2))
 ```
 
-The exact GP matches AbstractGPs to machine precision, and the Hilbert-space
-weights reproduce the same kernel: the spectral density the HSGP applies is the
-Fourier transform of exactly this KernelFunctions kernel.
+The exact GP reproduces the ecosystem covariance to the jitter it adds for a
+stable Cholesky factor, and the Hilbert-space basis reproduces it to a fraction
+of a percent.
 
 ## Simulate from an exact GP
 
@@ -100,8 +104,6 @@ cases `generated_y_t`, the latent infections `I_t`, and the GP path
 `Z_t = \log R_t`.
 
 ```@example gp
-using Turing: fix
-
 si = Gamma(6.5, 0.62)
 obs = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 n = 70
@@ -116,13 +118,45 @@ Z_true = sim.Z_t
     Rt_range = round.(extrema(exp.(Z_true)), digits = 2))
 ```
 
+The simulated ``R_t`` path starts above one, dips, peaks again around day 40 and
+falls through one near day 50, so the epidemic grows, turns over and declines —
+the shape the fits have to recover.
+
+```@example gp
+using CairoMakie
+
+fig_sim = Figure(; size = (760, 480))
+ax_rt = Axis(fig_sim[1, 1]; ylabel = "Reproduction number Rₜ")
+lines!(ax_rt, 1:n, exp.(Z_true); color = :black, linewidth = 2,
+    label = "simulated truth")
+hlines!(ax_rt, [1.0]; color = :grey, linestyle = :dash)
+axislegend(ax_rt; position = :rt)
+ax_y = Axis(fig_sim[2, 1]; xlabel = "Day", ylabel = "Reported cases")
+scatter!(ax_y, 1:n, y_obs; color = :black, markersize = 7,
+    label = "simulated observations")
+axislegend(ax_y; position = :lt)
+fig_sim
+```
+
 ## Fit both GPs and compare
 
 Conditioning on the observed counts and sampling with NUTS recovers the
 posterior. We differentiate with
 [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for
-this package. A small helper fits a chosen GP latent, times the run, recovers the
-posterior-mean ``\log R_t`` with [`generated_observables`](@ref), and scores it
+this package.
+
+The chain is started from a prior draw (`InitFromPrior()`). Turing's default
+initialisation instead draws each parameter uniformly on ``[-2, 2]`` in
+unconstrained space, which for a positive scale parameter means a starting value
+up to ``e^2 \approx 7.4``: seven prior standard deviations out for the marginal
+standard deviation ``\sigma``. A GP with ``\sigma \approx 7`` puts ``\log R_t``
+in the tens, where the renewal likelihood is astronomically bad and its curvature
+enormous, so NUTS shrinks the step size to ``10^{-8}`` and the chain never leaves
+its starting point. Any GP hyperprior with a long tail has this failure mode, and
+starting from the prior avoids it.
+
+A small helper fits a chosen GP latent, times the run, recovers the per-draw
+``\log R_t`` with [`generated_observables`](@ref), and scores the posterior mean
 against the truth. `sample` returns a
 [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, read directly
 — no conversion.
@@ -137,14 +171,11 @@ function fit_gp(latent)
     posterior = as_turing_model(model, y_obs, n)
     time = @elapsed chain = sample(posterior,
         NUTS(0.9; adtype = AutoMooncake(; config = nothing)), 300;
-        progress = false)
+        initial_params = InitFromPrior(), progress = false)
     gen = vec(generated_observables(posterior, y_obs, chain).generated)
-    Z_mean = mean([g.Z_t for g in gen])
-    # `posterior` (the conditioned Turing model) is returned alongside the
-    # `IDModel`: `generated_observables` re-runs the *conditioned* model over the
-    # draws, while `predict` below needs the unconditioned one built from `model`.
-    (; model, posterior, chain, Z_mean, time,
-        cor = cor(Z_mean, Z_true),
+    Z = reduce(hcat, (g.Z_t for g in gen))          # time × draw
+    Z_mean = vec(mean(Z; dims = 2))
+    (; model, chain, Z, Z_mean, time, cor = cor(Z_mean, Z_true),
         rmse = sqrt(mean((Z_mean .- Z_true) .^ 2)))
 end
 
@@ -170,68 +201,51 @@ judged against.
 ## Posterior trajectories
 
 Following the plotting convention of the other case studies, two small helpers
-reduce the per-draw trajectories to credible bands.
+reduce the per-draw trajectories to credible bands and draw a median line with
+50% and 95% ribbons.
 
-```@setup gp
-using Statistics
+```@example gp
+CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
 
-const CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
+# time × 5 credible bands from a time × draws matrix
+credible_bands(mat; qs = CI_QS) = reduce(hcat,
+    (map(row -> quantile(row, q), eachrow(mat)) for q in qs))
 
-function credible_bands(mat; qs = CI_QS)
-    reduce(hcat, (map(eachrow(mat)) do row
-        vals = collect(skipmissing(row))
-        isempty(vals) ? missing : quantile(vals, q)
-    end for q in qs))
-end
-
-function ci_ribbon!(ax, ts, bands; color, label)
-    keep = findall(!ismissing, view(bands, :, 3))
-    x, b = ts[keep], Float64.(bands[keep, :])
-    band!(ax, x, b[:, 1], b[:, 5]; color = (color, 0.15))
-    band!(ax, x, b[:, 2], b[:, 4]; color = (color, 0.3))
-    lines!(ax, x, b[:, 3]; color = color, linewidth = 2, label = label)
-end
-
-function predictive_bands(pred, n)
-    ndraws = length(vec(pred[@varname(y_t[n])]))
-    rows = map(1:n) do i
-        try
-            permutedims(vec(pred[@varname(y_t[i])]))
-        catch
-            fill(missing, 1, ndraws)
-        end
-    end
-    credible_bands(reduce(vcat, rows))
+# median line with 50% and 95% ribbons
+function ci_ribbon!(ax, ts, b; color, label)
+    band!(ax, ts, b[:, 1], b[:, 5]; color = (color, 0.15))
+    band!(ax, ts, b[:, 2], b[:, 4]; color = (color, 0.3))
+    lines!(ax, ts, b[:, 3]; color = color, linewidth = 2, label = label)
 end
 ```
 
-The reproduction number ``R_t = \exp(Z_t)`` comes from the returned `Z_t` draws;
-the posterior-predictive case counts come from `predict` on the model with the
-observations set to `missing`. We overlay both GP fits on the simulated truth.
+The reproduction number ``R_t = \exp(Z_t)`` comes from the returned `Z_t` draws.
+The reported counts are scored element-wise, so their posterior *predictive*
+distribution — fresh counts under each posterior parameter set — comes from
+`predict` on the same model with the observations set to `missing`, stacking the
+`y_t[i]` draws into a time × draws matrix. We overlay both GP fits on the
+simulated truth.
 
 ```@example gp
-using CairoMakie
-using Turing: @varname
-
 ts = 1:n
 fig = Figure(; size = (760, 620))
-ax1 = Axis(fig[1, 1]; ylabel = "Reproduction number R(t)")
-for (fit, color, label) in
-    ((hs, :teal, "HSGP"), (ex, :purple, "exact"))
-    gen = vec(generated_observables(fit.posterior, y_obs, fit.chain).generated)
-    Rt = credible_bands(reduce(hcat, (exp.(g.Z_t) for g in gen)))
-    ci_ribbon!(ax1, ts, Rt; color = color, label = label)
+ax1 = Axis(fig[1, 1]; ylabel = "Reproduction number Rₜ")
+for (fit, color, label) in ((hs, :teal, "HSGP"), (ex, :purple, "exact"))
+    ci_ribbon!(ax1, ts, credible_bands(exp.(fit.Z)); color = color,
+        label = label)
 end
 lines!(ax1, ts, exp.(Z_true); color = :black, linewidth = 2,
     linestyle = :dash, label = "truth")
+hlines!(ax1, [1.0]; color = :grey, linestyle = :dash)
 axislegend(ax1; position = :rt)
 
 ax2 = Axis(fig[2, 1]; xlabel = "Day", ylabel = "Reported cases")
 pred = predict(as_turing_model(hs.model, fill(missing, n), n), hs.chain)
-ci_ribbon!(ax2, ts, predictive_bands(pred, n); color = :teal,
+yt = reduce(vcat, (permutedims(vec(pred[@varname(y_t[i])])) for i in ts))
+ci_ribbon!(ax2, ts, credible_bands(yt); color = :teal,
     label = "HSGP posterior predictive")
 scatter!(ax2, ts, y_obs; color = :black, markersize = 7, label = "observed")
-axislegend(ax2; position = :rt)
+axislegend(ax2; position = :lt)
 fig
 ```
 
