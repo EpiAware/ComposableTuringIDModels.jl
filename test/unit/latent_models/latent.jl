@@ -155,6 +155,31 @@ end
     @test all(isfinite, path)
 end
 
+@testitem "HilbertSpaceGP composes into a renewal and predicts every y_t" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    using DynamicPPL: InitFromPrior
+    Random.seed!(13)
+    n = 25
+    model = IDModel(
+        Renewal(; generation_time = Gamma(6.5, 0.62),
+            rt = HilbertSpaceGP(m = 8),
+            initialisation = Normal(log(1.5), 0.1)),
+        NegativeBinomialError(cluster_factor = HalfNormal(0.1)))
+    prior = as_turing_model(model, fill(missing, n), n)
+    y_obs = fix(prior, (ℓ = 0.5, σ = 0.3))().generated_y_t
+    posterior = as_turing_model(model, y_obs, n)
+    chain = sample(posterior, NUTS(0.9), 30;
+        initial_params = InitFromPrior(), progress = false)
+    gen = vec(generated_observables(posterior, y_obs, chain).generated)
+    @test length(gen) == 30
+    @test all(g -> length(g.Z_t) == n && all(isfinite, g.Z_t), gen)
+    # Every reported-count index must come back from `predict`: the credible
+    # bands in the Gaussian-process case study read `y_t[i]` for every `i`, and
+    # a missing index would otherwise show up as a silently shortened band.
+    pred = predict(prior, chain)
+    @test all(i -> length(vec(pred[@varname(y_t[i])])) == 30, 1:n)
+end
+
 @testitem "ExactGP draws a length-n path with named GP parameters" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(9)

@@ -65,9 +65,9 @@ S(\omega) = \sigma^2 \sqrt{2\pi}\, \ell \, \exp\!\Big(-\tfrac{1}{2}\ell^2\omega^
 ```
 
 with marginal standard deviation ``\sigma`` and length scale ``\ell``. A thin
-convenience wrapper over `spectral_density(SqExponentialKernel(), ω, σ, ℓ)`, kept
-for the worked examples that check the approximation against the
-squared-exponential kernel directly.
+convenience wrapper over `spectral_density(SqExponentialKernel(), ω, σ, ℓ)`, used
+by the tests that check the basis against the squared-exponential Gram matrix
+directly.
 "
 function se_spectral_density(ω, σ, ℓ)
     return spectral_density(SqExponentialKernel(), ω, σ, ℓ)
