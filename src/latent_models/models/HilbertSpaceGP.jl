@@ -137,11 +137,19 @@ on accuracy where the other cannot help. A **short** ``\ell`` needs a larger `m`
 the basis has to resolve wiggles finer than ``2L/m``. A **long** ``\ell`` —
 comparable to the standardised half-range ``S \approx \sqrt 3`` — needs a larger
 `c`, because the approximation is periodic on ``[-L, L]`` and a slowly varying
-path feels that boundary; adding basis functions does nothing for it. The
-defaults (`m = 20`, `c = 1.5`) are a reasonable starting point for a smooth
-latent process and are accurate to a few parts in ten thousand over the bulk of
-the default ``\ell`` prior; the Gaussian-process case study measures the error
-across both regimes.
+path feels that boundary; adding basis functions does nothing for it.
+
+The defaults (`m = 20`, `c = 1.5`) are accurate to a few parts in ten thousand
+for ``\ell`` between roughly 0.3 and 0.5, and to better than 0.3% between roughly
+0.25 and 0.6. Outside that the relative error grows quickly: 1.5% at
+``\ell = 0.2`` and 25% at ``\ell = 0.1``, where `m` is what fixes it (`m = 60`
+brings ``\ell = 0.1`` back to three parts in ten thousand), and 1.7% at
+``\ell = 0.8``, where `c` sets the floor instead. The default ``\ell`` prior puts
+about a third of its mass below 0.2, so a fit that settles on a short length
+scale needs a larger `m` than the default. The prior's floor of 0.05 is a
+numerical guard on the spectral density, not a claim that a 20-function basis
+resolves that scale. The Gaussian-process case study measures the error at both
+ends.
 
 ## Fields
 
