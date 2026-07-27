@@ -105,6 +105,18 @@ function _models()
     renewal = IDModel(
         Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
+    # Renewal MODIFIERS: a susceptible-depleting renewal whose incidence is also
+    # seeded by an imported-cases rate. Both modifier kinds ride the one
+    # pre-scan seam — `SusceptibleDepletion` samples nothing and returns
+    # itself, while `ImportedCases` draws its rate before the scan and hands
+    # back a resolved modifier. The gradient must flow through the pre-scan
+    # submodel, the step rebuilt from the resolved modifiers, and the modifier
+    # threading inside the renewal recursion (#189).
+    modifiers = IDModel(
+        Renewal(gen_int, SusceptibleDepletion(2_000.0),
+            ImportedCases(Normal(0.0, 0.5));
+            rt = RandomWalk(), initialisation = Normal()),
+        NegativeBinomialError())
     # Exponential-growth-rate infections (the third infection family alongside
     # `DirectInfections` / `Renewal`): a cumulative growth-rate path exponentiated.
     egr = IDModel(
@@ -221,6 +233,7 @@ function _models()
 
     y_direct = sim(direct, n)
     y_renewal = sim(renewal, n)
+    y_modifiers = sim(modifiers, n)
     y_egr = sim(egr, n)
     y_nowcast = sim(nowcast, n)
     y_triangle = sim(triangle, n)
@@ -255,6 +268,8 @@ function _models()
             as_turing_model(direct, y_direct, n)),
         ("Renewal+NegativeBinomial posterior",
             as_turing_model(renewal, y_renewal, n)),
+        ("Renewal+ImportedCases posterior",
+            as_turing_model(modifiers, y_modifiers, n)),
         ("ExpGrowthRate+Poisson posterior",
             as_turing_model(egr, y_egr, n)),
         # nowcasting
@@ -366,7 +381,7 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (28 scenarios × 4 backends), Julia 1.12:
+Result matrix (29 scenarios × 4 backends), Julia 1.12:
 
 | scenario                                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
 |-------------------------------------------------------|:-----------:|:-----------:|:--------:|:------:|
@@ -385,6 +400,7 @@ Result matrix (28 scenarios × 4 backends), Julia 1.12:
 | AR latent-model-as-prior latent logjoint              |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Poisson posterior                    |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+NegativeBinomial posterior                    |      ✓      |      ✓      |    ✓    |   ✗   |
+| Renewal+ImportedCases posterior                       |      ✓      |      ✓      |    ✓    |   ✓   |
 | ExpGrowthRate+Poisson posterior                       |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+RightTruncate nowcast posterior               |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior                      |      ✓      |      ✓      |    ✓    |   ✓   |
@@ -400,7 +416,7 @@ Result matrix (28 scenarios × 4 backends), Julia 1.12:
 | Renewal+Split cascade posterior                       |      ✓      |      ✓      |    ✓    |   ✗   |
 
 scenario correctly. Enzyme (configured with `function_annotation = Enzyme.Const`,
-see [`backends`](@ref)) works on fifteen of the twenty-eight but raises
+see [`backends`](@ref)) works on sixteen of the twenty-nine but raises
 `IllegalTypeAnalysisException` / a related type-analysis or shadow error on
 thirteen:
 
