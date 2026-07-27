@@ -20,7 +20,7 @@
 - **`AbstractLatentModel` is collapsed into `AbstractPriorModel`.** It remains for
   one release as a deprecated alias (`const AbstractLatentModel =
   AbstractPriorModel`); prefer `AbstractPriorModel`. `implements_latent_interface`
-  forwards to `implements_prior_interface`.
+  has been removed — use `implements_prior_interface`.
 - **Chain variable names gain a namespace segment.** Prior variables are
   namespaced at the component's call site (`as_turing_submodel(…; prefix = true)`)
   instead of by a carried name, so e.g. `damp_AR` becomes `damp_AR.θ` and a process

@@ -151,7 +151,7 @@ We fit the plain renewal model three ways with NUTS, drawing **two chains** with
 **1000 warmup** iterations each so the cross-chain ``\hat R`` diagnostic is
 available, differentiating with
 [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) (see
-[Automatic differentiation backend](@ref ad-backend)).
+[Automatic differentiation backend](@ref ad-backends)).
 The naive fit treats the truncated totals as complete, and motivates the problem.
 [`RightTruncate`](@ref) applies the marginal correction to the same observed-so-far
 totals.

@@ -14,12 +14,32 @@ repos:
         exclude: '^templates/'
     -   id: check-toml
         exclude: '^templates/'
+    # `--assume-in-merge` so the check runs on every commit, not only while a
+    # merge is in progress (the default only fires when `.git/MERGE_HEAD`
+    # exists). Without it the hook is a no-op outside a merge, so a stray
+    # conflict marker committed after a resolve — or with `--no-verify` — sails
+    # through; that is how a marker reached CI on #250 (#251).
     -   id: check-merge-conflict
+        args: [--assume-in-merge]
     -   id: check-json
     -   id: debug-statements
     -   id: end-of-file-fixer
     -   id: mixed-line-ending
     -   id: trailing-whitespace
+#####
+# Conflict markers the stock hook misses
+# `check-merge-conflict` only looks for `<<<<<<<`, `=======` and `>>>>>>>`. A
+# `diff3`/`zdiff3` conflict style also emits a `|||||||` base marker, which it
+# does NOT catch — that is the exact marker that reached CI on #250. Forbid it
+# explicitly. Seven pipes at the start of a line (`||||||| <ref>`) is the
+# marker's shape and does not occur in real code or markdown tables (#251).
+- repo: local
+  hooks:
+  - id: forbid-diff3-base-marker
+    name: forbid diff3 conflict base marker
+    entry: '^\|\|\|\|\|\|\|'
+    language: pygrep
+    types: [text]
 #####
 # Julia
 # Due to lack of first-class Julia support, this needs a local Julia install

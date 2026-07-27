@@ -65,6 +65,42 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v3
+      # The benchmark environment installs the package as a dependency
+      # (`Pkg.develop` + `Pkg.instantiate` below), and Pkg honours only the
+      # *active* project's `[sources]`. A dependency the package pins there by
+      # git url/rev because it is not yet registered therefore cannot resolve,
+      # and the job fails with "has no known versions!" (#216). Register each
+      # such pin into a throwaway registry in this runner's depot: registries,
+      # unlike sources, are depot-level, so the dependency resolves by name in
+      # every environment on the runner. A package with no unregistered pins
+      # is a no-op (nothing cloned, no registry created), and the shell guard
+      # exits before installing anything, so a package with no `[sources]` at
+      # all pays nothing and takes on no new failure surface.
+      #
+      # The scratch registry from an earlier run comes back with the cached
+      # depot and is stale by construction, so it is dropped first, before the
+      # guard: a package that has since dropped its pin (because the
+      # dependency reached a registry) must not be left with a registry that
+      # still carries the name, which fails the depot with a hash mismatch.
+      - name: Bootstrap registry for unregistered [sources] deps
+        run: |
+          rm -rf "${JULIA_DEPOT_PATH:-$HOME/.julia}/registries/EpiAwareScratch"
+          if ! grep -qE '^\[sources(\.|\])' Project.toml; then
+            echo "no [sources] section: nothing to register"
+            exit 0
+          fi
+          julia -e '
+            using Pkg
+            Pkg.activate(; temp = true)
+            Pkg.add([
+                Pkg.PackageSpec(name = "LocalRegistry"),
+                Pkg.PackageSpec(
+                    url = "https://github.com/EpiAware/EpiAwarePackageTools.jl",
+                    rev = "main")])
+            using EpiAwarePackageTools.Benchmarks: bootstrap_sources_registry
+            done = bootstrap_sources_registry(pwd())
+            println(isempty(done) ? "no unregistered [sources] deps" :
+                    "registered: " * join(done, ", "))'
       - name: Run benchmark suite
         run: |
           julia --project=benchmark -e '

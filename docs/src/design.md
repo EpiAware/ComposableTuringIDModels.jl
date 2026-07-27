@@ -100,7 +100,7 @@ A composed model is an ordinary Turing model. Pass observed data instead of
 `missing` to condition it, then sample. We set the automatic-differentiation
 backend explicitly with `NUTS(; adtype = ...)`:
 [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) is the recommended default
-for this package (see [Automatic differentiation backend](@ref ad-backend)).
+for this package (see [Automatic differentiation backend](@ref ad-backends)).
 
 ```julia
 using Turing, Mooncake

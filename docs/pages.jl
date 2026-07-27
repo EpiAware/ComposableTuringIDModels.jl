@@ -16,6 +16,9 @@ pages = [
         "Time-varying damping in an AR process" => "case-studies/time-varying-damping.md",
         "Partial pooling across groups" => "case-studies/hierarchy-stacked.md"
     ],
+    "Tutorials" => [
+        "Automatic differentiation backends" => "getting-started/tutorials/ad-backends.md"
+    ],
     "API reference" => [
         "Public API" => "lib/public.md",
         "Internal API" => "lib/internals.md"
