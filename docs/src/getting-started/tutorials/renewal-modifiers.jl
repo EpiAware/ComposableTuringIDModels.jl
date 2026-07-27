@@ -13,7 +13,9 @@ reproduction number, the same reporting delay, and the same initial incidence.
 Only the modifier list changes.
 """
 
-using ComposableTuringIDModels, Distributions, Random, Turing, CairoMakie
+using ComposableTuringIDModels, Distributions, Random, Turing, Mooncake
+using CairoMakie
+using ADTypes: AutoMooncake
 using DynamicPPL: fix
 using Statistics: quantile
 
@@ -82,8 +84,8 @@ nothing # hide
 md"""
 ## What each modifier does
 
-Counts are plotted on a log scale, floored at one so that zero reports stay
-visible.
+Both panels use a log scale; the reported counts in the lower panel are floored
+at one so that zero-report days stay visible.
 The reporting delay leaves the first `length(delay) - 1` days without a reported
 count, so the lower panel starts on day `length(delay)`.
 """
@@ -177,7 +179,9 @@ model = IDModel(
         ImportedCases(Normal(0.0, 1.0))),
     obs)
 y_obs = sims.seeded.generated_y_t
-chain = sample(as_turing_model(model, y_obs, n), NUTS(), 250; progress = false)
+chain = sample(as_turing_model(model, y_obs, n),
+    NUTS(0.95; adtype = AutoMooncake(; config = nothing)), 250;
+    progress = false)
 nothing # hide
 
 md"""
