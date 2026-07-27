@@ -104,6 +104,12 @@
   the pool — while placing it first makes them part of the incidence the pool
   depletes.
 
+- **`SusceptibleDepletion` takes an unknown population size.** Its `pop_size`
+  slot now accepts a prior (a `Distribution` or a latent process) as well as a
+  number, drawn once before the scan through the seam above and named
+  `pop_size` under the modifier's position. Give it a positive prior, e.g.
+  `SusceptibleDepletion(LogNormal(log(1000), 0.2))`.
+
 - **Tutorial: renewal modifiers.** A short page building a delayed renewal
   process and adding susceptible depletion and importation to it, showing what
   each contributes and fitting the result.

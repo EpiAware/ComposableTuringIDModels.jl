@@ -207,8 +207,9 @@ md"""
 
 Both extensions are one positional argument on [`Renewal`](@ref), and neither
 changes the observation model, the latent process, or the fitting code.
-Susceptible depletion is a deterministic modifier; importation carries a prior
-and draws it through the same seam every other component uses, so its rate can
-equally be a fixed constant, an unknown constant, or a time-varying process such
-as a [`RandomWalk`](@ref).
+Each draws whatever it does not know through the same seam every other component
+uses, so an importation rate can equally be a fixed constant, an unknown
+constant, or a time-varying process such as a [`RandomWalk`](@ref), and a
+population size can be a number or a prior — `SusceptibleDepletion(2_000.0)`
+above would become `SusceptibleDepletion(LogNormal(log(2_000), 0.2))`.
 """

@@ -35,11 +35,13 @@ implements the other part of the interface:
   - `as_turing_model(mod, n)` — a `DynamicPPL.Model` returning the modifier
     used in the scan. The default method samples nothing and returns `mod`
     unchanged, so a purely deterministic modifier (e.g.
-    [`SusceptibleDepletion`](@ref)) is a scan modifier and implements nothing
+    `SusceptibleDepletion(1000.0)`) is a scan modifier and implements nothing
     extra. A prior-carrying modifier implements this method, draws its slots
     through [`as_turing_submodel`](@ref), and returns a *resolved* scan
     modifier holding the drawn values — e.g. [`ImportedCases`](@ref) resolves
-    to an [`ImportedRate`](@ref) and implements no scan interface of its own.
+    to an [`ImportedRate`](@ref) and implements no scan interface of its own,
+    and a [`SusceptibleDepletion`](@ref) given a prior for its population size
+    resolves to one holding the drawn number.
 
 [`RenewalStep`](@ref) resolves its whole modifier tuple through this one seam
 (see its `as_turing_model` method), so a sampling modifier needs no special
@@ -97,6 +99,23 @@ with population size ``N`` = `pop_size`. Its substate is the current susceptible
 count ``S``. Adding it to a renewal step gives a renewal process with a fixed
 population and susceptible depletion, e.g.
 `Renewal(gen_int, SusceptibleDepletion(N))`.
+
+`pop_size` is either a **number** — a known population — or a **prior**: a
+`Distribution` or a latent process, in which case the population size is an
+unknown constant drawn once before the scan through the modifier seam (see
+[`AbstractRenewalModifier`](@ref)) and named `pop_size`, prefixed by the
+modifier's position. A population size is positive, so give it a positive prior
+(a `LogNormal`, or a `truncated` normal).
+
+# Examples
+
+A known population scans as itself, an unknown one resolves to the drawn value:
+
+```@example SusceptibleDepletion
+using ComposableTuringIDModels, Distributions, Random
+Random.seed!(189)
+as_turing_model(SusceptibleDepletion(LogNormal(log(1000), 0.2)), 5)().pop_size
+```
 "
 struct SusceptibleDepletion{T} <: AbstractRenewalModifier
     pop_size::T
@@ -107,6 +126,35 @@ modifier_init_state(mod::SusceptibleDepletion) = mod.pop_size
 function apply_modifier(mod::SusceptibleDepletion, incidence, S)
     new_incidence = max(S / mod.pop_size, 1e-6) * incidence
     return new_incidence, S - new_incidence
+end
+
+# An unknown population size: a prior in the slot has no scan interface until
+# it is drawn, so say so rather than failing on `S / pop_size` inside the scan.
+const _UncertainDepletion = SusceptibleDepletion{<:PriorLike}
+
+modifier_init_state(mod::_UncertainDepletion) = _unresolved_modifier(mod)
+
+function apply_modifier(mod::_UncertainDepletion, incidence, S)
+    return _unresolved_modifier(mod)
+end
+
+@doc raw"
+Draw an unknown population size ahead of the scan.
+
+The population size is one number, so its slot is drawn at length 1 and read
+with [`_at`](@ref): a `Distribution` gives a scalar, a process its first value.
+Returns the [`SusceptibleDepletion`](@ref) the scan uses, holding the drawn
+number.
+
+# Arguments
+
+  - `mod`: a [`SusceptibleDepletion`](@ref) whose `pop_size` is a prior.
+  - `n`: the length of the renewal series (unused; the population size is
+    constant).
+"
+@model function as_turing_model(mod::_UncertainDepletion, n)
+    pop_size ~ as_turing_submodel(mod.pop_size, 1; prefix = true)
+    return SusceptibleDepletion(_at(pop_size, 1))
 end
 
 @doc raw"

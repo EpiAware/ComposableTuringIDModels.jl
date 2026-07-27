@@ -100,19 +100,19 @@ method: it samples through the same [`as_turing_submodel`](@ref) seam as
 everything else and returns the modifier the scan uses. Modifiers that sample
 nothing return themselves, so the step resolves its whole modifier tuple through
 one call and nothing in the renewal model tests what a modifier is.
-[`ImportedCases`](@ref) is the worked example, and modifiers apply in the order
-given:
+[`ImportedCases`](@ref) is the worked example, [`SusceptibleDepletion`](@ref)
+takes a prior for its population size the same way, and modifiers apply in the
+order given:
 
 ```@example design
-# Susceptible depletion, then importation added on top of the depleted
-# incidence, with the (unknown, constant) importation rate estimated.
-seeded = Renewal(gen_int, SusceptibleDepletion(1000.0),
+# Susceptible depletion with an unknown population, then importation added on
+# top of the depleted incidence with its rate estimated too.
+seeded = Renewal(gen_int, SusceptibleDepletion(LogNormal(log(1000), 0.2)),
     ImportedCases(Normal(0.0, 1.0)); rt = RandomWalk())
 nothing # hide
 ```
 
 See [Renewal modifiers](@ref renewal-modifiers) for what each contributes to a fitted model.
-
 
 ## Inference
 

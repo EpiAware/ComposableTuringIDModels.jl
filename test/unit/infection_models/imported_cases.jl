@@ -162,6 +162,39 @@ end
     @test !any(k -> occursin("import", string(k)), keys(draw))
 end
 
+@testitem "SusceptibleDepletion takes a prior for its population size" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using ComposableTuringIDModels: SusceptibleDepletion, modifier_init_state,
+                                    apply_modifier
+    using DynamicPPL: fix
+    Random.seed!(1896)
+    # A prior in the slot resolves to a depletion modifier holding the drawn
+    # number, so the scan sees the same deterministic modifier as ever.
+    resolved = as_turing_model(SusceptibleDepletion(Dirac(750.0)), 5)()
+    @test resolved isa SusceptibleDepletion
+    @test resolved.pop_size ≈ 750.0
+    @test modifier_init_state(resolved) ≈ 750.0
+
+    # Unresolved it has no scan interface, and says so.
+    unknown = SusceptibleDepletion(LogNormal(log(1000.0), 0.2))
+    @test_throws "has no scan interface" modifier_init_state(unknown)
+    @test_throws "has no scan interface" apply_modifier(unknown, 1.0, 1.0)
+
+    # End to end the unknown population bounds the epidemic like a known one,
+    # and its draw is namespaced by the modifier's position.
+    gen_int = [0.2, 0.3, 0.5]
+    r = Renewal(gen_int, unknown; rt = FixedIntercept(log(1.5)),
+        initialisation = Normal())
+    ks = string.(collect(keys(rand(as_turing_model(r, 20)))))
+    @test any(k -> startswith(k, "modifier_1.pop_size"), ks)
+
+    known = Renewal(gen_int, SusceptibleDepletion(Dirac(800.0));
+        rt = FixedIntercept(log(1.5)), initialisation = Normal())
+    I_t = fix(as_turing_model(known, 40), (init_incidence = 0.0,))().I_t
+    @test all(>(0), I_t)
+    @test sum(I_t) < 800.0
+end
+
 @testitem "the pre-scan seam takes any modifier, not just ImportedCases" begin
     using ComposableTuringIDModels, Distributions, Random, Turing
     using ComposableTuringIDModels: AbstractRenewalModifier,
@@ -267,7 +300,7 @@ end
     @test I_after[end] > I_before[end]
 end
 
-@testitem "a negative unconstrained rate still imports rather than subtracting" begin
+@testitem "a negative unconstrained rate still imports" begin
     using ComposableTuringIDModels, Distributions
     using DynamicPPL: fix
     gen_int = [0.2, 0.3, 0.5]
