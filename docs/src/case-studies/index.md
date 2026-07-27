@@ -1,10 +1,11 @@
 # [Case studies](@id case-studies-overview)
 
 These worked examples build complete models from the package's components and fit
-them to real epidemic surveillance data with [Turing](https://turinglang.org),
-recreating published analyses. Each one is self-contained and runs when the
-documentation is built, so the numbers you see are produced by the code on the
-page.
+them with [Turing](https://turinglang.org). Most use real epidemic surveillance
+data and recreate published analyses; the Gaussian-process study instead fits
+data simulated from the model itself, where the point is to recover a known
+truth. Each one is self-contained and runs when the documentation is built, so
+the numbers you see are produced by the code on the page.
 
 !!! note "Sampling settings"
     To keep the documentation build to a sensible time, these case studies draw

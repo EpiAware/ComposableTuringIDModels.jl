@@ -78,6 +78,7 @@ using Turing: fix
 n0, ℓ0, σ0, m0 = 40, 1.0, 1.0, 40
 x = (collect(1:n0) .- mean(1:n0)) ./ std(1:n0)   # models standardise the index
 K_ref = gp_cov(GP(σ0^2 * with_lengthscale(SqExponentialKernel(), ℓ0))(x))
+tol = (exact = 1e-5, hsgp = 5e-3)   # asserted below, so drift fails the build
 
 unit(k, j) = [i == j ? 1.0 : 0.0 for i in 1:k]
 relerr(K) = norm(K - K_ref) / norm(K_ref)
@@ -91,6 +92,7 @@ K_exact = gram([fix(as_turing_model(ExactGP(), n0),
                     (ℓ = ℓ0, σ = σ0, z = unit(n0, j)))() for j in 1:n0])
 K_hsgp = gram([fix(as_turing_model(HilbertSpaceGP(m = m0, c = 2.0), n0),
                    (ℓ = ℓ0, σ = σ0, β = unit(m0, j)))() for j in 1:m0])
+@assert relerr(K_exact) < tol.exact && relerr(K_hsgp) < tol.hsgp
 (exact = round(relerr(K_exact), sigdigits = 2),
     hsgp = round(relerr(K_hsgp), sigdigits = 2))
 ```
@@ -98,6 +100,10 @@ K_hsgp = gram([fix(as_turing_model(HilbertSpaceGP(m = m0, c = 2.0), n0),
 The exact GP reproduces the ecosystem covariance to the jitter it adds for a
 stable Cholesky factor, and the Hilbert-space basis reproduces it to a fraction
 of a percent.
+The comparison grid `x` reproduces the standardisation both models apply to the
+integer index, and the assertion is what keeps that honest. If either the
+standardisation or the basis changed, the check would fail rather than quietly
+print a worse number.
 
 ## Simulate from an exact GP
 
@@ -159,12 +165,13 @@ this package.
 The chain is started from a prior draw (`InitFromPrior()`). Turing's default
 initialisation instead draws each parameter uniformly on ``[-2, 2]`` in
 unconstrained space, which for a positive scale parameter means a starting value
-up to ``e^2 \approx 7.4``: seven prior standard deviations out for the marginal
-standard deviation ``\sigma``. A GP with ``\sigma \approx 7`` puts ``\log R_t``
-in the tens, where the renewal likelihood is astronomically bad and its curvature
-enormous, so NUTS shrinks the step size to ``10^{-8}`` and the chain never leaves
-its starting point. Any GP hyperprior with a long tail has this failure mode, and
-starting from the prior avoids it.
+up to ``e^2 \approx 7.4``. The prior on the marginal standard deviation
+``\sigma`` is a half-normal with unit scale, which puts almost all of its mass
+below 2, so that is far out in the tail. A GP with ``\sigma \approx 7`` puts
+``\log R_t`` in the tens, where the renewal likelihood is astronomically bad and
+its curvature enormous, so NUTS shrinks the step size by six or seven orders of
+magnitude and the chain never leaves its starting point. Any GP hyperprior with a
+long tail has this failure mode, and starting from the prior avoids it.
 
 A small helper fits a chosen GP latent, times the run, recovers the per-draw
 ``\log R_t`` with [`generated_observables`](@ref), and scores the posterior mean
@@ -206,7 +213,9 @@ several times the faster: its differentiated work is one ``n \times m``
 matrix–vector product, against an ``O(n^3)`` covariance build and factorisation
 for the exact GP. That gap is the reason the approximation exists, and it widens
 with the series length; at short ``n`` like this the exact GP is still affordable
-and gives the reference the approximation is judged against.
+and gives the reference the approximation is judged against. Each timing is a
+single un-warmed run that includes the model's compilation, so read the ratio as
+indicative rather than as a benchmark.
 
 ## Posterior trajectories
 
@@ -261,13 +270,17 @@ fig
 
 The share of days on which the 95% band contains the quantity it is estimating
 puts a number on what the figure shows, and would drop sharply if a fit ever
-degenerated:
+degenerated.
+Asserting it turns a degenerate fit into a build failure rather than a wrong
+figure sitting under prose that claims otherwise:
 
 ```@example gp
 covered(b, x) = round(mean(b[:, 1] .<= x .<= b[:, 5]); digits = 2)
-(Rt_hsgp = covered(credible_bands(exp.(hs.Z)), exp.(Z_true)),
+coverage = (Rt_hsgp = covered(credible_bands(exp.(hs.Z)), exp.(Z_true)),
     Rt_exact = covered(credible_bands(exp.(ex.Z)), exp.(Z_true)),
     cases = covered(credible_bands(yt), y_obs))
+@assert all(>=(0.8), coverage) "a 95% band covers under 80% of days: $coverage"
+coverage
 ```
 
 Both posterior ``R_t`` bands bracket the simulated truth, and the
