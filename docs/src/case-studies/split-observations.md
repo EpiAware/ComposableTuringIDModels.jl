@@ -104,7 +104,7 @@ Fitting conditions on both streams at once.
 We draw a full chain with NUTS, matching the other case studies, and
 differentiate with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the
 recommended backend for this package (see
-[Automatic differentiation backend](@ref ad-backend)).
+[Automatic differentiation backend](@ref ad-backends)).
 
 ```@example split
 ydata = (cases = y.cases, deaths = y.deaths)

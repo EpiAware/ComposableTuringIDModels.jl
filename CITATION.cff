@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: "ComposableTuringIDModels.jl"
+type: software
+authors:
+  - name: "Sam Abbott"
+repository-code: "https://github.com/EpiAware/ComposableTuringIDModels.jl"
+url: "https://github.com/EpiAware/ComposableTuringIDModels.jl"

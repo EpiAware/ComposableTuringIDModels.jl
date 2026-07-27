@@ -8,11 +8,11 @@
 # `test/ad/scenarios.jl` and the package's `test/ADFixtures` registry); only
 # this wiring is standard.
 #
-# This file is force-managed: `scaffold_update()` overwrites it with the generic driver
+# This file is force-managed: `update()` overwrites it with the generic driver
 # on every sync. A package whose ADFixtures registry predates the current
 # `ADRegistry` contract (its `scenarios` does not accept `category`) can keep a
 # package-owned driver while it migrates by adding the opt-out marker described
-# in `EpiAwarePackageTools.scaffold_update`'s docstring (kit #162); `scaffold_update()` then
+# in `EpiAwarePackageTools.update`'s docstring (kit #162); `update()` then
 # preserves this file instead of clobbering it.
 
 @testsnippet ADHelpers begin
