@@ -2,7 +2,11 @@
 #
 # Package-specific configuration read by the managed `make.jl`.
 
-const LIGHT_TUTORIALS = String[]
+# `renewal-modifiers.jl` is light: Literate emits `@example` blocks that
+# Documenter runs in-process, exactly as the case studies do, so the page also
+# renders under `--skip-notebooks`. Its fit is deliberately small (n = 60, 250
+# draws) to keep that cheap.
+const LIGHT_TUTORIALS = String["renewal-modifiers.jl"]
 
 # Names are relative to `TUTORIALS_SUBDIR`: `HEAVY_TUTORIALS` holds the Literate
 # `.jl` source names, `TUTORIAL_STUBS` is keyed by the rendered `.md` names.

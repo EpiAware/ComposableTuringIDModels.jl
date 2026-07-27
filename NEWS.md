@@ -76,19 +76,35 @@
 
 ### Added
 
+- **A pre-scan seam for renewal modifiers.** An `AbstractRenewalModifier` may now
+  carry priors of its own. A modifier optionally implements
+  `as_turing_model(mod, n)`, which samples its parameters and returns the
+  modifier the scan uses; the default method samples nothing and returns the
+  modifier unchanged, so a purely deterministic modifier such as
+  `SusceptibleDepletion` is untouched. `RenewalStep` resolves its whole modifier
+  tuple through that one seam before the scan, prefixing each modifier's
+  variables by its position, and `Renewal` draws its step through it. A modifier
+  with priors therefore needs no special handling anywhere in the infection
+  model, and any number of them can compose.
+
 - **`ImportedCases` renewal modifier.** Adds an externally seeded importation
   rate to the renewal incidence, `I_t = ι_t + R_t Σ I_{t-i} g_i`, so infections
   can arrive from outside the modelled population — the mechanism behind a
   renewal process that would otherwise die out from a zero initial incidence,
-  and behind reintroduction after local elimination. The rate is a length-`n`
-  prior slot on the **unconstrained** scale, like `rt` and `initialisation`:
-  `Renewal` maps it through its `transformation` (default `exp`), so importation
-  is positive by construction and any latent process (a bare `Distribution`, a
-  `RandomWalk`, a GP) can drive it without the prior having to be
-  positive-supported. It is added to the committed incidence after the modifier
-  chain, so it composes with `SusceptibleDepletion` without being scaled by it —
-  and, for the same reason, imported infections do not themselves deplete the
-  susceptible pool. At most one `ImportedCases` may be composed onto a step.
+  and behind reintroduction after local elimination. It is the worked example of
+  the seam above: the rate is a length-`n` prior slot on the **unconstrained**
+  scale, drawn before the scan and mapped through the modifier's own
+  `transformation` (default `exp`), so importation is positive by construction
+  and any latent process (a bare `Distribution`, a `RandomWalk`, a GP) can drive
+  it without the prior having to be positive-supported. Modifiers apply in the
+  order given, so placing importation after a `SusceptibleDepletion` adds the
+  imports to the depleted incidence — they are not scaled by the susceptible
+  fraction and do not themselves deplete the pool — while placing it first makes
+  them part of the incidence the pool depletes.
+
+- **Tutorial: renewal modifiers.** A short page building a delayed renewal
+  process and adding susceptible depletion and importation to it, showing what
+  each contributes and fitting the result.
 
 - **`Renewal`'s `generation_time` accepts a pmf-producing prior model.** Alongside
   a fixed pmf vector and a fixed continuous `Distribution`, `generation_time` now
