@@ -99,11 +99,13 @@ Random.seed!(189)
 as_turing_model(ImportedCases(RandomWalk()), 5)().rate
 ```
 
-Either goes onto a renewal process as a positional modifier:
+Either goes onto a renewal process as a positional modifier, where the rate
+joins the model's parameters under the modifier's position:
 
 ```@example ImportedCases
-Renewal([0.2, 0.3, 0.5], ImportedCases(RandomWalk());
-    rt = RandomWalk(), initialisation = Normal())
+r = Renewal([0.2, 0.3, 0.5], ImportedCases(Normal(-1.0, 0.5));
+    rt = FixedIntercept(0.0), initialisation = Normal())
+keys(rand(as_turing_model(r, 5)))
 ```
 
 ## Fields
@@ -125,20 +127,20 @@ struct ImportedCases{I <: PriorLike, F <: Function} <: AbstractRenewalModifier
 end
 
 @doc raw"
-A resolved [`ImportedCases`](@ref): the drawn importation-rate path, ready to
-scan.
+A resolved [`ImportedCases`](@ref): the drawn importation rate, ready to scan.
 
 This is what [`ImportedCases`](@ref) returns from its pre-scan
 `as_turing_model` seam — the prior has been sampled and transformed, so the scan
 sees a plain deterministic modifier. Its substate is the step counter, so step
-``t`` adds ``\iota_t``, and the incidence is floored at a small positive value.
+``t`` adds ``\iota_t`` read with [`_at`](@ref) (a constant rate stays a scalar),
+and the incidence is floored at a small positive value.
 
 ## Fields
 
-  - `rate`: the positive importation rate at each time.
+  - `rate`: the positive importation rate, constant or one value per time.
 "
-struct ImportedRate{V <: AbstractVector} <: AbstractRenewalModifier
-    "The positive importation rate at each time."
+struct ImportedRate{V} <: AbstractRenewalModifier
+    "The positive importation rate: one constant, or one value per time."
     rate::V
 end
 
@@ -147,7 +149,7 @@ end
 modifier_init_state(::ImportedRate) = 0
 
 function apply_modifier(mod::ImportedRate, incidence, t)
-    return max(incidence + mod.rate[t + 1], 1e-6), t + 1
+    return max(incidence + _at(mod.rate, t + 1), 1e-6), t + 1
 end
 
 @doc raw"
@@ -156,7 +158,9 @@ Sample the importation rate ahead of the scan.
 Draws the unconstrained rate slot through [`as_turing_submodel`](@ref) — a bare
 `Distribution` giving one constant rate, a process giving a length-`n` path —
 maps it onto the positive scale with the modifier's `transformation`, and
-returns the [`ImportedRate`](@ref) the scan uses.
+returns the [`ImportedRate`](@ref) the scan uses. The map is broadcast, so a
+constant stays a scalar (no length-`n` allocation) and the scan reads either
+shape with [`_at`](@ref).
 
 # Arguments
 
@@ -165,6 +169,5 @@ returns the [`ImportedRate`](@ref) the scan uses.
 "
 @model function as_turing_model(mod::ImportedCases, n)
     import_rates ~ as_turing_submodel(mod.importation_rate, n; prefix = true)
-    rate = [mod.transformation(_at(import_rates, t)) for t in 1:n]
-    return ImportedRate(rate)
+    return ImportedRate(mod.transformation.(import_rates))
 end

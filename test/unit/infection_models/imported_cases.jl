@@ -64,7 +64,7 @@ end
     @test I_imported[end] > I_plain[end]  # Importation adds to incidence
 end
 
-@testitem "ImportedCases with time-varying rate samples via as_turing_submodel" begin
+@testitem "ImportedCases draws a time-varying rate through the seam" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(1892)
     gen_int = [0.2, 0.3, 0.5]
@@ -83,7 +83,7 @@ end
     @test any(k -> startswith(string(k), "modifier_1.import_rates"), keys(draw))
 end
 
-@testitem "ImportedCases with fixed rate samples under NUTS" tags=[:sample] begin
+@testitem "ImportedCases samples under NUTS" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(1893)
     gen_int = [0.2, 0.3, 0.5]
@@ -113,6 +113,13 @@ end
     resolved = as_turing_model(ImportedCases(FixedIntercept(log(2.0))), 5)()
     @test resolved isa ImportedRate
     @test resolved.rate ≈ fill(2.0, 5)
+
+    # A bare `Distribution` is one constant, so the drawn rate stays a scalar
+    # rather than being materialised as `n` copies of itself.
+    constant = as_turing_model(ImportedCases(Dirac(log(3.0))), 5)()
+    @test constant.rate isa Number
+    @test constant.rate ≈ 3.0
+    @test first(apply_modifier(constant, 1.0, 7)) ≈ 4.0
 
     # The resolved modifier is a plain scan modifier: its substate is the step
     # counter, so step `t` adds the rate at `t`.
