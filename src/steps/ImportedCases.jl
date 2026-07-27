@@ -17,7 +17,7 @@
 # `transformation` before adding it. An importation rate is a count per unit
 # time and cannot be negative, and a slot that accepts any latent process has to
 # make that hold structurally — an unconstrained process (a `RandomWalk`, an
-# `AR`, a GP) spends much of its time below zero, and subtracting that from the
+# `AR`) spends much of its time below zero, and subtracting that from the
 # incidence is not importation.
 
 @doc raw"
@@ -81,16 +81,25 @@ mean.
 
 # Examples
 
-A constant rate with median ``\exp(-1) \approx 0.37`` imports per unit time:
+Drawing the modifier through its pre-scan seam shows the rate the scan will
+add. A bare `Distribution` gives one constant, here with median
+``\exp(-1) \approx 0.37`` imports per unit time:
 
 ```@example ImportedCases
-using ComposableTuringIDModels, Distributions
-Renewal([0.2, 0.3, 0.5], ImportedCases(Normal(-1.0, 0.5));
-    rt = RandomWalk(), initialisation = Normal())
+using ComposableTuringIDModels, Distributions, Random
+Random.seed!(189)
+as_turing_model(ImportedCases(Normal(-1.0, 0.5)), 5)().rate
 ```
 
-A time-varying rate, positive at every time despite the walk being
-unconstrained:
+A latent process gives a path, positive at every time despite the walk itself
+being unconstrained:
+
+```@example ImportedCases
+Random.seed!(189)
+as_turing_model(ImportedCases(RandomWalk()), 5)().rate
+```
+
+Either goes onto a renewal process as a positional modifier:
 
 ```@example ImportedCases
 Renewal([0.2, 0.3, 0.5], ImportedCases(RandomWalk());

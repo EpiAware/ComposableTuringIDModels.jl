@@ -50,7 +50,7 @@ errors with that message rather than a bare `MethodError`.
 Each modifier's sampled variables are prefixed by its **position** in the
 modifier tuple, `modifier_<i>`, so two modifiers of the same kind cannot
 collide on a variable name — in
-`Renewal(data, SusceptibleDepletion(N), ImportedCases(Normal()))` the
+`Renewal(gen_int, SusceptibleDepletion(N), ImportedCases(Normal()))` the
 importation rate is `modifier_2.import_rates`. Inserting or reordering a
 modifier therefore renames the variables of every modifier after it.
 "
@@ -62,8 +62,9 @@ abstract type AbstractRenewalModifier end
 # with a bare `MethodError` from inside the recursion.
 function _unresolved_modifier(mod)
     return error("$(typeof(mod)) has no scan interface. A modifier " *
-                 "carrying priors must be resolved before the scan with " *
-                 "`as_turing_model(step, n)` (what `Renewal` does); a " *
+                 "carrying priors must be resolved before the scan through " *
+                 "the step's `as_turing_model` seam, i.e. " *
+                 "`as_turing_submodel(step, n)` (what `Renewal` does); a " *
                  "deterministic modifier must implement " *
                  "`modifier_init_state` and `apply_modifier`.")
 end
@@ -94,7 +95,8 @@ S_t = S_{t-1} - I_t,
 
 with population size ``N`` = `pop_size`. Its substate is the current susceptible
 count ``S``. Adding it to a renewal step gives a renewal process with a fixed
-population and susceptible depletion, e.g. `Renewal(data, SusceptibleDepletion(N))`.
+population and susceptible depletion, e.g.
+`Renewal(gen_int, SusceptibleDepletion(N))`.
 "
 struct SusceptibleDepletion{T} <: AbstractRenewalModifier
     pop_size::T

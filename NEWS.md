@@ -92,15 +92,17 @@
   can arrive from outside the modelled population — the mechanism behind a
   renewal process that would otherwise die out from a zero initial incidence,
   and behind reintroduction after local elimination. It is the worked example of
-  the seam above: the rate is a length-`n` prior slot on the **unconstrained**
-  scale, drawn before the scan and mapped through the modifier's own
-  `transformation` (default `exp`), so importation is positive by construction
-  and any latent process (a bare `Distribution`, a `RandomWalk`, a GP) can drive
-  it without the prior having to be positive-supported. Modifiers apply in the
-  order given, so placing importation after a `SusceptibleDepletion` adds the
-  imports to the depleted incidence — they are not scaled by the susceptible
-  fraction and do not themselves deplete the pool — while placing it first makes
-  them part of the incidence the pool depletes.
+  the seam above: the rate is a per-step parameter slot on the
+  **unconstrained** scale — a bare `Distribution` is one unknown constant shared
+  across time, a vector of them or a latent process is a length-`n` path —
+  drawn before the scan and mapped through the modifier's own `transformation`
+  (default `exp`), so importation is positive by construction and any latent
+  process (a `RandomWalk`, an `AR`) can drive it without the prior having to be
+  positive-supported. Modifiers apply in the order given, so placing importation
+  after a `SusceptibleDepletion` adds the imports to the depleted incidence —
+  they are not scaled by the susceptible fraction and do not themselves deplete
+  the pool — while placing it first makes them part of the incidence the pool
+  depletes.
 
 - **Tutorial: renewal modifiers.** A short page building a delayed renewal
   process and adding susceptible depletion and importation to it, showing what
