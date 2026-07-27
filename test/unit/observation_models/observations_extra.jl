@@ -301,8 +301,8 @@ end
     from_matrix = define_y_t(obs, N, fill(20.0, 3); now = 3)
 
     # The same data as long-form `(reference, delay, count)` rows.
-    refs = Int[];
-    dls = Int[];
+    refs = Int[]
+    dls = Int[]
     cts = Int[]
     for t in 1:3, d in 0:2
 
