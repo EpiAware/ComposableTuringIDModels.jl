@@ -308,6 +308,37 @@ end
     @test ImportedCases(RandomWalk()) isa ImportedCases
 end
 
+@testitem "a per-element importation prior gives a length-n rate" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using ComposableTuringIDModels: ImportedRate
+    using DynamicPPL: fix
+    Random.seed!(1898)
+    n = 8
+    # A `Vector{<:Distribution}` is the third documented slot shape: one prior
+    # per time, so the seam draws a length-`n` path rather than a constant.
+    resolved = as_turing_model(
+        ImportedCases([Dirac(log(float(t))) for t in 1:n]), n)()
+    @test resolved isa ImportedRate
+    @test resolved.rate ≈ collect(1.0:n)
+
+    # It drives a renewal like any other slot shape, and the length is checked
+    # against the series rather than silently recycled.
+    gen_int = [0.2, 0.3, 0.5]
+    fixinit = (init_incidence = log(1.0),)
+    args = (; rt = FixedIntercept(log(1.0)), initialisation = Normal())
+    plain = Renewal(gen_int; args...)
+    seeded = Renewal(gen_int,
+        ImportedCases([Normal(-1.0, 0.1) for _ in 1:n]); args...)
+    I_plain = fix(as_turing_model(plain, n), fixinit)().I_t
+    I_seeded = fix(as_turing_model(seeded, n), fixinit)().I_t
+    @test all(>(0), I_seeded)
+    @test I_seeded[end] > I_plain[end]
+
+    mismatched = Renewal(gen_int,
+        ImportedCases([Normal(-1.0, 0.1) for _ in 1:(n + 1)]); args...)
+    @test_throws Exception as_turing_model(mismatched, n)()
+end
+
 @testitem "a renewal with importation is ForwardDiff-differentiable" begin
     using ComposableTuringIDModels, Distributions, ForwardDiff
     using ComposableTuringIDModels: ImportedRate, RenewalStep,
