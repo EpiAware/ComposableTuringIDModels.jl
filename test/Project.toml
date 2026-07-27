@@ -34,4 +34,15 @@ EpiAwarePackageTools = {rev = "main", url = "https://github.com/EpiAware/EpiAwar
 ComposableTuringIDModels = {path = ".."}
 
 [compat]
+# `Quality: formatting` resolves JuliaFormatter from this shared environment
+# (the managed `quality.jl` calls `test_formatting(QA_CONFIG.mod)` with no
+# `env`), so an unbounded entry lets a new formatter minor turn `main` red.
+# The range is disjoint on purpose. JET pins JuliaSyntax, so on Julia 1.11 JET
+# is capped at 0.9.x / JuliaSyntax 0.4 and only JuliaFormatter 2.4 resolves,
+# while on 1.12 JET 0.11 admits JuliaSyntax 1.0 and 2.12 resolves. The quality
+# testset runs only on the `1` x (ubuntu, macOS) legs — every other leg passes
+# `skip_quality` — so the 2.4 branch keeps 1.11 resolvable and the 2.12 branch
+# bounds the version that actually runs the check. Drop the 2.4 branch once
+# JET's floor moves past JuliaSyntax 0.4.
+JuliaFormatter = "2.4, 2.12"
 TestItems = "1.0.0"
