@@ -37,10 +37,6 @@ const _USING_LINE = "using ComposableTuringIDModels, Distributions, Turing"
 
 const _PRIOR_LINE = "prior_model = as_turing_model(model, missing, n)"
 
-const _GITHUB_LINE = "  [GitHub repository]($(_REPO_URL))."
-
-const _INSTALL_POINTER = "- Ready to install? See [Installation](@ref)."
-
 # `README.md` is owned by its GitHub readers and is edited only there; every
 # adjustment the docs home page needs is made here, on the generated copy.
 # `build_index` applies these rewrites line by line to the README, inside
@@ -72,25 +68,22 @@ const _INSTALL_POINTER = "- Ready to install? See [Installation](@ref)."
 #     `README.md`. A trailing `;` does not work here — unlike the REPL,
 #     `@example` displays the final value regardless. The block's job is to
 #     build the model; the blocks that follow carry the output worth reading.
-#  4. The Installation section is stripped from the home page (see
-#     `INDEX_STRIP_SECTIONS`), so add a pointer to where it went.
 const INDEX_REWRITES = Pair{String, String}[
     "(NOTICE)" => "($(_REPO_BLOB)/NOTICE)",
     "(LICENSE)" => "($(_REPO_BLOB)/LICENSE)",
     _USING_LINE => "$(_USING_LINE)\nusing Random\nRandom.seed!(27)",
-    _PRIOR_LINE => "$(_PRIOR_LINE)\nnothing # hide",
-    _GITHUB_LINE => "$(_GITHUB_LINE)\n$(_INSTALL_POINTER)"
+    _PRIOR_LINE => "$(_PRIOR_LINE)\nnothing # hide"
 ]
 
 # Run the README's ```julia fences on the home page so every block shows its
 # printed output (#218). The managed build converts EVERY fence into an
-# executed `@example readme` block and has no per-fence opt-out, so the one
-# fence that must not run, `Pkg.add("ComposableTuringIDModels")` under
-# Installation, is handled by stripping that section from the generated index
-# (see `INDEX_STRIP_SECTIONS` below). Executing it would hit the registry and
-# install a second copy of the package into the docs environment. Installation
-# stays in `README.md` for GitHub readers, is linked from the home page (see
-# `INDEX_REWRITES`), and the docs site carries it on the Overview page.
+# executed `@example readme` block and has no per-fence opt-out, so every fence
+# in `README.md` has to be runnable. It is: the README carries no installation
+# snippet, which is the one thing that must not run during a docs build (it
+# would hit the registry and install a second copy of the package into the docs
+# environment). Installation lives on the authored Getting started page
+# instead, where a plain ```julia fence renders without executing — the same
+# arrangement as the other EpiAware packages.
 #
 # COST: the last block fits `NUTS()` for 1000 draws, which dominates the cost
 # of the home page. At the pinned seed it took 226-319 s on an Apple-silicon
@@ -100,7 +93,9 @@ const INDEX_REWRITES = Pair{String, String}[
 # count lives in `README.md` and is deliberately not reduced here.
 const README_EXECUTE = true
 
-const INDEX_STRIP_SECTIONS = String["Installation"]
+# Nothing to omit from the home page: with installation moved to the Getting
+# started page, every README section is safe to render and run.
+const INDEX_STRIP_SECTIONS = String[]
 
 # The package benchmarks and publishes a timeline to the `benchmarks` branch,
 # so the generated page (heading + `docs/benchmarks.md` prose + history) is on.

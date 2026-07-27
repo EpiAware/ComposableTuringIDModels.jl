@@ -77,10 +77,11 @@
   `README.md`, and its blocks previously rendered without any printed output.
   They are now executed, so the composed model, the simulated series, and the
   fitted chain summary all appear on the page. The blocks run under a fixed
-  random seed, so the page is reproducible from build to build. The Installation
-  section is omitted from the home page, because executing it would install the
-  package from the registry during the docs build; it stays in `README.md`, is
-  linked from the home page, and is also on the Overview page.
+  random seed, so the page is reproducible from build to build. Installation
+  moved out of `README.md` onto a new Getting started page, because a `Pkg.add`
+  in the README would have run against the registry on every docs build.
+  Resolves
+  [#218](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/218).
 
 ### Added
 
