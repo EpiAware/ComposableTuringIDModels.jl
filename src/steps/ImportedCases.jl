@@ -1,17 +1,19 @@
 # Imported (externally seeded) cases as a renewal modifier (#189).
 #
-# Unlike `SusceptibleDepletion`, which is a pure function of the proposed
-# incidence and its own substate, importation adds a per-time rate that is
-# *sampled* — it is a prior slot, not a constant carried on the step. So the
-# modifier itself is a no-op in the `apply_modifier` chain and only marks the
-# step as importing; `Renewal` samples the rate as a length-`n` submodel and
-# zips it into the scan input, and `RenewalStep`'s tuple-input method adds it
-# after the modifier chain. That keeps importation additive on the *committed*
-# incidence rather than on the force of infection, so a later multiplicative
-# modifier cannot scale imports away.
+# `ImportedCases` is the worked example of a modifier that carries priors. The
+# rate it adds is *sampled*, and a scan step is a deterministic function, so the
+# rate is drawn once before the scan through the modifier seam
+# (`as_turing_model(mod, n)`, see `AbstractRenewalModifier`). That returns an
+# `ImportedRate` — the same modifier with the drawn path in place of the prior —
+# which then behaves like any other modifier in the scan: it transforms the
+# proposed incidence and carries its own substate.
 #
-# The slot is on the UNCONSTRAINED scale, like `Renewal`'s `rt` and
-# `initialisation`: `Renewal` pushes the sampled value through its
+# The substate is the step counter, which is how a per-time quantity is read
+# inside a scan whose step sees no clock. Nothing about this is specific to
+# importation: any modifier needing a per-time input resolves it the same way.
+#
+# The prior is on the UNCONSTRAINED scale, like `Renewal`'s `rt` and
+# `initialisation` slots, and the modifier maps it through its own
 # `transformation` before adding it. An importation rate is a count per unit
 # time and cannot be negative, and a slot that accepts any latent process has to
 # make that hold structurally — an unconstrained process (a `RandomWalk`, an
@@ -34,29 +36,34 @@ incidence, and behind reintroduction after local elimination.
 
 `importation_rate` is a length-`n` prior slot holding the **unconstrained**
 rate ``\tilde\iota_t``, exactly as [`Renewal`](@ref)'s `rt` slot holds the
-unconstrained ``Z_t``. [`Renewal`](@ref) maps it to the positive rate
-``\iota_t`` through its `transformation` ``g`` (default `exp`) before adding it,
-so importation is positive by construction and *any* latent process can drive
-it — a bare `Distribution` gives a constant rate shared across time, and a
-process (e.g. a [`RandomWalk`](@ref)) gives a time-varying ``\iota_t`` that
-stays positive even as the underlying path crosses zero.
+unconstrained ``Z_t``. The modifier maps it to the positive rate ``\iota_t``
+through its own `transformation` ``g`` (default `exp`), so importation is
+positive by construction and *any* latent process can drive it — a bare
+`Distribution` gives a constant rate shared across time, and a process (e.g. a
+[`RandomWalk`](@ref)) gives a time-varying ``\iota_t`` that stays positive even
+as the underlying path crosses zero.
 
-The rate is added to the committed incidence after the modifier chain, so it
-composes with modifiers such as [`SusceptibleDepletion`](@ref) without being
-scaled by them. Because it is added *after* that chain, imported infections do
-not themselves deplete the susceptible pool.
+The rate is drawn before the scan through the modifier seam (see
+[`AbstractRenewalModifier`](@ref)), giving an [`ImportedRate`](@ref) that adds
+``\iota_t`` at step ``t``. Where it sits in the modifier tuple therefore decides
+how it composes: placed *after* a [`SusceptibleDepletion`](@ref) the imports are
+added to the depleted incidence, so they are not scaled by the susceptible
+fraction and do not themselves deplete the pool; placed *before* it they are
+treated as part of the incidence the pool depletes.
 
 The resulting incidence is floored at a small positive value, keeping the
 renewal recursion well defined for observation models that require a positive
 mean.
 
-At most one `ImportedCases` may be composed onto a step — a second one would
-never be sampled, so [`Renewal`](@ref) rejects it at construction.
-
 # Arguments
 
   - `importation_rate`: the unconstrained importation-rate prior — a
     `Distribution`, a `Vector{<:Distribution}`, or any prior/latent process.
+
+# Keyword Arguments
+
+  - `transformation`: the map from the unconstrained rate onto the positive
+    importation rate (default `exp`).
 
 # Examples
 
@@ -75,15 +82,66 @@ unconstrained:
 Renewal([0.2, 0.3, 0.5], ImportedCases(RandomWalk());
     rt = RandomWalk(), initialisation = Normal())
 ```
+
+## Fields
+
+  - `importation_rate`: the unconstrained importation-rate prior.
+  - `transformation`: the map onto the positive importation rate.
 "
-struct ImportedCases{I <: PriorLike} <: AbstractRenewalModifier
+struct ImportedCases{I <: PriorLike, F <: Function} <: AbstractRenewalModifier
+    "The unconstrained importation-rate prior."
     importation_rate::I
-    function ImportedCases(importation_rate::PriorLike)
-        return new{typeof(importation_rate)}(importation_rate)
+    "The map from the unconstrained rate onto the positive rate."
+    transformation::F
+
+    function ImportedCases(
+            importation_rate::PriorLike; transformation::Function = exp)
+        return new{typeof(importation_rate), typeof(transformation)}(
+            importation_rate, transformation)
     end
 end
 
-# The modifier carries no state of its own and leaves the incidence untouched:
-# the sampled rate is added by `RenewalStep`'s tuple-input method (see above).
-modifier_init_state(::ImportedCases) = 0.0
-apply_modifier(::ImportedCases, inc, _) = (inc, 0.0)
+@doc raw"
+A resolved [`ImportedCases`](@ref): the drawn importation-rate path, ready to
+scan.
+
+This is what [`ImportedCases`](@ref) returns from its pre-scan
+`as_turing_model` seam — the prior has been sampled and transformed, so the scan
+sees a plain deterministic modifier. Its substate is the step counter, so step
+``t`` adds ``\iota_t``, and the incidence is floored at a small positive value.
+
+## Fields
+
+  - `rate`: the positive importation rate at each time.
+"
+struct ImportedRate{V <: AbstractVector} <: AbstractRenewalModifier
+    "The positive importation rate at each time."
+    rate::V
+end
+
+# The substate is the step counter: a scan step has no clock of its own, so a
+# per-time modifier carries the index it has reached.
+modifier_init_state(::ImportedRate) = 0
+
+function apply_modifier(mod::ImportedRate, incidence, t)
+    return max(incidence + mod.rate[t + 1], 1e-6), t + 1
+end
+
+@doc raw"
+Sample the importation rate ahead of the scan.
+
+Draws the unconstrained rate slot through [`as_turing_submodel`](@ref) — a bare
+`Distribution` giving one constant rate, a process giving a length-`n` path —
+maps it onto the positive scale with the modifier's `transformation`, and
+returns the [`ImportedRate`](@ref) the scan uses.
+
+# Arguments
+
+  - `mod`: the [`ImportedCases`](@ref) modifier.
+  - `n`: the length of the renewal series.
+"
+@model function as_turing_model(mod::ImportedCases, n)
+    import_rates ~ as_turing_submodel(mod.importation_rate, n; prefix = true)
+    rate = [mod.transformation(_at(import_rates, t)) for t in 1:n]
+    return ImportedRate(rate)
+end

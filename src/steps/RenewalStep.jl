@@ -25,8 +25,33 @@ across the scan. Concrete modifiers implement
   - `modifier_init_state(mod)` — the modifier's initial substate.
   - `apply_modifier(mod, incidence, substate)` — return
     `(new_incidence, new_substate)`.
+
+A modifier may additionally need **parameters sampled before the scan** — a
+per-time importation rate, an uncertain population size — which the scan itself
+cannot draw, because a scan step is a plain deterministic function. That is the
+third, optional part of the interface:
+
+  - `as_turing_model(mod, n)` — a `DynamicPPL.Model` returning the modifier
+    used in the scan. The default method samples nothing and returns `mod`
+    unchanged, so a purely deterministic modifier (e.g.
+    [`SusceptibleDepletion`](@ref)) implements nothing extra. A modifier with
+    priors implements it, draws its slots through
+    [`as_turing_submodel`](@ref), and returns a *resolved* modifier holding the
+    drawn values — e.g. [`ImportedCases`](@ref) returns an
+    [`ImportedRate`](@ref).
+
+[`RenewalStep`](@ref) resolves its whole modifier tuple through this one seam
+(see its `as_turing_model` method), so a sampling modifier needs no special
+handling anywhere in the renewal model.
 "
 abstract type AbstractRenewalModifier end
+
+# The default pre-scan seam: a modifier with no parameters of its own samples
+# nothing and scans as itself. Kept as a `@model` so every modifier resolves
+# through the same submodel call, with no branch on whether it samples.
+@model function as_turing_model(mod::AbstractRenewalModifier, n)
+    return mod
+end
 
 @doc raw"
 Susceptible-depletion modifier for [`RenewalStep`](@ref).
@@ -85,9 +110,7 @@ renewal_foi(step::RenewalStep, window, Rt) = renewal_foi(step.core, window, Rt)
 # state, no per-step overhead), so a modifier-free renewal is unchanged.
 const _PlainRenewalStep = RenewalStep{<:AbstractConstantRenewalStep, Tuple{}}
 
-# `Rt` is annotated so this fast path stays unambiguous against the tuple-input
-# method below (a plain step carries no modifiers, so it never sees a tuple).
-(step::_PlainRenewalStep)(state, Rt::Real) = step.core(state, Rt)
+(step::_PlainRenewalStep)(state, Rt) = step.core(state, Rt)
 
 function _renewal_init_state(step::_PlainRenewalStep, I₀, r_approx, len_gen_int)
     return _renewal_init_state(step.core, I₀, r_approx, len_gen_int)
@@ -117,24 +140,60 @@ function (step::RenewalStep)(state, Rt)
     return [new_window, new_substates...]
 end
 
-# Tuple-input method: pass `(Rt, import_rate)` through the scan when the step
-# has an `ImportedCases` modifier. The importation rate is added to the
-# incidence after the modifier chain, so the modifier itself stays a no-op (see
-# `ImportedCases`).
-function (step::RenewalStep)(state, input::Tuple)
-    Rt, import_rate = input
-    window = state[1]
-    substates = ntuple(i -> state[i + 1], length(step.modifiers))
-    foi = renewal_foi(step.core, window, Rt)
-    new_incidence, new_substates = _thread_modifiers(step.modifiers, foi, substates)
-    new_incidence = max(new_incidence + import_rate, 1e-6)
-    new_window = vcat(window[2:end], new_incidence)
-    return [new_window, new_substates...]
-end
-
 function _renewal_init_state(step::RenewalStep, I₀, r_approx, len_gen_int)
     window = _renewal_init_state(step.core, I₀, r_approx, len_gen_int)
     return [window, map(modifier_init_state, step.modifiers)...]
 end
 
 get_state(::RenewalStep, initial_state, state) = state .|> st -> last(st[1])
+
+# --- the pre-scan seam ------------------------------------------------------
+#
+# A scan step is a deterministic function, so a modifier that needs sampled
+# parameters (an importation rate, an uncertain population size) cannot draw
+# them inside the scan. The step is therefore resolved ONCE before the scan:
+# every modifier is sampled through its own `as_turing_model`, and the step is
+# rebuilt from the resolved modifiers. Modifiers that sample nothing return
+# themselves, so the same call covers both kinds and neither the step nor the
+# infection model ever tests what a modifier is.
+
+@doc raw"
+Resolve an accumulation step ahead of the scan, sampling any parameters its
+parts carry.
+
+The default method samples nothing and returns the step unchanged; a
+[`RenewalStep`](@ref) resolves its [`AbstractRenewalModifier`](@ref)s through
+their own `as_turing_model` methods and rebuilds itself from the resolved
+modifiers. [`Renewal`](@ref) draws its step through this one seam, so a
+modifier with priors needs no special handling in the infection model.
+
+# Arguments
+
+  - `step`: the accumulation step to resolve.
+  - `n`: the series length the scan will run over.
+"
+@model function as_turing_model(step::AbstractAccumulationStep, n)
+    return step
+end
+
+@model function as_turing_model(step::RenewalStep, n)
+    modifiers ~ to_submodel(_resolve_modifiers(step.modifiers, n, 1), false)
+    return RenewalStep(step.core, modifiers)
+end
+
+# Resolve a modifier tuple, one submodel per modifier. The recursion is
+# structural (over the tuple, not an index into it) so each level has a
+# concrete tuple type. Each modifier is prefixed by its position, so two
+# modifiers of the same kind cannot collide on a variable name.
+@model function _resolve_modifiers(mods::Tuple{}, n, index)
+    return ()
+end
+
+@model function _resolve_modifiers(mods::Tuple, n, index)
+    modifier ~ to_submodel(
+        prefix(as_turing_model(first(mods), n), Symbol(:modifier_, index)),
+        false)
+    rest ~ to_submodel(
+        _resolve_modifiers(Base.tail(mods), n, index + 1), false)
+    return (modifier, rest...)
+end

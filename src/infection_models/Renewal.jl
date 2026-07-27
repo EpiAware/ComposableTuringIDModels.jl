@@ -33,6 +33,10 @@ population ``N`` and susceptible depletion
 I_t = \frac{S_{t-1}}{N} \mathcal R_t \sum_{i=1}^{n-1} I_{t-i} g_i, \qquad
 S_t = S_{t-1} - I_t.
 ```
+Modifiers apply in the order given, and a modifier carrying priors (e.g. an
+[`ImportedCases`](@ref) importation rate) draws them once before the scan, so
+composing one takes no extra wiring:
+`Renewal(gen_int, SusceptibleDepletion(N), ImportedCases(Normal(-1, 0.5)))`.
 
 ## Fields
 
@@ -129,10 +133,6 @@ function Renewal(gen_int::AbstractVector,
         initialisation = Normal(), transformation::Function = exp)
     @assert all(gen_int .>= 0) "Generation interval must be non-negative"
     @assert sum(gen_int)≈1 "Generation interval must sum to 1"
-    # `_import_model` returns the first `ImportedCases` it finds, so a second one
-    # would never be sampled. Reject it here rather than dropping it silently.
-    n_imports = count(m -> m isa ImportedCases, modifiers)
-    @assert n_imports<=1 "at most one ImportedCases modifier is supported"
     core = ConstantRenewalStep(reverse(gen_int))
     recurrent_step = RenewalStep(core, modifiers)
     return Renewal(gen_int, transformation, _path_prior(rt), initialisation,
@@ -200,34 +200,13 @@ end
         step = infection.recurrent_step
     end
 
-    init = _make_renewal_init(step, gen_int, I₀, Rt[1])
-    if _has_imported_cases(infection.recurrent_step)
-        import_rates ~ as_turing_submodel(
-            _import_model(infection.recurrent_step), n; prefix = true)
-        # The importation slot is unconstrained, like `rt` and `initialisation`:
-        # `transformation` maps it to a positive rate, so any latent process can
-        # drive importation without the prior having to be positive-supported.
-        import_rates_t = [infection.transformation(_at(import_rates, t))
-                          for t in 1:n]
-        inputs = collect(zip(Rt, import_rates_t))
-        I_t = accumulate_scan(step, init, inputs)
-    else
-        I_t = accumulate_scan(step, init, Rt)
-    end
+    # Resolve the step before scanning: any modifier carrying priors (e.g.
+    # `ImportedCases`) draws them here and hands back the modifier the scan
+    # uses, while a purely deterministic modifier returns itself. One seam, no
+    # branch on what the step's modifiers are.
+    scan_step ~ as_turing_submodel(step, n)
+
+    init = _make_renewal_init(scan_step, gen_int, I₀, Rt[1])
+    I_t = accumulate_scan(scan_step, init, Rt)
     return (; I_t, Z_t)
-end
-
-# Whether a renewal step carries an `ImportedCases` modifier, and if so the
-# importation-rate prior it holds. Only a `RenewalStep` has modifiers; the bare
-# force-of-infection cores (and the inferred-generation-interval path, which
-# builds its step per draw) never import.
-_has_imported_cases(step::RenewalStep) = any(m -> m isa ImportedCases, step.modifiers)
-_has_imported_cases(::Nothing) = false
-_has_imported_cases(::AbstractConstantRenewalStep) = false
-
-function _import_model(step::RenewalStep)
-    for m in step.modifiers
-        m isa ImportedCases && return m.importation_rate
-    end
-    throw(ArgumentError("no ImportedCases modifier found on this renewal step"))
 end

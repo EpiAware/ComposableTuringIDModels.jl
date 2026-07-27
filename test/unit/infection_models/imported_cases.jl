@@ -1,15 +1,22 @@
-# Tests for the ImportedCases renewal modifier (issue #189).
+# Tests for the ImportedCases renewal modifier and the generic pre-scan
+# modifier seam it uses (issue #189).
 
 @testitem "ImportedCases struct carries the importation prior" begin
     using ComposableTuringIDModels, Distributions
     # Constant unknown rate (Distribution)
     ic = ImportedCases(Normal(0.0, 0.1))
     @test ic.importation_rate isa Normal
+    @test ic.transformation === exp
     @test ic isa ComposableTuringIDModels.AbstractRenewalModifier
 
     # Time-varying rate (latent process)
     ic_tv = ImportedCases(RandomWalk())
     @test ic_tv.importation_rate isa RandomWalk
+
+    # The map onto the positive rate is the modifier's own, not the host's.
+    ic_id = ImportedCases(truncated(Normal(1.0, 0.1), 0, Inf);
+        transformation = identity)
+    @test ic_id.transformation === identity
 end
 
 @testitem "ImportedCases composes into a Renewal step" begin
@@ -22,7 +29,7 @@ end
     @test only(r.recurrent_step.modifiers) isa ImportedCases
     @test r.recurrent_step.modifiers[1].importation_rate isa Normal
 
-    # Composed with another modifier
+    # Composed with another modifier, in the order given
     ic2 = ImportedCases(Normal(0.0, 0.1))
     r2 = Renewal(gen_int, ic2,
         ComposableTuringIDModels.SusceptibleDepletion(1000.0);
@@ -70,17 +77,18 @@ end
     @test all(isfinite, out.I_t)
     @test all(>=(0), out.I_t)
 
-    # The importation rate is a sampled parameter.
+    # The importation rate is a sampled parameter, namespaced by the modifier's
+    # position on the step so modifiers cannot collide.
     draw = rand(as_turing_model(r, 20))
-    @test any(k -> startswith(string(k), "import_rates"), keys(draw))
+    @test any(k -> startswith(string(k), "modifier_1.import_rates"), keys(draw))
 end
 
 @testitem "ImportedCases with fixed rate samples under NUTS" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(1893)
     gen_int = [0.2, 0.3, 0.5]
-    # An unconstrained prior is fine: `Renewal`'s transformation makes the rate
-    # positive, so the sampler cannot drive incidence negative.
+    # An unconstrained prior is fine: the modifier's transformation makes the
+    # rate positive, so the sampler cannot drive incidence negative.
     ic = ImportedCases(Normal(0.0, 0.1))
     model = IDModel(
         Renewal(gen_int, ic; rt = RandomWalk(),
@@ -92,33 +100,95 @@ end
     @test chn !== nothing
 end
 
-@testitem "the modifier itself is a no-op; the rate is added by the step" begin
+@testitem "ImportedCases resolves to an ImportedRate before the scan" begin
     using ComposableTuringIDModels, Distributions
-    using ComposableTuringIDModels: modifier_init_state, apply_modifier
-    ic = ImportedCases(Normal(0.0, 0.1))
-    # The rate is a prior, not a constant on the step, so the modifier carries
-    # no state and leaves the proposed incidence untouched.
-    @test modifier_init_state(ic) == 0.0
-    @test apply_modifier(ic, 3.5, modifier_init_state(ic)) == (3.5, 0.0)
+    using ComposableTuringIDModels: ImportedRate, modifier_init_state,
+                                    apply_modifier
+    # The pre-scan seam draws the unconstrained slot and hands back the
+    # modifier the scan actually uses.
+    resolved = as_turing_model(ImportedCases(FixedIntercept(log(2.0))), 5)()
+    @test resolved isa ImportedRate
+    @test resolved.rate ≈ fill(2.0, 5)
+
+    # The resolved modifier is a plain scan modifier: its substate is the step
+    # counter, so step `t` adds the rate at `t`.
+    inc, s0 = 3.5, modifier_init_state(resolved)
+    @test s0 == 0
+    inc1, s1 = apply_modifier(resolved, inc, s0)
+    @test inc1 ≈ inc + 2.0
+    @test s1 == 1
+    inc2, s2 = apply_modifier(resolved, inc, s1)
+    @test inc2 ≈ inc + 2.0
+    @test s2 == 2
 end
 
-@testitem "renewal steps without an ImportedCases modifier do not import" begin
-    using ComposableTuringIDModels, Distributions
+@testitem "a modifier with no pre-scan contribution resolves to itself" begin
+    using ComposableTuringIDModels, Distributions, Random
     using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
-                                    SusceptibleDepletion, _has_imported_cases,
-                                    _import_model
+                                    SusceptibleDepletion
+    using DynamicPPL: fix
     core = ConstantRenewalStep(reverse([0.2, 0.3, 0.5]))
-    # The bare force-of-infection core, a modifier-free step, and a step with
-    # only non-importing modifiers all take the plain (scalar-`Rt`) scan path.
-    @test !_has_imported_cases(core)
-    @test !_has_imported_cases(RenewalStep(core))
-    @test !_has_imported_cases(RenewalStep(core, (SusceptibleDepletion(1000.0),)))
-    # `nothing` is the inferred-generation-interval path, whose step is built
-    # per draw rather than carried on the model.
-    @test !_has_imported_cases(nothing)
-    # Asking a non-importing step for its rate is a caller error, not a
-    # silently-missing prior.
-    @test_throws ArgumentError _import_model(RenewalStep(core))
+    # `SusceptibleDepletion` implements nothing beyond the scan interface, so
+    # the default seam returns it unchanged.
+    dep = SusceptibleDepletion(1000.0)
+    @test as_turing_model(dep, 10)() === dep
+    # The bare force-of-infection core and a modifier-free step likewise.
+    @test as_turing_model(core, 10)() === core
+    resolved = as_turing_model(RenewalStep(core, (dep,)), 10)()
+    @test resolved isa RenewalStep
+    @test only(resolved.modifiers) === dep
+
+    # And a depleting renewal is unchanged end to end by the seam.
+    gen_int = [0.2, 0.3, 0.5]
+    depleting = Renewal(gen_int, dep; rt = FixedIntercept(log(1.5)),
+        initialisation = Normal())
+    I_t = fix(as_turing_model(depleting, 30), (init_incidence = 0.0,))().I_t
+    @test length(I_t) == 30
+    @test all(>(0), I_t)
+    @test sum(I_t) < 1000.0  # the pool bounds the epidemic
+    # No importation parameters are sampled when no modifier declares any.
+    draw = rand(as_turing_model(depleting, 10))
+    @test !any(k -> occursin("import", string(k)), keys(draw))
+end
+
+@testitem "several sampling modifiers compose without colliding" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(1894)
+    gen_int = [0.2, 0.3, 0.5]
+    # Two importation streams, each with its own prior: the seam namespaces
+    # each modifier by its position, so both are sampled.
+    r = Renewal(gen_int, ImportedCases(Normal(-1.0, 0.1)),
+        ImportedCases(RandomWalk()); rt = RandomWalk(),
+        initialisation = Normal())
+    draw = rand(as_turing_model(r, 15))
+    ks = string.(collect(keys(draw)))
+    @test any(k -> startswith(k, "modifier_1.import_rates"), ks)
+    @test any(k -> startswith(k, "modifier_2.import_rates"), ks)
+    out = as_turing_model(r, 15)()
+    @test length(out.I_t) == 15
+    @test all(>(0), out.I_t)
+end
+
+@testitem "modifier order sets how importation composes with depletion" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: SusceptibleDepletion
+    using DynamicPPL: fix
+    gen_int = [0.2, 0.3, 0.5]
+    fixinit = (init_incidence = log(1.0),)
+    ic() = ImportedCases(FixedIntercept(log(5.0)))
+    # Depletion first: imports are added to the depleted incidence, so they are
+    # not scaled by the susceptible fraction.
+    after = Renewal(gen_int, SusceptibleDepletion(50.0), ic();
+        rt = FixedIntercept(log(1.0)), initialisation = Normal())
+    # Importation first: the imports are part of the incidence the pool
+    # depletes, so they are scaled down as susceptibles run out.
+    before = Renewal(gen_int, ic(), SusceptibleDepletion(50.0);
+        rt = FixedIntercept(log(1.0)), initialisation = Normal())
+    I_after = fix(as_turing_model(after, 40), fixinit)().I_t
+    I_before = fix(as_turing_model(before, 40), fixinit)().I_t
+    @test all(>(0), I_after)
+    @test all(>(0), I_before)
+    @test I_after[end] > I_before[end]
 end
 
 @testitem "a negative unconstrained rate still imports rather than subtracting" begin
@@ -143,21 +213,6 @@ end
     @test I_imported[end] > I_plain[end]
 end
 
-@testitem "a second ImportedCases modifier is rejected at construction" begin
-    using ComposableTuringIDModels, Distributions
-    gen_int = [0.2, 0.3, 0.5]
-    ic1 = ImportedCases(Normal(0.0, 0.1))
-    ic2 = ImportedCases(Normal(1.0, 0.1))
-    # Only the first would ever be sampled, so a second is an error rather than
-    # a silent drop.
-    @test_throws AssertionError Renewal(gen_int, ic1, ic2;
-        rt = RandomWalk(), initialisation = Normal())
-    # One remains fine, alongside other modifiers.
-    @test Renewal(gen_int, ic1,
-        ComposableTuringIDModels.SusceptibleDepletion(1000.0);
-        rt = RandomWalk(), initialisation = Normal()) isa Renewal
-end
-
 @testitem "ImportedCases bounds its slot to a prior" begin
     using ComposableTuringIDModels, Distributions
     # The slot is `PriorLike`, so a wrong-role value fails at construction
@@ -167,4 +222,25 @@ end
     @test ImportedCases(Normal(0.0, 0.1)) isa ImportedCases
     @test ImportedCases([Normal(), Normal()]) isa ImportedCases
     @test ImportedCases(RandomWalk()) isa ImportedCases
+end
+
+@testitem "a renewal with importation is ForwardDiff-differentiable" begin
+    using ComposableTuringIDModels, Distributions, ForwardDiff
+    using ComposableTuringIDModels: ImportedRate, RenewalStep,
+                                    ConstantRenewalStep, SusceptibleDepletion,
+                                    accumulate_scan, _renewal_init_state
+    gen_int = [0.2, 0.3, 0.5]
+    core = ConstantRenewalStep(reverse(gen_int))
+    n = 20
+    # The scan runs over resolved modifiers, so the gradient flows through the
+    # sampled importation rate exactly as it does through `Rt`.
+    function total(θ)
+        step = RenewalStep(core,
+            (SusceptibleDepletion(1000.0), ImportedRate(fill(θ[2], n))))
+        init = _renewal_init_state(step, 1.0, 0.0, length(gen_int))
+        return sum(accumulate_scan(step, init, fill(θ[1], n)))
+    end
+    g = ForwardDiff.gradient(total, [1.1, 0.5])
+    @test all(isfinite, g)
+    @test all(>(0), g)
 end
