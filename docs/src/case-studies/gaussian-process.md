@@ -42,6 +42,17 @@ path from the fixed basis; [`ExactGP`](@ref) draws ``n`` non-centred weights
 ``z`` and pushes them through the Cholesky factor of the full covariance. Both
 parameterisations are non-centred, which NUTS handles well.
 
+They differ in how much of their work depends on the sampled parameters. The
+Hilbert-space basis is set by the series length, the number of basis functions
+and the boundary factor alone, so [`as_turing_model`](@ref) builds it before
+returning the model and captures it: it sits outside the `@model` body and is
+never differentiated, leaving one ``n \times m`` matrix–vector product in the
+gradient. (Composed into a [`Renewal`](@ref), the enclosing model rebuilds its
+submodels each evaluation and the basis is rebuilt with them — still
+undifferentiated, and a few percent of one gradient.) The exact GP's covariance
+and its Cholesky factor depend on ``\ell`` and ``\sigma``, so both are rebuilt
+*and* differentiated every time. That is where the timing gap below comes from.
+
 ## The kernel and the GP ecosystem
 
 The kernels are
@@ -190,13 +201,12 @@ ex = fit_gp(ExactGP())
         seconds = round(ex.time, digits = 1)))
 ```
 
-Both recover the latent reproduction number closely. The approximate model is the
-faster of the two — the Hilbert-space basis is fixed, so each evaluation is a
-matrix–vector product, whereas the exact GP rebuilds and factorises the full
-covariance at ``O(n^3)`` on every evaluation. That gap is the reason the
-approximation exists, and it widens with the series length; at short ``n`` like
-this the exact GP is still affordable and gives the reference the approximation is
-judged against.
+Both recover the latent reproduction number closely, and the approximate model is
+several times the faster: its differentiated work is one ``n \times m``
+matrix–vector product, against an ``O(n^3)`` covariance build and factorisation
+for the exact GP. That gap is the reason the approximation exists, and it widens
+with the series length; at short ``n`` like this the exact GP is still affordable
+and gives the reference the approximation is judged against.
 
 ## Posterior trajectories
 
@@ -247,6 +257,17 @@ ci_ribbon!(ax2, ts, credible_bands(yt); color = :teal,
 scatter!(ax2, ts, y_obs; color = :black, markersize = 7, label = "observed")
 axislegend(ax2; position = :lt)
 fig
+```
+
+The share of days on which the 95% band contains the quantity it is estimating
+puts a number on what the figure shows, and would drop sharply if a fit ever
+degenerated:
+
+```@example gp
+covered(b, x) = round(mean(b[:, 1] .<= x .<= b[:, 5]); digits = 2)
+(Rt_hsgp = covered(credible_bands(exp.(hs.Z)), exp.(Z_true)),
+    Rt_exact = covered(credible_bands(exp.(ex.Z)), exp.(Z_true)),
+    cases = covered(credible_bands(yt), y_obs))
 ```
 
 Both posterior ``R_t`` bands bracket the simulated truth, and the

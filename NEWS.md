@@ -81,11 +81,10 @@
   as ``\log R_t``. `HilbertSpaceGP` is the Hilbert-space basis-function
   approximation of Riutort-Mayol et al. (2023): the basis depends only on `n`,
   `m` and the boundary factor `c` — none of the sampled parameters — so it is
-  built outside the `@model` and never differentiated, and each evaluation is an
-  `n × m` matrix–vector product rather than an `O(n³)` factorisation. `ExactGP`
-  forms the full covariance and is the accuracy reference to judge it against.
-  Both take
-  their covariance kernel from
+  built outside the `@model` body and never differentiated, so the differentiated
+  part of each evaluation is an `n × m` matrix–vector product rather than an
+  `O(n³)` factorisation. `ExactGP` forms the full covariance and is the accuracy
+  reference to judge it against. Both take their covariance kernel from
   [KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/)
   rather than defining their own — `SqExponentialKernel` (the default),
   `Matern32Kernel` and `Matern52Kernel` are re-exported — so the kernels are the
