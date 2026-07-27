@@ -58,22 +58,6 @@ function spectral_density(::Matern52Kernel, ω, σ, ℓ)
 end
 
 @doc raw"
-Spectral density of the squared-exponential kernel at frequency ``\omega``.
-
-```math
-S(\omega) = \sigma^2 \sqrt{2\pi}\, \ell \, \exp\!\Big(-\tfrac{1}{2}\ell^2\omega^2\Big)
-```
-
-with marginal standard deviation ``\sigma`` and length scale ``\ell``. A thin
-convenience wrapper over `spectral_density(SqExponentialKernel(), ω, σ, ℓ)`, used
-by the tests that check the basis against the squared-exponential Gram matrix
-directly.
-"
-function se_spectral_density(ω, σ, ℓ)
-    return spectral_density(SqExponentialKernel(), ω, σ, ℓ)
-end
-
-@doc raw"
 A **Hilbert-space approximate Gaussian process** (HSGP) latent process.
 
 A Gaussian process places a prior over functions and is a natural latent process
@@ -134,8 +118,8 @@ need a larger `m`.
 
 ## Fields
 
-  - `length_scale_prior`: prior for the length scale ``\ell``.
-  - `marginal_std_prior`: prior for the marginal standard deviation ``\sigma``.
+  - `length_scale`: prior for the length scale ``\ell``.
+  - `marginal_std`: prior for the marginal standard deviation ``\sigma``.
   - `m`: number of basis functions.
   - `c`: boundary factor; the GP is approximated on ``[-L, L]`` with ``L = c S``.
   - `kernel`: the covariance kernel, a KernelFunctions.jl `Kernel` (default
@@ -158,9 +142,9 @@ length(as_turing_model(gp_matern, 30)())
 struct HilbertSpaceGP{L <: Sampleable, S <: Sampleable, K <: Kernel} <:
        AbstractLatentModel
     "Prior distribution for the length scale ``\\ell``."
-    length_scale_prior::L
+    length_scale::L
     "Prior distribution for the marginal standard deviation ``\\sigma``."
-    marginal_std_prior::S
+    marginal_std::S
     "Number of basis functions."
     m::Int
     "Boundary factor: the GP is approximated on ``[-L, L]`` with ``L = c S``."
@@ -168,13 +152,12 @@ struct HilbertSpaceGP{L <: Sampleable, S <: Sampleable, K <: Kernel} <:
     "Covariance kernel, a KernelFunctions.jl `Kernel`."
     kernel::K
 
-    function HilbertSpaceGP(length_scale_prior::Sampleable,
-            marginal_std_prior::Sampleable, m::Int, c::Real,
-            kernel::Kernel)
+    function HilbertSpaceGP(length_scale::Sampleable,
+            marginal_std::Sampleable, m::Int, c::Real, kernel::Kernel)
         @assert m>0 "m (the number of basis functions) must be greater than 0"
         @assert c>1 "c (the boundary factor) must be greater than 1"
-        new{typeof(length_scale_prior), typeof(marginal_std_prior), typeof(kernel)}(
-            length_scale_prior, marginal_std_prior, m, Float64(c), kernel)
+        new{typeof(length_scale), typeof(marginal_std), typeof(kernel)}(
+            length_scale, marginal_std, m, Float64(c), kernel)
     end
 end
 
@@ -186,12 +169,12 @@ end
 const _DEFAULT_LENGTH_SCALE_FLOOR = 0.05
 
 function HilbertSpaceGP(;
-        length_scale_prior::Sampleable = truncated(
+        length_scale::Sampleable = truncated(
             Normal(0.0, 0.4), _DEFAULT_LENGTH_SCALE_FLOOR, Inf),
-        marginal_std_prior::Sampleable = truncated(Normal(0.0, 1.0), 0, Inf),
+        marginal_std::Sampleable = truncated(Normal(0.0, 1.0), 0, Inf),
         m::Int = 20, c::Real = 1.5,
         kernel::Kernel = SqExponentialKernel())
-    return HilbertSpaceGP(length_scale_prior, marginal_std_prior, m, c, kernel)
+    return HilbertSpaceGP(length_scale, marginal_std, m, c, kernel)
 end
 
 @doc raw"
@@ -248,9 +231,9 @@ end
 # log-density / gradient evaluation: only `ℓ`, `σ`, `β` and the matrix–vector
 # product remain inside the differentiated path.
 @model function _hsgp_model(kernel::Kernel, Φ, sqrt_λ, m,
-        length_scale_prior, marginal_std_prior)
-    ℓ ~ length_scale_prior
-    σ ~ marginal_std_prior
+        length_scale, marginal_std)
+    ℓ ~ length_scale
+    σ ~ marginal_std
     β ~ filldist(Normal(), m)
     spectral_weights = sqrt.(spectral_density(kernel, sqrt_λ, σ, ℓ))
     gp = Φ * (spectral_weights .* β)
@@ -268,5 +251,5 @@ function as_turing_model(model::HilbertSpaceGP, n)
     @assert n>1 "n must be greater than 1"
     Φ, sqrt_λ = hsgp_basis(n, model.m, model.c)
     return _hsgp_model(model.kernel, Φ, sqrt_λ, model.m,
-        model.length_scale_prior, model.marginal_std_prior)
+        model.length_scale, model.marginal_std)
 end

@@ -58,14 +58,14 @@ end
 
 @testitem "HilbertSpaceGP basis approximates the squared-exponential kernel" begin
     using ComposableTuringIDModels, Distributions, LinearAlgebra
-    using ComposableTuringIDModels: hsgp_basis, se_spectral_density,
+    using ComposableTuringIDModels: hsgp_basis, spectral_density,
                                     _hsgp_standardised_index
     using KernelFunctions: with_lengthscale, kernelmatrix
     n, σ, ℓ, c = 20, 1.0, 0.5, 2.0
     x = _hsgp_standardised_index(n)
     K_exact = kernelmatrix(σ^2 * with_lengthscale(SqExponentialKernel(), ℓ), x)
     Φ, sqrt_λ = hsgp_basis(n, 40, c)
-    sd = sqrt.(se_spectral_density(sqrt_λ, σ, ℓ))
+    sd = sqrt.(spectral_density(SqExponentialKernel(), sqrt_λ, σ, ℓ))
     K_approx = Φ * Diagonal(sd .^ 2) * Φ'
     @test size(Φ) == (n, 40)
     @test norm(K_approx - K_exact) / norm(K_exact) < 0.05
@@ -97,7 +97,7 @@ end
 
 @testitem "HilbertSpaceGP spectral densities are positive, finite, and kernel-specific" begin
     using ComposableTuringIDModels
-    using ComposableTuringIDModels: spectral_density, se_spectral_density
+    using ComposableTuringIDModels: spectral_density
     ω = collect(range(0, 5; length = 12))
     σ, ℓ = 1.0, 1.0
     for K in (SqExponentialKernel(), Matern32Kernel(), Matern52Kernel())
@@ -107,8 +107,6 @@ end
         @test all(isfinite, S)
         @test S[1] > S[end]
     end
-    @test se_spectral_density(ω, σ, ℓ) ≈
-          spectral_density(SqExponentialKernel(), ω, σ, ℓ)
     @test spectral_density(Matern32Kernel(), ω, σ, ℓ) !=
           spectral_density(SqExponentialKernel(), ω, σ, ℓ)
 end
@@ -127,15 +125,22 @@ end
     @test norm(K_approx - K_exact) / norm(K_exact) < 0.15
 end
 
-@testitem "HilbertSpaceGP builds its basis once, outside the model body" begin
+@testitem "HilbertSpaceGP captures its basis as a model argument" begin
     using ComposableTuringIDModels, Distributions, Random
+    using ComposableTuringIDModels: hsgp_basis
     using DynamicPPL: DynamicPPL
     Random.seed!(7)
-    gp = HilbertSpaceGP(; m = 12)
-    mdl = as_turing_model(gp, 30)
+    n, m, c = 30, 12, 1.5
+    gp = HilbertSpaceGP(; m = m, c = c)
+    mdl = as_turing_model(gp, n)
     @test mdl isa DynamicPPL.Model
-    @test length(mdl()) == 30
-    @test length(mdl()) == 30
+    # The basis is an ARGUMENT of the returned model, not something the model
+    # body builds: `as_turing_model` computes it once and captures it, so no
+    # log-density evaluation differentiates through the sinusoids.
+    Φ, sqrt_λ = hsgp_basis(n, m, c)
+    @test mdl.args.Φ == Φ
+    @test mdl.args.sqrt_λ == sqrt_λ
+    @test length(mdl()) == n
 end
 
 @testitem "HilbertSpaceGP samples in the DEFAULT ℓ/m regime" tags=[:sample] begin
@@ -143,7 +148,7 @@ end
     Random.seed!(8)
     gp = HilbertSpaceGP()
     @test gp.m == 20
-    @test minimum(gp.length_scale_prior) > 0
+    @test minimum(gp.length_scale) > 0
     n = 30
     chn = sample(as_turing_model(gp, n), NUTS(), 40; progress = false)
     @test size(chn, 1) == 40
@@ -240,7 +245,7 @@ end
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(12)
     gp = ExactGP()
-    @test minimum(gp.length_scale_prior) > 0
+    @test minimum(gp.length_scale) > 0
     n = 20
     chn = sample(as_turing_model(gp, n), NUTS(), 40; progress = false)
     @test size(chn, 1) == 40

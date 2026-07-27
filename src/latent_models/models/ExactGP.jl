@@ -42,8 +42,8 @@ means the same thing here and in the Hilbert-space model.
 
 ## Fields
 
-  - `length_scale_prior`: prior for the length scale ``\ell``.
-  - `marginal_std_prior`: prior for the marginal standard deviation ``\sigma``.
+  - `length_scale`: prior for the length scale ``\ell``.
+  - `marginal_std`: prior for the marginal standard deviation ``\sigma``.
   - `kernel`: the covariance kernel, a KernelFunctions.jl `Kernel` (default
     `SqExponentialKernel()`).
   - `jitter`: diagonal ``\tau`` added to ``K`` for a stable Cholesky factor
@@ -66,35 +66,34 @@ length(as_turing_model(gp_matern, 30)())
 struct ExactGP{L <: Sampleable, S <: Sampleable, K <: Kernel} <:
        AbstractLatentModel
     "Prior distribution for the length scale ``\\ell``."
-    length_scale_prior::L
+    length_scale::L
     "Prior distribution for the marginal standard deviation ``\\sigma``."
-    marginal_std_prior::S
+    marginal_std::S
     "Covariance kernel, a KernelFunctions.jl `Kernel`."
     kernel::K
     "Diagonal jitter added to the covariance for a stable Cholesky factor."
     jitter::Float64
 
-    function ExactGP(length_scale_prior::Sampleable,
-            marginal_std_prior::Sampleable, kernel::Kernel, jitter::Real)
+    function ExactGP(length_scale::Sampleable, marginal_std::Sampleable,
+            kernel::Kernel, jitter::Real)
         @assert jitter>0 "jitter must be greater than 0"
-        new{typeof(length_scale_prior), typeof(marginal_std_prior),
-            typeof(kernel)}(
-            length_scale_prior, marginal_std_prior, kernel, Float64(jitter))
+        new{typeof(length_scale), typeof(marginal_std), typeof(kernel)}(
+            length_scale, marginal_std, kernel, Float64(jitter))
     end
 end
 
 function ExactGP(;
-        length_scale_prior::Sampleable = truncated(
+        length_scale::Sampleable = truncated(
             Normal(0.0, 0.4), _DEFAULT_LENGTH_SCALE_FLOOR, Inf),
-        marginal_std_prior::Sampleable = truncated(Normal(0.0, 1.0), 0, Inf),
+        marginal_std::Sampleable = truncated(Normal(0.0, 1.0), 0, Inf),
         kernel::Kernel = SqExponentialKernel(), jitter::Real = 1e-6)
-    return ExactGP(length_scale_prior, marginal_std_prior, kernel, jitter)
+    return ExactGP(length_scale, marginal_std, kernel, jitter)
 end
 
 @model function as_turing_model(model::ExactGP, n)
     @assert n>1 "n must be greater than 1"
-    ℓ ~ model.length_scale_prior
-    σ ~ model.marginal_std_prior
+    ℓ ~ model.length_scale
+    σ ~ model.marginal_std
     z ~ filldist(Normal(), n)
     x = _hsgp_standardised_index(n)
     K = kernelmatrix(σ^2 * with_lengthscale(model.kernel, ℓ), x)
