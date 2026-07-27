@@ -59,10 +59,10 @@ end
 @testitem "HilbertSpaceGP basis approximates the squared-exponential kernel" begin
     using ComposableTuringIDModels, Distributions, LinearAlgebra
     using ComposableTuringIDModels: hsgp_basis, spectral_density,
-                                    _hsgp_standardised_index
+                                    _standardised_index
     using KernelFunctions: with_lengthscale, kernelmatrix
     n, σ, ℓ, c = 20, 1.0, 0.5, 2.0
-    x = _hsgp_standardised_index(n)
+    x = _standardised_index(n)
     K_exact = kernelmatrix(σ^2 * with_lengthscale(SqExponentialKernel(), ℓ), x)
     Φ, sqrt_λ = hsgp_basis(n, 40, c)
     sd = sqrt.(spectral_density(SqExponentialKernel(), sqrt_λ, σ, ℓ))
@@ -75,7 +75,7 @@ end
     using ComposableTuringIDModels, Distributions
     @test_throws AssertionError HilbertSpaceGP(; m = 0)
     @test_throws AssertionError HilbertSpaceGP(; c = 1.0)
-    @test_throws Exception as_turing_model(HilbertSpaceGP(), 1)()
+    @test_throws AssertionError as_turing_model(HilbertSpaceGP(), 1)()
 end
 
 @testitem "HilbertSpaceGP supports squared-exponential and Matern kernels" begin
@@ -111,13 +111,25 @@ end
           spectral_density(SqExponentialKernel(), ω, σ, ℓ)
 end
 
+@testitem "spectral_density rejects a zero length scale rather than returning NaN" begin
+    using ComposableTuringIDModels
+    using ComposableTuringIDModels: spectral_density
+    # ν = √(2p+1)/ℓ is Inf at ℓ = 0 and the Matern densities become Inf/Inf,
+    # so an unguarded call would hand a NaN basis weight to the sampler.
+    for K in (SqExponentialKernel(), Matern32Kernel(), Matern52Kernel())
+        @test_throws AssertionError spectral_density(K, [1.0], 1.0, 0.0)
+        @test_throws AssertionError spectral_density(K, [1.0], 1.0, -0.5)
+        @test_throws AssertionError spectral_density(K, [1.0], -1.0, 1.0)
+    end
+end
+
 @testitem "HilbertSpaceGP Matern bases approximate their kernel covariance" begin
     using ComposableTuringIDModels, LinearAlgebra
     using ComposableTuringIDModels: hsgp_basis, spectral_density,
-                                    _hsgp_standardised_index
+                                    _standardised_index
     using KernelFunctions: with_lengthscale, kernelmatrix
     n, σ, ℓ, c = 20, 1.0, 0.8, 3.0
-    x = _hsgp_standardised_index(n)
+    x = _standardised_index(n)
     K_exact = kernelmatrix(σ^2 * with_lengthscale(Matern52Kernel(), ℓ), x)
     Φ, sqrt_λ = hsgp_basis(n, 60, c)
     sd = sqrt.(spectral_density(Matern52Kernel(), sqrt_λ, σ, ℓ))
@@ -219,13 +231,13 @@ end
 
 @testitem "ExactGP prior covariance is the exact kernel Gram matrix" begin
     using ComposableTuringIDModels, Distributions, Random, LinearAlgebra
-    using ComposableTuringIDModels: _hsgp_standardised_index
+    using ComposableTuringIDModels: _standardised_index
     using DynamicPPL: fix
     using KernelFunctions: with_lengthscale, kernelmatrix
     using Statistics: cov, mean
     Random.seed!(10)
     n, σ, ℓ = 10, 1.0, 0.6
-    x = _hsgp_standardised_index(n)
+    x = _standardised_index(n)
     K_exact = kernelmatrix(σ^2 * with_lengthscale(SqExponentialKernel(), ℓ), x)
     mdl = fix(as_turing_model(ExactGP(), n), (ℓ = ℓ, σ = σ))
     draws = reduce(hcat, (mdl() for _ in 1:4000))
@@ -236,7 +248,7 @@ end
 @testitem "ExactGP rejects invalid jitter and n" begin
     using ComposableTuringIDModels, Distributions
     @test_throws AssertionError ExactGP(; jitter = 0.0)
-    @test_throws Exception as_turing_model(ExactGP(), 1)()
+    @test_throws AssertionError as_turing_model(ExactGP(), 1)()
 end
 
 @testitem "ExactGP supports squared-exponential and Matern kernels" begin

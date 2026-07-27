@@ -37,6 +37,11 @@ smooth paths; `Matern32Kernel` (once-differentiable) and `Matern52Kernel`
 often used for a smooth epidemiological latent process.
 [`HilbertSpaceGP`](@ref) weights each basis function by ``\sqrt{S(\sqrt{\lambda_j})}``.
 
+Requires ``\ell > 0`` and ``\sigma \ge 0``. Both are asserted rather than
+allowed through: at ``\ell = 0`` the Matérn densities are ``\infty/\infty`` and
+return `NaN`, which would silently propagate into the basis weights. A new
+method should assert the same.
+
 # Examples
 ```@example spectral_density
 using ComposableTuringIDModels
@@ -44,17 +49,29 @@ spectral_density(SqExponentialKernel(), [0.0, 1.0, 2.0], 1.0, 0.8)
 ```
 "
 function spectral_density(::SqExponentialKernel, ω, σ, ℓ)
+    _check_spectral_args(σ, ℓ)
     return σ^2 * sqrt(2π) * ℓ .* exp.(-(ℓ^2 / 2) .* ω .^ 2)
 end
 
 function spectral_density(::Matern32Kernel, ω, σ, ℓ)
+    _check_spectral_args(σ, ℓ)
     ν = sqrt(3) / ℓ
     return σ^2 * 4 * ν^3 ./ (ν^2 .+ ω .^ 2) .^ 2
 end
 
 function spectral_density(::Matern52Kernel, ω, σ, ℓ)
+    _check_spectral_args(σ, ℓ)
     ν = sqrt(5) / ℓ
     return σ^2 * (16 / 3) * ν^5 ./ (ν^2 .+ ω .^ 2) .^ 3
+end
+
+# Shared guard for the `spectral_density` methods. A zero length scale makes the
+# Matérn densities NaN (ν = √(2p+1)/ℓ = Inf, then Inf^p/Inf^p), so reject it
+# with a diagnostic rather than let a NaN basis reach the sampler.
+function _check_spectral_args(σ, ℓ)
+    @assert ℓ>0 "the length scale ℓ must be greater than 0"
+    @assert σ>=0 "the marginal standard deviation σ must not be negative"
+    return nothing
 end
 
 @doc raw"
@@ -111,10 +128,18 @@ factor `c` (the domain is extended to ``L = c\,S`` beyond the half-range ``S`` o
 the standardised inputs, so that boundary effects do not distort the fit). Because
 the inputs are standardised to unit standard deviation (see [`hsgp_basis`](@ref)),
 ``\ell`` is scale-free — measured in standard deviations of the inputs, not raw
-time steps — so a fixed `m` stays adequate as the series length changes. The
+time steps — so a fixed `m` stays adequate as the series length changes.
+
+The two act at opposite ends of the length-scale range, and each sets the floor
+on accuracy where the other cannot help. A **short** ``\ell`` needs a larger `m`:
+the basis has to resolve wiggles finer than ``2L/m``. A **long** ``\ell`` —
+comparable to the standardised half-range ``S \approx \sqrt 3`` — needs a larger
+`c`, because the approximation is periodic on ``[-L, L]`` and a slowly varying
+path feels that boundary; adding basis functions does nothing for it. The
 defaults (`m = 20`, `c = 1.5`) are a reasonable starting point for a smooth
-latent process; short length scales relative to the standardised range may still
-need a larger `m`.
+latent process and are accurate to a few parts in ten thousand over the bulk of
+the default ``\ell`` prior; the Gaussian-process case study measures the error
+across both regimes.
 
 ## Fields
 
@@ -193,7 +218,7 @@ tests so they build the exact kernel on the coordinates the basis uses.
 
   - `n`: the series length.
 "
-function _hsgp_standardised_index(n::Int)
+function _standardised_index(n::Int)
     (collect(1:n) .- Statistics.mean(1:n)) ./ Statistics.std(1:n)
 end
 
@@ -217,7 +242,7 @@ so the standard deviation (and hence ``S``) is positive; `n = 1` would give
 "
 function hsgp_basis(n::Int, m::Int, c::Real)
     @assert n>1 "n must be greater than 1 for a well-defined basis (S > 0)"
-    x = _hsgp_standardised_index(n)
+    x = _standardised_index(n)
     S = maximum(abs, x)          # half-range of the standardised inputs
     L = c * S
     j = collect(1:m)'

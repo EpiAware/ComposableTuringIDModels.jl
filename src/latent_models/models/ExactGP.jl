@@ -5,8 +5,8 @@
 # same ecosystem-standard [KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/)
 # kernel and factorises it. It is the reference an approximation is judged
 # against — accurate but ``O(n^3)`` per evaluation. The two share the standardised
-# input grid ([`_hsgp_standardised_index`](@ref)), so a given length scale means
-# the same thing for both.
+# input grid (`_standardised_index`), so a given length scale means the same
+# thing for both.
 
 @doc raw"
 An **exact Gaussian-process** latent process.
@@ -36,9 +36,10 @@ Kernels are [KernelFunctions.jl](https://juliagaussianprocesses.github.io/Kernel
 types (`SqExponentialKernel`, `Matern32Kernel`, `Matern52Kernel`, ...) — the same
 kernels [`HilbertSpaceGP`](@ref) uses, and the ones
 [AbstractGPs.jl](https://juliagaussianprocesses.github.io/AbstractGPs.jl/) builds
-exact GPs from. The inputs are standardised with the shared
-[`_hsgp_standardised_index`](@ref), so the length scale ``\ell`` is scale-free and
-means the same thing here and in the Hilbert-space model.
+exact GPs from. The integer index ``1, \ldots, n`` is standardised to zero mean
+and unit standard deviation before the kernel sees it, exactly as in
+[`HilbertSpaceGP`](@ref), so the length scale ``\ell`` is scale-free and means
+the same thing for both models.
 
 ## Fields
 
@@ -95,7 +96,7 @@ end
     ℓ ~ model.length_scale
     σ ~ model.marginal_std
     z ~ filldist(Normal(), n)
-    x = _hsgp_standardised_index(n)
+    x = _standardised_index(n)
     K = kernelmatrix(σ^2 * with_lengthscale(model.kernel, ℓ), x)
     L = cholesky(Symmetric(K + model.jitter * I)).L
     gp = L * z
