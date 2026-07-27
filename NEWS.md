@@ -74,6 +74,14 @@
   statistically valid for the demonstrations; a production analysis would use
   more draws.
 
+- **The docs home page now runs its code blocks.** The page is generated from
+  `README.md`, and its blocks previously rendered without any printed output.
+  They are now executed, so the composed model, the simulated series, and the
+  fitted chain summary all appear on the page. The Installation section is
+  omitted from the home page, because executing it would install the package
+  from the registry during the docs build; it stays in `README.md` and is also
+  on the Overview page.
+
 ### Added
 
 - **`Renewal`'s `generation_time` accepts a pmf-producing prior model.** Alongside
