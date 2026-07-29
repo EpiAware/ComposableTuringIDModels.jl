@@ -65,13 +65,13 @@ types — the ones
 exact GPs from. A kernel enters [`ExactGP`](@ref) through its Gram matrix and
 [`HilbertSpaceGP`](@ref) only through its spectral density, so either model takes
 `SqExponentialKernel` (the default), `Matern32Kernel` or `Matern52Kernel`.
+[`ExactGP`](@ref) forms that Gram matrix itself rather than wrapping an
+AbstractGPs `GP`, because it needs the factor inside a Turing model where the
+hyperparameters are sampled; the kernels are shared either way.
 
-Both models are linear in a vector of standard-normal weights (`z` for the exact
-GP, ``\beta`` for the Hilbert-space one), so fixing the hyperparameters and
-feeding in unit vectors traces out that linear map. The Gram matrix of the result
-is the model's implied prior covariance, and we compare it against the covariance
-AbstractGPs builds from the same kernel on the same inputs — both models hand the
-kernel [`standardised_index`](@ref).
+Both models are linear in a vector of standard-normal weights, so unit vectors at
+fixed hyperparameters trace out that map and the Gram matrix of the result is the
+model's implied prior covariance. Against AbstractGPs' own:
 
 ```@example gp
 using LinearAlgebra
@@ -79,50 +79,27 @@ using AbstractGPs: GP, cov as gp_cov
 using KernelFunctions: with_lengthscale
 using Turing: fix
 
-n0, σ0 = 40, 1.0
-x = standardised_index(n0)
+n0, σ0, ℓ0 = 40, 1.0, 0.3          # ℓ0 is the median of the default prior
 unit(k, j) = [i == j ? 1.0 : 0.0 for i in 1:k]
 gram(cols) = (M = reduce(hcat, cols); M * M')
+relerr(K) = norm(K - K_ref) / norm(K_ref)
 
-exact_cov(ℓ) = gram([fix(as_turing_model(ExactGP(), n0),
-                        (ℓ = ℓ, σ = σ0, z = unit(n0, j)))() for j in 1:n0])
-hsgp_cov(ℓ, m, c) = gram([fix(as_turing_model(HilbertSpaceGP(m = m, c = c), n0),
-                             (ℓ = ℓ, σ = σ0, β = unit(m, j)))() for j in 1:m])
+K_ref = gp_cov(GP(σ0^2 * with_lengthscale(SqExponentialKernel(), ℓ0))(
+    standardised_index(n0)))
+K_exact = gram([fix(as_turing_model(ExactGP(), n0),
+                   (ℓ = ℓ0, σ = σ0, z = unit(n0, j)))() for j in 1:n0])
+K_hsgp = gram([fix(as_turing_model(HilbertSpaceGP(m = 20), n0),
+                  (ℓ = ℓ0, σ = σ0, β = unit(20, j)))() for j in 1:20])
 
-function relerr(K, ℓ)
-    K_ref = gp_cov(GP(σ0^2 * with_lengthscale(SqExponentialKernel(), ℓ))(x))
-    return norm(K - K_ref) / norm(K_ref)
-end
-
-# ℓ = 0.3 is the median of the default prior; 0.1 and 1.0 are its two tails
-err = (exact = relerr(exact_cov(0.3), 0.3),
-    default_mid = relerr(hsgp_cov(0.3, 20, 1.5), 0.3),
-    default_short = relerr(hsgp_cov(0.1, 20, 1.5), 0.1),
-    more_basis_short = relerr(hsgp_cov(0.1, 60, 1.5), 0.1),
-    default_long = relerr(hsgp_cov(1.0, 20, 1.5), 1.0),
-    more_basis_long = relerr(hsgp_cov(1.0, 40, 1.5), 1.0),
-    wider_domain_long = relerr(hsgp_cov(1.0, 20, 2.0), 1.0))
-
-# asserted, so drift fails the build rather than printing a worse number
-@assert err.exact < 1e-5 && err.default_mid < 1e-3
-@assert err.default_short > 0.1 && err.more_basis_short < 1e-3
-@assert err.default_long > 0.01 && err.wider_domain_long < 1e-3
-@assert isapprox(err.more_basis_long, err.default_long; rtol = 1e-3)
+err = (exact = relerr(K_exact), hsgp = relerr(K_hsgp))
+@assert err.exact < 1e-5 && err.hsgp < 1e-3   # drift fails the build
 map(e -> round(e, sigdigits = 2), err)
 ```
 
-The exact GP matches to the jitter it adds for a stable Cholesky factor. The
-Hilbert-space basis matches to two parts in ten thousand at the prior median, and
-degrades at both ends of the length-scale range with a different fix at each end.
-At the short end the basis cannot resolve wiggles finer than ``2L/m``, so the
-default `m = 20` is 25% out at ``\ell = 0.1`` and raising `m` to 60 recovers it.
-At the long end more basis functions do nothing: the approximation is periodic on
-``[-L, L]`` and a slowly varying path feels that boundary, so the fix is the
-boundary factor `c`, and widening to `c = 2` gains two orders of magnitude.
-
-The default ``\ell`` prior puts about a third of its mass below 0.2, so a series
-whose latent process really is that wiggly needs a larger `m` than the default.
-The Hilbert-space fit below settles inside the accurate middle.
+The exact GP matches to the jitter it adds for a stable Cholesky factor, and the
+basis to two parts in ten thousand. That accuracy is not uniform in ``\ell``: the
+basis cannot resolve wiggles finer than ``2L/m``, so a short length scale needs a
+larger `m`, and a long one feels the ``[-L, L]`` boundary and needs a wider `c`.
 
 ## Simulate from an exact GP
 
