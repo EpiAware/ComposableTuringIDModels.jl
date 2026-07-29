@@ -2,14 +2,9 @@
 # by make.jl from the module's documented bindings.
 pages = [
     "Home" => "index.md",
-    # Authored quickstart pages, distinct from the README-derived home page:
-    # installation lives here, so the home page's ```julia blocks can all run.
-    "Getting started" => [
-        "Overview" => "getting-started/index.md",
-        "Tutorials" => [
-            "Automatic differentiation backends" => "getting-started/tutorials/ad-backends.md"
-        ]
-    ],
+    # Installation is an authored page rather than a README section, so every
+    # ```julia block on the README-derived home page can run.
+    "Installation" => "getting-started/installation.md",
     "Overview" => "overview.md",
     "Composable design" => "design.md",
     "Case studies" => [
@@ -22,6 +17,9 @@ pages = [
         "Multiple observation streams: cases, deaths, and strata" => "case-studies/split-observations.md",
         "Time-varying damping in an AR process" => "case-studies/time-varying-damping.md",
         "Partial pooling across groups" => "case-studies/hierarchy-stacked.md"
+    ],
+    "Tutorials" => [
+        "Automatic differentiation backends" => "getting-started/tutorials/ad-backends.md"
     ],
     "API reference" => [
         "Public API" => "lib/public.md",
