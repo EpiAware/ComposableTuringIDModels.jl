@@ -301,8 +301,8 @@ end
     from_matrix = define_y_t(obs, N, fill(20.0, 3); now = 3)
 
     # The same data as long-form `(reference, delay, count)` rows.
-    refs = Int[];
-    dls = Int[];
+    refs = Int[]
+    dls = Int[]
     cts = Int[]
     for t in 1:3, d in 0:2
 
@@ -490,7 +490,8 @@ end
     n = 20
     d = 3
     # A per-time sequence of delay PMFs: the delay sharpens over time.
-    pmfs = [(w = [0.6 - 0.02t, 0.3, 0.1 + 0.02t]; w ./ sum(w)) for t in 1:n]
+    normalise(w) = w ./ sum(w)
+    pmfs = [normalise([0.6 - 0.02t, 0.3, 0.1 + 0.02t]) for t in 1:n]
     obs = LatentDelay(PoissonError(), pmfs)
     @test obs isa AbstractObservationModel
     # The delay field is recognised as time-varying (per-time kernels).
