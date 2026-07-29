@@ -13,7 +13,6 @@ DynamicPPL = "366bfd00-2699-11ea-058f-f148b4cae6d8"
 EpiAwarePackageTools = "7aaea248-0d11-4a0d-a7dc-86da30abb951"
 ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
-JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
 KernelFunctions = "ec8451be-7e33-11e9-00cf-bbf324bd1392"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -35,4 +34,16 @@ ComposableTuringIDModels = {path = ".."}
 EpiAwarePackageTools = {rev = "main", url = "https://github.com/EpiAware/EpiAwarePackageTools.jl"}
 
 [compat]
+# `Quality: formatting` resolves JuliaFormatter from this shared environment
+# (the managed `quality.jl` calls `test_formatting(QA_CONFIG.mod)` with no
+# `env`), so an unbounded entry lets a new formatter release turn `main` red.
+# Pin exactly to the repo's single-sourced formatter version so the check
+# asserts the style `task format` and pre-commit apply. That version comes from
+# the kit's `_JULIAFORMATTER_VERSION` and reaches this repo through three
+# MANAGED files — the `.pre-commit-config.yaml` hook `rev`, the exact pin in
+# `test/formatter/Project.toml` and `juliaformatter_version` in
+# `.github/workflows/pre-commit.yaml`. This file is package-owned, so
+# template-sync will not move it: `test/package/formatter_pin.jl` fails loudly
+# if the kit bumps the managed pin and this one is left behind.
+JuliaFormatter = "=2.10.1"
 TestItems = "1.0.0"
