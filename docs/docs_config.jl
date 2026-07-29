@@ -50,17 +50,17 @@ const INDEX_REWRITES = Pair{String, String}[
 # in `README.md` has to be runnable. It is: the README carries no installation
 # snippet, which is the one thing that must not run during a docs build (it
 # would hit the registry and install a second copy of the package into the docs
-# environment). Installation lives on the authored Getting started page
-# instead, where a plain ```julia fence renders without executing — the same
-# arrangement as the other EpiAware packages.
+# environment). Installation lives on the authored Installation page instead,
+# where a plain ```julia fence renders without executing — the same arrangement
+# as the other EpiAware packages.
 #
 # COST: the last block fits `NUTS()` for 1000 draws, which dominates the build
 # time of the home page (minutes, not seconds). The draw count lives in
 # `README.md` and is deliberately not reduced here.
 const README_EXECUTE = true
 
-# Nothing to omit from the home page: with installation moved to the Getting
-# started page, every README section is safe to render and run.
+# Nothing to omit from the home page: with installation moved to the
+# Installation page, every README section is safe to render and run.
 const INDEX_STRIP_SECTIONS = String[]
 
 # The package benchmarks and publishes a timeline to the `benchmarks` branch,
