@@ -19,6 +19,7 @@ pages = [
         "Partial pooling across groups" => "case-studies/hierarchy-stacked.md"
     ],
     "Tutorials" => [
+        "Renewal modifiers: depletion and importation" => "getting-started/tutorials/renewal-modifiers.md",
         "Automatic differentiation backends" => "getting-started/tutorials/ad-backends.md"
     ],
     "API reference" => [
