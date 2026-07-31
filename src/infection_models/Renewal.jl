@@ -33,6 +33,10 @@ population ``N`` and susceptible depletion
 I_t = \frac{S_{t-1}}{N} \mathcal R_t \sum_{i=1}^{n-1} I_{t-i} g_i, \qquad
 S_t = S_{t-1} - I_t.
 ```
+Modifiers apply in the order given, and a modifier carrying priors (e.g. an
+[`ImportedCases`](@ref) importation rate) draws them once before the scan, so
+composing one takes no extra wiring:
+`Renewal(gen_int, SusceptibleDepletion(N), ImportedCases(Normal(-1, 0.5)))`.
 
 ## Fields
 
@@ -196,7 +200,13 @@ end
         step = infection.recurrent_step
     end
 
-    init = _make_renewal_init(step, gen_int, I₀, Rt[1])
-    I_t = accumulate_scan(step, init, Rt)
+    # Resolve the step before scanning: any modifier carrying priors (e.g.
+    # `ImportedCases`) draws them here and hands back the modifier the scan
+    # uses, while a purely deterministic modifier returns itself. One seam, no
+    # branch on what the step's modifiers are.
+    scan_step ~ as_turing_submodel(step, n)
+
+    init = _make_renewal_init(scan_step, gen_int, I₀, Rt[1])
+    I_t = accumulate_scan(scan_step, init, Rt)
     return (; I_t, Z_t)
 end

@@ -2,6 +2,9 @@
 # by make.jl from the module's documented bindings.
 pages = [
     "Home" => "index.md",
+    # Installation is an authored page rather than a README section, so every
+    # ```julia block on the README-derived home page can run.
+    "Installation" => "getting-started/installation.md",
     "Overview" => "overview.md",
     "Composable design" => "design.md",
     "Case studies" => [
@@ -17,6 +20,7 @@ pages = [
         "Partial pooling across groups" => "case-studies/hierarchy-stacked.md"
     ],
     "Tutorials" => [
+        "Renewal modifiers: depletion and importation" => "getting-started/tutorials/renewal-modifiers.md",
         "Automatic differentiation backends" => "getting-started/tutorials/ad-backends.md"
     ],
     "API reference" => [

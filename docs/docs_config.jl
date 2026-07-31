@@ -2,7 +2,11 @@
 #
 # Package-specific configuration read by the managed `make.jl`.
 
-const LIGHT_TUTORIALS = String[]
+# `renewal-modifiers.jl` is light: Literate emits `@example` blocks that
+# Documenter runs in-process, exactly as the case studies do, so the page also
+# renders under `--skip-notebooks`. Its fit is deliberately small (n = 60, 250
+# draws) to keep that cheap.
+const LIGHT_TUTORIALS = String["renewal-modifiers.jl"]
 
 # Names are relative to `TUTORIALS_SUBDIR`: `HEAVY_TUTORIALS` holds the Literate
 # `.jl` source names, `TUTORIAL_STUBS` is keyed by the rendered `.md` names.
@@ -27,23 +31,40 @@ const LINKCHECK_IGNORE = Regex[
     r"blob/main/CITATION\.cff$"
 ]
 
-const _REPO_BLOB = "https://github.com/EpiAware/ComposableTuringIDModels.jl/blob/main"
+const _REPO_URL = "https://github.com/EpiAware/ComposableTuringIDModels.jl"
+
+const _REPO_BLOB = "$(_REPO_URL)/blob/main"
 
 # `NOTICE` and `LICENSE` are repo-root files. The README's relative links are
 # right on GitHub, but the generated `index.md` is served from the docs site,
 # where they resolve to nothing — so point the docs copy at the files on `main`.
+#
+# Nothing else is rewritten. The home page runs the README's code as written,
+# unseeded, so a build shows a genuine draw from the prior rather than a curated
+# one: the latent process is a random walk on the log scale, so the simulated
+# series and the fit that follows differ from build to build.
 const INDEX_REWRITES = Pair{String, String}[
     "(NOTICE)" => "($(_REPO_BLOB)/NOTICE)",
     "(LICENSE)" => "($(_REPO_BLOB)/LICENSE)"
 ]
 
-# The README's ```julia fences are illustrative, and the managed build converts
-# EVERY one of them to an executed `@example readme` block. Executing them would
-# run `Pkg.add("ComposableTuringIDModels")` from the Installation section against
-# the registry, add a 1000-draw NUTS fit to every docs build, and call
-# `summarystats`, which the README never brings into scope.
-const README_EXECUTE = false
+# Run the README's ```julia fences on the home page so every block shows its
+# printed output (#218). The managed build converts EVERY fence into an
+# executed `@example readme` block and has no per-fence opt-out, so every fence
+# in `README.md` has to be runnable. It is: the README carries no installation
+# snippet, which is the one thing that must not run during a docs build (it
+# would hit the registry and install a second copy of the package into the docs
+# environment). Installation lives on the authored Installation page instead,
+# where a plain ```julia fence renders without executing — the same arrangement
+# as the other EpiAware packages.
+#
+# COST: the last block fits `NUTS()` for 1000 draws, which dominates the build
+# time of the home page (minutes, not seconds). The draw count lives in
+# `README.md` and is deliberately not reduced here.
+const README_EXECUTE = true
 
+# Nothing to omit from the home page: with installation moved to the
+# Installation page, every README section is safe to render and run.
 const INDEX_STRIP_SECTIONS = String[]
 
 # The package benchmarks and publishes a timeline to the `benchmarks` branch,

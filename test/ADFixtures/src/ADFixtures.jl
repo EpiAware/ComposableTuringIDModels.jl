@@ -113,6 +113,18 @@ function _models()
     renewal = IDModel(
         Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
+    # Renewal MODIFIERS: a susceptible-depleting renewal whose incidence is also
+    # seeded by an imported-cases rate. Both modifier kinds ride the one
+    # pre-scan seam — `SusceptibleDepletion` samples nothing and returns
+    # itself, while `ImportedCases` draws its rate before the scan and hands
+    # back a resolved modifier. The gradient must flow through the pre-scan
+    # submodel, the step rebuilt from the resolved modifiers, and the modifier
+    # threading inside the renewal recursion (#189).
+    modifiers = IDModel(
+        Renewal(gen_int, SusceptibleDepletion(2_000.0),
+            ImportedCases(Normal(0.0, 0.5));
+            rt = RandomWalk(), initialisation = Normal()),
+        NegativeBinomialError())
     # Exponential-growth-rate infections (the third infection family alongside
     # `DirectInfections` / `Renewal`): a cumulative growth-rate path exponentiated.
     egr = IDModel(
@@ -229,6 +241,7 @@ function _models()
 
     y_direct = sim(direct, n)
     y_renewal = sim(renewal, n)
+    y_modifiers = sim(modifiers, n)
     y_egr = sim(egr, n)
     y_nowcast = sim(nowcast, n)
     y_triangle = sim(triangle, n)
@@ -266,6 +279,8 @@ function _models()
             as_turing_model(direct, y_direct, n)),
         ("Renewal+NegativeBinomial posterior",
             as_turing_model(renewal, y_renewal, n)),
+        ("Renewal+ImportedCases posterior",
+            as_turing_model(modifiers, y_modifiers, n)),
         ("ExpGrowthRate+Poisson posterior",
             as_turing_model(egr, y_egr, n)),
         # nowcasting
@@ -399,6 +414,7 @@ Result matrix (31 scenarios × 4 backends), Julia 1.12:
 | AR latent-model-as-prior latent logjoint              |      ✓      |      ✓      |    ✓    |   ✗   |
 | DirectInfections+Poisson posterior                    |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+NegativeBinomial posterior                    |      ✓      |      ✓      |    ✓    |   ✗   |
+| Renewal+ImportedCases posterior                       |      ✓      |      ✓      |    ✓    |   ✗   |
 | ExpGrowthRate+Poisson posterior                       |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+RightTruncate nowcast posterior               |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+ReportTriangle posterior                      |      ✓      |      ✓      |    ✓    |   ✓   |
@@ -417,7 +433,7 @@ ForwardDiff, ReverseDiff and Mooncake differentiate every scenario correctly.
 Enzyme (configured with `function_annotation = Enzyme.Const`, see
 [`backends`](@ref)) works on eighteen of the thirty-one but raises
 `IllegalTypeAnalysisException` / a related type-analysis or shadow error on
-thirteen:
+fourteen:
 
   - the `AR`-based latent log-densities (`AR`, `ARIMA`, `ARMA`,
     `CombineLatentModels` (which contains an `AR`), and both prior-interface `AR`
@@ -469,6 +485,17 @@ function backend_broken_scenarios()
         "AR latent-model-as-prior latent logjoint",
         "DirectInfections+NormalError posterior",
         "Renewal+NegativeBinomial posterior",
+        # The modifier renewal is the `Renewal+NegativeBinomial` model plus a
+        # modifier tuple, so it inherits that scenario's Enzyme brokenness and
+        # adds the nested `to_submodel` recursion that resolves the modifiers —
+        # the same threading behind the other `EnzymeNoShadowError` rows. It is
+        # recorded broken conservatively: `check_broken` records a plain pass
+        # when a listed scenario succeeds, so listing it costs nothing, while a
+        # wrong ✓ would red the Enzyme job. Both this scenario and its
+        # `Renewal+NegativeBinomial` base pass under Enzyme on macOS/aarch64
+        # locally, so this row (and that one) want re-checking against the
+        # Linux `ad.yaml` Enzyme job. Tracked in #97.
+        "Renewal+ImportedCases posterior",
         # Enzyme type-analysis brokenness tracked in #97.
         "Renewal+Split cascade posterior",
         # `EnzymeNoShadowError` through the `Ascertainment` +

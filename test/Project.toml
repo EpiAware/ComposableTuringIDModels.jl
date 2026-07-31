@@ -34,16 +34,5 @@ ComposableTuringIDModels = {path = ".."}
 EpiAwarePackageTools = {rev = "main", url = "https://github.com/EpiAware/EpiAwarePackageTools.jl"}
 
 [compat]
-# `Quality: formatting` resolves JuliaFormatter from this shared environment
-# (the managed `quality.jl` calls `test_formatting(QA_CONFIG.mod)` with no
-# `env`), so an unbounded entry lets a new formatter release turn `main` red.
-# Pin exactly to the repo's single-sourced formatter version so the check
-# asserts the style `task format` and pre-commit apply. That version comes from
-# the kit's `_JULIAFORMATTER_VERSION` and reaches this repo through three
-# MANAGED files — the `.pre-commit-config.yaml` hook `rev`, the exact pin in
-# `test/formatter/Project.toml` and `juliaformatter_version` in
-# `.github/workflows/pre-commit.yaml`. This file is package-owned, so
-# template-sync will not move it: `test/package/formatter_pin.jl` fails loudly
-# if the kit bumps the managed pin and this one is left behind.
 JuliaFormatter = "=2.10.1"
 TestItems = "1.0.0"

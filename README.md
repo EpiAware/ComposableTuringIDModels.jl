@@ -66,18 +66,10 @@ draw = rand(prior_model)
 Condition on data and run inference.
 
 ```julia
+using StatsBase
 posterior_model = as_turing_model(model, generated_y_t, n)
 chain = sample(posterior_model, NUTS(), 1_000)
 summarystats(chain)
-```
-
-## Installation
-
-Install the package from the Julia General registry:
-
-```julia
-using Pkg
-Pkg.add("ComposableTuringIDModels")
 ```
 
 ## Swap a part
