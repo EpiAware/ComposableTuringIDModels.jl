@@ -33,5 +33,5 @@ EpiAwarePackageTools = {rev = "main", url = "https://github.com/EpiAware/EpiAwar
 ComposableTuringIDModels = {path = ".."}
 
 [compat]
-JuliaFormatter = "=2.10.1"
+JuliaFormatter = "=2.10.1, 2.12"
 TestItems = "1.0.0"
