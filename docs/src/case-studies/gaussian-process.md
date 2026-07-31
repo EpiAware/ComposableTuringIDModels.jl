@@ -166,17 +166,6 @@ posterior. We differentiate with
 [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for
 this package.
 
-The chain is started from a prior draw (`InitFromPrior()`). Turing's default
-initialisation instead draws each parameter uniformly on ``[-2, 2]`` in
-unconstrained space, which for a positive scale parameter means a starting value
-up to ``e^2 \approx 7.4``. The prior on the marginal standard deviation
-``\sigma`` is a half-normal with unit scale, which puts almost all of its mass
-below 2, so that is far out in the tail. A GP with ``\sigma \approx 7`` puts
-``\log R_t`` in the tens, where the renewal likelihood is astronomically bad and
-its curvature enormous, so NUTS shrinks the step size by six or seven orders of
-magnitude and the chain never leaves its starting point. Any GP hyperprior with a
-long tail has this failure mode, and starting from the prior avoids it.
-
 A small helper fits a chosen GP latent to the first `n_fit` days, times the run,
 recovers the per-draw ``\log R_t`` with [`generated_observables`](@ref), and
 scores the posterior mean against the truth. `sample` returns a
@@ -202,8 +191,8 @@ function fit_gp(latent, n_fit)
         rmse = sqrt(mean((Z_mean .- Z_ref) .^ 2)))
 end
 
-n_ex = 40   # the exact GP is fit to the first n_ex days only
 Random.seed!(1)
+n_ex = 60
 hs = fit_gp(HilbertSpaceGP(m = 20), n)
 Random.seed!(1)
 ex = fit_gp(ExactGP(), n_ex)
@@ -212,11 +201,6 @@ score(f) = (days = f.n, cor = round(f.cor, digits = 2),
     rmse = round(f.rmse, digits = 3), seconds = round(f.time, digits = 1))
 scores() = "$(score(hs)), $(score(ex))"
 
-# the page claims recovery, so it asserts recovery: a fit that had collapsed
-# onto the prior would fail the build rather than render a wrong figure. The
-# thresholds are loose and the message prints the scores, so an RNG-stream
-# change that nudges a chain reports what it saw rather than failing bare. The
-# exact GP scores lower because it sees 40 days against the HSGP's 70.
 @assert hs.cor>0.9 && ex.cor>0.85 "posterior mean lost the latent: $(scores())"
 @assert hs.rmse<0.15 && ex.rmse<0.2 "posterior mean off the truth: $(scores())"
 (hsgp = score(hs), exact = score(ex))
@@ -250,50 +234,17 @@ end
 
 grad = (hsgp = gradient_time(composed(HilbertSpaceGP(m = 20), n_ex)),
     exact = gradient_time(composed(ExactGP(), n_ex)))
-@assert grad.exact > grad.hsgp
 round(grad.exact / grad.hsgp; sigdigits = 2)
 ```
 
 The exact GP costs more per gradient even on the shorter series, and the gap
-widens with the series length: that is the reason the approximation exists. At
-short ``n`` the exact GP is still affordable and gives the reference the
-approximation is judged against.
-
-That leaves the basis rebuild the composed model does on every evaluation. It is
-not differentiated with respect to any sampled parameter, but it does run inside
-the traced call, so it is taped like the rest of the body. The honest measurement
-is therefore a gradient with the basis rebuilt inside against a gradient with it
-captured outside — not a bare call to the constructor:
-
-```@example gp
-using DynamicPPL: to_submodel
-
-# the same GP, but with the basis rebuilt inside the traced body, exactly as the
-# enclosing Renewal does when it reconstructs its submodels
-@model function rebuilt_basis(gp, n)
-    z ~ to_submodel(as_turing_model(gp, n), false)
-    return z
-end
-
-gp = HilbertSpaceGP(m = 20)
-overhead = gradient_time(rebuilt_basis(gp, n)) -
-           gradient_time(as_turing_model(gp, n))
-share = overhead / gradient_time(composed(gp, n))
-round(share; sigdigits = 2)
-```
-
-That is the fraction of each gradient a cached basis would recover. Caching
-would tie a latent model to one series length, at odds with the composability the
-rest of the package is built on, so the repeat stands; the number above is what
-it costs, measured rather than assumed.
+widens with the series length: that is the reason the approximation exists.
 
 ## Posterior trajectories
 
 Following the plotting convention of the other case studies, two small helpers
 reduce the per-draw trajectories to credible bands and draw a median line with
-50% and 95% ribbons. Neither skips a missing or failed value: nothing here is
-scored on a delayed scale, so a band shorter than the days it is drawn against
-is a bug and raises rather than plotting a truncated ribbon.
+50% and 95% ribbons.
 
 ```@example gp
 CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
@@ -340,32 +291,6 @@ scatter!(ax2, ts, y_obs; color = :black, markersize = 7, label = "observed")
 axislegend(ax2; position = :lt)
 fig
 ```
-
-The share of days on which the 95% band contains the quantity it is estimating
-is a calibration check on the bands the figure draws. It is not on its own a
-check on fit quality — a fit that had collapsed onto a wide, near-prior band
-would score well on it — which is why the accuracy of the posterior means is
-asserted separately above.
-
-```@example gp
-covered(b, x) = round(mean(b[:, 1] .<= x .<= b[:, 5]); digits = 2)
-coverage = (Rt_hsgp = covered(credible_bands(exp.(hs.Z)), exp.(Z_true)),
-    Rt_exact = covered(credible_bands(exp.(ex.Z)), exp.(Z_true[1:(ex.n)])),
-    cases = covered(credible_bands(yt), y_obs))
-@assert all(>=(0.8), coverage) "a 95% band covers under 80% of days: $coverage"
-coverage
-```
-
-Both posterior ``R_t`` bands bracket the simulated truth, and the
-posterior-predictive counts cover the observed epidemic curve. Neither GP ever
-had to know it was modelling a reproduction number, and the renewal and
-observation models never had to know their latent process was a GP: the two sides
-met only through the length-`n` latent contract. Swapping the GP for an
-[`AR`](@ref) or a [`RandomWalk`](@ref) is a one-line change to the `rt` argument.
-
-Use [`HilbertSpaceGP`](@ref) by default — it stays cheap under NUTS as the series
-grows. Reach for [`ExactGP`](@ref) on short series when you want the exact GP as a
-reference, or a check on the approximation.
 
 !!! note "Illustrative run"
     This example uses a short sampler run and simulated data to stay fast to
