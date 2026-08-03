@@ -54,6 +54,7 @@ using Tables: rowtable
 # Distributions names used (and, for many, extended) by the package, imported
 # explicitly (not reexported).
 using Distributions: Distributions, Distribution, Sampleable,
+                     UnivariateDistribution,
                      ContinuousUnivariateDistribution, ContinuousDistribution,
                      Normal, Poisson, NegativeBinomial, Binomial, Gamma, truncated,
                      cdf, ccdf, logcdf, logccdf, invlogcdf, pdf, logpdf, quantile,

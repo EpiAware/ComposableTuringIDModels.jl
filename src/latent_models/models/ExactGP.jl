@@ -19,16 +19,18 @@ Hilbert-space model approximates:
 
 ```math
 K_{ij} = \sigma^2\, k(x_i, x_j; \ell), \qquad
-f = L z, \quad L L^\top = K + \tau(\sigma^2 + 1) I,
+f = L z, \quad L L^\top = K + \tau\sigma^2 I,
 \quad z_i \sim \mathrm{Normal}(0, 1).
 ```
 
-The nugget ``\tau`` is *relative*: it is scaled by ``\sigma^2 + 1`` rather than
-added as a fixed amount. The diagonal of ``K`` is ``\sigma^2``, so a fixed
-nugget is swamped once the sampler visits a large ``\sigma`` and the Cholesky
-factorisation throws on a matrix that is only numerically indefinite — which
-ends the chain. The ``+1`` keeps the guard in place at ``\sigma \approx 0``,
-where ``K`` itself vanishes.
+The nugget ``\tau`` is *relative*: it scales with ``\sigma^2``, the diagonal of
+``K``. A fixed absolute nugget is swamped once the sampler visits a large
+``\sigma``, and the Cholesky factorisation then throws on a matrix that is only
+numerically indefinite, ending the chain; a nugget with an absolute floor
+instead dominates the covariance at small ``\sigma``. Scaling it leaves the
+relative variance inflation at ``\tau`` throughout. A floor of
+``\tau\,\varepsilon`` is added so the factorisation stays defined at
+``\sigma = 0`` exactly, where ``K`` vanishes.
 
 The path is drawn non-centred: standard-normal weights ``z`` are pushed through
 the Cholesky factor ``L`` of the covariance. As with [`HilbertSpaceGP`](@ref)
@@ -78,8 +80,8 @@ gp_matern = ExactGP(kernel = Matern32Kernel())
 length(as_turing_model(gp_matern, 30)())
 ```
 "
-struct ExactGP{L <: Sampleable, S <: Sampleable, K <: Kernel} <:
-       AbstractLatentModel
+struct ExactGP{L <: UnivariateDistribution, S <: UnivariateDistribution,
+    K <: Kernel} <: AbstractPriorModel
     "Prior for the length scale ``\\ell``; puts no mass below zero."
     length_scale::L
     "Prior for ``\\sigma``; puts no mass below zero."
@@ -89,8 +91,8 @@ struct ExactGP{L <: Sampleable, S <: Sampleable, K <: Kernel} <:
     "Relative Cholesky nugget: the amount added is ``\\tau(\\sigma^2 + 1)``."
     jitter::Float64
 
-    function ExactGP(length_scale::Sampleable, marginal_std::Sampleable,
-            kernel::Kernel, jitter::Real)
+    function ExactGP(length_scale::UnivariateDistribution,
+            marginal_std::UnivariateDistribution, kernel::Kernel, jitter::Real)
         @assert jitter>0 "jitter must be greater than 0"
         _check_hyperprior_support(length_scale, marginal_std)
         new{typeof(length_scale), typeof(marginal_std), typeof(kernel)}(
@@ -99,9 +101,9 @@ struct ExactGP{L <: Sampleable, S <: Sampleable, K <: Kernel} <:
 end
 
 function ExactGP(;
-        length_scale::Sampleable = truncated(
+        length_scale::UnivariateDistribution = truncated(
             Normal(0.0, 0.4), _DEFAULT_LENGTH_SCALE_FLOOR, Inf),
-        marginal_std::Sampleable = truncated(Normal(0.0, 1.0), 0, Inf),
+        marginal_std::UnivariateDistribution = truncated(Normal(0.0, 1.0), 0, Inf),
         kernel::Kernel = SqExponentialKernel(), jitter::Real = 1e-6)
     return ExactGP(length_scale, marginal_std, kernel, jitter)
 end
@@ -122,11 +124,15 @@ end
     # extreme excursion), so scaling the matrix keeps that a valid, if
     # degenerate, draw instead of throwing mid-chain.
     K = σ^2 .* kernelmatrix(with_lengthscale(kernel, ℓ), x)
-    # The nugget is scaled by σ² + 1, not added as a fixed absolute amount: the
-    # diagonal of K is σ², so a fixed nugget is swamped once σ is large and the
-    # factorisation fails on a matrix that is only numerically indefinite. The
-    # + 1 keeps the guard at σ ≈ 0, where K itself vanishes.
-    L = cholesky(Symmetric(K + (jitter * (σ^2 + 1)) * I)).L
+    # The nugget tracks the diagonal of K, which is σ². A fixed absolute nugget
+    # is swamped once σ is large and the factorisation then fails on a matrix
+    # that is only numerically indefinite, which ends the chain; a nugget with a
+    # floor of `jitter` instead swamps the covariance when σ is small (at
+    # σ = 1e-3 a `jitter * (σ² + 1)` nugget inflates the variance by 100%). The
+    # absolute floor here is `jitter * eps()`, far below σ² for any σ the
+    # sampler can represent, and is only there to keep the factorisation
+    # defined at σ = 0 exactly, where K itself vanishes.
+    L = cholesky(Symmetric(K + (jitter * (σ^2 + eps())) * I)).L
     gp = L * z
     return gp
 end
