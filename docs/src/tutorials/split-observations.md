@@ -1,4 +1,4 @@
-# [Multiple observation streams: cases, deaths, and strata](@id case-study-split)
+# [Multiple observation streams: cases, deaths, and strata](@id tutorial-split)
 
 Real-time surveillance rarely watches an epidemic through a single lens.
 The same infections surface as reported cases, hospital admissions, deaths, and
@@ -49,7 +49,7 @@ automatically, so the streams stay distinct without any manual prefix layer.
 ## Parallel: cases and deaths from shared infections
 
 We drive the streams with a renewal infection process, exactly as in the
-[renewal case study](@ref case-study-renewal), and observe it through two
+[renewal case study](@ref tutorial-renewal), and observe it through two
 pipelines.
 Cases are a short-delay, high-ascertainment negative-binomial stream.
 Deaths are a long-delay stream whose ascertainment — the infection-fatality

@@ -1,6 +1,6 @@
-# [Declarative compartmental models with Catalyst](@id case-study-catalyst)
+# [Declarative compartmental models with Catalyst](@id tutorial-catalyst)
 
-The [SIR case study](@ref case-study-sir) builds its dynamics from a
+The [SIR case study](@ref tutorial-sir) builds its dynamics from a
 hand-written vector field, and the package hand-writes that model's Jacobian too
 so the stiff/auto solver stays fast and stable. A hand-written Jacobian has to
 be re-derived, and kept in sync, for every new compartmental model.
@@ -80,7 +80,7 @@ day as a proxy for the infectious compartment.
 N = 763          # children in the school
 
 datapath = joinpath(pkgdir(ComposableTuringIDModels),
-    "docs", "src", "case-studies", "data", "influenza_england_1978_school.csv")
+    "docs", "src", "tutorials", "data", "influenza_england_1978_school.csv")
 influenza = CSV.read(datapath, DataFrame)
 y_obs = influenza.in_bed            # children confined to bed each day
 ts = collect(1.0:length(y_obs))     # observation times (days)

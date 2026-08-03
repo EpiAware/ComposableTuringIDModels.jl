@@ -1,4 +1,4 @@
-# [An SIR compartmental model](@id case-study-sir)
+# [An SIR compartmental model](@id tutorial-sir)
 
 The renewal equation is one way to generate infections, but it is not the only
 one. Mechanistic compartmental models describe transmission with a system of
@@ -48,7 +48,7 @@ Random.seed!(1978)
 N = 763          # children in the school
 
 datapath = joinpath(pkgdir(ComposableTuringIDModels),
-    "docs", "src", "case-studies", "data", "influenza_england_1978_school.csv")
+    "docs", "src", "tutorials", "data", "influenza_england_1978_school.csv")
 influenza = CSV.read(datapath, DataFrame)
 y_obs = influenza.in_bed            # children confined to bed each day
 ts = collect(1.0:length(y_obs))     # observation times (days)

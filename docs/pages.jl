@@ -7,24 +7,24 @@ pages = [
     "Installation" => "getting-started/installation.md",
     "Overview" => "overview.md",
     "Composable design" => "design.md",
-    "Case studies" => [
-        "Overview" => "case-studies/index.md",
-        "Renewal model with negative-binomial reporting" => "case-studies/renewal-negbin.md",
-        "Reporting delays and day-of-week effects" => "case-studies/delays-dayofweek.md",
-        "Real-time nowcasting: correcting right-truncation" => "case-studies/realtime-nowcast.md",
-        "An SIR compartmental model" => "case-studies/sir-ode.md",
-        "Declarative compartmental models with Catalyst" => "case-studies/catalyst-ode.md",
-        "Multiple observation streams: cases, deaths, and strata" => "case-studies/split-observations.md",
-        "Time-varying damping in an AR process" => "case-studies/time-varying-damping.md",
-        "Partial pooling across groups" => "case-studies/hierarchy-stacked.md"
-    ],
     "Tutorials" => [
-        "Renewal modifiers: depletion and importation" => "getting-started/tutorials/renewal-modifiers.md",
-        "Automatic differentiation backends" => "getting-started/tutorials/ad-backends.md"
+        "Overview" => "tutorials/index.md",
+        "Renewal model with negative-binomial reporting" => "tutorials/renewal-negbin.md",
+        "Reporting delays and day-of-week effects" => "tutorials/delays-dayofweek.md",
+        "Real-time nowcasting: correcting right-truncation" => "tutorials/realtime-nowcast.md",
+        "An SIR compartmental model" => "tutorials/sir-ode.md",
+        "Declarative compartmental models with Catalyst" => "tutorials/catalyst-ode.md",
+        "Multiple observation streams: cases, deaths, and strata" => "tutorials/split-observations.md",
+        "Time-varying damping in an AR process" => "tutorials/time-varying-damping.md",
+        "Partial pooling across groups" => "tutorials/hierarchy-stacked.md",
+        "Renewal modifiers: depletion and importation" => "getting-started/tutorials/renewal-modifiers.md"
     ],
     "API reference" => [
         "Public API" => "lib/public.md",
         "Internal API" => "lib/internals.md"
     ],
-    "Benchmarks" => "benchmarks.md"
+    "Benchmarks" => [
+        "Overview" => "benchmarks.md",
+        "Automatic differentiation" => "getting-started/tutorials/ad-backends.md"
+    ]
 ]

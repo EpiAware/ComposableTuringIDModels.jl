@@ -1,4 +1,4 @@
-# [Reporting delays and day-of-week effects](@id case-study-delays)
+# [Reporting delays and day-of-week effects](@id tutorial-delays)
 
 Real surveillance data is rarely a clean count of infections on the day they
 occur. Cases are reported after a delay — an incubation period followed by a
@@ -8,7 +8,7 @@ these features into the observation model so that the latent infection signal is
 estimated free of reporting artefacts.
 
 This case study keeps the renewal infection core of the
-[previous example](@ref case-study-renewal) but replaces the simple observation
+[previous example](@ref tutorial-renewal) but replaces the simple observation
 model with a layered one: infections are convolved through two delay
 distributions and then modulated by a day-of-week reporting pattern. It also
 shows the latent process as an ARIMA-style differenced process broadcast to a
@@ -124,7 +124,7 @@ We fit the model to the daily confirmed COVID-19 cases from Italy's first wave
 ```@example delays
 using CSV, DataFrames
 datapath = joinpath(pkgdir(ComposableTuringIDModels),
-    "docs", "src", "case-studies", "data", "italy_data.csv")
+    "docs", "src", "tutorials", "data", "italy_data.csv")
 italy = CSV.read(datapath, DataFrame)
 n = 42
 y_obs = italy.confirm[1:n]

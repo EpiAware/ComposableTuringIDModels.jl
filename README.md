@@ -99,7 +99,7 @@ rewriting models.
   [Overview](https://composableturingidmodels.epiaware.org/dev/overview) and the
   [Composable design](https://composableturingidmodels.epiaware.org/dev/design) page.
 - Want worked examples? See the
-  [case studies](https://composableturingidmodels.epiaware.org/dev/case-studies), which
+  [tutorials](https://composableturingidmodels.epiaware.org/dev/tutorials), which
   fit complete models to real surveillance data.
 - Want the full interface? Browse the
   [Public API](https://composableturingidmodels.epiaware.org/dev/lib/public).

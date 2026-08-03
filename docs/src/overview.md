@@ -121,6 +121,6 @@ length(generated_y_t), length(I_t), length(Z_t)
 
   - [Composable design](@ref) explains the `as_turing_model` protocol and how
     parts nest as submodels in more detail.
-  - The [case studies](@ref case-studies-overview) build complete models and fit
+  - The [tutorials](@ref tutorials-overview) build complete models and fit
     them to real surveillance data, from a renewal model to a compartmental SIR.
   - The [Public API](@ref public-api) lists every component you can compose.

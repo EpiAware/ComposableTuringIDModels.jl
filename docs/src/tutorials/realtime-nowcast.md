@@ -1,4 +1,4 @@
-# [Real-time nowcasting: right-truncation vs the reporting triangle](@id case-study-nowcast)
+# [Real-time nowcasting: right-truncation vs the reporting triangle](@id tutorial-nowcast)
 
 In real time the most recent days of a surveillance series are **incomplete**.
 A case with reference day ``t`` is only counted after a reporting delay, so on
@@ -48,7 +48,7 @@ A naive fit drops the delay factor (equivalently ``F \equiv 1``).
 ## The renewal model
 
 Both corrections wrap the same composed renewal model as the
-[renewal case study](@ref case-study-renewal), an autoregressive ``\log R_t``
+[renewal case study](@ref tutorial-renewal), an autoregressive ``\log R_t``
 process folded into a [`Renewal`](@ref) infection process observed with a
 [`NegativeBinomialError`](@ref).
 
@@ -81,7 +81,7 @@ path the rest of the package uses.
 
 ```@example nowcast
 datapath = joinpath(pkgdir(ComposableTuringIDModels),
-    "docs", "src", "case-studies", "data", "italy_data.csv")
+    "docs", "src", "tutorials", "data", "italy_data.csv")
 italy = CSV.read(datapath, DataFrame)
 n = 45
 eventual = italy.confirm[1:n]                 # eventual (complete) totals

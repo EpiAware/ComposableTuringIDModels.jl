@@ -1,4 +1,4 @@
-# [Renewal model with negative-binomial reporting](@id case-study-renewal)
+# [Renewal model with negative-binomial reporting](@id tutorial-renewal)
 
 The renewal equation is the workhorse of real-time epidemic estimation: it
 expresses new infections as a function of past infections weighted by the
@@ -141,7 +141,7 @@ docs and read with [CSV](https://csv.juliadata.org)/[DataFrames](https://datafra
 ```@example renewal
 using CSV, DataFrames
 datapath = joinpath(pkgdir(ComposableTuringIDModels),
-    "docs", "src", "case-studies", "data", "south_korea_data.csv")
+    "docs", "src", "tutorials", "data", "south_korea_data.csv")
 south_korea = CSV.read(datapath, DataFrame)
 first(south_korea, 5)
 ```

@@ -1,4 +1,4 @@
-# [Partial pooling across groups in a composed model](@id case-study-hierarchy)
+# [Partial pooling across groups in a composed model](@id tutorial-hierarchy)
 
 A multi-group epidemic is a panel: one shared infection process seen by several
 groups, each reporting it at its own level.
