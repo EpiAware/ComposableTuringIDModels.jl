@@ -202,8 +202,7 @@ grad = (hsgp = gradient_time(composed(HilbertSpaceGP(m = 20), n_ex)),
 round(grad.exact / grad.hsgp; sigdigits = 2)
 ```
 
-The exact GP costs more per gradient even on the shorter series, and the gap widens with series length.
-That is the reason the approximation exists.
+The exact GP costs more per gradient even on the shorter series, and the gap widens with series length, which is why the approximation exists.
 
 ## Posterior trajectories
 
