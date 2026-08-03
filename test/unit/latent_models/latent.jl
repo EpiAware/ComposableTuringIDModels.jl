@@ -306,7 +306,7 @@ end
     # covariance is only numerically indefinite — mid-chain, which kills the
     # sampler rather than returning a bad draw.
     n = 40
-    for σ in (1e-8, 1.0, 1e3, 1e5), ℓ in (0.05, 0.5, 5.0)
+    for σ in (0.0, 1e-8, 1.0, 1e3, 1e5), ℓ in (0.05, 0.5, 5.0)
 
         path = fix(as_turing_model(ExactGP(), n), (ℓ = ℓ, σ = σ))()
         @test length(path) == n

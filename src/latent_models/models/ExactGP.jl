@@ -116,7 +116,12 @@ end
     ℓ ~ length_scale
     σ ~ marginal_std
     z ~ filldist(Normal(), length(x))
-    K = kernelmatrix(σ^2 * with_lengthscale(kernel, ℓ), x)
+    # Scale the Gram matrix, not the kernel: `σ^2 * kernel` builds a
+    # KernelFunctions `ScaledKernel`, which asserts σ² > 0 at construction.
+    # NUTS can sample σ = 0.0 exactly (the prior floor, or an underflowed
+    # extreme excursion), so scaling the matrix keeps that a valid, if
+    # degenerate, draw instead of throwing mid-chain.
+    K = σ^2 .* kernelmatrix(with_lengthscale(kernel, ℓ), x)
     # The nugget is scaled by σ² + 1, not added as a fixed absolute amount: the
     # diagonal of K is σ², so a fixed nugget is swamped once σ is large and the
     # factorisation fails on a matrix that is only numerically indefinite. The
