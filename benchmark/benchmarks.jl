@@ -74,19 +74,24 @@ let samp_grp = SUITE["Sampling"] = BenchmarkGroup()
     y = as_turing_model(model, missing, N)(MersenneTwister(3)).generated_y_t
     cond = as_turing_model(model, y, N)
     # A short NUTS run; `seconds` in run.jl caps wall time, and a low draw count
-    # keeps this representative without dominating the suite. The simulated
-    # data is drawn with a fixed seed (rather than the default RNG) so wall
-    # time is stable across runs: an unseeded draw occasionally produces a
-    # dataset that pushes NUTS's adaptation into far more leapfrog steps,
-    # which can blow past the `seconds` budget and leave BenchmarkTools with
-    # only one timing sample for that run. AirspeedVelocity's history
-    # plotter then errors comparing that run against others that did get
-    # multiple samples: its `create_line_plot` tests for the "75" quantile
+    # keeps this representative without dominating the suite.
+    #
+    # Both the data and the sampler are seeded. NUTS wall time is driven by
+    # leapfrog steps per transition, which depend on the initial point and the
+    # adaptation trajectory as well as on the dataset, so seeding the data
+    # alone would leave every evaluation running a different chain. The RNG is
+    # constructed inside the benchmarked expression so evaluations do not share
+    # a mutated stream.
+    #
+    # This matters because a run whose trial blows past the `seconds` budget
+    # collapses to a single timing sample, and AirspeedVelocity's history
+    # plotter then errors: its `create_line_plot` tests for the "75" quantile
     # key in the first revision alone, then indexes "25"/"75" on every
-    # revision. Seeding makes the collapse to one sample far less likely
-    # but cannot rule it out, since runner noise alone can blow the budget.
+    # revision. Seeding removes the variance this benchmark controls; it
+    # cannot rule the collapse out, since runner contention alone can blow the
+    # budget.
     samp_grp["NUTS (DirectInfections+Poisson, 50 draws)"] = @benchmarkable sample(
-        $cond, NUTS(), 50; progress = false)
+        MersenneTwister(4), $cond, NUTS(), 50; progress = false)
 end
 
 # --- AD gradients -----------------------------------------------------------
