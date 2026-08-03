@@ -93,6 +93,21 @@ negbin_model = IDModel(infections, NegativeBinomialError())
 That is the point: you compare modelling assumptions by swapping parts, not by
 rewriting models.
 
+## Related packages
+
+- [CensoredDistributions.jl](https://github.com/EpiAware/CensoredDistributions.jl)
+  builds the interval-censored, truncated delay distributions used for reporting
+  delays.
+- [GenerationTime.jl](https://github.com/EpiAware/GenerationTime.jl) represents
+  and estimates generation time distributions.
+- [ReparameterisedDistributions.jl](https://github.com/EpiAware/ReparameterisedDistributions.jl)
+  switches distributions between parameterisations so priors can be stated in
+  whichever one is natural.
+- [ModifiedDistributions.jl](https://github.com/EpiAware/ModifiedDistributions.jl)
+  modifies the behaviour of Distributions.jl distributions.
+- [Turing.jl](https://github.com/TuringLang/Turing.jl) is the probabilistic
+  programming backend every model here compiles down to.
+
 ## Where to learn more
 
 - New here? Start with the
