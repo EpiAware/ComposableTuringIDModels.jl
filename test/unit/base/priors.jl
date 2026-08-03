@@ -207,6 +207,65 @@ end
     @test length(as_turing_model(CombineLatentModels([Normal(), AR()]), 10)()) == 10
 end
 
+@testitem "PriorLike field parameters stay concrete (issue #188)" begin
+    # PriorLike = Union{Distribution, AbstractVector{<:Distribution},
+    # AbstractPriorModel} is used only as a type-parameter BOUND
+    # (`M <: PriorLike`) on component structs, never as a bare field type
+    # (`::PriorLike`). A constructed instance therefore stores its prior in a
+    # concrete field, with the Union resolved away at compile time. This test
+    # locks that pattern in: a future struct that stores `::PriorLike`
+    # directly (rather than parametrically) would widen the field to the full
+    # Union and fail here.
+    using ComposableTuringIDModels, Distributions
+    concrete_field(x, f) = isconcretetype(fieldtype(typeof(x), f))
+
+    @test concrete_field(RandomWalk(), :init)
+    @test concrete_field(RandomWalk(), :ϵ_t)
+    @test concrete_field(HierarchicalNormal(), :std)
+    @test concrete_field(AR(), :damp)
+    @test concrete_field(AR(), :init)
+    @test concrete_field(AR(), :ϵ_t)
+    @test concrete_field(MA(), :θ)
+    @test concrete_field(MA(), :ϵ_t)
+    diffmod = DiffLatentModel(; model = RandomWalk(), init = Normal())
+    @test concrete_field(diffmod, :model)
+    @test concrete_field(diffmod, :init)
+    renmod = Renewal(; generation_time = [0.2, 0.3, 0.5],
+        rt = RandomWalk(), initialisation = Normal())
+    @test concrete_field(renmod, :rt)
+    @test concrete_field(renmod, :initialisation)
+    @test concrete_field(NormalError(), :std)
+    @test concrete_field(NegativeBinomialError(), :cluster_factor)
+    @test concrete_field(Hierarchy(), :mean)
+    @test concrete_field(Hierarchy(), :across)
+end
+
+@testitem "as_turing_model construction/logdensity is type-stable (#188)" begin
+    # Companion to the field-concreteness test above: `Test.@inferred` on
+    # construction and the linked log-density forward pass (the same call
+    # `benchmark/benchmarks.jl` times, and what an AD backend differentiates
+    # through) confirms the PriorLike union bound never leaks into the
+    # gradient hot path.
+    #
+    # `rand(mdl)` is deliberately NOT checked here: for `AR`, its order `p` is
+    # a runtime `Int` field (not a type parameter), so `as_turing_model`'s
+    # `if p == 1` branch tracks a different set of generated quantities
+    # (`ρ := ...`) per branch, making `rand`'s return type a genuine
+    # `Union` — pre-existing, orthogonal to `PriorLike`, and not on the
+    # logdensity/gradient path this issue is about.
+    using ComposableTuringIDModels, Distributions, Test
+    using DynamicPPL: LogDensityFunction, VarInfo, link, getlogjoint
+    import LogDensityProblems as LDP
+
+    n = 10
+    for comp in (RandomWalk(), HierarchicalNormal(), AR())
+        mdl = @inferred as_turing_model(comp, n)
+        ldf = LogDensityFunction(mdl, getlogjoint, link(VarInfo(mdl), mdl))
+        x = zeros(LDP.dimension(ldf))
+        @inferred LDP.logdensity(ldf, x)
+    end
+end
+
 @testitem "priors compose as submodels (distribution and latent)" begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(103)
