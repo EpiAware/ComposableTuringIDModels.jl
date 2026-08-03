@@ -119,7 +119,7 @@ end
     Ymiss = Matrix{Union{Missing, Float64}}(missing, n_groups, n_time)
     sim = as_turing_model(model, Ymiss)()
     Ydata = Float64.(reduce(vcat, [permutedims(sim.generated_y_t[g])
-                                    for g in 1:n_groups]))
+                                   for g in 1:n_groups]))
 
     posterior = as_turing_model(model, Ydata)
     chain = sample(posterior, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 80;
