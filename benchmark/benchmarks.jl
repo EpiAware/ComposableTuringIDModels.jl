@@ -41,8 +41,10 @@ function _eval_models()
     renewal = IDModel(
         Renewal(; generation_time = GEN_INT, rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
-    y_direct = as_turing_model(direct, missing, N)().generated_y_t
-    y_renewal = as_turing_model(renewal, missing, N)().generated_y_t
+    y_direct = as_turing_model(direct, missing, N)(
+        MersenneTwister(1)).generated_y_t
+    y_renewal = as_turing_model(renewal, missing, N)(
+        MersenneTwister(2)).generated_y_t
     return [
         ("AR latent", as_turing_model(AR(), N)),
         ("RandomWalk latent", as_turing_model(RandomWalk(), N)),
@@ -69,10 +71,18 @@ let samp_grp = SUITE["Sampling"] = BenchmarkGroup()
     model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
-    y = as_turing_model(model, missing, N)().generated_y_t
+    y = as_turing_model(model, missing, N)(MersenneTwister(3)).generated_y_t
     cond = as_turing_model(model, y, N)
     # A short NUTS run; `seconds` in run.jl caps wall time, and a low draw count
-    # keeps this representative without dominating the suite.
+    # keeps this representative without dominating the suite. The simulated
+    # data is drawn with a fixed seed (rather than the default RNG) so wall
+    # time is stable across runs: an unseeded draw occasionally produces a
+    # dataset that pushes NUTS's adaptation into far more leapfrog steps,
+    # which can blow past the `seconds` budget and leave BenchmarkTools with
+    # only one timing sample for that run. AirspeedVelocity's history
+    # plotter then errors comparing that run against others that did get
+    # multiple samples (upstream bug:
+    # MilesCranmer/AirspeedVelocity.jl#158).
     samp_grp["NUTS (DirectInfections+Poisson, 50 draws)"] = @benchmarkable sample(
         $cond, NUTS(), 50; progress = false)
 end
