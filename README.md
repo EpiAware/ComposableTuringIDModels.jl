@@ -95,17 +95,13 @@ rewriting models.
 
 ## Related packages
 
-- [CensoredDistributions.jl](https://censoreddistributions.epiaware.org/stable/)
-  builds the interval-censored, truncated delay distributions used for reporting
-  delays. It is a direct dependency of this package.
 - [ModifiedDistributions.jl](https://modifieddistributions.epiaware.org/)
-  modifies the behaviour of Distributions.jl distributions.
+  modifies the behaviour of the underlying Distributions.jl distributions.
 - [ReparameterisedDistributions.jl](https://reparameteriseddistributions.epiaware.org/)
-  switches distributions between parameterisations so priors can be stated in
+  switches distributions between parameterisations, so a prior can be stated in
   whichever one is natural.
-- [DEdiseasecomponents.jl](https://github.com/EpiAware/DEdiseasecomponents.jl)
-  supplies differential-equation components, covering the same compartmental
-  processes as the ODE infection models here.
+- [LoweredDistributions.jl](https://lowereddistributions.epiaware.org/) holds
+  common components for differential-equation infectious disease models.
 - [Turing.jl](https://turinglang.org/) is the probabilistic programming backend
   every model here compiles down to.
 
