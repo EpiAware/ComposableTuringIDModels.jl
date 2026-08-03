@@ -132,3 +132,27 @@ chain = sample(posterior, NUTS(; adtype = AutoMooncake(; config = nothing)), 1_0
 The standard Turing tools — `rand` for prior draws, `fix` to pin parameters,
 `condition` (or `|`) to condition on values, and `sample` for inference — all
 apply unchanged.
+
+## Infection↔observation mappings
+
+An infection model does not have to generate a single curve. Two components
+widen `I_t` to an `inf_strata x time` matrix, one row per stratum:
+
+  - [`GroupedInfections`](@ref) draws **one shared** infection process and
+    replicates it across a grouping axis by a per-group effect — a partially
+    pooled panel, the "same many" case.
+  - [`CombineInfections`](@ref) draws **several distinct** infection processes
+    independently and stacks them — the "different many" case (a region-level
+    epidemic, say, where each region's curve is genuinely its own process).
+
+On the observation side, [`Split`](@ref) (with an optional [`StrataMap`](@ref)
+weight matrix) reads that matrix and projects it onto observation streams
+through an `obs_strata x inf_strata` weight, so one mechanism covers every
+mapping cardinality: `map = I` is one-to-one, an aggregation row is
+many-to-one, and a general matrix is many-to-many. `IDModel` gains two outer
+constructors that build the `GroupedInfections` + `Split` pair directly —
+`IDModel(infection_model, group_effect, observation_model)` and
+`IDModel(idmodel, group_effect)` — so a panel model is built with the same
+`IDModel` constructor as a single-group one. See [Partial pooling across
+groups](@ref case-study-hierarchy) and [Multiple observation
+streams](@ref case-study-split) for worked examples.
