@@ -108,6 +108,11 @@ per-stream series. When `Split` is nested inside another modifier the incoming
 `missing` reaches it as a shared placeholder; the explicit stream names let it
 still fan out.
 
+In the data-driven strata mode (`m.names === nothing`), `y_t` may instead be
+an `AbstractMatrix` (one stream per row, `\"group1\"`, `\"group2\"`, … as the
+generated names) — the data contract a grouped/panel [`IDModel`](@ref) uses
+via [`GroupedInfections`](@ref) or [`CombineInfections`](@ref).
+
 The incoming expected series may be a single vector (broadcast to every stream),
 a per-stream NamedTuple, an `inf_strata × time` matrix (one stream per row), or a
 [`StrataMap`](@ref).
@@ -188,12 +193,15 @@ function _component_children(m::Split)
                                                   for nm in keys(m.streams)]
 end
 
-# Ordered stream names: fixed for explicit streams, else the `y_t` keys.
+# Ordered stream names: fixed for explicit streams; else the `y_t` keys for a
+# NamedTuple, or `"group1", "group2", ...` for a plain data matrix (rows are
+# streams, e.g. a grouped/panel `IDModel`'s data — see `GroupedInfections`).
 function _split_names(m::Split, y_t)
     m.names === nothing || return m.names
-    y_t isa NamedTuple ||
-        error("A strata Split needs a NamedTuple `y_t` to name its streams")
-    return collect(string.(keys(y_t)))
+    y_t isa NamedTuple && return collect(string.(keys(y_t)))
+    y_t isa AbstractMatrix && return "group" .* string.(1:size(y_t, 1))
+    error("A strata Split needs a NamedTuple or AbstractMatrix `y_t` to name " *
+          "its streams")
 end
 
 # Per-Split expected input: with a stored weight `map` the incoming series is the
@@ -211,11 +219,17 @@ function _split_models(m::Split, names)
     return [m.streams for _ in names]
 end
 
-# Per-stream data: a NamedTuple splits by name; anything else (a `missing` or a
-# nested placeholder vector) is shared to every stream.
+# Per-stream data: a NamedTuple splits by name; an AbstractMatrix splits by
+# row (stream `k` is row `k`, matching `_split_names`'s matrix branch);
+# anything else (a `missing` or a nested placeholder vector) is shared to
+# every stream.
 function _split_y_t(names, y_t::NamedTuple)
     @assert Set(Symbol.(names)) == Set(keys(y_t)) "The stream names $(Tuple(names)) must match the observed-series keys $(keys(y_t))"
     return [y_t[Symbol(nm)] for nm in names]
+end
+function _split_y_t(names, y_t::AbstractMatrix)
+    @assert size(y_t, 1)==length(names) "The data matrix has $(size(y_t, 1)) rows but there are $(length(names)) streams"
+    return [y_t[i, :] for i in eachindex(names)]
 end
 _split_y_t(names, y_t) = [y_t for _ in names]
 
