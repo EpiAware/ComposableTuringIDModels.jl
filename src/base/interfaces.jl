@@ -51,8 +51,10 @@ passes only a series length `n` (no external latent path).
 
 # Keyword Arguments
 
-  - `n`: the infection series length used for the construction check (default
-    `10`).
+  - `n`: the shape argument used for the construction check (default `10`).
+    Usually a series length (`Int`), but a component such as
+    [`GroupedInfections`](@ref) needs a richer shape (e.g. a `(n_time,
+    n_groups)` `NamedTuple`) — pass the matching value for those.
 
 # Examples
 ```@example
@@ -61,7 +63,7 @@ implements_infection_interface(
     DirectInfections(; Z = RandomWalk(), initialisation = Normal()))
 ```
 "
-function implements_infection_interface(model; n::Int = 10)
+function implements_infection_interface(model; n = 10)
     model isa AbstractInfectionModel || return false
     return as_turing_model(model, n) isa DynamicPPL.Model
 end
