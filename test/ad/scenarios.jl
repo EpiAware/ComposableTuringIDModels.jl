@@ -18,8 +18,16 @@ end
     test_working_backend("Enzyme reverse")
 end
 
+@testitem "Enzyme forward gradients (marginal)" tags=[:ad, :enzyme, :enzyme_forward] setup=[ADHelpers] begin
+    test_working_backend("Enzyme forward")
+end
+
 @testitem "Mooncake reverse gradients (marginal)" tags=[:ad, :mooncake, :mooncake_reverse] setup=[ADHelpers] begin
     test_working_backend("Mooncake reverse")
+end
+
+@testitem "Mooncake forward gradients (marginal)" tags=[:ad, :mooncake, :mooncake_forward] setup=[ADHelpers] begin
+    test_working_backend("Mooncake forward")
 end
 
 # Add latent (or other) scenario groups as the package needs, e.g.:
