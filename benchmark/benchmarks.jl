@@ -81,8 +81,10 @@ let samp_grp = SUITE["Sampling"] = BenchmarkGroup()
     # which can blow past the `seconds` budget and leave BenchmarkTools with
     # only one timing sample for that run. AirspeedVelocity's history
     # plotter then errors comparing that run against others that did get
-    # multiple samples (upstream bug:
-    # MilesCranmer/AirspeedVelocity.jl#158).
+    # multiple samples: its `create_line_plot` tests for the "75" quantile
+    # key in the first revision alone, then indexes "25"/"75" on every
+    # revision. Seeding makes the collapse to one sample far less likely
+    # but cannot rule it out, since runner noise alone can blow the budget.
     samp_grp["NUTS (DirectInfections+Poisson, 50 draws)"] = @benchmarkable sample(
         $cond, NUTS(), 50; progress = false)
 end
