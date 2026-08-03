@@ -93,6 +93,18 @@ negbin_model = IDModel(infections, NegativeBinomialError())
 That is the point: you compare modelling assumptions by swapping parts, not by
 rewriting models.
 
+## Related packages
+
+- [ModifiedDistributions.jl](https://modifieddistributions.epiaware.org/)
+  modifies the behaviour of the underlying Distributions.jl distributions.
+- [ReparameterisedDistributions.jl](https://reparameteriseddistributions.epiaware.org/)
+  switches distributions between parameterisations, so a prior can be stated in
+  whichever one is natural.
+- [LoweredDistributions.jl](https://lowereddistributions.epiaware.org/) holds
+  common components for differential-equation infectious disease models.
+- [Turing.jl](https://turinglang.org/) is the probabilistic programming backend
+  every model here compiles down to.
+
 ## Where to learn more
 
 - New here? Start with the
