@@ -95,18 +95,19 @@ rewriting models.
 
 ## Related packages
 
-- [CensoredDistributions.jl](https://github.com/EpiAware/CensoredDistributions.jl)
+- [CensoredDistributions.jl](https://censoreddistributions.epiaware.org/stable/)
   builds the interval-censored, truncated delay distributions used for reporting
-  delays.
-- [GenerationTime.jl](https://github.com/EpiAware/GenerationTime.jl) represents
-  and estimates generation time distributions.
-- [ReparameterisedDistributions.jl](https://github.com/EpiAware/ReparameterisedDistributions.jl)
+  delays. It is a direct dependency of this package.
+- [ModifiedDistributions.jl](https://modifieddistributions.epiaware.org/)
+  modifies the behaviour of Distributions.jl distributions.
+- [ReparameterisedDistributions.jl](https://reparameteriseddistributions.epiaware.org/)
   switches distributions between parameterisations so priors can be stated in
   whichever one is natural.
-- [ModifiedDistributions.jl](https://github.com/EpiAware/ModifiedDistributions.jl)
-  modifies the behaviour of Distributions.jl distributions.
-- [Turing.jl](https://github.com/TuringLang/Turing.jl) is the probabilistic
-  programming backend every model here compiles down to.
+- [DEdiseasecomponents.jl](https://github.com/EpiAware/DEdiseasecomponents.jl)
+  supplies differential-equation components, covering the same compartmental
+  processes as the ODE infection models here.
+- [Turing.jl](https://turinglang.org/) is the probabilistic programming backend
+  every model here compiles down to.
 
 ## Where to learn more
 
