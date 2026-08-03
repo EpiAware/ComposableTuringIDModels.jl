@@ -1,30 +1,25 @@
 # [A Gaussian-process latent process](@id case-study-gp)
 
-Any latent process that implements `as_turing_model(model, n)` and returns a
-length-`n` path can drive an infection model. This case study uses a **Gaussian
-process** (GP) — a prior over functions, and so a flexible choice for a smoothly
-varying quantity such as ``\log R_t``: rather than assume a parametric form we
-let the data choose the shape, subject only to a smoothness assumption from the
-kernel.
+Any latent process that implements `as_turing_model(model, n)` and returns a length-`n` path can drive an infection model.
+A Gaussian process (GP) is a prior over functions, so it lets the data pick the shape of a smoothly varying quantity such as ``\log R_t`` subject only to the smoothness the kernel implies.
+Reach for one when the roughness of the path should be learned rather than fixed in advance.
+[`AR`](@ref) and [`RandomWalk`](@ref) are cheaper and usually enough for local smoothing.
 
-An exact GP over ``n`` points needs an ``n \times n`` covariance factorisation
-that costs ``O(n^3)`` *at every leapfrog step* of the sampler. The package ships
-two GP latent models built on the same ecosystem kernels:
+The package ships two GP latent models built on the same
+[KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/)
+kernels.
 
-  - [`ExactGP`](@ref) — the exact GP. Accurate, but ``O(n^3)`` per evaluation, so
-    best for short series. It is the accuracy reference.
-  - [`HilbertSpaceGP`](@ref) — the Hilbert-space basis-function approximation of
+  - [`ExactGP`](@ref) forms the full ``n \times n`` covariance and factorises it.
+    Accurate, but ``O(n^3)`` per log-density evaluation, so use it on short
+    series and as the accuracy reference.
+  - [`HilbertSpaceGP`](@ref) is the basis-function approximation of
     [riutortmayol2023practical](@citet), building on [solin2020hilbert](@citep).
     A fixed basis makes each evaluation an ``n \times m`` matrix–vector product,
-    which is fast and stable under gradient-based sampling.
-
-We build both, check them against the GP ecosystem, then fit both to the same
-simulated data and compare accuracy and speed.
+    so use it for anything longer.
 
 ## Two GP latent models
 
-Both are latent models in their own right: give one a series length and it
-returns a length-`n` draw, like any other component.
+Both are latent models in their own right, so giving one a series length returns a length-`n` draw like any other component.
 
 ```@example gp
 using ComposableTuringIDModels, Distributions, Random
@@ -36,42 +31,20 @@ exact = ExactGP()
     exact = length(as_turing_model(exact, 60)()))
 ```
 
-Both sample a length scale ``\ell`` and marginal standard deviation ``\sigma``.
-[`HilbertSpaceGP`](@ref) then draws ``m`` basis weights ``\beta`` and forms the
-path from the fixed basis; [`ExactGP`](@ref) draws ``n`` non-centred weights
-``z`` and pushes them through the Cholesky factor of the full covariance. Both
-parameterisations are non-centred, which NUTS handles well.
+Both sample a length scale ``\ell`` and a marginal standard deviation ``\sigma``.
+[`HilbertSpaceGP`](@ref) then draws ``m`` standard-normal basis weights ``\beta``, and [`ExactGP`](@ref) draws ``n`` weights ``z`` that it pushes through the Cholesky factor of the full covariance.
+Both are non-centred parameterisations, which NUTS handles well.
 
-They differ in how much of their work depends on the sampled parameters. The
-Hilbert-space basis is set by the series length, the number of basis functions
-and the boundary factor alone, so [`as_turing_model`](@ref) builds it before
-returning the model and captures it: the `@model` body never sees it, and one
-``n \times m`` matrix–vector product is all that is differentiated. The exact
-GP's covariance and its Cholesky factor depend on ``\ell`` and ``\sigma``, so
-both are rebuilt *and* differentiated on every evaluation. That is where the
-timing gap below comes from.
+The basis depends only on `n`, `m` and `c`, so [`as_turing_model`](@ref) builds it before returning the model and only the matrix–vector product is differentiated.
+The exact GP rebuilds and differentiates its covariance and Cholesky factor on every evaluation, which is where the timing gap below comes from.
 
-Composed into a [`Renewal`](@ref), the enclosing `@model` reconstructs its
-submodels on every evaluation, so the basis is rebuilt inside the traced call.
-It still depends on no sampled parameter, but it is executed and taped along
-with everything else, so it is not free. That cost is measured below.
+## Kernels and a check against AbstractGPs
 
-## The kernel and the GP ecosystem
+A kernel enters [`ExactGP`](@ref) through its Gram matrix and [`HilbertSpaceGP`](@ref) only through its spectral density, so either model takes `SqExponentialKernel` (the default), `Matern32Kernel` or `Matern52Kernel`, in order from smoothest paths to roughest.
 
-The kernels are
-[KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/)
-types — the ones
-[AbstractGPs.jl](https://juliagaussianprocesses.github.io/AbstractGPs.jl/) builds
-exact GPs from. A kernel enters [`ExactGP`](@ref) through its Gram matrix and
-[`HilbertSpaceGP`](@ref) only through its spectral density, so either model takes
-`SqExponentialKernel` (the default), `Matern32Kernel` or `Matern52Kernel`.
-[`ExactGP`](@ref) forms that Gram matrix itself rather than wrapping an
-AbstractGPs `GP`, because it needs the factor inside a Turing model where the
-hyperparameters are sampled; the kernels are shared either way.
-
-Both models are linear in a vector of standard-normal weights, so unit vectors at
-fixed hyperparameters trace out that map and the Gram matrix of the result is the
-model's implied prior covariance. Against AbstractGPs' own:
+Both models are linear in a vector of standard-normal weights, so unit vectors at fixed hyperparameters trace out that map and the Gram matrix of the result is the model's implied prior covariance.
+The check below compares it against the same kernel in
+[AbstractGPs.jl](https://juliagaussianprocesses.github.io/AbstractGPs.jl/).
 
 ```@example gp
 using LinearAlgebra
@@ -96,31 +69,38 @@ err = (exact = relerr(K_exact), hsgp = relerr(K_hsgp))
 map(e -> round(e, sigdigits = 2), err)
 ```
 
-The exact GP matches to the jitter it adds for a stable Cholesky factor, and the
-basis to two parts in ten thousand. That accuracy is not uniform in ``\ell``: the
-basis cannot resolve wiggles finer than ``2L/m``, so a short length scale needs a
-larger `m`, and a long one feels the ``[-L, L]`` boundary and needs a wider `c`.
+The exact GP matches to the jitter it adds for a stable Cholesky factor, and the basis to two parts in ten thousand.
+
+That accuracy is not uniform in ``\ell``, and the two knobs fail at opposite ends.
+The basis cannot resolve wiggles finer than ``2L/m``, so a short length scale needs a larger `m`.
+A long one instead feels the ``[-L, L]`` boundary and needs a wider `c`, which more basis functions will not fix.
+
+```@example gp
+function hsgp_relerr(ℓ, m)
+    K_true = gp_cov(GP(σ0^2 * with_lengthscale(SqExponentialKernel(), ℓ))(
+        standardised_index(n0)))
+    K = gram([fix(as_turing_model(HilbertSpaceGP(m = m), n0),
+                 (ℓ = ℓ, σ = σ0, β = unit(m, j)))() for j in 1:m])
+    return norm(K - K_true) / norm(K_true)
+end
+
+ℓs = [0.1, 0.2, 0.4, 0.8]
+e20, e60 = hsgp_relerr.(ℓs, 20), hsgp_relerr.(ℓs, 60)
+@assert e60[1] < e20[1] / 100 && e60[4] ≈ e20[4]  # m fixes short ℓ, not long
+(ℓ = ℓs, m20 = round.(e20, sigdigits = 2), m60 = round.(e60, sigdigits = 2))
+```
+
+The default ``\ell`` prior puts about a third of its mass below 0.2, so a fit that settles on a short length scale wants a larger `m` than the default 20.
+Raising `m` does nothing at ``\ell = 0.8``, where the boundary factor `c` sets the floor.
 
 ## Simulate from an exact GP
 
-To use a GP as the reproduction number we hand it to a [`Renewal`](@ref)
-infection model as its `rt` latent process. The generation interval is a
-``\mathrm{Gamma}(6.5, 0.62)`` serial interval discretised by [`Renewal`](@ref),
-and reported cases are overdispersed counts via [`NegativeBinomialError`](@ref).
+Handing a GP to a [`Renewal`](@ref) as its `rt` process makes it the reproduction number.
+The generation interval is a ``\mathrm{Gamma}(6.5, 0.62)`` serial interval discretised by [`Renewal`](@ref), and reported cases are overdispersed counts from [`NegativeBinomialError`](@ref).
 
-We simulate a ground truth by driving the renewal model with an [`ExactGP`](@ref)
-whose hyperparameters are *fixed* to a known length scale, then drawing one
-trajectory. Passing `missing` observations makes the composed model a prior
-simulator; `fix` pins the GP hyperparameters and a single seeded draw gives the
-observed data — no rejection loop. The returned quantities include the reported
-cases `generated_y_t`, the latent infections `I_t`, and the GP path
-`Z_t = \log R_t`.
-
-The epidemic is seeded at around fifty infections rather than a handful, which
-matters for what the page can claim. With only a few cases a day the first
-fortnight of counts would carry almost no information about ``R_t``, both fits
-would fall back on the prior there, and a comparison against the truth would
-mostly measure the seed size rather than either model.
+Passing `missing` observations makes the composed model a prior simulator, `fix` pins the GP hyperparameters to a known length scale, and one seeded draw gives the data.
+The returned quantities include the reported cases `generated_y_t` and the GP path `Z_t`, which is ``\log R_t``.
+Seeding at around fifty infections keeps the early counts informative about ``R_t``; from a handful, both fits would sit on the prior for the first fortnight and the comparison would measure the seed size.
 
 ```@example gp
 si = Gamma(6.5, 0.62)
@@ -139,9 +119,7 @@ Z_true = sim.Z_t
     Rt_range = round.(extrema(exp.(Z_true)), digits = 2))
 ```
 
-The simulated ``R_t`` path starts around two, dips, peaks again around day 40 and
-falls through one near day 50, so the epidemic grows, turns over and declines —
-the shape the fits have to recover.
+The simulated ``R_t`` starts near two, dips, peaks again around day 40 and falls through one near day 50, so the epidemic grows, turns over and declines.
 
 ```@example gp
 using CairoMakie
@@ -161,16 +139,9 @@ fig_sim
 
 ## Fit both GPs and compare
 
-Conditioning on the observed counts and sampling with NUTS recovers the
-posterior. We differentiate with
-[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for
-this package.
-
-A small helper fits a chosen GP latent to the first `n_fit` days, times the run,
-recovers the per-draw ``\log R_t`` with [`generated_observables`](@ref), and
-scores the posterior mean against the truth. `sample` returns a
-[FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, read directly
-— no conversion.
+Conditioning on the counts and sampling with NUTS recovers the posterior, differentiated with
+[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for this package.
+The helper below fits a chosen GP latent to the first `n_fit` days, times the run, recovers the per-draw ``\log R_t`` with [`generated_observables`](@ref) and scores the posterior mean against the truth.
 
 ```@example gp
 using Turing, Mooncake, Statistics
@@ -206,17 +177,11 @@ scores() = "$(score(hs)), $(score(ex))"
 (hsgp = score(hs), exact = score(ex))
 ```
 
-Both posterior means correlate with the simulated ``\log R_t`` above 0.9 on the
-days they cover, and the trajectory figure below shows the two agreeing with
-each other over the days they share — the check the exact GP is here to provide.
+Both posterior means correlate with the simulated ``\log R_t`` above 0.9 over the days they cover, and the figure below shows the two fits agreeing where they overlap.
+The exact GP is fit to `n_ex` days rather than all `n` because its ``O(n^3)`` factorisation at the full length would dominate the cost of building this page.
 
-The exact GP is fit to the first `n_ex` days rather than all `n`: its ``O(n^3)``
-factorisation is rebuilt and differentiated at every leapfrog step, and at the
-full length it would dominate the cost of building this page. The wall-clock
-times above are single un-warmed runs that include the model's compilation and
-cover different series lengths, so read them as indicative. Timing one gradient
-of each composed log-density on the *same* `n_ex` days is the like-for-like
-comparison, and it is what the sampler actually pays per leapfrog step:
+Those wall-clock times are single un-warmed runs over different series lengths, so read them as indicative.
+One gradient of each composed log-density over the same `n_ex` days is the like-for-like comparison, and it is what the sampler pays per leapfrog step.
 
 ```@example gp
 using Chairmarks: @b
@@ -237,14 +202,13 @@ grad = (hsgp = gradient_time(composed(HilbertSpaceGP(m = 20), n_ex)),
 round(grad.exact / grad.hsgp; sigdigits = 2)
 ```
 
-The exact GP costs more per gradient even on the shorter series, and the gap
-widens with the series length: that is the reason the approximation exists.
+The exact GP costs more per gradient even on the shorter series, and the gap widens with series length.
+That is the reason the approximation exists.
 
 ## Posterior trajectories
 
-Following the plotting convention of the other case studies, two small helpers
-reduce the per-draw trajectories to credible bands and draw a median line with
-50% and 95% ribbons.
+``R_t = \exp(Z_t)`` comes from the returned `Z_t` draws.
+The reported counts are scored element-wise, so their posterior predictive distribution comes from `predict` on the same model with the observations set to `missing`, stacking the `y_t[i]` draws into a time × draws matrix.
 
 ```@example gp
 CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
@@ -259,16 +223,7 @@ function ci_ribbon!(ax, ts, b; color, label)
     band!(ax, ts, b[:, 2], b[:, 4]; color = (color, 0.3))
     lines!(ax, ts, b[:, 3]; color = color, linewidth = 2, label = label)
 end
-```
 
-The reproduction number ``R_t = \exp(Z_t)`` comes from the returned `Z_t` draws.
-The reported counts are scored element-wise, so their posterior *predictive*
-distribution — fresh counts under each posterior parameter set — comes from
-`predict` on the same model with the observations set to `missing`, stacking the
-`y_t[i]` draws into a time × draws matrix. We overlay both GP fits on the
-simulated truth.
-
-```@example gp
 ts = 1:n
 fig = Figure(; size = (760, 620))
 ax1 = Axis(fig[1, 1]; ylabel = "Reproduction number Rₜ")
