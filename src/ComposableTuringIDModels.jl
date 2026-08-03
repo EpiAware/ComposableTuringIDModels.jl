@@ -32,10 +32,16 @@ using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
 using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
-using LinearAlgebra: dot
+using LinearAlgebra: dot, cholesky, Symmetric, I
 using LogExpFunctions: softmax, xexpy, log1pexp
 using OrdinaryDiffEq: ODEProblem, ODEFunction, solve, remake, AutoVern7, Rodas5P
 using Random: AbstractRNG, randexp, default_rng
+
+# KernelFunctions.jl supplies the ecosystem-standard covariance kernel types used
+# by `HilbertSpaceGP`; the package adds only the 1-D spectral densities those
+# kernels need for the Hilbert-space approximation (see HilbertSpaceGP.jl).
+using KernelFunctions: Kernel, SqExponentialKernel, Matern32Kernel,
+                       Matern52Kernel, with_lengthscale, kernelmatrix
 
 # Inference-layer dependencies.
 using ADTypes: ADTypes, AutoForwardDiff
@@ -72,7 +78,12 @@ export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial
 # --- latent models ---
 export IID, HierarchicalNormal, RandomWalk, AR, TimeVaryingAR, MA, Intercept,
        FixedIntercept,
-       Null, DiffLatentModel
+       Null, DiffLatentModel, HilbertSpaceGP, ExactGP
+# Covariance kernels for `HilbertSpaceGP` / `ExactGP` are re-exported from
+# KernelFunctions.jl (the ecosystem standard); `spectral_density` adds the
+# Hilbert-space weights those kernels need.
+export SqExponentialKernel, Matern32Kernel, Matern52Kernel, spectral_density,
+       standardised_index
 
 # --- latent modifiers / manipulators / combinations / broadcasting ---
 export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
@@ -148,6 +159,8 @@ include("latent_models/models/RandomWalk.jl")
 include("latent_models/models/AR.jl")
 include("latent_models/models/TimeVaryingAR.jl")
 include("latent_models/models/MA.jl")
+include("latent_models/models/HilbertSpaceGP.jl")
+include("latent_models/models/ExactGP.jl")
 include("latent_models/models/Intercept.jl")
 include("latent_models/models/Null.jl")
 include("latent_models/modifiers/DiffLatentModel.jl")
