@@ -64,7 +64,7 @@ per-evaluation work.
   - `kernel`: the covariance kernel, a KernelFunctions.jl `Kernel` (default
     `SqExponentialKernel()`).
   - `jitter`: relative diagonal nugget ``\tau`` for a stable Cholesky factor
-    (default `1e-6`); the amount added is ``\tau(\sigma^2 + 1)``.
+    (default `1e-6`); the amount added is ``\tau\sigma^2``.
 
 # Examples
 ```@example ExactGP
@@ -88,7 +88,7 @@ struct ExactGP{L <: UnivariateDistribution, S <: UnivariateDistribution,
     marginal_std::S
     "Covariance kernel, a KernelFunctions.jl `Kernel`."
     kernel::K
-    "Relative Cholesky nugget: the amount added is ``\\tau(\\sigma^2 + 1)``."
+    "Relative Cholesky nugget: the amount added is ``\\tau\\sigma^2``."
     jitter::Float64
 
     function ExactGP(length_scale::UnivariateDistribution,
