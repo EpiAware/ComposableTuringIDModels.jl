@@ -84,6 +84,7 @@ export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
 export DirectInfections, ExpGrowthRate, Renewal,
        RenewalStep, SusceptibleDepletion, ImportedCases,
        R_to_r, r_to_R, expected_Rt
+export CombineInfections, GroupedInfections
 
 # --- ODE compartmental models ---
 export SIRParams, SEIRParams, ODEProcess, CatalystODEParams
@@ -102,7 +103,7 @@ export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
 export Split, StrataMap
 
 # --- composition ---
-export IDModel, GroupedIDModel
+export IDModel
 
 # --- inference orchestration ---
 export IDProblem, NUTSampler, DirectSample,
@@ -169,6 +170,8 @@ include("infection_models/ExpGrowthRate.jl")
 include("infection_models/Renewal.jl")
 # `utils.jl` defines the `R_to_r(::Renewal)` method, so it follows `Renewal`.
 include("infection_models/utils.jl")
+include("infection_models/CombineInfections.jl")
+include("infection_models/GroupedInfections.jl")
 
 # --- ODE compartmental models ---
 include("ode/SIRParams.jl")
@@ -195,7 +198,6 @@ include("observation_models/Split.jl")
 
 # --- composition ---
 include("compose.jl")
-include("grouped.jl")
 
 # --- inference orchestration ---
 include("inference/types.jl")
