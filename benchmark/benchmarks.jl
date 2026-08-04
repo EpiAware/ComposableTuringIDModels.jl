@@ -41,8 +41,10 @@ function _eval_models()
     renewal = IDModel(
         Renewal(; generation_time = GEN_INT, rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
-    y_direct = as_turing_model(direct, missing, N)().generated_y_t
-    y_renewal = as_turing_model(renewal, missing, N)().generated_y_t
+    y_direct = as_turing_model(direct, missing, N)(
+        MersenneTwister(1)).generated_y_t
+    y_renewal = as_turing_model(renewal, missing, N)(
+        MersenneTwister(2)).generated_y_t
     return [
         ("AR latent", as_turing_model(AR(), N)),
         ("RandomWalk latent", as_turing_model(RandomWalk(), N)),
@@ -69,12 +71,27 @@ let samp_grp = SUITE["Sampling"] = BenchmarkGroup()
     model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         PoissonError())
-    y = as_turing_model(model, missing, N)().generated_y_t
+    y = as_turing_model(model, missing, N)(MersenneTwister(3)).generated_y_t
     cond = as_turing_model(model, y, N)
     # A short NUTS run; `seconds` in run.jl caps wall time, and a low draw count
     # keeps this representative without dominating the suite.
+    #
+    # Both the data and the sampler are seeded. NUTS wall time is driven by
+    # leapfrog steps per transition, which depend on the initial point and the
+    # adaptation trajectory as well as on the dataset, so seeding the data
+    # alone would leave every evaluation running a different chain. The RNG is
+    # constructed inside the benchmarked expression so evaluations do not share
+    # a mutated stream.
+    #
+    # This matters because a run whose trial blows past the `seconds` budget
+    # collapses to a single timing sample, and AirspeedVelocity's history
+    # plotter then errors: its `create_line_plot` tests for the "75" quantile
+    # key in the first revision alone, then indexes "25"/"75" on every
+    # revision. Seeding removes the variance this benchmark controls; it
+    # cannot rule the collapse out, since runner contention alone can blow the
+    # budget.
     samp_grp["NUTS (DirectInfections+Poisson, 50 draws)"] = @benchmarkable sample(
-        $cond, NUTS(), 50; progress = false)
+        MersenneTwister(4), $cond, NUTS(), 50; progress = false)
 end
 
 # --- AD gradients -----------------------------------------------------------

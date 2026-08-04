@@ -63,6 +63,16 @@ for models with no exposable latent such as [`ODEProcess`](@ref)). Exposing
 Members include [`DirectInfections`](@ref), [`ExpGrowthRate`](@ref),
 [`Renewal`](@ref) and [`ODEProcess`](@ref). Only [`Renewal`](@ref) carries a
 generation interval; the others take a `transformation` directly.
+
+`n` is usually a bare series length (`Int`), but the contract is duck-typed:
+a multi-stratum infection model can widen it to whatever shape it needs.
+[`GroupedInfections`](@ref) takes a `(n_time, n_groups)` `NamedTuple` (the
+group count is not a struct field, so it must arrive through `n`) and returns
+an `n_groups x n_time` `I_t` matrix; [`CombineInfections`](@ref) keeps the
+plain `Int` (its stratum count is fixed by how many models it holds) and
+returns an `n_strata x n_time` matrix. Either composes with [`Split`](@ref) /
+[`StrataMap`](@ref) on the observation side for the full range of
+infection↔observation mapping cardinalities.
 "
 abstract type AbstractInfectionModel <: AbstractComposableModel end
 

@@ -213,11 +213,18 @@ map(s -> sum(skipmissing(s)), age.generated_y_t)         # simulated total per b
 
 The aggregate `total` stream sees the summed expected infections of both bands —
 its expected series is exactly `young .+ old`.
-Swapping the single infection stratum for an `infection-strata × time` matrix (one
-row per genuinely distinct infection process) and the weights for estimated ones
-is the seam a partially-observed or cross-classified reporting structure grows
-from; modelling those separate infection strata jointly is future work
-([#45](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/45)).
+
+Here the single renewal process supplied one infection stratum, broadcast
+through `W`. When the strata are genuinely **separate infection processes** —
+several distinct regions, say, each with its own latent — swap the single
+infection model for [`CombineInfections`](@ref): it draws each process
+independently and stacks the results into the same `infection-strata × time`
+matrix `Split`/`StrataMap` already expect, so `IDModel(CombineInfections([...]),
+Split(template, W))` maps several distinct infection processes onto streams
+end-to-end. For a **shared** infection curve replicated per group by a
+partially pooled level instead — the panel case, not several distinct
+processes — see [`GroupedInfections`](@ref) and [Partial pooling across
+groups](@ref tutorial-hierarchy).
 
 ## References
 

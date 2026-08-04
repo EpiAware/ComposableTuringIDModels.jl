@@ -156,19 +156,32 @@ on accuracy where the other cannot help. A **short** ``\ell`` needs a larger `m`
 the basis has to resolve wiggles finer than ``2L/m``. A **long** ``\ell`` —
 comparable to the standardised half-range ``S \approx \sqrt 3`` — needs a larger
 `c`, because the approximation is periodic on ``[-L, L]`` and a slowly varying
-path feels that boundary; adding basis functions does nothing for it.
+path feels that boundary; adding basis functions does nothing for it. Below
+`c = 1.2` that boundary error cannot be cleared by any `m`, so the constructor
+rejects it.
 
-The defaults (`m = 20`, `c = 1.5`) are accurate to a few parts in ten thousand
-for ``\ell`` between roughly 0.3 and 0.5, and to better than 0.3% between roughly
-0.25 and 0.6. Outside that the relative error grows quickly: 1.5% at
-``\ell = 0.2`` and 25% at ``\ell = 0.1``, where `m` is what fixes it (`m = 60`
-brings ``\ell = 0.1`` back to three parts in ten thousand), and 1.7% at
-``\ell = 0.8``, where `c` sets the floor instead. The default ``\ell`` prior puts
-about a third of its mass below 0.2, so a fit that settles on a short length
-scale needs a larger `m` than the default. The prior's floor of 0.05 is a
-numerical guard on the spectral density, not a claim that a 20-function basis
-resolves that scale. The Gaussian-process case study measures the error at both
-ends.
+!!! warning \"The defaults are tuned for the squared-exponential kernel\"
+    With `m = 20` and `c = 1.5` the squared-exponential covariance is
+    reconstructed to a few parts in ten thousand for ``\ell`` between roughly
+    0.3 and 0.5, degrading to 1.6% at ``\ell = 0.2`` and 26% at ``\ell = 0.1``
+    (where `m` is what fixes it: `m = 60` brings ``\ell = 0.1`` back to three
+    parts in ten thousand) and to 1.5% at ``\ell = 0.8`` (where `c` sets the
+    floor instead). **The Matérn kernels are markedly worse at the same `m`** —
+    their spectral density has an algebraic rather than Gaussian tail, so the
+    truncated basis discards more of it. At ``\ell = 0.3`` the `Matern32Kernel`
+    error is about 2.5%, roughly 110 times the squared-exponential figure, and
+    at ``\ell = 0.5`` it is still 0.6%; `Matern52Kernel` sits between the two.
+
+    A truncated basis loses variance rather than adding it, so where `m` is too
+    small the process is systematically **under-dispersed**: at `m = 20` the
+    implied marginal standard deviation against a nominal ``\sigma = 1`` is
+    0.99/0.96/0.97 (squared-exponential / Matérn-3/2 / Matérn-5/2) at
+    ``\ell = 0.2`` and 0.89/0.84/0.86 at ``\ell = 0.1``, which biases the
+    inferred ``\sigma`` upward without being visible in a plot of the fit. The
+    default ``\ell`` prior puts roughly a fifth of its mass below 0.15, so raise
+    `m` for a fit that settles on a short length scale, and raise it further for
+    a Matérn kernel. The prior's floor of 0.05 is a numerical guard on the
+    spectral density, not a claim that a 20-function basis resolves that scale.
 
 ## Fields
 
@@ -196,8 +209,8 @@ gp_matern = HilbertSpaceGP(kernel = Matern32Kernel())
 length(as_turing_model(gp_matern, 30)())
 ```
 "
-struct HilbertSpaceGP{L <: Sampleable, S <: Sampleable, K <: Kernel} <:
-       AbstractLatentModel
+struct HilbertSpaceGP{L <: UnivariateDistribution, S <: UnivariateDistribution,
+    K <: Kernel} <: AbstractPriorModel
     "Prior for the length scale ``\\ell``; puts no mass below zero."
     length_scale::L
     "Prior for ``\\sigma``; puts no mass below zero."
@@ -209,10 +222,15 @@ struct HilbertSpaceGP{L <: Sampleable, S <: Sampleable, K <: Kernel} <:
     "Covariance kernel, a KernelFunctions.jl `Kernel`."
     kernel::K
 
-    function HilbertSpaceGP(length_scale::Sampleable,
-            marginal_std::Sampleable, m::Int, c::Real, kernel::Kernel)
+    function HilbertSpaceGP(length_scale::UnivariateDistribution,
+            marginal_std::UnivariateDistribution, m::Int, c::Real,
+            kernel::Kernel)
         @assert m>0 "m (the number of basis functions) must be greater than 0"
-        @assert c>1 "c (the boundary factor) must be greater than 1"
+        # Below c = 1.2 the boundary effect leaves an error floor no number of
+        # basis functions can clear (24% at c = 1.05, 6% at c = 1.2, measured as
+        # relative Frobenius error against the Gram matrix), so the constructor
+        # rejects it rather than accepting an unusable configuration.
+        @assert c>=1.2 "c (the boundary factor) must be at least 1.2"
         _check_hyperprior_support(length_scale, marginal_std)
         new{typeof(length_scale), typeof(marginal_std), typeof(kernel)}(
             length_scale, marginal_std, m, Float64(c), kernel)
@@ -227,9 +245,9 @@ end
 const _DEFAULT_LENGTH_SCALE_FLOOR = 0.05
 
 function HilbertSpaceGP(;
-        length_scale::Sampleable = truncated(
+        length_scale::UnivariateDistribution = truncated(
             Normal(0.0, 0.4), _DEFAULT_LENGTH_SCALE_FLOOR, Inf),
-        marginal_std::Sampleable = truncated(Normal(0.0, 1.0), 0, Inf),
+        marginal_std::UnivariateDistribution = truncated(Normal(0.0, 1.0), 0, Inf),
         m::Int = 20, c::Real = 1.5,
         kernel::Kernel = SqExponentialKernel())
     return HilbertSpaceGP(length_scale, marginal_std, m, c, kernel)
