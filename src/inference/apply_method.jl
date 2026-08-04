@@ -35,9 +35,8 @@ function apply_method(idproblem::IDProblem, method::AbstractIDMethod, data;
     return apply_method(cond_model, method, data; kwargs...)
 end
 
-# Apply a method to a model and wrap the solution as observables. Mirrors the
-# upstream two- and three-argument `apply_method`: run the method
-# (`_apply_method`) and return an [`IDObservables`](@ref) via
+# Apply a method to a model and wrap the solution as observables: run the
+# method (`_apply_method`) and return an [`IDObservables`](@ref) via
 # [`generated_observables`](@ref).
 function apply_method(model::DynamicPPL.Model, method::AbstractIDMethod, data;
         kwargs...)
