@@ -1,12 +1,10 @@
-# Prefix-the-variables observation modifier (replaces the upstream
-# `prefix_submodel` helper via `DynamicPPL.prefix`).
+# Prefix-the-variables observation modifier, via `DynamicPPL.prefix`.
 
 @doc raw"
 Wrap an inner observation model so its sampled variables are prefixed with
 `prefix`.
 
-This replaces the original `prefix_submodel` helper for observation models: the
-inner model is prefixed with `DynamicPPL.prefix` before being sampled as a
+The inner model is prefixed with `DynamicPPL.prefix` before being sampled as a
 submodel, so its variables appear as `prefix.varname`.
 
 # Arguments
