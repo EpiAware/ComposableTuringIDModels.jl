@@ -144,6 +144,48 @@ end
     @test_throws Exception StrataMap(M, [1.0 0.0 0.0])
 end
 
+@testitem "Split builds data-driven strata from a plain data matrix (grouped IDModel)" begin
+    using ComposableTuringIDModels, Random
+    Random.seed!(451)
+    # A grouped/panel `IDModel`'s data contract: rows are groups/streams,
+    # columns are time — no NamedTuple needed to name the streams.
+    template = Split(PoissonError())
+    y = Matrix{Union{Missing, Float64}}(missing, 3, 5)
+    M = [10.0 10 10 10 10; 20.0 20 20 20 20; 30.0 30 30 30 30]
+    sm = as_turing_model(template, y, M)
+    out = sm()
+    @test keys(out.y_t) == (:group1, :group2, :group3)
+    @test out.expected.group1 == fill(10.0, 5)
+    @test out.expected.group3 == fill(30.0, 5)
+    names = string.(collect(keys(rand(sm))))
+    @test any(startswith("group1."), names)
+
+    # A data matrix whose row count disagrees with the template stream count
+    # errors, mirroring the NamedTuple key-mismatch check.
+    y_wrong = Matrix{Union{Missing, Float64}}(missing, 2, 5)
+    @test_throws Exception as_turing_model(template, y_wrong, M)()
+end
+
+@testitem "CombineInfections composes with Split for a many-to-many mapping" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(452)
+    # Two distinct infection processes ("different many"), mapped onto three
+    # observation streams (their own two plus a combined total) by a weight
+    # matrix — many-to-many with a non-square map.
+    north = DirectInfections(; Z = RandomWalk(), initialisation = Normal(log(50.0), 0.2))
+    south = DirectInfections(; Z = RandomWalk(), initialisation = Normal(log(30.0), 0.2))
+    inf = CombineInfections([north, south], ["north", "south"])
+    W = [1.0 0.0; 0.0 1.0; 1.0 1.0]   # north, south, and their sum
+    model = IDModel(inf, Split(PoissonError(), W))
+    out = as_turing_model(
+        model, (north = missing, south = missing, total = missing), 10)()
+    @test keys(out.generated_y_t) == (:north, :south, :total)
+    e = out.expected_y_t
+    @test e.north ≈ out.I_t[1, :]
+    @test e.south ≈ out.I_t[2, :]
+    @test e.total ≈ e.north .+ e.south
+end
+
 @testitem "Split(template, map) projects infection strata inside a composed model" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(89)
