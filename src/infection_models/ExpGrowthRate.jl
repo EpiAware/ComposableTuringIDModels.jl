@@ -1,7 +1,7 @@
 # Exponential-growth-rate infection process model.
 
-# `exp(y)` written through `LogExpFunctions.xexpy` to match the upstream
-# numerics used by `ExpGrowthRate`. This is the default `transformation`.
+# `exp(y)` written through `LogExpFunctions.xexpy` for numerical stability.
+# This is the default `transformation`.
 _oneexpy(y::T) where {T} = xexpy(one(T), y)
 
 @doc raw"
