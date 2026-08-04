@@ -160,11 +160,15 @@ built through the shared [`define_y_t`](@ref) hook.
 As a reference we also fit the plain model to the **complete** (untruncated)
 series, what the analyst would eventually see.
 
-The four fits are independent, so we spawn them as tasks rather than running
-each `sample` call to completion before starting the next.
-`MCMCThreads()` alone only ever occupies `min(nchains, Threads.nthreads())`
-threads per call, two here; spawning the fits lets the scheduler fill any
-threads a single two-chain fit leaves idle with work from the others.
+The four fits are independent, but each already asks `MCMCThreads()` for two
+threads, one per chain.
+Running all four at once would ask for eight, oversubscribing a machine with
+fewer and holding four posteriors' worth of sampler state in memory at once
+for no benefit.
+Instead we cap how many fits run concurrently at half the available threads,
+so the concurrency matches the two-chains-per-fit budget exactly: one fit at
+a time on a two-thread machine (the sequential order this page always ran
+in), two at a time on four threads, and so on.
 
 ```@example nowcast
 naive_model = IDModel(renewal, error)
@@ -185,15 +189,10 @@ nuts_fit(post) = sample(
     post, NUTS(1000, 0.95; adtype = adt), MCMCThreads(), 250, 2;
     progress = false)
 
-naive_task = Threads.@spawn nuts_fit(naive_post)
-rt_task = Threads.@spawn nuts_fit(rt_post)
-tri_task = Threads.@spawn nuts_fit(tri_post)
-complete_task = Threads.@spawn nuts_fit(complete_post)
-
-naive_chain = fetch(naive_task)
-rt_chain = fetch(rt_task)
-tri_chain = fetch(tri_task)
-complete_chain = fetch(complete_task)
+nconcurrent = max(1, Threads.nthreads() ÷ 2)
+naive_chain, rt_chain, tri_chain, complete_chain = asyncmap(
+    nuts_fit, (naive_post, rt_post, tri_post, complete_post);
+    ntasks = nconcurrent)
 nothing # hide
 ```
 
