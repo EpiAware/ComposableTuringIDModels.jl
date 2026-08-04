@@ -2,6 +2,10 @@ Changes are documented in Github releases.
 
 ## Unreleased
 
+  - **Breaking**: `TimeVaryingAR` is removed. It was a thin wrapper over
+    `AR(; damp = <process>)`; replace `TimeVaryingAR()` with
+    `AR(; damp = RandomWalk())` (its keyword arguments carry over unchanged).
+    See issue #182.
   - **Breaking**: `GroupedIDModel` is removed. Grouping/panel modelling is now
     part of `IDModel` itself, via `IDModel(infection_model, group_effect,
     observation_model)` and `IDModel(idmodel, group_effect)`. Two new

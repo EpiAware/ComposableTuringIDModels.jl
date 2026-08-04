@@ -1,20 +1,3 @@
-@testitem "TimeVaryingAR is a thin alias over AR(damp = process)" begin
-    using ComposableTuringIDModels, Random
-    Random.seed!(1)
-    tv = TimeVaryingAR()
-    # No separate type: TimeVaryingAR builds an AR with a process damp slot.
-    @test tv isa AR
-    @test tv isa AbstractLatentModel
-    @test tv.damp isa RandomWalk
-    @test tv.p == 1
-    @test tv.transform === tanh
-    z = as_turing_model(tv, 12)()
-    @test z isa AbstractVector
-    @test length(z) == 12
-    # n must exceed 1 (there is at least one transition)
-    @test_throws Exception as_turing_model(TimeVaryingAR(), 1)()
-end
-
 @testitem "TVARStep threads a per-step coefficient through the recursion" begin
     using ComposableTuringIDModels
     using ComposableTuringIDModels: TVARStep, accumulate_scan
@@ -78,20 +61,20 @@ end
     @test length(pk) > 1
 end
 
-@testitem "TimeVaryingAR composes as a latent in the stack" begin
+@testitem "AR(damp = RandomWalk()) composes as a latent in the stack" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(2)
     # It returns a numeric path, so it drops into a bare-vector latent slot such as
     # a Renewal's rt inside a composed IDModel.
     idmodel = IDModel(
-        Renewal(; generation_time = [0.2, 0.3, 0.5], rt = TimeVaryingAR(),
-            initialisation = Normal()),
+        Renewal(; generation_time = [0.2, 0.3, 0.5],
+            rt = AR(; damp = RandomWalk()), initialisation = Normal()),
         PoissonError())
     y = as_turing_model(idmodel, missing, 12)().generated_y_t
     @test length(y) == 12
 end
 
-@testitem "TimeVaryingAR differentiates under ForwardDiff" begin
+@testitem "AR(damp = RandomWalk()) differentiates under ForwardDiff" begin
     using ComposableTuringIDModels, Turing
     using DynamicPPL: LogDensityFunction, VarInfo, link, getlogjoint
     import LogDensityProblems as LDP
