@@ -1,6 +1,6 @@
 # [Declarative compartmental models with Catalyst](@id tutorial-catalyst)
 
-The [SIR case study](@ref tutorial-sir) builds its dynamics from a
+The [SIR tutorial](@ref tutorial-sir) builds its dynamics from a
 hand-written vector field, and the package hand-writes that model's Jacobian too
 so the stiff/auto solver stays fast and stable. A hand-written Jacobian has to
 be re-derived, and kept in sync, for every new compartmental model.

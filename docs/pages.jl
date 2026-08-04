@@ -15,6 +15,7 @@ pages = [
         "An SIR compartmental model" => "tutorials/sir-ode.md",
         "Declarative compartmental models with Catalyst" => "tutorials/catalyst-ode.md",
         "Multiple observation streams: cases, deaths, and strata" => "tutorials/split-observations.md",
+        "A Gaussian-process latent process" => "tutorials/gaussian-process.md",
         "Time-varying damping in an AR process" => "tutorials/time-varying-damping.md",
         "Partial pooling across groups" => "tutorials/hierarchy-stacked.md",
         "Renewal modifiers: depletion and importation" => "getting-started/tutorials/renewal-modifiers.md"

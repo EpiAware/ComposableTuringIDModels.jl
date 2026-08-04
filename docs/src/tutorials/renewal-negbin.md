@@ -8,7 +8,7 @@ construction follows from an age-dependent branching process and pairs naturally
 with a negative-binomial observation model to give a Bayesian hierarchical model
 for reported case counts.
 
-This case study builds that model from two composed parts — a [`Renewal`](@ref)
+This tutorial builds that model from two composed parts — a [`Renewal`](@ref)
 infection process that carries an autoregressive latent process for ``\log R_t``,
 and a [`NegativeBinomialError`](@ref) observation model — and fits it to the
 test-confirmed COVID-19 cases from South Korea that [mishra2020derivation](@citet)

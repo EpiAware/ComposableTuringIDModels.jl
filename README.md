@@ -100,8 +100,9 @@ rewriting models.
 - [ReparameterisedDistributions.jl](https://reparameteriseddistributions.epiaware.org/)
   switches distributions between parameterisations, so a prior can be stated in
   whichever one is natural.
-- [LoweredDistributions.jl](https://lowereddistributions.epiaware.org/) holds
-  common components for differential-equation infectious disease models.
+- [LoweredDistributions.jl](https://lowereddistributions.epiaware.org/) lowers a
+  distribution onto a backend-agnostic dynamical-systems representation, so a
+  delay distribution and a compartmental model become two views of one thing.
 - [Turing.jl](https://turinglang.org/) is the probabilistic programming backend
   every model here compiles down to.
 

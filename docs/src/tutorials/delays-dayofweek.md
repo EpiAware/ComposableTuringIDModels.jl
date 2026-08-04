@@ -7,7 +7,7 @@ for real-time estimation such as those of [abbott2020estimating](@citet) build
 these features into the observation model so that the latent infection signal is
 estimated free of reporting artefacts.
 
-This case study keeps the renewal infection core of the
+This tutorial keeps the renewal infection core of the
 [previous example](@ref tutorial-renewal) but replaces the simple observation
 model with a layered one: infections are convolved through two delay
 distributions and then modulated by a day-of-week reporting pattern. It also

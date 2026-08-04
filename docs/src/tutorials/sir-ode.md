@@ -7,7 +7,7 @@ showed how to embed such an ODE in a Bayesian model and infer its parameters,
 using a classic influenza outbreak in an English boarding school as their
 example.
 
-This case study swaps the renewal infection process for an
+This tutorial swaps the renewal infection process for an
 [`ODEProcess`](@ref) built from [`SIRParams`](@ref), keeping the same
 composable observation machinery. Infections come from solving the SIR equations
 with the [SciML](https://sciml.ai) stack

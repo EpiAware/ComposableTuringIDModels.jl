@@ -3,7 +3,7 @@
 # Package-specific configuration read by the managed `make.jl`.
 
 # `renewal-modifiers.jl` is light: Literate emits `@example` blocks that
-# Documenter runs in-process, exactly as the case studies do, so the page also
+# Documenter runs in-process, exactly as the tutorials do, so the page also
 # renders under `--skip-notebooks`. Its fit is deliberately small (n = 60, 250
 # draws) to keep that cheap.
 const LIGHT_TUTORIALS = String["renewal-modifiers.jl"]
