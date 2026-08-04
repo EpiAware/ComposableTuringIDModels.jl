@@ -56,6 +56,14 @@ function _models()
     ar = as_turing_model(AR(), n)
     arima = as_turing_model(
         DiffLatentModel(; model = AR(), init = [Normal(), Normal()]), n)
+    hsgp = as_turing_model(HilbertSpaceGP(; m = 8), n)
+    hsgp_matern = as_turing_model(
+        HilbertSpaceGP(; m = 8, kernel = Matern52Kernel()), n)
+    # The exact GP the Hilbert-space model approximates. Its gradient runs
+    # through `kernelmatrix` and a `cholesky(Symmetric(...))` of a matrix built
+    # from the sampled `ℓ`/`σ` — the most AD-sensitive path of the two GPs, and
+    # the one the Gaussian-process case study drives under Mooncake.
+    exactgp = as_turing_model(ExactGP(), n)
     # Moving-average: exercises `accumulate_scan(MAStep(θ), ...)` and its
     # `dot(θ, state)` innovation buffer (the MA counterpart of `AR`).
     ma = as_turing_model(MA(), 8)
@@ -252,6 +260,9 @@ function _models()
         ("RandomWalk latent logjoint", rw),
         ("AR latent logjoint", ar),
         ("ARIMA latent logjoint", arima),
+        ("HilbertSpaceGP latent logjoint", hsgp),
+        ("HilbertSpaceGP Matern latent logjoint", hsgp_matern),
+        ("ExactGP latent logjoint", exactgp),
         ("MA latent logjoint", ma),
         ("HierarchicalNormal latent logjoint", hier),
         ("DiffLatentModel(RandomWalk) latent logjoint", diffrw),
@@ -381,13 +392,16 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (29 scenarios × 4 backends), Julia 1.12:
+Result matrix (31 scenarios × 4 backends), Julia 1.12:
 
 | scenario                                              | ForwardDiff | ReverseDiff | Mooncake | Enzyme |
 |-------------------------------------------------------|:-----------:|:-----------:|:--------:|:------:|
 | RandomWalk latent logjoint                            |      ✓      |      ✓      |    ✓    |   ✓   |
 | AR latent logjoint                                    |      ✓      |      ✓      |    ✓    |   ✗   |
 | ARIMA latent logjoint                                 |      ✓      |      ✓      |    ✓    |   ✗   |
+| HilbertSpaceGP latent logjoint                        |      ✓      |      ✓      |    ✓    |   ✓   |
+| HilbertSpaceGP Matern latent logjoint                 |      ✓      |      ✓      |    ✓    |   ✓   |
+| ExactGP latent logjoint                               |      ✓      |      ✓      |    ✓    |   ✓   |
 | MA latent logjoint                                    |      ✓      |      ✓      |    ✓    |   ✗   |
 | HierarchicalNormal latent logjoint                    |      ✓      |      ✓      |    ✓    |   ✓   |
 | DiffLatentModel(RandomWalk) latent logjoint           |      ✓      |      ✓      |    ✓    |   ✗   |
@@ -415,8 +429,9 @@ Result matrix (29 scenarios × 4 backends), Julia 1.12:
 | BinomialError ascertainment posterior                 |      ✓      |      ✓      |    ✓    |   ✓   |
 | Renewal+Split cascade posterior                       |      ✓      |      ✓      |    ✓    |   ✗   |
 
-scenario correctly. Enzyme (configured with `function_annotation = Enzyme.Const`,
-see [`backends`](@ref)) works on fifteen of the twenty-nine but raises
+ForwardDiff, ReverseDiff and Mooncake differentiate every scenario correctly.
+Enzyme (configured with `function_annotation = Enzyme.Const`, see
+[`backends`](@ref)) works on eighteen of the thirty-one but raises
 `IllegalTypeAnalysisException` / a related type-analysis or shadow error on
 fourteen:
 

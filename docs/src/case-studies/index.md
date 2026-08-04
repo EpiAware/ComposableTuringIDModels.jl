@@ -1,10 +1,11 @@
 # [Case studies](@id case-studies-overview)
 
 These worked examples build complete models from the package's components and fit
-them to real epidemic surveillance data with [Turing](https://turinglang.org),
-recreating published analyses. Each one is self-contained and runs when the
-documentation is built, so the numbers you see are produced by the code on the
-page.
+them with [Turing](https://turinglang.org). Most use real epidemic surveillance
+data and recreate published analyses; the Gaussian-process study instead fits
+data simulated from the model itself, where the point is to recover a known
+truth. Each one is self-contained and runs when the documentation is built, so
+the numbers you see are produced by the code on the page.
 
 !!! note "Sampling settings"
     To keep the documentation build to a sensible time, these case studies draw
@@ -15,8 +16,8 @@ page.
     stable figures; a real analysis would use more draws and check convergence diagnostics
     carefully.
 
-They progress from a single renewal model to a layered observation process and
-then to a mechanistic compartmental model:
+They progress from a single renewal model to a layered observation process, a
+mechanistic compartmental model, and a flexible Gaussian-process latent:
 
   - [Renewal model with negative-binomial reporting](@ref case-study-renewal) —
     a time-varying reproduction number ``R_t`` driven by an autoregressive
@@ -43,6 +44,11 @@ then to a mechanistic compartmental model:
     process where dynamics come from an ordinary differential equation solved by
     the SciML stack [rackauckas2017differentialequations](@citep), following the
     Bayesian compartmental-inference example of [chatzilena2019contemporary](@citet).
+  - [A Gaussian-process latent process](@ref case-study-gp) — plugs a
+    Hilbert-space approximate Gaussian process [riutortmayol2023practical](@citep)
+    into the renewal model as the latent ``\log R_t`` process, fits it under NUTS
+    with Mooncake, and checks it against an exact GP and against the simulated
+    latent.
 
 Every example uses the same recipe: assemble components into a model, call
 [`as_turing_model`](@ref) (directly or through [`IDModel`](@ref) /
