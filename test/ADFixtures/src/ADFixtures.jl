@@ -445,10 +445,25 @@ broken_scenario_names() = String[]
 Per-backend broken scenario names (`Dict{String, Set{String}}`), populated
 HONESTLY from the actual `test/ad` run rather than by silencing.
 
-Result matrix (35 scenarios × 6 backends), Julia 1.12, macOS/aarch64 (the
-ForwardDiff/ReverseDiff/Mooncake columns are also validated by the Linux
-`ad.yaml` CI job on every push; the Enzyme columns are this package's own
-local run only — see the notes below the table):
+Result matrix (35 scenarios × 6 backends), Julia 1.12, macOS/aarch64.
+Provenance matters here, so it is stated per section below rather than
+implied by the table: ForwardDiff and ReverseDiff were run against all
+35 scenarios directly in this PR's own re-measurement (after the #53
+merge and the fixture fix described below) and are also validated by
+the Linux `ad.yaml` CI job on every push. Mooncake (both modes) and
+Enzyme reverse were NOT re-run against the merged 35-scenario set in
+this PR; the figures for the 32 pre-existing scenarios are carried
+forward from this PR's own prior local measurement (before the #53
+merge), unverified against the current code by this re-measurement
+pass. Enzyme forward was spot-checked on one scenario after the
+fixture fix (see below); the rest of its column is likewise carried
+forward from the prior local measurement, before that fix. The three
+Gaussian-process scenarios (`HilbertSpaceGP`, `HilbertSpaceGP Matern`,
+`ExactGP`, added by #53) have **no** Mooncake-forward or Enzyme
+(either mode) measurement at all — local re-measurement runs for both
+were started and killed incomplete under heavy machine contention
+before they produced a result for any scenario. That gap is real and
+is not filled with a guess:
 
 | scenario                                              | FD | RD | MCr | MCf | ENZr | ENZf |
 |--------------------------------------------------------|:--:|:--:|:---:|:---:|:----:|:----:|
@@ -469,7 +484,7 @@ local run only — see the notes below the table):
 | Hierarchy latent logjoint                             | ✓ | ✓ | ✓  | ✓  |  ✓  |  ✓  |
 | AR vector-prior latent logjoint                       | ✓ | ✓ | ✓  | ✓  |  ✗  |  ✗  |
 | AR latent-model-as-prior latent logjoint              | ✓ | ✓ | ✓  | ✓  |  ✗  |  ✓  |
-| DirectInfections+Poisson posterior                    | ✓ | ✓ | ✓  | ✓  |  ✓  |  ✗  |
+| DirectInfections+Poisson posterior                    | ✓ | ✓ | ✓  | ✓  |  ✓  |  ✓  |
 | Renewal+NegativeBinomial posterior                    | ✓ | ✓ | ✓  | ✓  |  ✗  |  ✗  |
 | Renewal+ImportedCases posterior                       | ✓ | ✓ | ✓  | ✓  |  ✗  |  ✗  |
 | ExpGrowthRate+Poisson posterior                       | ✓ | ✓ | ✓  | ✓  |  ✓  |  ✗  |
@@ -488,32 +503,72 @@ local run only — see the notes below the table):
 | BinomialError ascertainment posterior                 | ✓ | ✓ | ✓  | ✓  |  ✓  |  ✓  |
 | Renewal+Split cascade posterior                       | ✓ | ✓ | ✓  | ✓  |  ✗  |  ✗  |
 
-(FD = ForwardDiff, RD = ReverseDiff, MCr/MCf = Mooncake reverse/forward, ENZr/
-ENZf = Enzyme reverse/forward. `?` marks the three Gaussian-process scenarios
-against the two backends this package's own local macOS/aarch64 run could not
-finish re-measuring for this PR: the local `Pkg.test`-style run was killed
-mid-JIT under heavy machine contention rather than producing a real pass or
-fail. They are deliberately left out of `backend_broken_scenarios()` below
-rather than guessed into either column — the Linux `ad.yaml` job runs all six
-backends on every push and is the real gate, so an unmeasured combination is
-marked unmeasured and left for that job to decide, the same principle behind
-listing the seven Enzyme-reverse rows below conservatively.)
+(FD = ForwardDiff, RD = ReverseDiff, MCr/MCf = Mooncake reverse/forward,
+ENZr/ENZf = Enzyme reverse/forward. `?` is a genuine "not measured", not
+a guess — see the provenance note above. The Linux `ad.yaml` job runs
+all six backends against all 35 scenarios on every push and is the
+authoritative check for every `?` and for every carried-forward ✓/✗ in
+this table; it is the thing that actually gates the `main` merge, not
+this docstring.)
 
-ForwardDiff, ReverseDiff and Mooncake (both modes) differentiate every one of
-the thirty-two pre-existing scenarios correctly, matching the ForwardDiff
-reference; the three new Gaussian-process scenarios are unmeasured against
-Mooncake here for the reason above.
+**Fixture fix, confirmed by direct experiment (this PR's own
+re-measurement pass):** the Enzyme-forward brokenness previously
+attributed below to "a missing forward-mode Enzyme rule for `deepcopy`
+on `Vector{Union{Missing, Int64}}`" was partly a fixture artefact, not
+an Enzyme limitation. `_models()`'s `sim` helper simulated data via
+`as_turing_model(m, missing, nn)().generated_y_t`, which returns
+DynamicPPL's `Union{Missing, T}`-eltype predictive container — even
+once every entry is concrete, the `missing` placeholder stays part of
+the runtime type. Feeding that straight back in as conditioning data
+means the model's data argument still `hasmissing`
+(`DynamicPPL.convert_model_argument`, `src/compiler.jl`), so the
+deepcopy-for-missing-safety branch fires again on already-concrete
+data — which is where Enzyme forward's missing `deepcopy` rule for
+`Vector{Union{Missing, Int64}}` was actually being hit. A direct
+before/after test on `DirectInfections+Poisson posterior` confirms
+this: with the `Vector{Union{Missing, Int64}}` container as
+conditioning data, Enzyme forward raises exactly the documented
+`MethodError: no method matching forward(::FwdConfigWidth,
+::Const{typeof(deepcopy)}, ::Type{Const{Vector{Union{Missing,
+Int64}}}}, ...)`; with the identical values narrowed to a concrete
+`Vector{Int64}` first, the same model differentiates correctly under
+Enzyme forward and matches the ForwardDiff reference. `sim` (and the
+standalone `BinomialError` fixture's `y_binom`) now narrow to a
+concrete element type before conditioning, via a `_concrete` helper
+that only narrows when no genuine `missing`s remain (some scenarios,
+e.g. `DirectInfections+Aggregate`, legitimately score only some time
+points and must keep real `missing`s in the untouched ones).
 
-Enzyme reverse (configured with `function_annotation = Enzyme.Const`, see
-[`backends`](@ref)) is declared broken on fifteen of the thirty-two
-pre-existing scenarios (the three Gaussian-process scenarios are unmeasured
-against it; see above), raising `IllegalTypeAnalysisException` / a related
-type-analysis or shadow error:
+`DirectInfections+Poisson posterior` was individually re-confirmed
+passing under Enzyme forward after this fix and is removed from the
+`enzyme_forward` set below. The other fourteen scenarios previously
+attributed to the same `deepcopy` cause share the identical
+`Vector{Union{Missing, Int64}}` argument shape and the identical `sim`
+code path, so the same fix is expected to resolve them too — but only
+`DirectInfections+Poisson posterior` was individually re-run against
+the fixed fixture in this PR; the other fourteen are left in
+`enzyme_forward` below rather than removed on inference. The `ad.yaml`
+`enzyme_forward` CI job is what will actually confirm or refute that
+expectation.
+
+Enzyme reverse (configured with `function_annotation = Enzyme.Const`,
+see [`backends`](@ref)) was declared broken on fifteen of the
+thirty-two pre-existing scenarios in this PR's own prior local
+measurement (not re-run against the merged 35-scenario set in this
+pass; the three Gaussian-process scenarios have no Enzyme-reverse
+measurement at all — see the provenance note above), raising
+`IllegalTypeAnalysisException` / a related type-analysis or shadow
+error:
 
   - the `AR`-based latent log-densities (`AR`, `ARIMA`, `ARMA`,
     `CombineLatentModels` (which contains an `AR`), and both prior-interface `AR`
     scenarios), inside the `accumulate_scan(ARStep(damp_AR), ...)` /
     `LinearAlgebra.dot` recursion;
+  - `MA` — whose step also uses `dot` but is broken for a DIFFERENT
+    reason: threading its `HierarchicalNormal` innovation submodel
+    through the prior seam raises an `EnzymeNoShadowError`, not the
+    `accumulate_scan`/`dot` `IllegalTypeAnalysisException` that breaks
+    the `AR`-family above;
   - `DiffLatentModel(RandomWalk)` (the repeated `cumsum` reconstruction);
   - `DirectInfections+NormalError` (the Gaussian likelihood loop);
   - `DirectInfections+Ascertainment day-of-week` and
@@ -530,10 +585,15 @@ type-analysis or shadow error:
 Seven of those fifteen (`AR`, `CombineLatentModels`, `AR latent-model-as-prior`,
 `Renewal+NegativeBinomial`, `Renewal+ImportedCases`,
 `DirectInfections+Ascertainment day-of-week`, `DirectInfections+PrefixModifiers`)
-pass under Enzyme reverse on macOS/aarch64 locally, and are listed
-conservatively pending a check against the Linux `ad.yaml` job: `check_broken`
-records a plain pass when a listed scenario succeeds, so listing costs
-nothing, while a wrong ✓ here would red the Enzyme job. Tracked in #97.
+were recorded as passing under Enzyme reverse on macOS/aarch64 in that
+same prior local measurement, and are listed conservatively rather
+than unbroken on the strength of that alone: this PR did not
+independently re-run Enzyme reverse to confirm it, `check_broken`
+records a plain pass at zero cost when a listed-broken scenario
+actually succeeds (so leaving them listed cannot regress the test
+suite), and a wrong ✓ here would instead red the `enzyme_reverse` CI
+job outright. The Linux `ad.yaml` `enzyme_reverse` job is what should
+actually settle whether these seven get unbroken. Tracked in #97.
 
 The uncertain-delay / uncertain-generation-interval scenarios
 (`Renewal+UncertainLatentDelay`, `Renewal+UncertainGenInterval`) previously
@@ -547,47 +607,40 @@ instead (see
 `ComposableTuringIDModels`'s prior seam) removes the deprecation path, and both
 scenarios now differentiate correctly under Enzyme (#97).
 
-Enzyme forward is declared broken on twenty-one of the thirty-two pre-existing
-scenarios (the three Gaussian-process scenarios are unmeasured against it; see
-above), measured directly against this package's local macOS/aarch64 Enzyme
-install (not yet cross-checked against the Linux `ad.yaml` job) and falling
-into three causes:
+Enzyme forward was declared broken on twenty-one of the thirty-two
+pre-existing scenarios in this PR's own prior local measurement
+(before the fixture fix above), falling into three causes:
 
   - the same `accumulate_scan`/`dot`-recursion `IllegalTypeAnalysisException`
     family as Enzyme reverse above (`ARIMA`, `MA`, `DiffLatentModel(RandomWalk)`,
     `ARMA`, `AR vector-prior`) — confirmed directly for `ARIMA`, `MA`, and
-    `AR vector-prior`;
-  - a missing forward-mode Enzyme rule for `deepcopy` on the observed-data
-    vector every count-likelihood `IDModel` posterior conditions on
-    (`MethodError: no method matching forward(::FwdConfigWidth, ::Const{typeof(deepcopy)},
-    ::Type{Const{Vector{Union{Missing, Int64}}}}, ...)`), confirmed directly for
-    `DirectInfections+Poisson`, `Renewal+NegativeBinomial`,
-    `DirectInfections+Aggregate`, `DirectInfections+Ascertainment day-of-week`,
-    `DirectInfections+RecordExpected`, and `DirectInfections+PrefixModifiers`,
-    and inferred for the remaining `Vector{Union{Missing, Int64}}`-observed
-    posteriors sharing the same `y_t` type (`Renewal+ImportedCases`,
+    `AR vector-prior`; unaffected by the fixture fix, since none of these
+    condition on observed data at all;
+  - the fixture-artefact `deepcopy` cause fixed above (`DirectInfections+Poisson`
+    confirmed fixed directly; `Renewal+NegativeBinomial`, `Renewal+ImportedCases`,
     `ExpGrowthRate+Poisson`, `Renewal+RightTruncate`, `Renewal+ReportTriangle`,
     `Renewal+LatentDelay`, `Renewal+UncertainLatentDelay`,
     `Renewal+TimeVaryingLatentDelay`, `Renewal+UncertainGenInterval`,
-    `DirectInfections+TransformObservation`) rather than individually
-    re-confirmed; and
+    `DirectInfections+Ascertainment day-of-week`, `DirectInfections+Aggregate`,
+    `DirectInfections+TransformObservation`, `DirectInfections+RecordExpected`,
+    and `DirectInfections+PrefixModifiers` share the identical
+    `Vector{Union{Missing, Int64}}` argument shape and are expected fixed by
+    the same change but not individually re-run); and
   - `Renewal+Split cascade`, which throws its own `EnzymeNoDerivativeError`
     rather than either of the above, through the same per-stream submodel
-    threading that breaks it under Enzyme reverse.
+    threading that breaks it under Enzyme reverse — unaffected by the fixture
+    fix.
 
-The missing-`deepcopy`-rule class is a gap in Enzyme's forward-mode rule set,
-not a package defect: `DirectInfections+NormalError` and `BinomialError
-ascertainment` condition on non-`Int64` observed data (`Float64` /
-probability-scale respectively) and both differentiate correctly under Enzyme
-forward, and the pure latent-process log-joints (which condition on no
-observed data at all) are unaffected by it.
+`DirectInfections+NormalError` and `BinomialError ascertainment` condition on
+non-`Int64` observed data (`Float64` / probability-scale respectively) and both
+differentiate correctly under Enzyme forward even with the old,
+un-narrowed fixture; the pure latent-process log-joints (which condition on no
+observed data at all) are unaffected by the `deepcopy` cause either way.
 
-These are real Enzyme limitations, not defects in the package (the same models
-sample fine under NUTS with ForwardDiff or Mooncake). They are recorded as
-`@test_broken` for Enzyme below rather than hidden. Notably `MA` — whose step
-also uses `dot` — differentiates under Enzyme reverse, so that recursion's
-brokenness is specific to the `AR`-family accumulate_scan rather than to `dot`
-in general.
+These `accumulate_scan`/`dot`-recursion and submodel-threading cases are real
+Enzyme limitations, not defects in the package (the same models sample fine
+under NUTS with ForwardDiff or Mooncake). They are recorded as `@test_broken`
+for Enzyme below rather than hidden.
 """
 function backend_broken_scenarios()
     enzyme_reverse = Set([
@@ -643,19 +696,25 @@ function backend_broken_scenarios()
         # Tracked in #97.
         "Renewal+TimeVaryingLatentDelay posterior"
     ])
-    # Measured directly against this package's local macOS/aarch64 Enzyme
-    # install (see the docstring above); not yet cross-checked against the
-    # Linux `ad.yaml` job. Two causes dominate: the same accumulate_scan/`dot`
-    # recursion family as Enzyme reverse, and a missing forward-mode Enzyme
-    # rule for `deepcopy` on the `Vector{Union{Missing, Int64}}` observed-data
-    # every count-likelihood `IDModel` posterior conditions on.
+    # Carried forward from this PR's own prior local measurement (before the
+    # #53 merge and the fixture fix — see the docstring above), NOT
+    # re-confirmed against the merged 35-scenario set, except
+    # `DirectInfections+Poisson posterior`, which was individually re-run
+    # against the fixed fixture and removed from this set after confirming it
+    # now passes. The other fourteen `Vector{Union{Missing, Int64}}`-observed
+    # entries here share the identical fixture code path and are expected to
+    # be fixed the same way, but that is an expectation, not a
+    # re-measurement — the `ad.yaml` `enzyme_forward` job is what actually
+    # confirms it. The `accumulate_scan`/`dot`-recursion family
+    # (`ARIMA`/`MA`/`DiffLatentModel(RandomWalk)`/`ARMA`/`AR vector-prior`)
+    # and `Renewal+Split cascade` are unaffected by the fixture fix (see
+    # docstring) and stay broken for their own, unrelated reasons.
     enzyme_forward = Set([
         "ARIMA latent logjoint",
         "MA latent logjoint",
         "DiffLatentModel(RandomWalk) latent logjoint",
         "ARMA latent logjoint",
         "AR vector-prior latent logjoint",
-        "DirectInfections+Poisson posterior",
         "Renewal+NegativeBinomial posterior",
         "Renewal+ImportedCases posterior",
         "ExpGrowthRate+Poisson posterior",
