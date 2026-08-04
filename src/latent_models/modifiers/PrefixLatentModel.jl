@@ -1,12 +1,10 @@
-# Prefix-the-variables latent modifier (replaces the upstream `prefix_submodel`
-# helper via `DynamicPPL.prefix`).
+# Prefix-the-variables latent modifier, via `DynamicPPL.prefix`.
 
 @doc raw"
 Wrap an inner latent model so its sampled variables are prefixed with `prefix`.
 
-This replaces the original `prefix_submodel` helper: the inner model is prefixed
-with `DynamicPPL.prefix` before being sampled as a submodel, so its variables
-appear as `prefix.varname`.
+The inner model is prefixed with `DynamicPPL.prefix` before being sampled as a
+submodel, so its variables appear as `prefix.varname`.
 
 # Arguments
 

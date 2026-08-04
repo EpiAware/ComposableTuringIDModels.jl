@@ -6,9 +6,8 @@
 A composed epidemiological model linking an infection process and an observation
 model.
 
-The infection process owns its own latent (parameter) process internally — it is
-no longer a separate top-level component — so a composed model is just two parts:
-infections, then observations.
+The infection process owns its own latent (parameter) process internally, so
+a composed model is just two parts: infections, then observations.
 
 Sampling [`as_turing_model(model, y_t, n)`](@ref as_turing_model) runs the two
 stages as submodels:
@@ -23,10 +22,9 @@ The returned generated quantities are `(; generated_y_t, expected_y_t, I_t, Z_t)
 series, or a `NamedTuple` of streams for a [`Split`](@ref)); `expected_y_t` is its
 pre-error `expected` series (the uniform observation return contract). `Z_t` is the
 infection model's internal latent draw (e.g. the (log) ``R_t`` path), kept
-accessible as a generated quantity even though it is no longer a top-level
-component — or `nothing` for infection models with no exposable latent (e.g.
-[`ODEProcess`](@ref)). Pass `y_t = missing` to simulate from the prior, or a data
-vector to condition.
+accessible as a generated quantity, or `nothing` for infection models with no
+exposable latent (e.g. [`ODEProcess`](@ref)). Pass `y_t = missing` to simulate
+from the prior, or a data vector to condition.
 
 ## Fields
 
@@ -56,12 +54,12 @@ end
 Build a grouped/panel `IDModel`: one shared infection process observed by
 several groups, each reporting it at its own partially pooled level.
 
-This is the shared constructor issue #180 asked for — the same `IDModel(...)`
-call that builds a single-group model also builds a panel, distinguished only
-by passing a `group_effect` prior between the infection and observation
-arguments. It composes [`GroupedInfections`](@ref) (the shared curve replicated
-per group) with `Split(observation_model)` (every group observed through the
-same observation model, namespaced by group):
+The same `IDModel(...)` call that builds a single-group model also builds a
+panel, distinguished only by passing a `group_effect` prior between the
+infection and observation arguments. It composes [`GroupedInfections`](@ref)
+(the shared curve replicated per group) with `Split(observation_model)`
+(every group observed through the same observation model, namespaced by
+group):
 
 ```julia
 IDModel(infection_model, group_effect, observation_model) ==

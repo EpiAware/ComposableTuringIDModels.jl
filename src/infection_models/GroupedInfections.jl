@@ -1,8 +1,7 @@
 # One shared infection process replicated across a grouping axis by a
 # per-group effect, into one groups x time `I_t` matrix — the "same many"
-# many-to-many infection-side mapping. Lifts `GroupedIDModel`'s core
-# mechanism (issue #45) out of its bespoke `@model` so it composes with
-# `IDModel` and `Split` like every other infection model (issue #180).
+# many-to-many infection-side mapping. Composes with `IDModel` and `Split`
+# like every other infection model.
 
 @doc raw"
 Replicate one shared infection process across a grouping axis by a per-group
@@ -33,14 +32,13 @@ per-group effects, so both stay recoverable as generated quantities through
 The group prior is namespaced through the prior-slot prefix convention
 (`prefix = true`, matching every other prior slot in the package) so its own
 innovations can never collide with the shared infection process's latent; the
-shared infection process itself stays flat (prefix off), unchanged from a
-plain (non-grouped) `IDModel`.
+shared infection process itself stays flat (prefix off), the default for
+every infection model.
 
 Combine with [`Split`](@ref) on the observation side — `Split(template)`
-observes every group through the same observation model (the direct successor
-of `GroupedIDModel`); `IDModel`'s outer constructors
-(`IDModel(infection_model, group_effect, observation_model)`) build this pair
-directly.
+observes every group through the same observation model; `IDModel`'s outer
+constructors (`IDModel(infection_model, group_effect, observation_model)`)
+build this pair directly.
 
 ## Fields
 
@@ -91,8 +89,8 @@ end
 @model function as_turing_model(
         model::GroupedInfections, n::NamedTuple{(:n_time, :n_groups)})
     n_time, n_groups = n.n_time, n.n_groups
-    # The shared infection process is drawn once, flat (prefix off) — unchanged
-    # from a plain (non-grouped) `IDModel`.
+    # The shared infection process is drawn once, flat (prefix off) — the
+    # default for every infection model.
     infections ~ as_turing_submodel(model.infection_model, n_time)
     I_t = infections.I_t
     # Per-group effects, namespaced through the prior-slot prefix convention so

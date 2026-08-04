@@ -9,9 +9,9 @@
 # internal primitive; users build `RenewalStep`s through the [`Renewal`](@ref)
 # helper.
 #
-# This is deliberately NOT the naive `state = step(state, ϵ)` sequential-threading
-# composite sketched upstream: that double-advances time for steps whose call
-# commits a new value. The contract here separates the *contribution* to the new
+# This deliberately avoids the naive `state = step(state, ϵ)` sequential-threading
+# composite: that double-advances time for steps whose call commits a new
+# value. The contract here separates the *contribution* to the new
 # incidence (each modifier transforms it) from the single shared-window *advance*
 # performed once per step. AR/MA step-fusion (a different, non-shared state
 # contract) is out of scope and stays as model nesting; see #48.

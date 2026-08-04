@@ -1,5 +1,4 @@
-# Dependency-free pretty-printing for model components (replaces upstream's
-# PrettyPrinting.jl tree display).
+# Dependency-free pretty-printing for model components.
 #
 # A composed model is a tree of components: an `IDModel` holds an infection and
 # an observation model, an infection model owns a latent process, a modifier

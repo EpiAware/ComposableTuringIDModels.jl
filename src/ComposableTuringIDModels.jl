@@ -22,10 +22,10 @@ rand(as_turing_model(model, missing, 20))
 "
 module ComposableTuringIDModels
 
-# This package does NOT blanket-reexport Distributions/Turing (as the upstream
-# EpiAware also did not): users `using ComposableTuringIDModels, Distributions, Turing`.
-# Only the names the package itself uses or extends are imported below, which
-# keeps the public surface to the package's own exports.
+# This package does NOT blanket-reexport Distributions/Turing: users
+# `using ComposableTuringIDModels, Distributions, Turing`. Only the names the
+# package itself uses or extends are imported below, which keeps the public
+# surface to the package's own exports.
 
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
                   returned
