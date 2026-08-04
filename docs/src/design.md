@@ -8,19 +8,16 @@ independent parts. A full model has two top-level parts:
     reproduction number or growth rate) that the infection model maps to ``I_t``;
   - an **observation model** maps infections to the observed data ``y_t``.
 
-A **latent model** describes an unobserved process ``Z_t`` over time. It is no
-longer a mandatory top-level component: the latent (e.g. ``\log R_t``) is not
-always the estimand, so it is folded into the infection model that consumes it.
-This gives more flexibility — you choose an infection model and hand it whatever
+A **latent model** describes an unobserved process ``Z_t`` over time. It is not
+a mandatory top-level component: the latent (e.g. ``\log R_t``) is not always
+the estimand, so it is folded into the infection model that consumes it. This
+gives more flexibility — you choose an infection model and hand it whatever
 latent process you want to drive it — and decouples the generation interval so
 that only the [`Renewal`](@ref) model carries one.
 
 Every part is a plain struct that implements a single method of the generic
 constructor [`as_turing_model`](@ref). There is no deep type hierarchy: a part
-is identified by the method it implements, not by its place in a tree. This is
-the central design change from the package this one is adapted from, which
-used separate `generate_latent`, `generate_latent_infs`, and
-`generate_observations` functions dispatched over a layered abstract hierarchy.
+is identified by the method it implements, not by its place in a tree.
 
 ## One constructor, composed by submodels
 
