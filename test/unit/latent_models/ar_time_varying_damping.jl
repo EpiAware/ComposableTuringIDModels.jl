@@ -117,3 +117,9 @@ end
     @test length(ρ_mean) == n - 1
     @test cor(ρ_mean, ρ_true) > 0.6
 end
+
+@testitem "AR rejects a series shorter than its order" begin
+    using ComposableTuringIDModels, Distributions
+    # `n` must leave at least one step after the order-p initial conditions.
+    @test_throws AssertionError as_turing_model(AR(; damp = RandomWalk()), 1)()
+end
