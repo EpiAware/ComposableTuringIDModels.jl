@@ -4,8 +4,16 @@ Changes are documented in Github releases.
 
   - **Breaking**: `TimeVaryingAR` is removed. It was a thin wrapper over
     `AR(; damp = <process>)`; replace `TimeVaryingAR()` with
-    `AR(; damp = RandomWalk())` (its keyword arguments carry over unchanged).
-    See issue #182.
+    `AR(; damp = RandomWalk())`. See issue #182.
+
+    **`TimeVaryingAR` always defaulted `transform` to `tanh`; `AR` picks
+    its default from `damp`'s type instead** (`identity` for a bare
+    `Distribution` or vector of them, `tanh` for a process such as
+    `RandomWalk`). The migration above is exact for the default,
+    process-valued `damp`. Anyone who passed a bare `Distribution` as
+    `damp` (e.g. `TimeVaryingAR(; damp = Normal(0, 0.05))`) must add
+    `transform = tanh` explicitly to `AR` to keep the old behaviour — a
+    mechanical rename silently switches them to `identity`, with no error.
   - **Breaking**: `GroupedIDModel` is removed. Grouping/panel modelling is now
     part of `IDModel` itself, via `IDModel(infection_model, group_effect,
     observation_model)` and `IDModel(idmodel, group_effect)`. Two new
