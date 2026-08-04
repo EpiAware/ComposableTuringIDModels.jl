@@ -212,10 +212,7 @@ end
     # AbstractPriorModel} is used only as a type-parameter BOUND
     # (`M <: PriorLike`) on component structs, never as a bare field type
     # (`::PriorLike`). A constructed instance therefore stores its prior in a
-    # concrete field, with the Union resolved away at compile time. This test
-    # locks that pattern in: a future struct that stores `::PriorLike`
-    # directly (rather than parametrically) would widen the field to the full
-    # Union and fail here.
+    # concrete field, with the Union resolved away at compile time.
     using ComposableTuringIDModels, Distributions
     concrete_field(x, f) = isconcretetype(fieldtype(typeof(x), f))
 
@@ -238,6 +235,39 @@ end
     @test concrete_field(NegativeBinomialError(), :cluster_factor)
     @test concrete_field(Hierarchy(), :mean)
     @test concrete_field(Hierarchy(), :across)
+end
+
+@testitem "no struct binds a field to the bare PriorLike union (#188)" begin
+    # Companion to the instance-level test above. That test enumerates
+    # instances by hand, so it only ever re-checks the structs named here
+    # today; it says nothing about a struct added later. This scans every
+    # struct type in the module at the DECLARATION level instead, so it
+    # needs no instance and covers structs added after this test was
+    # written, including ones with no zero-argument constructor.
+    #
+    # `fieldtypes(Base.unwrap_unionall(T))` reports the bound type variable
+    # (e.g. `D<:PriorLike`) for a `M <: PriorLike` type-parameter slot, but
+    # the literal `PriorLike` union itself for a bare `::PriorLike` field,
+    # so the two forms are distinguishable without constructing anything.
+    using ComposableTuringIDModels
+    using ComposableTuringIDModels: PriorLike
+
+    function bare_priorlike_fields(mod)
+        found = Tuple{DataType, Symbol}[]
+        for name in names(mod; all = true)
+            isdefined(mod, name) || continue
+            val = getfield(mod, name)
+            val isa Type || continue
+            T = Base.unwrap_unionall(val)
+            (T isa DataType && isstructtype(T)) || continue
+            for (fname, ftype) in zip(fieldnames(T), fieldtypes(T))
+                ftype === PriorLike && push!(found, (T, fname))
+            end
+        end
+        return found
+    end
+
+    @test isempty(bare_priorlike_fields(ComposableTuringIDModels))
 end
 
 @testitem "as_turing_model construction/logdensity is type-stable (#188)" begin
