@@ -140,7 +140,7 @@ end
 # See the architecture note in HilbertSpaceGP.jl: `as_turing_model` is a plain
 # function that hoists the parameter-independent work and delegates to a single
 # inner `@model`, keeping the one `as_turing_model(model, n)` entry point.
-function as_turing_model(model::ExactGP, n)
+function as_turing_model(model::ExactGP, n::Int)
     @assert n>1 "n must be greater than 1"
     x = standardised_index(n)
     return _exact_gp_model(model.kernel, x, model.jitter,

@@ -122,8 +122,9 @@ end
     @test first(apply_modifier(constant, 1.0, 7)) ≈ 4.0
 
     # The resolved modifier is a plain scan modifier: its substate is the step
-    # counter, so step `t` adds the rate at `t`.
-    inc, s0 = 3.5, modifier_init_state(resolved)
+    # counter, so step `t` adds the rate at `t`. The initial substate is built
+    # from the incidence window, which a step counter ignores.
+    inc, s0 = 3.5, modifier_init_state(resolved, [1.0, 1.0, 1.0])
     @test s0 == 0
     inc1, s1 = apply_modifier(resolved, inc, s0)
     @test inc1 ≈ inc + 2.0
@@ -178,7 +179,7 @@ end
     struct FixedScale{T} <: AbstractRenewalModifier
         scale::T
     end
-    ComposableTuringIDModels.modifier_init_state(::FixedScale) = 0
+    ComposableTuringIDModels.modifier_init_state(::FixedScale, window) = 0
     function ComposableTuringIDModels.apply_modifier(
             mod::FixedScale, incidence, t)
         return mod.scale * incidence, t + 1
@@ -223,7 +224,7 @@ end
     # `ImportedCases` carries priors and has no scan interface of its own, so
     # scanning a hand-built step that was never resolved names the problem.
     ic = ImportedCases(Normal(0.0, 0.1))
-    @test_throws "has no scan interface" modifier_init_state(ic)
+    @test_throws "has no scan interface" modifier_init_state(ic, [1.0, 1.0])
     @test_throws "has no scan interface" apply_modifier(ic, 1.0, 0)
 end
 

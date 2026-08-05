@@ -12,6 +12,12 @@ latent process is extended over the horizon by drawing its future innovations
 from the prior, so the returned forecast propagates both parameter and latent
 uncertainty.
 
+`y` extends along the TIME axis: a plain vector of length ``T`` (the
+single-series case), a `strata x T` matrix (extended by `horizon` further
+columns), or a `NamedTuple` of per-stream series (each stream extended in
+turn). The strata count, when there is one, is read from the observation model
+and `y` exactly as [`IDProblem`](@ref) reads it at build time.
+
 This works because the package's latent processes are non-centred: a
 [`RandomWalk`](@ref), [`AR`](@ref) or [`MA`](@ref) accumulates an i.i.d. sequence
 of standard innovations, so the future innovations are independent prior draws
@@ -61,12 +67,27 @@ function forecast(model::IDModel, y, chain, horizon::Integer;
         rng::AbstractRNG = default_rng())
     horizon ≥ 1 ||
         throw(ArgumentError("horizon must be ≥ 1, got $horizon"))
-    y_ext = vcat(y, fill(missing, horizon))
-    n = length(y) + horizon
-    fc_model = as_turing_model(model, y_ext, n)
+    n_time = _series_time_length(y)
+    y_ext = _extend_series(y, horizon)
+    shape = _obs_data_shape(model.observation_model, y, n_time + horizon)
+    fc_model = as_turing_model(model, y_ext, shape)
     extended = _extend_latent_draws(rng, fc_model, chain)
     return predict(rng, fc_model, extended)
 end
+
+# The observed series' length along the time axis, whatever its shape: a plain
+# vector's length, a `strata x time` matrix's column count, or (recursively) a
+# `NamedTuple` of streams' shared time length (read off its first stream).
+_series_time_length(y::AbstractVector) = length(y)
+_series_time_length(y::AbstractMatrix) = size(y, 2)
+_series_time_length(y::NamedTuple) = _series_time_length(first(y))
+
+# Extend the observed series by `horizon` further TIME points of `missing`,
+# preserving its shape: append to a vector, add columns to a `strata x time`
+# matrix, or extend every stream of a `NamedTuple` in turn.
+_extend_series(y::AbstractVector, horizon) = vcat(y, fill(missing, horizon))
+_extend_series(y::AbstractMatrix, horizon) = hcat(y, fill(missing, size(y, 1), horizon))
+_extend_series(y::NamedTuple, horizon) = map(v -> _extend_series(v, horizon), y)
 
 @doc raw"
 Forecast from a fitted [`IDProblem`](@ref); see [`forecast`](@ref) for the model
@@ -98,6 +119,16 @@ end
 # This reaches into the FlexiChains storage that Turing's `predict` consumes; if
 # FlexiChains gains a public API for length-extending a parameter this should
 # move onto it.
+#
+# Every vector parameter is a candidate, and the forecast model itself decides
+# which are actually extended: a stream is only spliced when the forecast model
+# draws MORE of it than the chain holds (the `length(full) > fit_len` test
+# below). A parameter on an axis the horizon does not grow — a `Hierarchy`'s
+# per-stratum effects, say — is the same length in both models, so it is left
+# alone without needing to be recognised as such. A length that grows with the
+# horizon is what "time-indexed" means here, which is why no heuristic on the
+# time-axis length is used or wanted: an innovation stream is typically shorter
+# than the series it drives.
 function _extend_latent_draws(rng::AbstractRNG, fc_model, chain)
     extended = deepcopy(chain)
     data = extended._data

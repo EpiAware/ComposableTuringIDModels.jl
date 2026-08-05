@@ -10,7 +10,8 @@ When a non-empty prefix is supplied for a component it is wrapped in a
 # Arguments
 
   - `latent_models`: the [`CombineLatentModels`](@ref) collection.
-  - `n`: the length of the latent series to generate.
+  - `n`: the shape to generate — a length or an `(n_strata, n_time)` shape,
+    whatever the component models accept.
 
 # Examples
 ```@example CombineLatentModels
@@ -52,11 +53,22 @@ function CombineLatentModels(models::AbstractVector)
     return CombineLatentModels(models, prefixes)
 end
 
-@model function as_turing_model(latent_models::CombineLatentModels, n)
+# `CombineLatentModels` wraps whatever its member models return, so it serves
+# both a length-`n` path and an `(n_strata, n_time)` shape (`fill(0.0, n)`
+# builds a zero of either shape). The two methods below delegate to one shared
+# `@model`, which avoids both the duplication and a dispatch ambiguity against
+# the `AbstractPriorModel`/`Dims{2}` guard.
+@model function _combine_latents(latent_models::CombineLatentModels, n)
     final_latent ~ to_submodel(
         _accumulate_latents(latent_models.models, 1, fill(0.0, n), n,
             length(latent_models.models)), false)
     return final_latent
+end
+function as_turing_model(latent_models::CombineLatentModels, n::Int)
+    return _combine_latents(latent_models, n)
+end
+function as_turing_model(latent_models::CombineLatentModels, n::Dims{2})
+    return _combine_latents(latent_models, n)
 end
 
 @model function _accumulate_latents(models, index, acc_latent, n, n_models)

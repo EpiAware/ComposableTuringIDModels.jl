@@ -20,7 +20,7 @@ rand(mdl)
     ϵ_t::D = Normal(0, 1)
 end
 
-@model function as_turing_model(model::IID, n)
+@model function as_turing_model(model::IID, n::Int)
     ϵ_t ~ filldist(model.ϵ_t, n)
     return ϵ_t
 end

@@ -201,6 +201,25 @@ end
     return _discretised_pmf(u.family(θ...); Δd = u.Δd, D = u.D)
 end
 
+@doc raw"
+Sample a **constant-parameter** [`UncertainDelay`](@ref) over an axis,
+returning the same pmf at every point.
+
+Every parameter is a `Distribution` (uncertain but constant), so one pmf is
+drawn — through the no-`n` method above — and copied across the axis. This is
+what lets a stratified renewal's generation-interval slot take a fully
+constant `UncertainDelay`: drawn at `n_strata`, every stratum gets the same
+(uncertain) interval, with no new component. Give one of the parameters a
+[`Hierarchy`](@ref) instead for a **partially pooled** per-stratum interval —
+that makes the delay time-varying (see the method below) rather than needing
+this one.
+"
+@model function as_turing_model(
+        u::UncertainDelay{P, F, T, false}, n::Int) where {P, F, T}
+    pmf ~ to_submodel(as_turing_model(u), false)
+    return [pmf for _ in 1:n]
+end
+
 # A time-varying delay yields a pmf per time point, so it needs a series length and
 # cannot stand in for a single time-invariant pmf.
 function as_turing_model(u::UncertainDelay{P, F, T, true}) where {P, F, T}

@@ -112,7 +112,7 @@ end
 # The maximum reporting delay carried by the PMF component (delays `0 … Dmax`).
 _pmf_Dmax(c::ReportingPMF) = length(c.pmf) - 1
 
-@model function as_turing_model(c::ReportingPMF, n)
+@model function as_turing_model(c::ReportingPMF, n::Int)
     return c.pmf
 end
 

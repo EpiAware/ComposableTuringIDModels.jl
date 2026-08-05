@@ -25,20 +25,17 @@ parameter, an [`AR`](@ref) process, …) satisfies the same
 `as_turing_model(m, n) ⇒ length-n` contract, so it drops into any prior slot
 directly. A genuinely scalar parameter is drawn with a native tilde
 (`σ ~ model.std`), keeping the chain as small as a bare `~ dist`.
-
-This delivers issue #37 (priors as length-`n` submodels).
 "
 abstract type AbstractPriorModel <: AbstractComposableModel end
 
 @doc raw"
-Deprecated alias for [`AbstractPriorModel`](@ref).
+Alias for [`AbstractPriorModel`](@ref).
 
-A latent process and a parameter prior share one role — both map a length `n` to a
-length-`n` vector via `as_turing_model(m, n)` — so the separate
-`AbstractLatentModel` type has been collapsed into [`AbstractPriorModel`](@ref).
-`AbstractLatentModel` remains as a `const` alias for one release for backwards
-compatibility (`AbstractLatentModel === AbstractPriorModel`); prefer
-[`AbstractPriorModel`](@ref) in new code.
+A latent process and a parameter prior share one role — both map a length `n` to
+a length-`n` vector via `as_turing_model(m, n)` — so `AbstractLatentModel` is a
+`const` alias for [`AbstractPriorModel`](@ref)
+(`AbstractLatentModel === AbstractPriorModel`). Either name refers to the same
+type; use whichever reads better at the call site.
 "
 const AbstractLatentModel = AbstractPriorModel
 
@@ -63,13 +60,12 @@ Members include [`DirectInfections`](@ref), [`ExpGrowthRate`](@ref),
 [`Renewal`](@ref) and [`ODEProcess`](@ref). Only [`Renewal`](@ref) carries a
 generation interval; the others take a `transformation` directly.
 
-`n` is usually a bare series length (`Int`), but the contract is duck-typed:
-a multi-stratum infection model can widen it to whatever shape it needs.
-[`GroupedInfections`](@ref) takes a `(n_time, n_groups)` `NamedTuple` (the
-group count is not a struct field, so it must arrive through `n`) and returns
-an `n_groups x n_time` `I_t` matrix; [`CombineInfections`](@ref) keeps the
-plain `Int` (its stratum count is fixed by how many models it holds) and
-returns an `n_strata x n_time` matrix. Either composes with [`Split`](@ref) /
+`n` is the size of the value the model returns: a [`ModelShape`](@ref). A bare
+`n::Int` is a length-`n` path, giving a plain vector `I_t`. An `n::Dims{2}` is
+`(n_strata, n_time)`, which is `size(I_t)` — one renewal recursion per stratum,
+each with its own seed. [`CombineInfections`](@ref) keeps the plain `Int` (its
+stratum count is fixed by how many models it holds) and returns an
+`n_strata x n_time` matrix. Any of these compose with [`Split`](@ref) /
 [`StrataMap`](@ref) on the observation side for the full range of
 infection↔observation mapping cardinalities.
 "

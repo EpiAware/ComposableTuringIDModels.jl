@@ -65,7 +65,7 @@ function ReportingCDF(distribution::C; D = nothing, Δd = 1.0) where {
     return ReportingCDF(cumsum(pmf))
 end
 
-@model function as_turing_model(c::ReportingCDF, n)
+@model function as_turing_model(c::ReportingCDF, n::Int)
     F = c.cdf
     nF = length(F)
     # Reference days older than the delay's support (age ≥ `nF`) are fully

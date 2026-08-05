@@ -92,7 +92,8 @@ end
 # symbolic `remake` below places each value into the problem by name, so the
 # stored (Catalyst-sorted) layout is never assumed and the ForwardDiff `Dual`
 # values propagate through `remake` unchanged.
-@model function ComposableTuringIDModels.as_turing_model(params::CatalystODEParams, n)
+@model function ComposableTuringIDModels.as_turing_model(
+        params::CatalystODEParams, n::Union{Int, Nothing})
     u0 = Vector{Pair}(undef, length(params.u0_specs))
     p = Vector{Pair}(undef, length(params.p_specs))
     for (k, s) in enumerate(params.u0_specs)

@@ -39,7 +39,7 @@ function RandomWalk(; init = Normal(), ϵ_t = HierarchicalNormal())
     return RandomWalk(init, _path_prior(ϵ_t))
 end
 
-@model function as_turing_model(model::RandomWalk, n)
+@model function as_turing_model(model::RandomWalk, n::Int)
     @assert n>0 "n must be greater than 0"
     rw_init ~ as_turing_submodel(model.init, 1; prefix = true)
     ϵ_t ~ as_turing_submodel(model.ϵ_t, n - 1)
