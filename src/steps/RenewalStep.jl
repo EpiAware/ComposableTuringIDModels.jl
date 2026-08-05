@@ -104,9 +104,10 @@ population and susceptible depletion, e.g.
 `Renewal(gen_int, SusceptibleDepletion(N))`.
 
 `pop_size` is a scalar for one series, and a per-stratum vector for a
-stratified renewal, where each stratum then depletes its own pool. A scalar
-given to a stratified renewal is shared by every stratum, so each depletes a
-separate pool of the same size.
+stratified renewal.
+Each stratum then depletes its own pool.
+A scalar given to a stratified renewal is shared by every stratum, so each
+depletes a separate pool of the same size.
 
 It samples nothing, so it is a plain scan modifier: the pre-scan seam (see
 [`AbstractRenewalModifier`](@ref)) returns it unchanged.
@@ -231,8 +232,8 @@ end
 Resolve an accumulation step ahead of the scan, sampling any parameters its
 parts carry.
 
-The default method samples nothing and returns the step unchanged; a
-[`RenewalStep`](@ref) resolves both its core and its
+The default method samples nothing and returns the step unchanged.
+A [`RenewalStep`](@ref) resolves both its core and its
 [`AbstractRenewalModifier`](@ref)s through their own `as_turing_model` methods
 and rebuilds itself from the resolved parts. [`Renewal`](@ref) draws its step
 through this one seam, so neither a modifier with priors nor a drawn coupling

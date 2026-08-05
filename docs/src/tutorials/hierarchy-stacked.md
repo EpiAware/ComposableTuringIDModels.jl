@@ -2,16 +2,18 @@
 
 A multi-group epidemic is a panel: one shared infection process seen by several
 groups, each reporting it at its own level.
-[`Stratify`](@ref) expresses this panel directly: a shared process drawn once
-over time, and a per-group deviation drawn once over the group axis, combined
-into one `groups × time` latent matrix.
+[`Stratify`](@ref) expresses this panel directly.
+A shared process is drawn once over time, and a per-group deviation is drawn
+once over the group axis.
+The two combine into one `groups × time` latent matrix.
 [`Split`](@ref) then observes every group through the same observation model,
 namespaced by group.
 See the [Composable design](@ref) page for how the two compose.
 
 This page drives a per-group reporting level with a [`Hierarchy`](@ref) inside
-a [`Stratify`](@ref), simulates from it and fits it end-to-end under NUTS,
-recovering the per-group levels.
+a [`Stratify`](@ref).
+It simulates from that model and fits it end-to-end under NUTS, recovering
+the per-group levels.
 The group dimension threads from the data and the group prior is namespaced by
 the component, so the panel composes with no hand-orchestration.
 
@@ -19,9 +21,10 @@ the component, so the panel composes with no hand-orchestration.
 
 The shared epidemic is a [`DirectInfections`](@ref) process carrying a
 [`RandomWalk`](@ref) latent, observed with a [`PoissonError`](@ref).
-[`Stratify`](@ref) puts a per-group level on that latent: every group shares
-the same random walk, offset by its own log-level ``\ell_g``, so each group's
-infection curve is the shared curve scaled by ``e^{\ell_g}``.
+[`Stratify`](@ref) puts a per-group level on that latent.
+Every group shares the same random walk, offset by its own log-level
+``\ell_g``, so each group's infection curve is the shared curve scaled by
+``e^{\ell_g}``.
 Those per-group levels are partially pooled with a [`Hierarchy`](@ref),
 supplied as `Stratify`'s `across` slot.
 
@@ -51,9 +54,10 @@ with the infection [`RandomWalk`](@ref)'s own `ϵ_t`.
 collide, and [`Split`](@ref) prefixes each group's observation with
 `group<g>`.
 `Stratify`'s `combine` argument maps a group's level and the shared path onto
-that group's row of the latent matrix, additively by default:
-``Z_{g,t} = \text{shared}_t + \ell_g``, so after the model's `exp`
-transformation each group's curve is the shared curve scaled by ``e^{\ell_g}``.
+that group's row of the latent matrix.
+By default this is additive: ``Z_{g,t} = \text{shared}_t + \ell_g``.
+After the model's `exp` transformation, each group's curve is the shared
+curve scaled by ``e^{\ell_g}``.
 Swap `combine` for a different mapping the way [`Ascertainment`](@ref) swaps its
 `transform`.
 
@@ -98,8 +102,7 @@ size(chain, 1)
 ```
 
 The relative per-group levels are recovered per draw from the generated `Z_t`
-with
-`returned`, and compared with the simulated truth:
+with `returned`, then compared with the simulated truth:
 
 ```@example hier
 level_draws = reduce(hcat,
@@ -137,9 +140,10 @@ pooled per-group levels are recovered inside a full composed panel.
 supplied the per-group levels, and the group dimension threaded from the data
 with the group prior namespaced by the component.
 Swapping `across = RandomWalk()` in the [`Hierarchy`](@ref) would instead pool
-*neighbouring* groups (correlated ordered strata), and swapping `Stratify`'s
-`across` slot for a bare [`IID`](@ref) or a `Distribution` would drop the
-shared level for independent per-group levels, each with no other change.
+*neighbouring* groups (correlated ordered strata).
+Swapping `Stratify`'s `across` slot for a bare [`IID`](@ref) or a
+`Distribution` would drop the shared level for independent per-group levels,
+each with no other change.
 
 When the groups are genuinely **separate** infection processes rather than one
 shared curve — several distinct regions, say, each with its own latent — see

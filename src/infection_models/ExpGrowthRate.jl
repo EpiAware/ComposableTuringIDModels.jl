@@ -25,8 +25,8 @@ carries a generation interval).
 Handing `rt` a [`Stratify`](@ref) (or [`Replicate`](@ref)) and calling
 `as_turing_model(model, (n_strata, n_time))` gives one growth-rate series per
 stratum, each cumulated (and seeded) independently. This model has no coupling
-slot — the cumulative sum has no incidence window for a mixing operator to act
-on; see [`Renewal`](@ref) for coupled strata.
+slot. The cumulative sum has no incidence window for a mixing operator to act
+on. See [`Renewal`](@ref) for coupled strata.
 
 ## Fields
 

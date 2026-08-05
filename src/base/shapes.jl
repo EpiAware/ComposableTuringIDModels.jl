@@ -36,11 +36,11 @@ A path model has no strata axis of its own; ask for one explicitly rather than
 guessing whether a shared path was meant to be pooled across strata.
 
 Every [`AbstractPriorModel`](@ref) speaks the length-`n` path contract
-(`as_turing_model(m, n::Int)`); this guard rejects a `Dims{2}` shape for any
-model that has not opted into a strata axis, so a stratum-shaped call to a
-plain path model fails at the point it is made rather than returning something
-silently wrong. Wrap the model in a `Stratify` (or a `Replicate`) to give it
-one.
+(`as_turing_model(m, n::Int)`).
+This guard rejects a `Dims{2}` shape for any model that has not opted into a
+strata axis, so a stratum-shaped call to a plain path model fails at the point
+it is made rather than returning something silently wrong.
+Wrap the model in a `Stratify` (or a `Replicate`) to give it one.
 
 # Examples
 ```@example ModelShape_guard

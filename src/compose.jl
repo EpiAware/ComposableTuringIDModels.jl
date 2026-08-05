@@ -103,7 +103,7 @@ The number of infection strata an observation model consumes.
 
 The seam an observation model uses to say how many infection strata it
 consumes, given the number of observation streams in the data. The default
-passes the observation stream count straight through (a one-to-one mapping);
+passes the observation stream count straight through (a one-to-one mapping).
 [`Split`](@ref) with a weight `map` overrides it with the map's column count,
 so a many-to-one or many-to-many mapping can build the right-shaped infection
 process from the data alone.

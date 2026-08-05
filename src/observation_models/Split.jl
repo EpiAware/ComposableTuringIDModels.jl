@@ -101,11 +101,9 @@ it sits chooses the composition:
     `LatentDelay(Split((cases = leaf, deaths = pipeline)), case_delay)`.
   - **Data-driven strata** — built from a single **template** model (or a set
     of named streams) plus a weight `map`: the infection→observation
-    cardinality is entirely down to `map`. `map = I` (or no map) is
-    one-to-one; one aggregation row is many-to-one; a general weight matrix is
-    many-to-many; a non-square `map` is finer or coarser than the infection
-    process, e.g. splitting one infection stratum across streams with weights
-    that sum to 1. See [`StrataMap`](@ref) for the underlying projection.
+    cardinality is entirely down to `map`, covering the same range of
+    cardinalities as above. See [`StrataMap`](@ref) for the underlying
+    projection.
 
 The threaded quantity is always a stream's **expected** (pre-error) series, never
 its realised noisy draw; observing a downstream stream off another's *sampled*

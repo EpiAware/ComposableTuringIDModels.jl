@@ -15,9 +15,10 @@ Generation-time-weighted incidence pressure on each stratum, before ``R_t``.
 ```
 
 This is the one dispatch point for coupling between strata. It sits *between*
-the generation-time convolution and ``R_t``, which is why coupling is a slot on
-the renewal core rather than a renewal modifier: a modifier transforms the
-finished force of infection, and ``K(R \odot v) \neq R \odot Kv``.
+the generation-time convolution and ``R_t``.
+That is why coupling is a slot on the renewal core rather than a renewal
+modifier: a modifier transforms the finished force of infection, and
+``K(R \odot v) \neq R \odot Kv``.
 
 The `mixing` argument chooses the method.
 
@@ -149,7 +150,7 @@ ConstantRenewalStep(rev_gen_int) = ConstantRenewalStep(rev_gen_int, I)
 # --- window arithmetic ------------------------------------------------------
 #
 # One incidence window serves both shapes. A single series is a vector of the
-# last `lags` incidences; several strata are a `strata × lags` matrix, one row
+# last `lags` incidences. Several strata are a `strata × lags` matrix, one row
 # per stratum. Each helper has one method per shape, so the recursion, the
 # state assembly and the seeding are written once.
 

@@ -86,7 +86,9 @@ _series_time_length(y::NamedTuple) = _series_time_length(first(y))
 # preserving its shape: append to a vector, add columns to a `strata x time`
 # matrix, or extend every stream of a `NamedTuple` in turn.
 _extend_series(y::AbstractVector, horizon) = vcat(y, fill(missing, horizon))
-_extend_series(y::AbstractMatrix, horizon) = hcat(y, fill(missing, size(y, 1), horizon))
+function _extend_series(y::AbstractMatrix, horizon)
+    return hcat(y, fill(missing, size(y, 1), horizon))
+end
 _extend_series(y::NamedTuple, horizon) = map(v -> _extend_series(v, horizon), y)
 
 @doc raw"

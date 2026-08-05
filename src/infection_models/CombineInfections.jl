@@ -23,12 +23,11 @@ both naming their innovation `ϵ_t`), so this is one of the components that
 prefixes on purpose rather than following the package's flat, prefix-off
 default.
 
-`n` stays a plain `Int` here: the stratum count is fixed by how many models
+`n` stays a plain `Int` here. The stratum count is fixed by how many models
 `models` holds, not by a shape argument, and each model runs its own
 independent scan, so there is no shared incidence window for a `mixing`
-operator to couple. One model spanning a strata axis is couplable — see
-[`Renewal`](@ref)'s `rt = Stratify(...)` and `mixing` slot; several distinct
-models, one per stratum, are not.
+operator to couple. See [`Renewal`](@ref)'s `mixing` slot and [Coupled patch
+models](@ref case-study-patches) for the couplable case.
 
 ## Fields
 

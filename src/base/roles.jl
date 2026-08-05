@@ -31,11 +31,12 @@ abstract type AbstractPriorModel <: AbstractComposableModel end
 @doc raw"
 Alias for [`AbstractPriorModel`](@ref).
 
-A latent process and a parameter prior share one role — both map a length `n` to
-a length-`n` vector via `as_turing_model(m, n)` — so `AbstractLatentModel` is a
-`const` alias for [`AbstractPriorModel`](@ref)
-(`AbstractLatentModel === AbstractPriorModel`). Either name refers to the same
-type; use whichever reads better at the call site.
+A latent process and a parameter prior share one role: both map a length `n`
+to a length-`n` vector via `as_turing_model(m, n)`.
+So `AbstractLatentModel` is a `const` alias for [`AbstractPriorModel`](@ref)
+(`AbstractLatentModel === AbstractPriorModel`).
+Either name refers to the same type.
+Use whichever reads better at the call site.
 "
 const AbstractLatentModel = AbstractPriorModel
 

@@ -1,5 +1,4 @@
-# A gravity coupling operator, fixed or inferred. Both paths call the same
-# `gravity` function, so they cannot drift.
+# A gravity coupling operator, fixed or inferred.
 
 @doc raw"
 Build a gravity coupling operator from populations and distances.
@@ -15,9 +14,9 @@ makes the diagonal the uncoupled model and the off-diagonals the extra imported
 pressure on top of it.
 
 The result is deliberately **not** normalised. Row-normalising it would cancel
-``\alpha`` entirely, since a common row factor divides out, so normalisation is
-left to the caller. For a row-stochastic operator use `K ./ sum(K; dims = 2)`,
-and for the usual local-plus-travel form use
+``\alpha`` entirely, since a common row factor divides out.
+Normalisation is therefore left to the caller. For a row-stochastic operator
+use `K ./ sum(K; dims = 2)`. For the usual local-plus-travel form use
 `(1 - ε) * I(n) + ε * K ./ sum(K; dims = 2)`.
 
 # Arguments
@@ -51,11 +50,12 @@ end
 @doc raw"
 A gravity coupling operator with inferred exponents.
 
-The exponents of [`gravity`](@ref) are prior slots, so the operator is rebuilt
-from sampled values on every draw and the coupling between strata is estimated
-rather than assumed. Handing one to [`Renewal`](@ref)'s `mixing` keyword is the
-only difference from a fixed matrix; the renewal draws it through the step seam
-before the scan.
+The exponents of [`gravity`](@ref) are prior slots, so the operator is
+rebuilt from sampled values on every draw.
+The coupling between strata is therefore estimated rather than assumed.
+Handing one to [`Renewal`](@ref)'s `mixing` keyword is the only difference
+from a fixed matrix.
+The renewal draws it through the step seam before the scan.
 
 Each exponent slot takes a bare `Distribution` (one scalar draw), a
 [`FixedIntercept`](@ref) to hold it fixed, or any other prior model, so a

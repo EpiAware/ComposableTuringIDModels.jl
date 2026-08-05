@@ -63,8 +63,8 @@ Infections can arrive at a patch from outside the modelled system.
 They can also arrive from another patch inside it.
 [`ImportedCases`](@ref) with a stratified rate covers the first case.
 Its rate is drawn before the scan runs.
-It never depletes a susceptible pool, and it never comes from another
-patch's own transmission chain.
+It never depletes a susceptible pool.
+It never comes from another patch's own transmission chain.
 
 ```@example patches
 exogenous = Renewal(gen_int,
@@ -127,8 +127,7 @@ size(as_turing_model(gravity_model, (n_strata, n_time))().I_t)
 `g`'s own weight.
 That own weight is the `within` keyword, default `1.0`.
 `Gravity` draws priors on `α`, `β` and `γ`, then calls the same function
-inside the model.
-The fixed and the inferred path never drift apart.
+inside the model, so the fixed and inferred paths cannot drift.
 
 ## Many-to-one observation: age bands into one stream
 

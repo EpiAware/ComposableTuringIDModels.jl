@@ -223,10 +223,9 @@ matrix `Split`/`StrataMap` already expect, so `IDModel(CombineInfections([...]),
 Split(template, W))` maps several distinct infection processes onto streams
 end-to-end. For one process carried across a strata axis instead, with
 partially pooled per-stratum deviations, see [`Stratify`](@ref) and [Partial
-pooling across groups](@ref tutorial-hierarchy). That is also the couplable
-case: strata drawn from one process can exchange infection pressure through
-[`Renewal`](@ref)'s `mixing` slot, which several independent processes cannot.
-See [Coupled patch models](@ref tutorial-patches).:docs/src/case-studies/split-observations.md
+pooling across groups](@ref tutorial-hierarchy). It also composes with
+[`Renewal`](@ref)'s `mixing` slot, see [Coupled patch models](@ref
+tutorial-patches).
 
 ## References
 

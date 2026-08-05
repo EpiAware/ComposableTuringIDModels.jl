@@ -146,10 +146,10 @@ On the observation side, [`Split`](@ref) (with an optional [`StrataMap`](@ref)
 weight matrix) reads that matrix and projects it onto observation streams
 through an `obs_strata x inf_strata` weight, so one mechanism covers every
 mapping cardinality: `map = I` is one-to-one, an aggregation row is
-many-to-one, and a general matrix is many-to-many. A panel model composes the
-same way as a single-group one: build the infection side with
-[`Stratify`](@ref) and pass it straight to the plain
-`IDModel(infection_model, observation_model)` constructor — no separate panel
-constructor is needed. See [Partial pooling across groups](@ref
-tutorial-hierarchy) and [Multiple observation streams](@ref tutorial-split)
-for worked examples.
+many-to-one, and a general matrix is many-to-many.
+A panel model composes the same way as a single-group one.
+Build the infection side with [`Stratify`](@ref) and pass it straight to the
+plain `IDModel(infection_model, observation_model)` constructor.
+No separate panel constructor is needed.
+See [Partial pooling across groups](@ref tutorial-hierarchy) and [Multiple
+observation streams](@ref tutorial-split) for worked examples.

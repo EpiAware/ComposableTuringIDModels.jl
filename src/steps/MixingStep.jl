@@ -27,8 +27,8 @@ A renewal core whose coupling operator is drawn before the scan.
 This is to a coupling operator what [`ImportedCases`](@ref) is to an importation
 rate. A scan step is a deterministic function, so an operator built from sampled
 parameters cannot be assembled inside the recursion. `MixingStep` holds the
-generation interval and an [`AbstractMixingModel`](@ref), and its
-`as_turing_model` seam draws the model's parameters and hands back a
+generation interval and an [`AbstractMixingModel`](@ref).
+Its `as_turing_model` seam draws the model's parameters and hands back a
 [`ConstantRenewalStep`](@ref) carrying the realised operator.
 
 It is generic over every mixing model, so a new movement model needs only its

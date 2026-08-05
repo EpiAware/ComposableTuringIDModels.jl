@@ -42,7 +42,7 @@ composing one takes no extra wiring:
 
 Handing `rt` a [`Stratify`](@ref) (or [`Replicate`](@ref)) and calling
 `as_turing_model(renewal, (n_strata, n_time))` runs one renewal recursion per
-stratum: `R_t` is a `n_strata × n_time` matrix, each stratum has its own seed
+stratum. `R_t` is a `n_strata × n_time` matrix, each stratum has its own seed
 (from a vector-valued `initialisation`, or the same scalar seed broadcast to
 every stratum), and each stratum's incidence window advances on its own. The
 `mixing` keyword couples the strata by transforming the incidence window each
@@ -54,8 +54,8 @@ is `n_strata` independent single-series renewal processes sharing one model.
 The generation interval, when inferred, is drawn at the shape the renewal needs:
 one pmf for `n::Int`, one pmf per stratum for `n::Dims{2}`. Because each
 parameter of an [`UncertainDelay`](@ref) is itself a prior slot, giving one a
-[`Hierarchy`](@ref) partially pools that parameter across strata, so a partially
-pooled generation interval needs no new component — e.g.
+[`Hierarchy`](@ref) partially pools that parameter across strata.
+A partially pooled generation interval therefore needs no new component, e.g.
 `UncertainDelay(LogNormal, [Hierarchy(), σ_prior]; D = 14.0)` drawn at
 `n_strata`.
 

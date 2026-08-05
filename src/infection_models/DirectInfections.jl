@@ -22,8 +22,8 @@ Handing `Z` a [`Stratify`](@ref) (or [`Replicate`](@ref)) and calling
 `as_turing_model(model, (n_strata, n_time))` gives one direct-infections series
 per stratum, each with its own seed (from a vector-valued `initialisation`, or
 the same scalar seed broadcast to every stratum). This model has no coupling
-slot — a plain transformation of the latent path has no incidence window for a
-mixing operator to act on; see [`Renewal`](@ref) for coupled strata.
+slot. A plain transformation of the latent path has no incidence window for a
+mixing operator to act on. See [`Renewal`](@ref) for coupled strata.
 
 ## Fields
 

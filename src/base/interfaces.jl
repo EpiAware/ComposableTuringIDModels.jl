@@ -52,9 +52,9 @@ passes only a series length `n` (no external latent path).
 # Keyword Arguments
 
   - `n`: the shape argument used for the construction check (default `10`).
-    An `Int` draws a length-`n` path; a `Dims{2}` (`n_strata, n_time`) draws a
-    `strata x time` matrix — pass the matching value for a component that
-    needs a strata axis.
+    An `Int` draws a length-`n` path.
+    A `Dims{2}` (`n_strata, n_time`) draws a `strata x time` matrix.
+    Pass the matching value for a component that needs a strata axis.
 
 # Examples
 ```@example
