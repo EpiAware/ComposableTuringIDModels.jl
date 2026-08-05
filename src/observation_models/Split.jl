@@ -241,8 +241,18 @@ function _split_expected(m::Split, Y_t, names)
 end
 
 # Per-stream models: the named entries, or the template replicated per stream.
+#
+# The named-entries branch used to be a `Vector` comprehension
+# (`[m.streams[Symbol(nm)] for nm in names]`); with two or more
+# differently-typed streams that infers a packed small-`Union` eltype (e.g.
+# `Vector{Union{NegativeBinomialError, LatentDelay{...}}}`) — exactly the
+# array shape Enzyme's strict type analysis cannot resolve under reverse mode
+# (`IllegalTypeAnalysisException: ... This usually indicates the use of a
+# Union type`). A `Tuple` holds the same heterogeneous values without that
+# packed-union array memory layout, so build one instead; the homogeneous
+# template branch is already a single concrete type and needs no change.
 function _split_models(m::Split, names)
-    m.streams isa NamedTuple && return [m.streams[Symbol(nm)] for nm in names]
+    m.streams isa NamedTuple && return Tuple(m.streams[Symbol(nm)] for nm in names)
     return [m.streams for _ in names]
 end
 
