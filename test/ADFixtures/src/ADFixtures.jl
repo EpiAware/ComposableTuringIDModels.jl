@@ -543,63 +543,39 @@ Genuine Enzyme failures, grouped by cause:
 Unresolved causes are tracked in #97.
 """
 function backend_broken_scenarios()
+    # Enzyme reverse now has one remaining broken scenario.
+    #
+    # The five scenarios that shared a union-typed value through the prior
+    # seam (`as_turing_submodel`'s `filldist`/`product_distribution` runtime
+    # ternary) were fixed by 375eee3, which unconditionally returns
+    # `product_distribution` and removes the `Union{Product, FillDist}`
+    # return type that Enzyme's type analysis could not resolve.
+    #
+    # `Renewal+TimeVaryingLatentDelay posterior` was measured passing after
+    # the `_at_all` fix (0e740ef) and is now removed from the broken list.
     enzyme_reverse = Set([
-        "ARIMA latent logjoint",
-        # `MA.jl`'s `q > 1` branch calls `as_turing_submodel` on a vector of
-        # distributions, which returns via a runtime ternary between
-        # `filldist` and `product_distribution` — a union return Enzyme's
-        # type analysis cannot resolve. `q` is a plain `Int`, not a type
-        # parameter, so Julia compiles (and Enzyme walks) that branch even
-        # though `MA()` defaults to `q = 1` and never runs it.
-        "MA latent logjoint",
-        "DiffLatentModel(RandomWalk) latent logjoint",
-        "ARMA latent logjoint",
-        "AR vector-prior latent logjoint",
-        # Listed conservatively, pending reconfirmation. It was measured
-        # passing under Enzyme reverse after the `_at_all` fix, but an
-        # earlier sweep, taken before that fix, recorded it failing, and the
-        # two have not been reconciled against the committed tree.
-        # Over-listing is safe; under-listing reds CI. Tracked in #97.
-        "Renewal+TimeVaryingLatentDelay posterior",
-        # Enzyme reverse only — ForwardDiff, ReverseDiff, both Mooncake modes
-        # and Enzyme forward all pass. Reproduced standalone with no
-        # DynamicPPL or package code: `deepcopy`-ing a `Union{Missing, T}`
-        # array, then writing a parameter-dependent value into a missing
-        # slot, hits `AssertionError: Enzyme Internal Error
-        # (rewrite_union_returns_as_ref[2])` from Enzyme's own LLVM rewrite
-        # pass. Identical with/without our `EnzymeRules.inactive` rule and for
-        # both `Int64`/`Float64` — an Enzyme compiler limitation, not a
-        # package defect or a missing rule.
+    # Enzyme reverse only — ForwardDiff, ReverseDiff, both Mooncake modes
+    # and Enzyme forward all pass. Reproduced standalone with no
+    # DynamicPPL or package code: `deepcopy`-ing a `Union{Missing, T}`
+    # array, then writing a parameter-dependent value into a missing
+    # slot, hits `AssertionError: Enzyme Internal Error
+    # (rewrite_union_returns_as_ref[2])` from Enzyme's own LLVM rewrite
+    # pass. Identical with/without our `EnzymeRules.inactive` rule and for
+    # both `Int64`/`Float64` — an Enzyme compiler limitation, not a
+    # package defect or a missing rule.
         "DirectInfections+PartiallyMissing posterior"
     ])
-    # `ARIMA`/`MA`/`DiffLatentModel(RandomWalk)`/`ARMA`/
-    # `AR vector-prior` and `Renewal+Split cascade` share one cause: a
-    # union-typed value reaching Enzyme's type analysis. Three routes found
-    # so far — a runtime ternary returning two concrete types (prior seam),
-    # a packed union-eltype array from a heterogeneous comprehension
-    # (`Split._split_models`, fixed), and a runtime index into a
-    # heterogeneous tuple (time-varying delay, fixed).
-    enzyme_forward = Set([
-        "ARIMA latent logjoint",
-        "MA latent logjoint",
-        "DiffLatentModel(RandomWalk) latent logjoint",
-        "ARMA latent logjoint",
-        "AR vector-prior latent logjoint",
-        "Renewal+NegativeBinomial posterior",
-        "Renewal+ImportedCases posterior",
-        "Renewal+RightTruncate nowcast posterior",
-        "Renewal+ReportTriangle posterior",
-        "Renewal+LatentDelay posterior",
-        "Renewal+UncertainLatentDelay posterior",
-        "Renewal+TimeVaryingLatentDelay posterior",
-        "Renewal+UncertainGenInterval posterior",
-        # Passes under Enzyme reverse. The forward-mode failure originates
-        # inside `accumulate_scan(::ConstantRenewalStep, ...)` at
-        # `src/steps/accumulate_scan.jl:25` — the renewal infection step
-        # itself, not the observation side, and not in `Split.jl`. Cause not
-        # yet established beyond that location.
-        "Renewal+Split cascade posterior"
-    ])
+    # Enzyme forward now has no remaining broken scenarios.
+    #
+    # The five union-typed scenarios (ARIMA, MA, DiffLatentModel(RW), ARMA,
+    # AR vector-prior) were fixed by the priors.jl change in 375eee3.
+    #
+    # The nine renewal/delay-convolution scenarios were fixed by the
+    # forward-mode `LinearAlgebra.dot` Enzyme rule (375eee3), which provides
+    # a custom `EnzymeRules.forward` for the BLAS `dot` call in
+    # `renewal_foi`/`LDStep`/`TimeVaryingLDStep` that Enzyme forward mode
+    # has no built-in rule for (`EnzymeNoDerivativeError`).
+    enzyme_forward = Set{String}()
     return Dict{String, Set{String}}(
         "Enzyme reverse" => enzyme_reverse,
         "Enzyme forward" => enzyme_forward)
