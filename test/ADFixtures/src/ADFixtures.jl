@@ -544,71 +544,41 @@ Unresolved causes are tracked in #97.
 """
 function backend_broken_scenarios()
     enzyme_reverse = Set([
-        "AR latent logjoint",
         "ARIMA latent logjoint",
-        # Plain `MA` threads its `HierarchicalNormal` innovation (and vector-`θ`)
-        # submodels through the prior seam, the same `EnzymeNoShadowError`
-        # submodel-threading limit as its `AR`/`ARIMA`/`ARMA` siblings above.
+        # `MA.jl`'s `q > 1` branch calls `as_turing_submodel` on a vector of
+        # distributions, which returns via a runtime ternary between
+        # `filldist` and `product_distribution` — a union return Enzyme's
+        # type analysis cannot resolve. `q` is a plain `Int`, not a type
+        # parameter, so Julia compiles (and Enzyme walks) that branch even
+        # though `MA()` defaults to `q = 1` and never runs it.
         "MA latent logjoint",
         "DiffLatentModel(RandomWalk) latent logjoint",
         "ARMA latent logjoint",
-        "CombineLatentModels latent logjoint",
         "AR vector-prior latent logjoint",
-        "AR latent-model-as-prior latent logjoint",
-        "DirectInfections+NormalError posterior",
-        "Renewal+NegativeBinomial posterior",
-        # The modifier renewal is the `Renewal+NegativeBinomial` model plus a
-        # modifier tuple, so it inherits that scenario's Enzyme brokenness and
-        # adds the nested `to_submodel` recursion that resolves the modifiers —
-        # the same threading behind the other `EnzymeNoShadowError` rows. It is
-        # recorded broken conservatively: `check_broken` records a plain pass
-        # when a listed scenario succeeds, so listing it costs nothing, while a
-        # wrong ✓ would red the Enzyme job. Both this scenario and its
-        # `Renewal+NegativeBinomial` base pass under Enzyme on macOS/aarch64
-        # locally, so this row (and that one) want re-checking against the
-        # Linux `ad.yaml` Enzyme job. Tracked in #97.
-        "Renewal+ImportedCases posterior",
-        # Enzyme type-analysis brokenness tracked in #97.
-        "Renewal+Split cascade posterior",
-        # `EnzymeNoShadowError` through the `Ascertainment` +
-        # `broadcast_dayofweek` submodel threading after the #76 prior collapse
-        # (prefix-on prior slots): Enzyme cannot find a shadow for the
-        # `PrefixLatentModel`-wrapped day-of-week `BroadcastLatentModel`. Enzyme
-        # only; ForwardDiff/ReverseDiff/Mooncake differentiate it correctly.
-        # Tracked in #97.
-        "DirectInfections+Ascertainment day-of-week posterior",
-        # `PrefixLatentModel`/`PrefixObservationModel` wrap an inner model with
-        # the same `prefix(as_turing_model(...), Symbol(...))` +
-        # `to_submodel` call as the day-of-week `Ascertainment` scenario above,
-        # so it is listed conservatively for the same `EnzymeNoShadowError`
-        # submodel-threading reason. Both this scenario and its
-        # `DirectInfections+Ascertainment day-of-week` sibling pass under
-        # Enzyme reverse on macOS/aarch64 locally, so both rows want
-        # re-checking against the Linux `ad.yaml` Enzyme job; listing costs
-        # nothing (`check_broken` records a plain pass if a listed scenario
-        # succeeds). Tracked in #97.
-        "DirectInfections+PrefixModifiers posterior",
-        # The process-parameter (time-varying) reporting delay threads a
-        # `RandomWalk` submodel per delay parameter; Enzyme wraps the constant
-        # `sdlog` scalar in a `Base.RefValue` its type-analysis cannot resolve
-        # against `_at` (`MethodError: no method matching _at(::RefValue, ::Int)`).
-        # Enzyme only; ForwardDiff/ReverseDiff/Mooncake differentiate it correctly.
-        # Tracked in #97.
-        "Renewal+TimeVaryingLatentDelay posterior"
+        # Listed conservatively, pending reconfirmation. It was measured
+        # passing under Enzyme reverse after the `_at_all` fix, but an
+        # earlier sweep, taken before that fix, recorded it failing, and the
+        # two have not been reconciled against the committed tree.
+        # Over-listing is safe; under-listing reds CI. Tracked in #97.
+        "Renewal+TimeVaryingLatentDelay posterior",
+        # Enzyme reverse only — ForwardDiff, ReverseDiff, both Mooncake modes
+        # and Enzyme forward all pass. Reproduced standalone with no
+        # DynamicPPL or package code: `deepcopy`-ing a `Union{Missing, T}`
+        # array, then writing a parameter-dependent value into a missing
+        # slot, hits `AssertionError: Enzyme Internal Error
+        # (rewrite_union_returns_as_ref[2])` from Enzyme's own LLVM rewrite
+        # pass. Identical with/without our `EnzymeRules.inactive` rule and for
+        # both `Int64`/`Float64` — an Enzyme compiler limitation, not a
+        # package defect or a missing rule.
+        "DirectInfections+PartiallyMissing posterior"
     ])
-    # Carried forward from this PR's own prior local measurement (before the
-    # #53 merge and the fixture fix — see the docstring above), NOT
-    # re-confirmed against the merged 35-scenario set, except
-    # `DirectInfections+Poisson posterior`, which was individually re-run
-    # against the fixed fixture and removed from this set after confirming it
-    # now passes. The other fourteen `Vector{Union{Missing, Int64}}`-observed
-    # entries here share the identical fixture code path and are expected to
-    # be fixed the same way, but that is an expectation, not a
-    # re-measurement — the `ad.yaml` `enzyme_forward` job is what actually
-    # confirms it. The `accumulate_scan`/`dot`-recursion family
-    # (`ARIMA`/`MA`/`DiffLatentModel(RandomWalk)`/`ARMA`/`AR vector-prior`)
-    # and `Renewal+Split cascade` are unaffected by the fixture fix (see
-    # docstring) and stay broken for their own, unrelated reasons.
+    # `ARIMA`/`MA`/`DiffLatentModel(RandomWalk)`/`ARMA`/
+    # `AR vector-prior` and `Renewal+Split cascade` share one cause: a
+    # union-typed value reaching Enzyme's type analysis. Three routes found
+    # so far — a runtime ternary returning two concrete types (prior seam),
+    # a packed union-eltype array from a heterogeneous comprehension
+    # (`Split._split_models`, fixed), and a runtime index into a
+    # heterogeneous tuple (time-varying delay, fixed).
     enzyme_forward = Set([
         "ARIMA latent logjoint",
         "MA latent logjoint",
@@ -617,21 +587,17 @@ function backend_broken_scenarios()
         "AR vector-prior latent logjoint",
         "Renewal+NegativeBinomial posterior",
         "Renewal+ImportedCases posterior",
-        "ExpGrowthRate+Poisson posterior",
         "Renewal+RightTruncate nowcast posterior",
         "Renewal+ReportTriangle posterior",
         "Renewal+LatentDelay posterior",
         "Renewal+UncertainLatentDelay posterior",
         "Renewal+TimeVaryingLatentDelay posterior",
         "Renewal+UncertainGenInterval posterior",
-        "DirectInfections+Ascertainment day-of-week posterior",
-        "DirectInfections+Aggregate posterior",
-        "DirectInfections+TransformObservation posterior",
-        "DirectInfections+RecordExpected posterior",
-        "DirectInfections+PrefixModifiers posterior",
-        # `EnzymeNoDerivativeError`, not the `deepcopy` rule gap above — its own
-        # cause, through the same per-stream submodel threading that breaks it
-        # under Enzyme reverse.
+        # Passes under Enzyme reverse. The forward-mode failure originates
+        # inside `accumulate_scan(::ConstantRenewalStep, ...)` at
+        # `src/steps/accumulate_scan.jl:25` — the renewal infection step
+        # itself, not the observation side, and not in `Split.jl`. Cause not
+        # yet established beyond that location.
         "Renewal+Split cascade posterior"
     ])
     return Dict{String, Set{String}}(
