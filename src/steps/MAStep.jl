@@ -8,7 +8,10 @@ struct MAStep{C <: AbstractVector{<:Real}} <: AbstractAccumulationStep
 end
 
 function (ma::MAStep)(state, ϵ)
-    new_val = ϵ + dot(ma.θ, state.state)
+    # `mapreduce`, not `LinearAlgebra.dot` — see `ARStep`: `θ` is
+    # order-`q`-length (short), so BLAS `ddot` buys nothing and Enzyme has no
+    # type-analysis rule for its lowering.
+    new_val = ϵ + mapreduce(*, +, ma.θ, state.state)
     new_state = vcat(ϵ, state.state[1:(end - 1)])
     return (; val = new_val, state = new_state)
 end
