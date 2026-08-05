@@ -553,29 +553,73 @@ function backend_broken_scenarios()
     #
     # `Renewal+TimeVaryingLatentDelay posterior` was measured passing after
     # the `_at_all` fix (0e740ef) and is now removed from the broken list.
+    # MA latent logjoint was fixed by the priors.jl filldist ternary removal
+    # (375eee3) — the docstring identified the prior-seam union as the exact
+    # cause. It now passes under Enzyme reverse (21 tests).
+    #
+    # The four AR-related scenarios (ARIMA, DiffLatentModel(RW), ARMA,
+    # AR vector-prior) still fail with `IllegalTypeAnalysisException` under
+    # Enzyme reverse despite the same fix. The common thread is the
+    # `accumulate_scan(ARStep(...), ...)` / `DiffLatentModel._combine_diff`
+    # path, which differs from the `MA`-side `accumulate_scan(MAStep(...), ...)`
+    # in that it composes further accumulation steps (AR inside ARMA inside
+    # DiffLatentModel). The remaining union type is likely introduced by
+    # `vcat`/`cumsum` in `_combine_diff` or by the `%` branch in
+    # `combine_correct` — the root cause is not yet established.
     enzyme_reverse = Set([
-    # Enzyme reverse only — ForwardDiff, ReverseDiff, both Mooncake modes
-    # and Enzyme forward all pass. Reproduced standalone with no
-    # DynamicPPL or package code: `deepcopy`-ing a `Union{Missing, T}`
-    # array, then writing a parameter-dependent value into a missing
-    # slot, hits `AssertionError: Enzyme Internal Error
-    # (rewrite_union_returns_as_ref[2])` from Enzyme's own LLVM rewrite
-    # pass. Identical with/without our `EnzymeRules.inactive` rule and for
-    # both `Int64`/`Float64` — an Enzyme compiler limitation, not a
-    # package defect or a missing rule.
+        "ARIMA latent logjoint",
+        "DiffLatentModel(RandomWalk) latent logjoint",
+        "ARMA latent logjoint",
+        "AR vector-prior latent logjoint",
+        # Enzyme reverse only — ForwardDiff, ReverseDiff, both Mooncake modes
+        # and Enzyme forward all pass. Reproduced standalone with no
+        # DynamicPPL or package code: `deepcopy`-ing a `Union{Missing, T}`
+        # array, then writing a parameter-dependent value into a missing
+        # slot, hits `AssertionError: Enzyme Internal Error
+        # (rewrite_union_returns_as_ref[2])` from Enzyme's own LLVM rewrite
+        # pass. Identical with/without our `EnzymeRules.inactive` rule and for
+        # both `Int64`/`Float64` — an Enzyme compiler limitation, not a
+        # package defect or a missing rule.
         "DirectInfections+PartiallyMissing posterior"
     ])
-    # Enzyme forward now has no remaining broken scenarios.
+    # Enzyme forward still has 12 broken scenarios.
     #
-    # The five union-typed scenarios (ARIMA, MA, DiffLatentModel(RW), ARMA,
-    # AR vector-prior) were fixed by the priors.jl change in 375eee3.
+    # The four AR-related scenarios (ARIMA, DiffLatentModel(RW), ARMA,
+    # AR vector-prior) fail with `IllegalTypeAnalysisException` (same cause
+    # as Enzyme reverse — the `accumulate_scan(ARStep(...), ...)` path).
     #
-    # The nine renewal/delay-convolution scenarios were fixed by the
-    # forward-mode `LinearAlgebra.dot` Enzyme rule (375eee3), which provides
-    # a custom `EnzymeRules.forward` for the BLAS `dot` call in
-    # `renewal_foi`/`LDStep`/`TimeVaryingLDStep` that Enzyme forward mode
-    # has no built-in rule for (`EnzymeNoDerivativeError`).
-    enzyme_forward = Set{String}()
+    # The eight renewal/delay-convolution scenarios fail with
+    # `EnzymeNoDerivativeError` from the BLAS `dot` call in
+    # `renewal_foi`/`LDStep`/`TimeVaryingLDStep`. The `EnzymeRules.forward`
+    # rule for `LinearAlgebra.dot` (375eee3) is loaded and works for simple
+    # cases, but Enzyme inlines the BLAS `cblas_ddot64_` call before the
+    # rule can intercept it, so the fallback BLAS replacement fires instead.
+    # This is a known gap — either the rule needs a narrower type signature
+    # that Enzyme can match before inlining, or the model code needs to avoid
+    # `dot` on BLAS-visible vector lengths (the `mapreduce` alternative used
+    # in `ARStep`/`MAStep` regressed ReverseDiff — see the revert in
+    # f69939f — but a fresh approach may work).
+    #
+    # `Renewal+ImportedCases posterior` is also listed as broken: 12 of 21
+    # differentiation tests fail (the `pairwise_gen_int` gravity-coupling
+    # path likely hits the same `dot` BLAS gap, plus the dense `*` matrix
+    # operations in `renewal_pressure` that Enzyme does support but the
+    # combined gradient path triggers a `BoundsError` in).
+    enzyme_forward = Set([
+        "ARIMA latent logjoint",
+        "DiffLatentModel(RandomWalk) latent logjoint",
+        "ARMA latent logjoint",
+        "AR vector-prior latent logjoint",
+        "Renewal+NegativeBinomial posterior",
+        "Renewal+ImportedCases posterior",
+        "Renewal+RightTruncate nowcast posterior",
+        "Renewal+ReportTriangle posterior",
+        "Renewal+LatentDelay posterior",
+        "Renewal+UncertainLatentDelay posterior",
+        "Renewal+TimeVaryingLatentDelay posterior",
+        "Renewal+UncertainGenInterval posterior",
+        "Renewal+Split cascade posterior"
+    ])
     return Dict{String, Set{String}}(
         "Enzyme reverse" => enzyme_reverse,
         "Enzyme forward" => enzyme_forward)
