@@ -256,9 +256,18 @@ keeps every pmf the same length.
             prefix(as_turing_model(u.params[i], n), Symbol(:param, i)), false)
         params[i] = drawn
     end
+    # Freeze the heterogeneous draws into a `Tuple` before `_at` reads them
+    # back: a `Vector{Any}` keeps every element boxed as `Any` all the way
+    # through the closure below, so Enzyme's activity analysis cannot resolve
+    # a shadow per element and instead boxes each one in a `Base.RefValue`
+    # that `_at` cannot index (`MethodError: no method matching
+    # _at(::RefValue, ::Int)`). A `Tuple`'s element types are fixed by its
+    # runtime contents, so each draw reaches `_at` as a concrete `Number` or
+    # `Vector` — a real type-stability fix, independent of Enzyme.
+    params_t = Tuple(params)
     return map(1:n) do t
         _discretised_pmf(
-            u.family((_at(params[i], t) for i in 1:np)...); Δd = u.Δd, D = u.D)
+            u.family((_at(params_t[i], t) for i in 1:np)...); Δd = u.Δd, D = u.D)
     end
 end
 
