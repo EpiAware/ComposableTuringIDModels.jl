@@ -10,10 +10,18 @@ weighted) linear map.
 
 `strata` is an `inf_strata × time` matrix of per-infection-stratum expected
 series; `map` is an `obs_strata × inf_strata` weight matrix. Stream `k` receives
-``\sum_j \mathrm{map}[k, j]\,\mathrm{strata}[j, :]``, so one `map` covers the
-one-to-one (`map = I`), many-to-one (an aggregation row), and many-to-many
-(a general weight matrix) infection→observation mappings. The stream count is
-`size(map, 1)`, read from the data at model-build time.
+``\sum_j \mathrm{map}[k, j]\,\mathrm{strata}[j, :]``, so `map` is the one
+mechanism for every infection→observation cardinality:
+
+  - **one-to-one** — `map = I(n)`, or no map at all.
+  - **many-to-one** — one aggregation row, e.g. `[1.0 1.0 1.0]` summing three
+    infection strata into a single observation stream.
+  - **many-to-many** — a general weight matrix.
+  - **finer or coarser than the infection process** — a non-square `map`, e.g.
+    splitting one infection stratum across two reporting streams with weights
+    that sum to 1.
+
+The stream count is `size(map, 1)`, read from the data at model-build time.
 
 ## Fields
 
@@ -91,10 +99,11 @@ it sits chooses the composition:
     stream is observed *downstream* of an earlier one. For deaths as a delayed
     fraction of the *expected reported cases*, share the case delay then split:
     `LatentDelay(Split((cases = leaf, deaths = pipeline)), case_delay)`.
-  - **Data-driven strata** — built from a single **template** model: the number
-    and names of streams come from the data at model-build time (one per entry
-    of the `y_t` NamedTuple), and a [`StrataMap`](@ref) maps infection strata
-    onto observation streams.
+  - **Data-driven strata** — built from a single **template** model (or a set
+    of named streams) plus a weight `map`: the infection→observation
+    cardinality is entirely down to `map`, covering the same range of
+    cardinalities as above. See [`StrataMap`](@ref) for the underlying
+    projection.
 
 The threaded quantity is always a stream's **expected** (pre-error) series, never
 its realised noisy draw; observing a downstream stream off another's *sampled*
@@ -110,8 +119,8 @@ still fan out.
 
 In the data-driven strata mode (`m.names === nothing`), `y_t` may instead be
 an `AbstractMatrix` (one stream per row, `\"group1\"`, `\"group2\"`, … as the
-generated names) — the data contract a grouped/panel [`IDModel`](@ref) uses
-via [`GroupedInfections`](@ref) or [`CombineInfections`](@ref).
+generated names) — the data contract a multi-stratum [`IDModel`](@ref) using
+[`CombineInfections`](@ref) on the infection side uses.
 
 The incoming expected series may be a single vector (broadcast to every stream),
 a per-stream NamedTuple, an `inf_strata × time` matrix (one stream per row), or a
@@ -119,7 +128,11 @@ a per-stream NamedTuple, an `inf_strata × time` matrix (one stream per row), or
 
 ## Constructors
 
-  - `Split(streams::NamedTuple)` — explicit named streams.
+  - `Split(streams::NamedTuple)` — explicit named streams, one-to-one with the
+    incoming expected series.
+  - `Split(streams::NamedTuple, map::AbstractMatrix)` — explicit named streams
+    fed by an `obs_strata × inf_strata` weight `map`, so named streams can
+    still express a many-to-one, many-to-many, or finer/coarser mapping.
   - `Split(template::AbstractObservationModel)` — a data-driven strata split
     replicating the template once per `y_t` entry.
   - `Split(template::AbstractObservationModel, map::AbstractMatrix)` — a strata
@@ -148,6 +161,12 @@ cascade = LatentDelay(
             [0.2, 0.3, 0.5]))),
     [0.5, 0.3, 0.2])
 rand(as_turing_model(cascade, (cases = missing, deaths = missing), fill(100.0, 12)))
+
+# Many-to-one: three age strata of infections observed as one hospitalisation
+# stream, via a single aggregation row.
+hospitalisations = Split((hosp = NegativeBinomialError(),), [1.0 1.0 1.0])
+I_t = [10.0 10.0 10.0; 20.0 20.0 20.0; 5.0 5.0 5.0]   # 3 strata, 3 time steps
+rand(as_turing_model(hospitalisations, (hosp = missing,), I_t))
 ```
 
 ## Fields
@@ -169,6 +188,14 @@ end
 function Split(streams::NamedTuple)
     @assert !isempty(streams) "A Split needs at least one stream"
     return Split(streams, collect(string.(keys(streams))), nothing)
+end
+
+# Named streams fed by a weight map: the map's row count must match the
+# number of named streams, one row per stream.
+function Split(streams::NamedTuple, map::AbstractMatrix)
+    @assert !isempty(streams) "A Split needs at least one stream"
+    @assert size(map, 1)==length(streams) "The strata map has $(size(map, 1)) rows but there are $(length(streams)) streams"
+    return Split(streams, collect(string.(keys(streams))), map)
 end
 
 # Data-driven strata: a single template replicated per data stream.
@@ -195,7 +222,7 @@ end
 
 # Ordered stream names: fixed for explicit streams; else the `y_t` keys for a
 # NamedTuple, or `"group1", "group2", ...` for a plain data matrix (rows are
-# streams, e.g. a grouped/panel `IDModel`'s data — see `GroupedInfections`).
+# streams).
 function _split_names(m::Split, y_t)
     m.names === nothing || return m.names
     y_t isa NamedTuple && return collect(string.(keys(y_t)))

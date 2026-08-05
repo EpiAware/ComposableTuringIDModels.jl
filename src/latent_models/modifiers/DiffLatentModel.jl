@@ -58,7 +58,7 @@ function DiffLatentModel(; model, init = [Normal()])
     return DiffLatentModel(model, init, d)
 end
 
-@model function as_turing_model(model::DiffLatentModel, n)
+@model function as_turing_model(model::DiffLatentModel, n::Int)
     d = model.d
     @assert n>d "n must be longer than d"
     latent_init ~ as_turing_submodel(model.init, d; prefix = true)

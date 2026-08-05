@@ -55,7 +55,7 @@ function MA(; θ = [truncated(Normal(0.0, 0.05), -1, 1)],
     return MA(θ, q, _path_prior(ϵ_t))
 end
 
-@model function as_turing_model(model::MA, n)
+@model function as_turing_model(model::MA, n::Int)
     q = model.q
     @assert n>q "n must be longer than the order of the moving average process"
     if q == 1

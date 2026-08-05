@@ -128,3 +128,33 @@ r_to_R(0.1, [0.2, 0.3, 0.5])
 function r_to_R(r, w::AbstractVector)
     return 1 / neg_MGF(r, w)
 end
+
+# Shape helpers shared by `Renewal`, `DirectInfections` and `ExpGrowthRate`: how
+# the initial-infections seed and the latent path are read at a `ModelShape`.
+
+# Drive a scan one time step at a time: a path by its elements, a
+# strata × time matrix by its columns.
+_steps(Rt::AbstractVector) = Rt
+_steps(Rt::AbstractMatrix) = eachcol(Rt)
+
+# The initial-infections seed: one value for a single series, one per stratum
+# otherwise. A bare `Distribution` in the slot draws one scalar; `only` on a
+# `Number` (or a length-1 vector) returns it unchanged, so it also covers the
+# `n::Int` case directly. Broadcast against `n::Dims{2}` gives the same seed to
+# every stratum.
+_seed(x, ::Int) = only(x)
+_seed(x::Real, n::Dims{2}) = fill(x, n[1])
+function _seed(x::AbstractVector, n::Dims{2})
+    @assert length(x)==n[1] "`initialisation` drew $(length(x)) values but the model has $(n[1]) strata"
+    return x
+end
+
+# The implied initial growth rate from a seed `R_t` and generation interval,
+# widened to a per-stratum `R_t` and/or a per-stratum generation interval: a
+# shared interval broadcasts across strata (`Ref(w)`), a per-stratum interval
+# (one row per stratum) is read row by row.
+_init_rate(Rt₀::Real, w::AbstractVector) = R_to_r(Rt₀, w)
+_init_rate(Rt₀::AbstractVector, w::AbstractVector) = R_to_r.(Rt₀, Ref(w))
+function _init_rate(Rt₀::AbstractVector, w::AbstractMatrix)
+    [R_to_r(Rt₀[g], view(w, g, :)) for g in eachindex(Rt₀)]
+end

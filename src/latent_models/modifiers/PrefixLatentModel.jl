@@ -9,7 +9,8 @@ submodel, so its variables appear as `prefix.varname`.
 # Arguments
 
   - `model`: the inner latent model.
-  - `n`: the length of the latent series to generate.
+  - `n`: the shape to generate — a length or an `(n_strata, n_time)` shape,
+    whatever the inner model accepts.
 
 # Examples
 ```@example PrefixLatentModel
@@ -34,8 +35,14 @@ vector of them).
     prefix::P
 end
 
-@model function as_turing_model(model::PrefixLatentModel, n)
+# `PrefixLatentModel` wraps whatever its inner model returns, so it serves both
+# a length-`n` path and an `(n_strata, n_time)` shape. The two methods below
+# delegate to one shared `@model`, which avoids both the duplication and a
+# dispatch ambiguity against the `AbstractPriorModel`/`Dims{2}` guard.
+@model function _prefix_latent(model::PrefixLatentModel, n)
     submodel ~ to_submodel(
         prefix(as_turing_model(model.model, n), Symbol(model.prefix)), false)
     return submodel
 end
+as_turing_model(model::PrefixLatentModel, n::Int) = _prefix_latent(model, n)
+as_turing_model(model::PrefixLatentModel, n::Dims{2}) = _prefix_latent(model, n)

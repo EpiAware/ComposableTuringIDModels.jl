@@ -335,7 +335,7 @@ end
 # out of the differentiated per-evaluation path while preserving the single
 # `as_turing_model(model, n)` entry point; the `@model` is an implementation
 # detail of that one method, not a second public model per struct.
-function as_turing_model(model::HilbertSpaceGP, n)
+function as_turing_model(model::HilbertSpaceGP, n::Int)
     @assert n>1 "n must be greater than 1"
     Φ, sqrt_λ = hsgp_basis(n, model.m, model.c)
     return _hsgp_model(model.kernel, Φ, sqrt_λ, model.m,

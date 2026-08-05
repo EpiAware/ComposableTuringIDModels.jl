@@ -2,18 +2,18 @@
 
 A multi-group epidemic is a panel: one shared infection process seen by several
 groups, each reporting it at its own level.
-[`IDModel`](@ref) expresses this panel with the same constructor as a
-single-group model, just with a `group_effect` prior threaded between the
-infection and observation arguments:
-`IDModel(infection_model, group_effect, observation_model)`.
-Internally this builds a [`GroupedInfections`](@ref) (the shared curve
-replicated per group) observed through a [`Split`](@ref) (every group through
-the same observation model, namespaced by group) — see the [Composable
-design](@ref) page for how the two compose.
+[`Stratify`](@ref) expresses this panel directly.
+A shared process is drawn once over time, and a per-group deviation is drawn
+once over the group axis.
+The two combine into one `groups × time` latent matrix.
+[`Split`](@ref) then observes every group through the same observation model,
+namespaced by group.
+See the [Composable design](@ref) page for how the two compose.
 
 This page drives a per-group reporting level with a [`Hierarchy`](@ref) inside
-a grouped [`IDModel`](@ref), simulates from it and fits it end-to-end under
-NUTS, recovering the per-group levels.
+a [`Stratify`](@ref).
+It simulates from that model and fits it end-to-end under NUTS, recovering
+the per-group levels.
 The group dimension threads from the data and the group prior is namespaced by
 the component, so the panel composes with no hand-orchestration.
 
@@ -21,11 +21,12 @@ the component, so the panel composes with no hand-orchestration.
 
 The shared epidemic is a [`DirectInfections`](@ref) process carrying a
 [`RandomWalk`](@ref) latent, observed with a [`PoissonError`](@ref).
-Every group sees the *same* infection curve ``I_t`` but reports it at its own
-level: a per-group log-reporting level ``\ell_g`` scales the expected counts
-before the observation model.
-Those per-group levels are partially pooled with a [`Hierarchy`](@ref), supplied
-as the `group_effect`.
+[`Stratify`](@ref) puts a per-group level on that latent.
+Every group shares the same random walk, offset by its own log-level
+``\ell_g``, so each group's infection curve is the shared curve scaled by
+``e^{\ell_g}``.
+Those per-group levels are partially pooled with a [`Hierarchy`](@ref),
+supplied as `Stratify`'s `across` slot.
 
 ```@example hier
 using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
@@ -34,28 +35,30 @@ Random.seed!(77)
 
 hierarchy = Hierarchy(; mean = Normal(0.0, 0.5), across = IID(Normal(0.0, 0.5)))
 model = IDModel(
-    DirectInfections(; Z = RandomWalk(), initialisation = Normal(log(50.0), 0.2)),
-    hierarchy,
-    PoissonError())
+    DirectInfections(; Z = Stratify(RandomWalk(), hierarchy),
+        initialisation = Normal(log(50.0), 0.2)),
+    Split(PoissonError()))
 ```
 
 The grouping dimension is **not** a field of any component.
 Passing `as_turing_model(model, Y)` reads `n_groups` and `n_time` from the
 shape of the data matrix `Y` (rows are groups, columns are time) and passes
-`n_groups` to the [`Hierarchy`](@ref) and `n_time` to the infection process,
-the same way a series length is passed to `as_turing_model(latent, n)`.
+`n_groups` to the [`Hierarchy`](@ref) (through `Stratify`'s `across` slot) and
+`n_time` to the shared random walk, the same way a series length is passed to
+`as_turing_model(latent, n)`.
 
 The group prior carries its own innovations (the [`IID`](@ref) `across` process
 samples an `ϵ_t`), which under the prefix-off submodel convention would collide
 with the infection [`RandomWalk`](@ref)'s own `ϵ_t`.
-[`GroupedInfections`](@ref) namespaces the group prior through the prior-slot
-prefix convention so the two never collide, and [`Split`](@ref) prefixes each
-group's observation with `group<g>`.
-The mapping from a group's effect to its row of the infection matrix is the
-`combiner` keyword argument.
-Its default is a multiplicative effect on the exponential scale,
-``\text{row}_g = e^{\ell_g}\, I_t``, so `exp(ℓ_g)` scales the shared curve.
-Swap `combiner` for a different mapping the way [`Ascertainment`](@ref) swaps its
+[`Stratify`](@ref) prefixes its `across` slot automatically so the two never
+collide, and [`Split`](@ref) prefixes each group's observation with
+`group<g>`.
+`Stratify`'s `combine` argument maps a group's level and the shared path onto
+that group's row of the latent matrix.
+By default this is additive: ``Z_{g,t} = \text{shared}_t + \ell_g``.
+After the model's `exp` transformation, each group's curve is the shared
+curve scaled by ``e^{\ell_g}``.
+Swap `combine` for a different mapping the way [`Ascertainment`](@ref) swaps its
 `transform`.
 
 ## Simulate
@@ -68,8 +71,15 @@ We simulate eight groups over 24 time steps:
 n_time, n_groups = 24, 8
 Ymiss = Matrix{Union{Missing, Float64}}(missing, n_groups, n_time)
 sim = as_turing_model(model, Ymiss)()
-Ydata = Float64.(reduce(vcat, [permutedims(sim.generated_y_t[g]) for g in 1:n_groups]))
-true_levels = sim.Z_t.group_levels
+Ydata = Float64.(reduce(vcat,
+    [permutedims(sim.generated_y_t[Symbol(:group, g)]) for g in 1:n_groups]))
+# Z_t[g, :] is the shared random walk plus group g's pooled level. Averaging
+# over time and subtracting the grand mean cancels the shared component and
+# leaves each group's level relative to the others. Only that relative level
+# is identified: a constant added to every group's level and subtracted from
+# the shared path gives the same Z_t, so the two are confounded.
+group_level(Z) = vec(mean(Z; dims = 2)) .- mean(Z)
+true_levels = group_level(sim.Z_t)
 (n_time = n_time, n_groups = n_groups, data_size = size(Ydata),
     true_levels = round.(true_levels, digits = 2))
 ```
@@ -91,11 +101,12 @@ chain = sample(posterior, NUTS(0.85; adtype = Turing.AutoForwardDiff()), 300;
 size(chain, 1)
 ```
 
-The per-group levels are a generated quantity, recovered per draw with `returned`
-and compared with the simulated truth:
+The relative per-group levels are recovered per draw from the generated `Z_t`
+with `returned`, then compared with the simulated truth:
 
 ```@example hier
-level_draws = reduce(hcat, [g.Z_t.group_levels for g in vec(returned(posterior, chain))])
+level_draws = reduce(hcat,
+    [group_level(g.Z_t) for g in vec(returned(posterior, chain))])
 post_mean = vec(mean(level_draws; dims = 2))
 (true_levels = round.(true_levels, digits = 2),
     posterior_means = round.(post_mean, digits = 2),
@@ -123,15 +134,16 @@ scatter!(ax, true_levels, md; color = :seagreen, markersize = 12)
 fig
 ```
 
-Each group's credible interval covers the ``y = x`` line, so the partially pooled
-per-group levels are recovered inside a full composed panel.
-`IDModel`'s grouped constructor supplied the panel structure, the
-[`Hierarchy`](@ref) supplied the per-group levels, and the group dimension
-threaded from the data with the group prior namespaced by the component.
+Each group's credible interval covers the ``y = x`` line, so the partially
+pooled per-group levels are recovered inside a full composed panel.
+[`Stratify`](@ref) supplied the panel structure, the [`Hierarchy`](@ref)
+supplied the per-group levels, and the group dimension threaded from the data
+with the group prior namespaced by the component.
 Swapping `across = RandomWalk()` in the [`Hierarchy`](@ref) would instead pool
-*neighbouring* groups (correlated ordered strata), and swapping the `group_effect`
-for a bare [`IID`](@ref) or a `Distribution` would drop the shared level for
-independent per-group levels, each with no other change.
+*neighbouring* groups (correlated ordered strata).
+Swapping `Stratify`'s `across` slot for a bare [`IID`](@ref) or a
+`Distribution` would drop the shared level for independent per-group levels,
+each with no other change.
 
 When the groups are genuinely **separate** infection processes rather than one
 shared curve — several distinct regions, say, each with its own latent — see

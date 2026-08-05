@@ -100,7 +100,7 @@ function BroadcastLatentModel(model; period::Integer,
     return BroadcastLatentModel(model, period, broadcast_rule)
 end
 
-@model function as_turing_model(model::BroadcastLatentModel, n)
+@model function as_turing_model(model::BroadcastLatentModel, n::Int)
     m = broadcast_n(model.broadcast_rule, n, model.period)
     latent_period ~ as_turing_submodel(model.model, m)
     return broadcast_rule(model.broadcast_rule, latent_period, n, model.period)

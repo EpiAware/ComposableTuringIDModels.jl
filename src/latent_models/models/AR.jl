@@ -46,8 +46,7 @@ The coefficient is mapped through `transform` (default `tanh` for a process, so 
 unbounded path stays in the stationary band; `identity` for a bounded
 `Distribution`) and tracked as the generated quantity `ρ`, recoverable from the
 chain (`group(chain, :ρ)`). Higher-order (`p > 1`) coefficients are constant;
-time-varying higher-order AR is tracked in
-[#113](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/113).
+time-varying higher-order AR is not yet supported.
 
 # Examples
 ```@example AR
@@ -97,7 +96,7 @@ function AR(; damp = truncated(Normal(0.0, 0.05), 0, 1), init = Normal(),
     return AR(damp, init, p, _path_prior(ϵ_t), transform)
 end
 
-@model function as_turing_model(model::AR, n)
+@model function as_turing_model(model::AR, n::Int)
     p = model.p
     @assert n>p "n must be longer than the order of the autoregressive process"
     ar_init ~ as_turing_submodel(model.init, p; prefix = true)

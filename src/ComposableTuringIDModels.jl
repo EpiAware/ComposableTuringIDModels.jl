@@ -32,7 +32,7 @@ using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
 using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
-using LinearAlgebra: dot, cholesky, Symmetric, I
+using LinearAlgebra: dot, cholesky, Symmetric, I, UniformScaling
 using LogExpFunctions: softmax, xexpy, log1pexp
 using OrdinaryDiffEq: ODEProblem, ODEFunction, solve, remake, AutoVern7, Rodas5P
 using Random: AbstractRNG, randexp, default_rng
@@ -90,13 +90,18 @@ export SqExponentialKernel, Matern32Kernel, Matern52Kernel, spectral_density,
 export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
        CombineLatentModels, ConcatLatentModels, BroadcastLatentModel,
        RepeatEach, RepeatBlock, broadcast_rule, broadcast_n, broadcast_dayofweek,
-       broadcast_weekly, equal_dimensions, arma, arima, Hierarchy
+       broadcast_weekly, equal_dimensions, arma, arima, Hierarchy,
+       Stratify, Replicate
 
 # --- infection models ---
 export DirectInfections, ExpGrowthRate, Renewal,
        RenewalStep, SusceptibleDepletion, ImportedCases,
        R_to_r, r_to_R, expected_Rt
-export CombineInfections, GroupedInfections
+export CombineInfections
+
+# --- coupling between strata ---
+export renewal_pressure, pairwise_gen_int, AbstractMixingModel, MixingStep,
+       Gravity, gravity
 
 # --- ODE compartmental models ---
 export SIRParams, SEIRParams, ODEProcess, CatalystODEParams
@@ -122,18 +127,28 @@ export IDProblem, NUTSampler, DirectSample,
        apply_method, IDObservables, generated_observables,
        spread_draws, get_param_array, forecast
 
+# --- extension points ---
+# Names a component author implements against but rarely calls: the shape
+# contract, the two seams that widen a model across strata, and the renewal
+# step/modifier interfaces. Public but not exported, so they are documented and
+# supported without crowding the namespace of a `using` call.
+public ModelShape, across_shape, infection_strata,
+       AbstractAccumulationStep, AbstractConstantRenewalStep,
+       ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
+       apply_modifier, renewal_foi
+
 # --- core architecture ---
 include("base/base.jl")
 include("base/roles.jl")
+include("base/shapes.jl")
 include("base/interfaces.jl")
 include("base/priors.jl")
 include("base/prettyprinting.jl")
 
 # --- accumulation steps ---
 # The backend-agnostic `accumulate_scan` machinery and the concrete step structs
-# it scans over, regrouped from `base/`, `utils/`, and the individual model
-# files into one location (see issue #48, Phase 1). Included early so every step
-# type is defined before the model components that construct them.
+# it scans over. Included early so every step type is defined before the model
+# components that construct them.
 include("steps/AbstractAccumulationStep.jl")
 include("steps/accumulate_scan.jl")
 include("steps/RWStep.jl")
@@ -144,6 +159,8 @@ include("steps/LDStep.jl")
 include("steps/TimeVaryingLDStep.jl")
 include("steps/RenewalSteps.jl")
 include("steps/RenewalStep.jl")
+include("steps/MixingStep.jl")
+include("steps/Gravity.jl")
 include("steps/ImportedCases.jl")
 
 # --- utilities and distributions ---
@@ -171,6 +188,8 @@ include("latent_models/modifiers/RecordExpectedLatent.jl")
 include("latent_models/manipulators/CombineLatentModels.jl")
 include("latent_models/manipulators/ConcatLatentModels.jl")
 include("latent_models/manipulators/Hierarchy.jl")
+include("latent_models/manipulators/Stratify.jl")
+include("latent_models/manipulators/Replicate.jl")
 include("latent_models/manipulators/broadcast/LatentModel.jl")
 include("latent_models/manipulators/broadcast/rules.jl")
 include("latent_models/manipulators/broadcast/helpers.jl")
@@ -184,7 +203,6 @@ include("infection_models/Renewal.jl")
 # `utils.jl` defines the `R_to_r(::Renewal)` method, so it follows `Renewal`.
 include("infection_models/utils.jl")
 include("infection_models/CombineInfections.jl")
-include("infection_models/GroupedInfections.jl")
 
 # --- ODE compartmental models ---
 include("ode/SIRParams.jl")

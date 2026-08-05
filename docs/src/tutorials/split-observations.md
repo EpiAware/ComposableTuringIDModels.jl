@@ -221,10 +221,11 @@ infection model for [`CombineInfections`](@ref): it draws each process
 independently and stacks the results into the same `infection-strata × time`
 matrix `Split`/`StrataMap` already expect, so `IDModel(CombineInfections([...]),
 Split(template, W))` maps several distinct infection processes onto streams
-end-to-end. For a **shared** infection curve replicated per group by a
-partially pooled level instead — the panel case, not several distinct
-processes — see [`GroupedInfections`](@ref) and [Partial pooling across
-groups](@ref tutorial-hierarchy).
+end-to-end. For one process carried across a strata axis instead, with
+partially pooled per-stratum deviations, see [`Stratify`](@ref) and [Partial
+pooling across groups](@ref tutorial-hierarchy). It also composes with
+[`Renewal`](@ref)'s `mixing` slot, see [Coupled patch models](@ref
+tutorial-patches).
 
 ## References
 

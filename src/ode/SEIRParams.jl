@@ -50,7 +50,7 @@ infectious compartments using the constant-incidence equilibrium proportions
 # Arguments
 
   - `params`: the [`SEIRParams`](@ref) struct.
-  - `n`: unused size argument; accepted for the common `as_turing_model`
+  - `n`: unused `Int` size argument; accepted for the common `as_turing_model`
     signature.
 
 # Keyword Arguments
@@ -70,7 +70,7 @@ seirparams = SEIRParams(
     incubation_rate = LogNormal(log(0.1), 0.05),
     recovery_rate = LogNormal(log(0.1), 0.05),
     initial_prop_infected = Beta(1, 99))
-rand(as_turing_model(seirparams, nothing))
+rand(as_turing_model(seirparams, 0))
 ```
 
 ## Fields
@@ -104,7 +104,7 @@ function SEIRParams(; tspan, infectiousness::Distribution, incubation_rate::Dist
         incubation_rate, recovery_rate, initial_prop_infected)
 end
 
-@model function as_turing_model(params::SEIRParams, n)
+@model function as_turing_model(params::SEIRParams, n::Union{Int, Nothing})
     β ~ params.infectiousness
     α ~ params.incubation_rate
     γ ~ params.recovery_rate

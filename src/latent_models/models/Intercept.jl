@@ -22,7 +22,7 @@ end
 
 Intercept(; intercept) = Intercept(intercept)
 
-@model function as_turing_model(model::Intercept, n)
+@model function as_turing_model(model::Intercept, n::Int)
     intercept ~ model.intercept
     return fill(intercept, n)
 end
@@ -34,6 +34,6 @@ A fixed (non-sampled) intercept broadcast to a length-`n` latent process.
     intercept::F
 end
 
-@model function as_turing_model(model::FixedIntercept, n)
+@model function as_turing_model(model::FixedIntercept, n::Int)
     return fill(model.intercept, n)
 end

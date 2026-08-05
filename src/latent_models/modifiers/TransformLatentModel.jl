@@ -6,7 +6,8 @@ Apply a transformation function to the output of an inner latent model.
 # Arguments
 
   - `model`: the inner latent model whose output is transformed.
-  - `n`: the length of the latent series to generate.
+  - `n`: the shape to generate — a length or an `(n_strata, n_time)` shape,
+    whatever the inner model accepts.
 
 # Examples
 ```@example TransformLatentModel
@@ -42,7 +43,17 @@ end
 
 TransformLatentModel(; model, transform) = TransformLatentModel(model, transform)
 
-@model function as_turing_model(model::TransformLatentModel, n)
+# `TransformLatentModel` wraps whatever its inner model returns, so it serves
+# both a length-`n` path and an `(n_strata, n_time)` shape. The two methods
+# below delegate to one shared `@model`, which avoids both the duplication and
+# a dispatch ambiguity against the `AbstractPriorModel`/`Dims{2}` guard.
+@model function _transform_latent(model::TransformLatentModel, n)
     untransformed ~ as_turing_submodel(model.model, n)
     return model.transform(untransformed)
+end
+function as_turing_model(model::TransformLatentModel, n::Int)
+    return _transform_latent(model, n)
+end
+function as_turing_model(model::TransformLatentModel, n::Dims{2})
+    return _transform_latent(model, n)
 end

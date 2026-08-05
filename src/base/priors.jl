@@ -30,7 +30,7 @@ variable names flat. Two kinds of call site pass `prefix = true`:
 
   - a **prior slot** (a component's `damp` / `init` / `θ` etc.), so the slot's
     left-hand name namespaces the whole prior submodel and a process-valued prior
-    can never collide with the host's own variables (issue #80);
+    can never collide with the host's own variables;
   - the **deliberately-prefixing** components ([`PrefixLatentModel`](@ref),
     [`Split`](@ref)), which stream their children under an explicit name.
 
@@ -76,9 +76,10 @@ end
 # method above — the length-`n`, e.g. time-varying / hierarchical, path. A
 # component consumes whichever it gets with [`_at`](@ref), so supplying a process
 # makes the parameter vary with no rewiring while a `Distribution` keeps its clean
-# constant name. `n` is ignored for the scalar case.
+# constant name. `n` is ignored for the scalar case, whatever shape it is asked
+# for.
 
-as_turing_submodel(d::Distribution, ::Int; prefix::Bool = false) = d
+as_turing_submodel(d::Distribution, ::ModelShape; prefix::Bool = false) = d
 
 function as_turing_submodel(
         v::AbstractVector{<:Distribution}, n::Int; prefix::Bool = false)
@@ -121,11 +122,12 @@ Giving `as_turing_model` a `Distribution` method lets a **bare distribution** fl
 through [`as_turing_submodel`](@ref) exactly like a full model, so a component's
 parameter slot samples `θ ~ as_turing_submodel(model.slot, n)` uniformly whether
 the slot holds a bare distribution or a process. A bare distribution draws ONE
-scalar value (a constant, no length-`n` allocation); `n` is ignored. A component
-then reads a possibly-time-varying parameter per step with [`_at`](@ref), so the
-scalar stays constant while a process-valued slot varies — this is the single seam
-behind [`AR`](@ref)'s optionally-time-varying damping and the other per-step
-parameters.
+scalar value (a constant, no length-`n` allocation) whatever shape it is asked
+for — `n` is ignored, whether it is a length or an `(n_strata, n_time)` shape.
+A component then reads a possibly-time-varying parameter per step with
+[`_at`](@ref), so the scalar stays constant while a process-valued slot
+varies — this is the single seam behind [`AR`](@ref)'s optionally-time-varying
+damping and the other per-step parameters.
 
 For `n` **independent** draws (a white-noise process) use the explicit
 [`IID`](@ref) component; for a **single shared** value broadcast to length `n` use
@@ -134,7 +136,8 @@ For `n` **independent** draws (a white-noise process) use the explicit
 # Arguments
 
   - `prior`: the prior distribution.
-  - `n`: accepted for a uniform seam signature; ignored (the draw is scalar).
+  - `n`: accepted for a uniform seam signature; ignored (the draw is scalar
+    whatever shape is asked for).
 
 # Examples
 ```@example as_turing_model_distribution
@@ -142,7 +145,7 @@ using ComposableTuringIDModels, Distributions
 as_turing_model(Normal(), 3)()   # a single scalar draw
 ```
 "
-@model function as_turing_model(prior::Distribution, n::Int)
+@model function as_turing_model(prior::Distribution, n::ModelShape)
     θ ~ prior
     return θ
 end
@@ -203,6 +206,8 @@ allocation).
 "
 _at(p::Number, t) = p
 _at(p::AbstractVector, t) = p[t]
+# A strata × time parameter read at step `t` is that step's column.
+_at(p::AbstractMatrix, t) = view(p, :, t)
 
 # Order (p / q / d) implied by a prior: a vector fixes it to the vector length; a
 # single distribution or a richer prior model defaults to order 1.

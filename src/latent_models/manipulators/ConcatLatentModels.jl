@@ -105,7 +105,7 @@ function equal_dimensions(n::Int, m::Int)::Vector{Int}
     return [base + (i <= r ? 1 : 0) for i in 1:m]
 end
 
-@model function as_turing_model(latent_models::ConcatLatentModels, n)
+@model function as_turing_model(latent_models::ConcatLatentModels, n::Int)
     @assert latent_models.no_models<n "The number of latent variables must be greater than the number of models"
     dims = latent_models.dimension_adaptor(n, latent_models.no_models)
     @assert all(x -> x > 0, dims) "Non-positive dimensions are not allowed"

@@ -1,8 +1,7 @@
 # Stack several (possibly different) infection processes into one
-# infection-strata x time `I_t` matrix — the "different many" many-to-many
-# infection-side mapping (issue #180). Complements `Split`/`StrataMap`, which
-# already carry the observation-side mapping from an `inf_strata x time`
-# matrix onto observation streams.
+# infection-strata x time `I_t` matrix. Complements `Split`/`StrataMap`, which
+# carry the observation-side mapping from an `inf_strata x time` matrix onto
+# observation streams.
 
 @doc raw"
 Combine several infection processes into one `n_strata x n_time` `I_t` matrix.
@@ -23,6 +22,12 @@ processes would otherwise collide on variable names (e.g. two [`RandomWalk`](@re
 both naming their innovation `ϵ_t`), so this is one of the components that
 prefixes on purpose rather than following the package's flat, prefix-off
 default.
+
+`n` stays a plain `Int` here. The stratum count is fixed by how many models
+`models` holds, not by a shape argument, and each model runs its own
+independent scan, so there is no shared incidence window for a `mixing`
+operator to couple. See [`Renewal`](@ref)'s `mixing` slot and [Coupled patch
+models](@ref case-study-patches) for the couplable case.
 
 ## Fields
 

@@ -8,6 +8,23 @@
     @test all(>(0), out.I_t)
 end
 
+@testitem "ExpGrowthRate at Dims{2}, with a Replicate rt: independent paths" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(410)
+    # `ExpGrowthRate`'s own docstring shows a stratified example, but it is
+    # never actually built at `(n_strata, n_time)` in the tests, so the
+    # `_cumsum(::AbstractMatrix)` branch it needs there is unexercised.
+    # `Replicate` in the `rt` slot is likewise only tested standalone or
+    # inside `Stratify`'s `across`, never as an infection model's own
+    # `rt`/`Z`, despite being a documented, independent-per-stratum use case.
+    egr = ExpGrowthRate(; rt = Replicate(RandomWalk()), initialisation = Normal())
+    out = as_turing_model(egr, (3, 12))()
+    @test size(out.I_t) == (3, 12)
+    @test size(out.Z_t) == (3, 12)
+    @test all(isfinite, out.I_t)
+    @test all(>(0), out.I_t)
+end
+
 @testitem "Renewal generates an Rt path and maps it to infections" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(42)

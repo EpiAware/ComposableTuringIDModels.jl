@@ -1,4 +1,4 @@
-# The renewal accumulation step (#48).
+# The renewal accumulation step.
 #
 # `RenewalStep` is *the* renewal step: a constant-generation-interval force of
 # infection with an ordered tuple of modifiers composing on top, sharing one
@@ -14,7 +14,7 @@
 # value. The contract here separates the *contribution* to the new
 # incidence (each modifier transforms it) from the single shared-window *advance*
 # performed once per step. AR/MA step-fusion (a different, non-shared state
-# contract) is out of scope and stays as model nesting; see #48.
+# contract) is out of scope and stays as model nesting.
 
 @doc raw"
 Abstract supertype for renewal modifiers composed onto a [`RenewalStep`](@ref).
@@ -23,7 +23,10 @@ The type covers two shapes. A **scan** modifier is called by the scan itself: it
 transforms the proposed new incidence and carries its own substate. It
 implements
 
-  - `modifier_init_state(mod)` — the modifier's initial substate.
+  - `modifier_init_state(mod, window)` — the modifier's initial substate, given
+    the step's initial incidence window. The window is passed because a
+    substate that tracks the incidence has to match its shape: a scalar for one
+    series, one value per stratum for a stratified renewal.
   - `apply_modifier(mod, incidence, substate)` — return
     `(new_incidence, new_substate)`.
 
@@ -69,7 +72,9 @@ function _unresolved_modifier(mod)
                  "`modifier_init_state` and `apply_modifier`.")
 end
 
-modifier_init_state(mod::AbstractRenewalModifier) = _unresolved_modifier(mod)
+function modifier_init_state(mod::AbstractRenewalModifier, window)
+    return _unresolved_modifier(mod)
+end
 
 function apply_modifier(mod::AbstractRenewalModifier, incidence, substate)
     return _unresolved_modifier(mod)
@@ -98,26 +103,48 @@ count ``S``. Adding it to a renewal step gives a renewal process with a fixed
 population and susceptible depletion, e.g.
 `Renewal(gen_int, SusceptibleDepletion(N))`.
 
+`pop_size` is a scalar for one series, and a per-stratum vector for a
+stratified renewal.
+Each stratum then depletes its own pool.
+A scalar given to a stratified renewal is shared by every stratum, so each
+depletes a separate pool of the same size.
+
 It samples nothing, so it is a plain scan modifier: the pre-scan seam (see
 [`AbstractRenewalModifier`](@ref)) returns it unchanged.
 
 ## Fields
 
-  - `pop_size`: the population size.
+  - `pop_size`: the population size, one value or one per stratum.
 "
 struct SusceptibleDepletion{T} <: AbstractRenewalModifier
-    "The population size."
+    "The population size, one value or one per stratum."
     pop_size::T
 end
 
-modifier_init_state(mod::SusceptibleDepletion) = mod.pop_size
+# The susceptible pool has to match the incidence it depletes, so a scalar pool
+# given to a stratified renewal is spread over the strata rather than left as a
+# scalar that the first step would silently widen.
+function modifier_init_state(mod::SusceptibleDepletion, window)
+    return _match_strata(mod.pop_size, window)
+end
+
+_match_strata(pop_size, ::AbstractVector) = pop_size
+_match_strata(pop_size::Real, window::AbstractMatrix) = fill(pop_size, size(window, 1))
+function _match_strata(pop_size::AbstractVector, window::AbstractMatrix)
+    @assert length(pop_size)==size(window, 1) "`pop_size` has " *
+                                              "$(length(pop_size)) entries " *
+                                              "but the renewal has " *
+                                              "$(size(window, 1)) strata"
+    return pop_size
+end
 
 # The susceptible fraction is floored because a large force of infection can
 # take more than the pool holds, leaving `S` negative for the rest of the run.
-# The floor keeps the recursion going there.
+# The floor keeps the recursion going there. Every operation is broadcast, so
+# one line serves a scalar and a per-stratum pool.
 function apply_modifier(mod::SusceptibleDepletion, incidence, S)
-    new_incidence = max(S / mod.pop_size, 1e-6) * incidence
-    return new_incidence, S - new_incidence
+    new_incidence = max.(S ./ mod.pop_size, 1e-6) .* incidence
+    return new_incidence, S .- new_incidence
 end
 
 @doc raw"
@@ -177,16 +204,19 @@ function (step::RenewalStep)(state, Rt)
     substates = ntuple(i -> state[i + 1], length(step.modifiers))
     foi = renewal_foi(step.core, window, Rt)
     new_incidence, new_substates = _thread_modifiers(step.modifiers, foi, substates)
-    new_window = vcat(window[2:end], new_incidence)
+    new_window = _advance(window, new_incidence)
     return [new_window, new_substates...]
 end
 
 function _renewal_init_state(step::RenewalStep, I₀, r_approx, len_gen_int)
     window = _renewal_init_state(step.core, I₀, r_approx, len_gen_int)
-    return [window, map(modifier_init_state, step.modifiers)...]
+    substates = map(mod -> modifier_init_state(mod, window), step.modifiers)
+    return [window, substates...]
 end
 
-get_state(::RenewalStep, initial_state, state) = state .|> st -> last(st[1])
+function get_state(::RenewalStep, initial_state, state)
+    return _series([_newest(s[1]) for s in state])
+end
 
 # --- the pre-scan seam ------------------------------------------------------
 #
@@ -202,11 +232,13 @@ get_state(::RenewalStep, initial_state, state) = state .|> st -> last(st[1])
 Resolve an accumulation step ahead of the scan, sampling any parameters its
 parts carry.
 
-The default method samples nothing and returns the step unchanged; a
-[`RenewalStep`](@ref) resolves its [`AbstractRenewalModifier`](@ref)s through
-their own `as_turing_model` methods and rebuilds itself from the resolved
-modifiers. [`Renewal`](@ref) draws its step through this one seam, so a
-modifier with priors needs no special handling in the infection model.
+The default method samples nothing and returns the step unchanged.
+A [`RenewalStep`](@ref) resolves both its core and its
+[`AbstractRenewalModifier`](@ref)s through their own `as_turing_model` methods
+and rebuilds itself from the resolved parts. [`Renewal`](@ref) draws its step
+through this one seam, so neither a modifier with priors nor a drawn coupling
+operator (a [`MixingStep`](@ref)) needs special handling in the infection
+model.
 
 Each modifier is prefixed by its position in the tuple, so the ``i``th
 modifier's variables are namespaced `modifier_<i>` (see
@@ -222,8 +254,9 @@ modifier's variables are namespaced `modifier_<i>` (see
 end
 
 @model function as_turing_model(step::RenewalStep, n)
+    core ~ as_turing_submodel(step.core, n; prefix = true)
     modifiers ~ to_submodel(_resolve_modifiers(step.modifiers, n, 1), false)
-    return RenewalStep(step.core, modifiers)
+    return RenewalStep(core, modifiers)
 end
 
 # Resolve a modifier tuple, one submodel per modifier. The recursion is

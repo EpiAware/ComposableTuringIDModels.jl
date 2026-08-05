@@ -18,6 +18,7 @@ pages = [
         "A Gaussian-process latent process" => "tutorials/gaussian-process.md",
         "Time-varying damping in an AR process" => "tutorials/time-varying-damping.md",
         "Partial pooling across groups" => "tutorials/hierarchy-stacked.md",
+        "Coupled patch models" => "tutorials/patch-models.md",
         "Renewal modifiers: depletion and importation" => "getting-started/tutorials/renewal-modifiers.md"
     ],
     "API reference" => [
