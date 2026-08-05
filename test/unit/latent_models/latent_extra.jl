@@ -10,6 +10,34 @@
     @test length(as_turing_model(rec, 5)()) == 5
 end
 
+@testitem "shape-transparent manipulators pass through a (strata, time) shape" begin
+    using ComposableTuringIDModels, Distributions, Random
+    # `TransformLatentModel`, `PrefixLatentModel`, `RecordExpectedLatent` and
+    # `CombineLatentModels` all wrap whatever their inner model returns, so
+    # each has its own `as_turing_model(m, n::Dims{2})` method delegating to
+    # the same shared `@model` used at `n::Int`. None of the four is ever
+    # called at that shape elsewhere, so each is checked here directly.
+    n = (3, 8)
+    inner() = Stratify(RandomWalk(), Hierarchy())
+
+    Random.seed!(311)
+    trans = TransformLatentModel(inner(), x -> exp.(x))
+    @test size(as_turing_model(trans, n)()) == n
+    @test all(>(0), as_turing_model(trans, n)())
+
+    Random.seed!(312)
+    pm = PrefixLatentModel(inner(), "Strata")
+    @test size(as_turing_model(pm, n)()) == n
+
+    Random.seed!(313)
+    rec = RecordExpectedLatent(inner())
+    @test size(as_turing_model(rec, n)()) == n
+
+    Random.seed!(314)
+    combined = CombineLatentModels([inner(), inner()])
+    @test size(as_turing_model(combined, n)()) == n
+end
+
 @testitem "latent modifiers accept a Distribution / IID / process member" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(310)

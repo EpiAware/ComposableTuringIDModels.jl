@@ -59,6 +59,19 @@ end
     @test renewal_pressure(K, [0.0], window) ≈ hand
 end
 
+@testitem "renewal_pressure: a mixing matrix AND a per-stratum interval" begin
+    using ComposableTuringIDModels: renewal_pressure
+    # `K` is checked with a shared `g`, and a per-stratum `g` is checked with
+    # `I`, but never both non-identity together, so the general path (a
+    # mixing matrix on top of per-stratum convolved histories) is unchecked.
+    g = [0.2 0.3 0.5; 0.5 0.3 0.2]            # 2 strata x 3 lags
+    window = [10.0 20.0 30.0; 1.0 2.0 3.0]
+    K = [0.9 0.1; 0.2 0.8]
+    conv = [sum(window[s, i] * g[s, i] for i in 1:3) for s in 1:2]
+    hand = [sum(K[gg, h] * conv[h] for h in 1:2) for gg in 1:2]
+    @test renewal_pressure(K, g, window) ≈ hand
+end
+
 @testitem "an off-diagonal mixing matrix moves incidence between strata" begin
     using ComposableTuringIDModels, Distributions
     using LinearAlgebra: I
@@ -95,6 +108,12 @@ end
     @test K[2, 1] ≈ pop[2]^1.0 * pop[1]^1.0 / dist[2, 1]^2.0
     within = gravity(pop, dist; within = 0.5)
     @test within[1, 1] == 0.5 == within[2, 2]
+end
+
+@testitem "gravity rejects a dist matrix that doesn't match pop" begin
+    using ComposableTuringIDModels
+    @test_throws AssertionError gravity(
+        [1e6, 2e5, 3e5], [0.0 1.0; 1.0 0.0])
 end
 
 @testitem "a drawn Gravity mixing samples its exponents" begin
@@ -190,4 +209,41 @@ end
 
     @test_throws "non-negative" pairwise_gen_int(K, [-0.1, 0.5, 0.6])
     @test_throws "sum to 1" pairwise_gen_int(K, [0.2, 0.2, 0.2])
+end
+
+@testitem "pairwise_gen_int plugs into a Renewal's mixing slot" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using LinearAlgebra: I
+    # `pairwise_gen_int` is only unit-tested as a bare function elsewhere; a
+    # `strata x strata x lags` array built from it is never actually handed
+    # to `Renewal(...; mixing = ...)`. With `K = I` the per-pair intervals
+    # degenerate to the shared interval on the diagonal alone, so this must
+    # reproduce the uncoupled (`mixing = I`) model exactly — the identity
+    # that pins the array's lag convention, worth a regression test rather
+    # than only something checked by hand.
+    gen_int = [0.2, 0.3, 0.5]
+    n_strata, n_time = 2, 20
+    rt = Stratify(RandomWalk(), Hierarchy())
+    seeds = IID(Normal(log(20.0), 0.5))
+
+    identity_pairwise = pairwise_gen_int([1.0 0.0; 0.0 1.0], gen_int)
+    coupled_identity = Renewal(; generation_time = gen_int, rt = rt,
+        initialisation = seeds, mixing = identity_pairwise)
+    uncoupled = Renewal(; generation_time = gen_int, rt = rt,
+        initialisation = seeds, mixing = I)
+
+    Random.seed!(900)
+    I_pairwise = as_turing_model(coupled_identity, (n_strata, n_time))().I_t
+    Random.seed!(900)
+    I_uncoupled = as_turing_model(uncoupled, (n_strata, n_time))().I_t
+    @test I_pairwise ≈ I_uncoupled
+
+    # A genuinely off-diagonal pairwise interval still runs and differs.
+    K = [0.9 0.1; 0.2 0.8]
+    coupled = Renewal(; generation_time = gen_int, rt = rt,
+        initialisation = seeds, mixing = pairwise_gen_int(K, gen_int))
+    Random.seed!(900)
+    I_coupled = as_turing_model(coupled, (n_strata, n_time))().I_t
+    @test all(isfinite, I_coupled)
+    @test I_coupled != I_uncoupled
 end

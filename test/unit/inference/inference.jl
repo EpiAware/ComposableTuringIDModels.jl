@@ -11,6 +11,63 @@
     @test length(sim.Z_t) == 20
 end
 
+@testitem "_obs_data_shape resolves stratified shapes from data or Split" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: _obs_data_shape, _obs_data_shape_missing
+    # `IDProblem` and `forecast` share this helper, so every branch it can
+    # take is exercised directly here rather than only through the callers.
+    plain = PoissonError()
+    Y = fill(5.0, 2, 10)
+    @test _obs_data_shape(plain, Y, 10) == (2, 10)   # AbstractMatrix y_t
+    mapped = Split(PoissonError(), [1.0 1.0 1.0])    # 1 stream, 3 inf strata
+    @test _obs_data_shape(mapped, fill(5.0, 1, 10), 10) == (3, 10)
+
+    named = Split((a = PoissonError(), b = PoissonError()))
+    y_nt = (a = fill(5.0, 10), b = fill(3.0, 10))
+    @test _obs_data_shape(named, y_nt, 10) == (2, 10)   # NamedTuple y_t
+
+    # `y_t === missing` falls back to `_obs_data_shape_missing`; its three
+    # `Split` branches (map / names / neither) are each checked in turn.
+    @test _obs_data_shape(plain, missing, 10) == 10
+    @test _obs_data_shape_missing(mapped, 10) == (3, 10)   # map branch
+    @test _obs_data_shape_missing(named, 10) == (2, 10)    # names branch
+    # Data-driven strata mode: no map, no names (both set at data time), so
+    # with `y_t = missing` there is nothing to read a stratum count from and
+    # the shape falls back to a single series.
+    strata_template = Split(PoissonError())
+    @test _obs_data_shape_missing(strata_template, 10) == 10   # neither branch
+end
+
+@testitem "IDProblem resolves a stratified infection process via Split" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(710)
+    T = 12
+    # A Split with a weight map fixes the infection-stratum count at the
+    # map's column count, regardless of the (1-stream) data.
+    problem_map = IDProblem(
+        infection = DirectInfections(;
+            Z = Stratify(
+                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))),
+            initialisation = Normal(log(20), 0.2)),
+        observation_model = Split(PoissonError(), [1.0 1.0 1.0]),
+        tspan = (1, T))
+    Y = Matrix{Union{Missing, Float64}}(missing, 1, T)
+    sim_map = as_turing_model(problem_map, (; y_t = Y))()
+    @test size(sim_map.I_t) == (3, T)
+
+    # A Split with named streams and `y_t = missing` builds one stratum per
+    # name.
+    problem_named = IDProblem(
+        infection = DirectInfections(;
+            Z = Stratify(
+                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))),
+            initialisation = Normal(log(20), 0.2)),
+        observation_model = Split((a = PoissonError(), b = PoissonError())),
+        tspan = (1, T))
+    sim_named = as_turing_model(problem_named, (; y_t = missing))()
+    @test size(sim_named.I_t) == (2, T)
+end
+
 @testitem "apply_method runs a NUTSampler over an IDProblem" tags=[:sample] begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(72)
@@ -123,6 +180,49 @@ end
     fc = forecast(problem, y, chain, h)
     @test size(fc, 1) == 30
     @test length(vec(fc[@varname(y_t[T + h])])) == 30
+end
+
+@testitem "forecast extends a stratified model given a matrix y" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(105)
+    model = IDModel(
+        DirectInfections(; Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
+            initialisation = IID(Normal(log(20.0), 0.3))),
+        PoissonError())
+    n_strata, T, h = 2, 12, 4
+    y = as_turing_model(
+        model, fill(missing, n_strata, T), (n_strata, T))().generated_y_t
+    chain = sample(
+        as_turing_model(model, y, (n_strata, T)), Prior(), 30;
+        progress = false)
+    fc = forecast(model, y, chain, h)
+    @test size(fc, 1) == 30
+    # Rebuilding at the extended shape and reading the generated quantities
+    # back off the forecast draws confirms the matrix-shaped `y` was resolved
+    # to the right stratified shape throughout (build, sample, and forecast).
+    gens_fc = vec(returned(
+        as_turing_model(model, hcat(y, fill(missing, n_strata, h)),
+            (n_strata, T + h)), fc))
+    @test all(d -> size(gens_fc[d].I_t) == (n_strata, T + h), 1:10)
+end
+
+@testitem "forecast extends a stratified model given a NamedTuple y" tags=[:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(106)
+    model = IDModel(
+        DirectInfections(; Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
+            initialisation = IID(Normal(log(20.0), 0.3))),
+        Split((a = PoissonError(), b = PoissonError())))
+    T, h = 12, 4
+    y = as_turing_model(
+        model, (a = missing, b = missing), (2, T))().generated_y_t
+    chain = sample(
+        as_turing_model(model, y, (2, T)), Prior(), 30; progress = false)
+    fc = forecast(model, y, chain, h)
+    @test size(fc, 1) == 30
+    y_ext = map(v -> vcat(v, fill(missing, h)), y)
+    gens_fc = vec(returned(as_turing_model(model, y_ext, (2, T + h)), fc))
+    @test all(d -> size(gens_fc[d].I_t) == (2, T + h), 1:10)
 end
 
 @testitem "forecast extends a renewal with an inferred generation interval" tags=[:sample] begin

@@ -57,6 +57,35 @@ end
     @test !all(x -> isapprox(x, diffs2[1]; atol = 1e-6), diffs2)
 end
 
+@testitem "across_shape is a third-party extension point" begin
+    using ComposableTuringIDModels, Distributions, Random, Turing
+    using ComposableTuringIDModels: across_shape, AbstractPriorModel
+    Random.seed!(603)
+    # A user-defined `across` model, added here rather than in the package:
+    # it needs the full `(n_strata, n_time)` shape, exactly like `Replicate`,
+    # and adds its own `across_shape` method to say so. `Stratify` picks it
+    # up unchanged — mirrors the "the pre-scan seam takes any modifier"
+    # extension test for `AbstractRenewalModifier` in imported_cases.jl.
+    struct TimeVaryingAcross{M} <: AbstractPriorModel
+        model::M
+    end
+    ComposableTuringIDModels.across_shape(::TimeVaryingAcross, n::Dims{2}) = n
+    Turing.@model function ComposableTuringIDModels.as_turing_model(
+            m::TimeVaryingAcross, n::Dims{2})
+        out ~ as_turing_submodel(m.model, n)
+        return out
+    end
+
+    @test across_shape(TimeVaryingAcross(Replicate(RandomWalk())), (4, 10)) ==
+          (4, 10)
+
+    strat = Stratify(RandomWalk(), TimeVaryingAcross(Replicate(RandomWalk())))
+    out = as_turing_model(strat, (3, 15))()
+    @test size(out) == (3, 15)
+    diffs = out[1, :] .- out[2, :]
+    @test !all(x -> isapprox(x, diffs[1]; atol = 1e-6), diffs)
+end
+
 @testitem "a path model at a strata shape errors, naming Stratify" begin
     using ComposableTuringIDModels, Distributions
     @test_throws "Stratify" as_turing_model(RandomWalk(), (3, 10))
