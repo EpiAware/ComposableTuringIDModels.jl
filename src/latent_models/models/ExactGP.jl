@@ -133,7 +133,17 @@ end
     # sampler can represent, and is only there to keep the factorisation
     # defined at σ = 0 exactly, where K itself vanishes.
     L = cholesky(Symmetric(K + (jitter * (σ^2 + eps())) * I)).L
-    gp = L * z
+    # `L * z` with `L::LowerTriangular` dispatches to the triangular BLAS
+    # path (`trmv`/`trmm`), which Enzyme forward-mode has no derivative
+    # rule for (`EnzymeNoDerivativeError`). Materialising `L` densely first
+    # forces a plain `gemv`/`gemm`, which Enzyme does support. This is
+    # mathematically identical — the entries `L` is missing above the
+    # diagonal are exactly zero, so they contribute nothing to the product —
+    # but not guaranteed bit-identical, since `trmv`/`gemv` may sum in a
+    # different order and so differ in the last ulp. Only an O(n^2) copy is
+    # added, negligible next to the O(n^3) factorisation already paid every
+    # call.
+    gp = Matrix(L) * z
     return gp
 end
 
