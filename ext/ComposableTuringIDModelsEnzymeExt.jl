@@ -32,6 +32,7 @@ module ComposableTuringIDModelsEnzymeExt
 
 using Enzyme: Enzyme
 using Enzyme.EnzymeRules: EnzymeRules
+using LinearAlgebra: dot
 
 # The element-type bound here is load-bearing, not decorative — DO NOT widen
 # it to a bare `AbstractArray{>:Missing}` (no `T` bound). `Union{Missing, Any}`
@@ -62,6 +63,89 @@ using Enzyme.EnzymeRules: EnzymeRules
 function EnzymeRules.inactive(::typeof(deepcopy),
         ::AbstractArray{Union{Missing, T}}) where {T <: Real}
     return nothing
+end
+
+# Forward-mode `LinearAlgebra.dot` rule (renewal / delay-convolution path).
+#
+# `RenewalSteps.jl`, `LDStep.jl`, `TimeVaryingLDStep.jl` and
+# `infection_models/utils.jl` convolve a recent-incidence/state window with a
+# generation-interval or reporting-delay kernel via `dot`. Unlike the AR/MA
+# lag-order vectors fixed by `ARStep`/`MAStep` (fixed at 2-3, and rewritten to
+# `mapreduce` directly — see those files), a generation interval or delay PMF
+# is user-supplied epi data with no architectural length bound (routinely
+# 10-30+ discretised days), so rewriting every call site to `mapreduce` would
+# trade BLAS for a generic reduction on a length nothing here controls. A
+# custom rule fixes the actual gap instead: under Enzyme forward, `dot`
+# raises `EnzymeNoDerivativeError: dot Runtime Activity not yet implemented
+# for Forward-Mode BLAS calls` (Enzyme reverse already has a working BLAS
+# `dot` rule and is untouched by this — only `EnzymeRules.forward` is
+# defined below, deliberately no `augmented_primal`/`reverse`, so the
+# working reverse path is never overridden).
+#
+# The derivative of `dot(x, y)` is exact and has no edge cases (`∂/∂x = y`,
+# `∂/∂y = x`), so this rule cannot silently produce a wrong-but-plausible
+# gradient the way a mismarked `inactive`/`EnzymeRules` shape rule could —
+# it can only be right or obviously broken, which is why a hand-written rule
+# is judged safe here where it would not be for a broader shape-based rule.
+# Bounded tightly to `AbstractVector{<:Real}` on both arguments so it only
+# ever intercepts the real-valued vector `dot` calls this package makes, not
+# every possible `dot` overload (complex vectors, matrices, etc.) that a
+# session with both `Enzyme` and this package loaded might otherwise call.
+#
+# This is an upstream Enzyme.jl gap (forward-mode BLAS `dot` does not support
+# runtime activity), not a defect in this package. Delete this rule once
+# Enzyme ships its own forward-mode BLAS `dot` support for runtime activity.
+
+# Un-batched: both `x` and `y` are `Const` or plain `Duplicated`.
+function EnzymeRules.forward(config::EnzymeRules.FwdConfig,
+        func::Enzyme.Const{typeof(dot)},
+        RT::Type{<:Union{Enzyme.Const, Enzyme.DuplicatedNoNeed,
+            Enzyme.Duplicated}},
+        x::Union{Enzyme.Const{<:AbstractVector{<:Real}},
+            Enzyme.Duplicated{<:AbstractVector{<:Real}}},
+        y::Union{Enzyme.Const{<:AbstractVector{<:Real}},
+            Enzyme.Duplicated{<:AbstractVector{<:Real}}})
+    dres = zero(promote_type(eltype(x.val), eltype(y.val)))
+    x isa Enzyme.Const || (dres += dot(x.dval, y.val))
+    y isa Enzyme.Const || (dres += dot(x.val, y.dval))
+    if EnzymeRules.needs_primal(config) && EnzymeRules.needs_shadow(config)
+        return Enzyme.Duplicated(func.val(x.val, y.val), dres)
+    elseif EnzymeRules.needs_primal(config)
+        return func.val(x.val, y.val)
+    elseif EnzymeRules.needs_shadow(config)
+        return dres
+    else
+        return nothing
+    end
+end
+
+# Batched: at least one of `x`/`y` is `BatchDuplicated`
+# (DifferentiationInterface's Enzyme-forward gradient batches all `dim(θ)`
+# seed directions in one pass).
+function EnzymeRules.forward(config::EnzymeRules.FwdConfig,
+        func::Enzyme.Const{typeof(dot)},
+        RT::Type{<:Union{Enzyme.BatchDuplicatedNoNeed, Enzyme.BatchDuplicated}},
+        x::Union{Enzyme.Const{<:AbstractVector{<:Real}},
+            Enzyme.BatchDuplicated{<:AbstractVector{<:Real}}},
+        y::Union{Enzyme.Const{<:AbstractVector{<:Real}},
+            Enzyme.BatchDuplicated{<:AbstractVector{<:Real}}})
+    N = EnzymeRules.width(config)
+    T = promote_type(eltype(x.val), eltype(y.val))
+    dvals = ntuple(Val(N)) do i
+        dres = zero(T)
+        x isa Enzyme.Const || (dres += dot(x.dval[i], y.val))
+        y isa Enzyme.Const || (dres += dot(x.val, y.dval[i]))
+        dres
+    end
+    if EnzymeRules.needs_primal(config) && EnzymeRules.needs_shadow(config)
+        return Enzyme.BatchDuplicated(func.val(x.val, y.val), dvals)
+    elseif EnzymeRules.needs_primal(config)
+        return func.val(x.val, y.val)
+    elseif EnzymeRules.needs_shadow(config)
+        return dvals
+    else
+        return nothing
+    end
 end
 
 end # module ComposableTuringIDModelsEnzymeExt
