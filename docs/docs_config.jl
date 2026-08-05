@@ -27,8 +27,14 @@ const ORG_BRANDING = true
 # unconditionally. This change adds the file, but linkcheck resolves the link
 # against `main`, so it stays a 404 until this branch lands. Drop this entry
 # once the file is on `main`.
+#
+# `dev/tutorials` is the same self-reference problem: the README now points at
+# the renamed Tutorials section, but linkcheck resolves it against the *live*
+# deployed site, which still serves the old `case-studies` paths until this
+# branch merges and redeploys. Drop this entry once the file is on `main`.
 const LINKCHECK_IGNORE = Regex[
-    r"blob/main/CITATION\.cff$"
+    r"blob/main/CITATION\.cff$",
+    r"dev/tutorials$"
 ]
 
 const _REPO_URL = "https://github.com/EpiAware/ComposableTuringIDModels.jl"
