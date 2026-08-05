@@ -49,7 +49,15 @@ function _models()
     n = 12
 
     # Simulate observations from a composed model's prior (its `generated_y_t`).
-    sim(m, nn) = as_turing_model(m, missing, nn)().generated_y_t
+    # `as_turing_model(::IDModel, ...)` narrows its own `y_t` argument via
+    # `ComposableTuringIDModels.concrete_observations` automatically (see that
+    # function's docstring: DynamicPPL's predictive container keeps a
+    # `Union{Missing, T}` eltype even once concrete, which trips a `deepcopy`
+    # Enzyme forward has no rule for). `sim` narrows explicitly too, so
+    # callers below that use its result outside `IDModel` (the standalone
+    # `BinomialError` scenario) get the same fix.
+    sim(m, nn) = ComposableTuringIDModels.concrete_observations(
+        as_turing_model(m, missing, nn)().generated_y_t)
 
     # --- latent-process log-joints (prior only) ---------------------------------
     rw = as_turing_model(RandomWalk(), n)
@@ -209,6 +217,18 @@ function _models()
     aggregate = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7]))
+    # Partially-missing observations: a plain `DirectInfections`+`Poisson`
+    # posterior whose data vector carries genuine reporting gaps (some entries
+    # `missing`, some concrete). Distinct from `Aggregate` above, whose missing
+    # entries are an artefact of its window scattering rather than the data
+    # itself — this is the direct ragged/reporting-gap case a real dataset
+    # hits, and the case `ComposableTuringIDModels.concrete_observations`
+    # cannot narrow away (some entries really are unobserved). It stays
+    # differentiable under Enzyme forward via the `EnzymeRules.inactive`
+    # `deepcopy` mark in `ext/ComposableTuringIDModelsEnzymeExt.jl`.
+    partialmiss = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+        PoissonError())
     # Transform-the-expected-observations: softplus applied before the error.
     transobs = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
@@ -250,7 +270,8 @@ function _models()
     n_b = 10
     N_b = fill(20, n_b)
     Ybase_b = fill(1.0, n_b)
-    y_binom = as_turing_model(binom_obs, (y = missing, N = N_b), Ybase_b)().y_t
+    y_binom = ComposableTuringIDModels.concrete_observations(
+        as_turing_model(binom_obs, (y = missing, N = N_b), Ybase_b)().y_t)
 
     # `Split` observation composition: a renewal model observed through two
     # streams, with `deaths` cascaded downstream of `cases` by sharing the case
@@ -278,6 +299,12 @@ function _models()
     y_ugen = sim(ugen, n)
     y_ascert = sim(ascert, 14)
     y_aggregate = sim(aggregate, 14)
+    # A straight `sim` draw, then genuine reporting gaps re-introduced by hand:
+    # every third entry blanked back to `missing` (distinct from `Aggregate`
+    # above, whose missing pattern comes from its window scattering, not the
+    # data itself).
+    y_partialmiss = Vector{Union{Missing, Int}}(sim(partialmiss, n))
+    y_partialmiss[2:3:end] .= missing
     y_transobs = sim(transobs, n)
     y_normalobs = sim(normalobs, n)
     y_split = sim(split, n)
@@ -331,6 +358,8 @@ function _models()
             as_turing_model(ascert, y_ascert, 14)),
         ("DirectInfections+Aggregate posterior",
             as_turing_model(aggregate, y_aggregate, 14)),
+        ("DirectInfections+PartiallyMissing posterior",
+            as_turing_model(partialmiss, y_partialmiss, n)),
         ("DirectInfections+TransformObservation posterior",
             as_turing_model(transobs, y_transobs, n)),
         ("DirectInfections+NormalError posterior",

@@ -17,6 +17,51 @@
     @test all(>=(0), gen.I_t)
 end
 
+@testitem "concrete_observations narrows only when nothing is missing" begin
+    using ComposableTuringIDModels: concrete_observations
+
+    # Fully concrete data (no `missing` left) is narrowed to a concrete eltype.
+    y = Vector{Union{Missing, Int}}([1, 2, 3])
+    narrowed = concrete_observations(y)
+    @test narrowed == [1, 2, 3]
+    @test eltype(narrowed) == Int
+
+    # A real `missing` must survive unchanged: narrowing it away would drop
+    # genuine reporting gaps.
+    y_gap = Vector{Union{Missing, Int}}([1, missing, 3])
+    @test concrete_observations(y_gap) === y_gap
+
+    # A `NamedTuple` of data streams (e.g. `BinomialError`'s `(y, N)`, or a
+    # `Split` observation's per-stream series) is narrowed field-wise.
+    nt = (y = Vector{Union{Missing, Int}}([4, 5]), N = [10, 10])
+    narrowed_nt = concrete_observations(nt)
+    @test eltype(narrowed_nt.y) == Int
+
+    # A scalar `missing` (the "simulate from the prior" sentinel) passes
+    # through unchanged.
+    @test concrete_observations(missing) === missing
+end
+
+@testitem "composed model: as_turing_model narrows y_t automatically" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: DynamicPPL, logjoint
+    Random.seed!(24)
+    model = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+        PoissonError())
+    n = 10
+    # Data simulated from the prior carries DynamicPPL's `Union{Missing, T}`
+    # predictive eltype even though every entry is concrete.
+    y = as_turing_model(model, missing, n)().generated_y_t
+    @test eltype(y) >: Missing
+
+    # Conditioning on it still builds and evaluates a valid model: the
+    # narrowing happens automatically inside `as_turing_model`.
+    posterior = as_turing_model(model, y, n)
+    @test posterior isa DynamicPPL.Model
+    @test isfinite(logjoint(posterior, rand(posterior)))
+end
+
 @testitem "composed model: fix and condition" begin
     using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: fix, condition
