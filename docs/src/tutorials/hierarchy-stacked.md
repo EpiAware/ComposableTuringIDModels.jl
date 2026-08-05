@@ -1,4 +1,4 @@
-# [Partial pooling across groups in a composed model](@id case-study-hierarchy)
+# [Partial pooling across groups in a composed model](@id tutorial-hierarchy)
 
 A multi-group epidemic is a panel: one shared infection process seen by several
 groups, each reporting it at its own level.
@@ -136,4 +136,4 @@ independent per-group levels, each with no other change.
 When the groups are genuinely **separate** infection processes rather than one
 shared curve — several distinct regions, say, each with its own latent — see
 [`CombineInfections`](@ref) instead, described on the [Multiple observation
-streams](@ref case-study-split) page.
+streams](@ref tutorial-split) page.

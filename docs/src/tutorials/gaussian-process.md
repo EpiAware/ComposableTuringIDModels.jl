@@ -1,4 +1,4 @@
-# [A Gaussian-process latent process](@id case-study-gp)
+# [A Gaussian-process latent process](@id tutorial-gp)
 
 Any latent process that implements `as_turing_model(model, n)` and returns a length-`n` path can drive an infection model.
 A Gaussian process (GP) is a prior over functions, so it lets the data pick the shape of a smoothly varying quantity such as ``\log R_t`` subject only to the smoothness the kernel implies.

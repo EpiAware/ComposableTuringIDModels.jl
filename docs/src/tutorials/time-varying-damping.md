@@ -1,4 +1,4 @@
-# [Time-varying damping in an AR process](@id case-study-tvdamp)
+# [Time-varying damping in an AR process](@id tutorial-tvdamp)
 
 Every parameter slot of a component takes a raw prior. Which *kind* of prior you
 put in the slot decides whether the parameter is **constant** or **time-varying**,

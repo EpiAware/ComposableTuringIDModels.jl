@@ -151,5 +151,5 @@ constructors that build the `GroupedInfections` + `Split` pair directly —
 `IDModel(infection_model, group_effect, observation_model)` and
 `IDModel(idmodel, group_effect)` — so a panel model is built with the same
 `IDModel` constructor as a single-group one. See [Partial pooling across
-groups](@ref case-study-hierarchy) and [Multiple observation
-streams](@ref case-study-split) for worked examples.
+groups](@ref tutorial-hierarchy) and [Multiple observation
+streams](@ref tutorial-split) for worked examples.

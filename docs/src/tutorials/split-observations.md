@@ -1,4 +1,4 @@
-# [Multiple observation streams: cases, deaths, and strata](@id case-study-split)
+# [Multiple observation streams: cases, deaths, and strata](@id tutorial-split)
 
 Real-time surveillance rarely watches an epidemic through a single lens.
 The same infections surface as reported cases, hospital admissions, deaths, and
@@ -9,7 +9,7 @@ Fitting them jointly — one infection trajectory, several observation streams �
 propagates uncertainty correctly and lets a sparse stream (deaths) borrow
 strength from a dense one (cases).
 
-This case study uses one construct, [`Split`](@ref), for every multi-stream
+This tutorial uses one construct, [`Split`](@ref), for every multi-stream
 shape.
 `Split` observes the expected series arriving at the point where it sits in the
 pipeline through several named streams, so *where you place it* chooses the
@@ -49,7 +49,7 @@ automatically, so the streams stay distinct without any manual prefix layer.
 ## Parallel: cases and deaths from shared infections
 
 We drive the streams with a renewal infection process, exactly as in the
-[renewal case study](@ref case-study-renewal), and observe it through two
+[renewal tutorial](@ref tutorial-renewal), and observe it through two
 pipelines.
 Cases are a short-delay, high-ascertainment negative-binomial stream.
 Deaths are a long-delay stream whose ascertainment — the infection-fatality
@@ -101,7 +101,7 @@ y = sim.generated_y_t
 ```
 
 Fitting conditions on both streams at once.
-We draw a full chain with NUTS, matching the other case studies, and
+We draw a full chain with NUTS, matching the other tutorials, and
 differentiate with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the
 recommended backend for this package (see
 [Automatic differentiation backend](@ref ad-backends)).
@@ -224,7 +224,7 @@ Split(template, W))` maps several distinct infection processes onto streams
 end-to-end. For a **shared** infection curve replicated per group by a
 partially pooled level instead — the panel case, not several distinct
 processes — see [`GroupedInfections`](@ref) and [Partial pooling across
-groups](@ref case-study-hierarchy).
+groups](@ref tutorial-hierarchy).
 
 ## References
 
