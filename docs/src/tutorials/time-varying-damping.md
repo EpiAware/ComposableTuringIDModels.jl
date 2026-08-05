@@ -37,11 +37,11 @@ z_t = \rho_t\, z_{t-1} + \epsilon_t, \qquad \rho_t = \tanh(u_t),
 
 where the unconstrained path ``u_t`` is drawn from the process (a
 [`RandomWalk`](@ref) here) and `tanh` maps it into the stationary band
-``(-1, 1)``. This is a one-line change to the `damp` argument — the AR recursion
-is untouched — and the named constructor [`TimeVaryingAR`](@ref) is exactly this:
+``(-1, 1)``. This is a one-line change to the `damp` argument — the AR
+recursion is untouched:
 
 ```@example tvdamp
-tv = AR(; damp = RandomWalk())          # === TimeVaryingAR()
+tv = AR(; damp = RandomWalk())
 (order = tv.p, transform = tv.transform)
 ```
 
