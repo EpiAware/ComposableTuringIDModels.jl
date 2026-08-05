@@ -203,8 +203,7 @@ as_turing_model([Normal(0, 1), Normal(5, 0.1)], 2)()
     # `product_distribution` otherwise (not `arraydist`, whose deprecated
     # `Distributions.Product` path breaks Enzyme reverse — see the note in
     # `as_turing_submodel`'s vector method).
-    product_dist = all(first(prior) .== prior) ? filldist(first(prior), n) :
-                   product_distribution(prior)
+    product_dist = product_distribution(prior)
     θ ~ product_dist
     return θ
 end
