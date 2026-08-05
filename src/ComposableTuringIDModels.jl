@@ -77,7 +77,7 @@ export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial
        NegativeBinomialMeanClust, condition_model
 
 # --- latent models ---
-export IID, HierarchicalNormal, RandomWalk, AR, TimeVaryingAR, MA, Intercept,
+export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept,
        FixedIntercept,
        Null, DiffLatentModel, HilbertSpaceGP, ExactGP
 # Covariance kernels for `HilbertSpaceGP` / `ExactGP` are re-exported from
@@ -159,7 +159,6 @@ include("latent_models/models/IID.jl")
 include("latent_models/models/HierarchicalNormal.jl")
 include("latent_models/models/RandomWalk.jl")
 include("latent_models/models/AR.jl")
-include("latent_models/models/TimeVaryingAR.jl")
 include("latent_models/models/MA.jl")
 include("latent_models/models/HilbertSpaceGP.jl")
 include("latent_models/models/ExactGP.jl")
