@@ -266,9 +266,26 @@ keeps every pmf the same length.
     # `Vector` — a real type-stability fix, independent of Enzyme.
     params_t = Tuple(params)
     return map(1:n) do t
-        _discretised_pmf(
-            u.family((_at(params_t[i], t) for i in 1:np)...); Δd = u.Δd, D = u.D)
+        # `_at_all` (head/tail recursion below), not `ntuple(i -> _at(params_t[i],
+        # t), np)` or a `(... for i in 1:np)` generator: `params_t` is
+        # heterogeneous (e.g. `Tuple{Vector{Float64}, Float64}`), so indexing it
+        # with a runtime `i` returns a `Union` of the element types — the same
+        # "use of a Union type" `IllegalTypeAnalysisException` Enzyme reverse
+        # raises for a packed-union-eltype *array* (see `Split._split_models`),
+        # just reached via a runtime-indexed heterogeneous *tuple* instead.
+        # `_at_all` recurses on `first`/`Base.tail`, so each element is read at
+        # its own statically-known position — no runtime index, no `Union`.
+        θs = _at_all(params_t, t)
+        _discretised_pmf(u.family(θs...); Δd = u.Δd, D = u.D)
     end
+end
+
+# Read every drawn parameter at time `t` via `_at`, one static tuple position
+# at a time (`first`/`Base.tail` recursion) — see the comment above the call
+# site for why this replaces a runtime-indexed loop over `params_t`.
+_at_all(::Tuple{}, t) = ()
+function _at_all(params::Tuple, t)
+    return (_at(first(params), t), _at_all(Base.tail(params), t)...)
 end
 
 # Whether a `delay` field yields per-time kernels (time-varying) or a single
