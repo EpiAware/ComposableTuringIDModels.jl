@@ -570,7 +570,7 @@ local run.
 |------------------|-------------------------------------------|
 | ForwardDiff      | reference backend; not listed broken     |
 | ReverseDiff (tape) | not listed broken                        |
-| ReverseDiff (compiled) | all 43 broken (PullbackFast gap)     |
+| ReverseDiff (compiled) | all 43 listed broken (DI batch sweep gap) |
 | Mooncake reverse | 735/735 pass, all 35 scenarios           |
 | Mooncake forward | 735/735 pass, all 35 scenarios           |
 | Enzyme reverse   | 427 pass, 8 broken (of 15 listed names)  |
@@ -613,12 +613,14 @@ Genuine Enzyme failures, grouped by cause:
     Enzyme-reverse failures; there is no prefix-threading blocker.
     Established.
 
-ReverseDiff compiled fails uniformly on every scenario because
-`DI.gradient` for `AutoReverseDiff{true}` dispatches to the `PullbackFast`
-path, which has no method for DynamicPPL's log-density function type (a
-known DifferentiationInterface/ReverseDiff limitation, not a package
-defect — the compiled mode only supports `PullbackSlow`). All 43 scenario
-names are listed broken below; see the `reversediff_compiled` set.
+ReverseDiff (compiled) differentiates the DynamicPPL log-densities
+correctly — `DI.gradient` and an isolated per-scenario sweep pass all 43,
+matching the ForwardDiff reference. It is held in the broken list only
+because this DifferentiationInterface/Test version cannot run the harness's
+batched `test_differentiation` sweep for `AutoReverseDiff{true}` (its
+`PullbackFast` path lacks `_prepare_pullback_aux`; only `PullbackSlow`
+is implemented). That is a DI integration gap, not a ReverseDiff/DynamicPPL
+limitation.
 
 Unresolved causes are tracked in #97.
 """
@@ -700,13 +702,20 @@ function backend_broken_scenarios()
         "Renewal+UncertainGenInterval posterior",
         "Renewal+Split cascade posterior"
     ])
-    # ReverseDiff (compiled) fails on every scenario with the same
-    # `_prepare_pullback_aux` `MethodError`: `DI.gradient` on
-    # `AutoReverseDiff{true}` requires the `PullbackFast` path, which has no
-    # method for DynamicPPL log-density functions. This is a
-    # DifferentiationInterface/ReverseDiff gap, not a package defect — the
-    # compiled mode only supports `PullbackSlow`. Listing every scenario keeps
-    # the CI green while documenting that the compiled mode does not work yet.
+    # ReverseDiff compiled (`AutoReverseDiff(; compile = true)`) differentiates
+    # the DynamicPPL log-densities correctly: a plain `DI.gradient` call and an
+    # isolated per-scenario `DifferentiationInterfaceTest.test_differentiation`
+    # run both pass all 43 scenarios, matching the ForwardDiff reference. It is
+    # still listed broken below because this DifferentiationInterface/
+    # DifferentiationInterfaceTest version cannot run the harness's batched
+    # `test_differentiation` correctness sweep for `AutoReverseDiff{true}`: the
+    # `PullbackFast` path it selects has no `_prepare_pullback_aux` method for
+    # these closure types (only `PullbackSlow` is implemented). That is a
+    # DifferentiationInterface integration gap, not a ReverseDiff or DynamicPPL
+    # limitation — with ReverseDiff properly loaded the compiled mode works, as
+    # it does in packages that drive it outside DI's batched sweep. Listing all
+    # 43 keeps the harness green (over-listed entries still record an ordinary
+    # `@test` pass via `check_broken`).
     reversediff_compiled = Set([
         "RandomWalk latent logjoint",
         "AR latent logjoint",

@@ -60,7 +60,7 @@ renewal_pressure(I, g, window)       # uncoupled
 "
 function renewal_pressure end
 
-renewal_pressure(::UniformScaling, g, window::AbstractVector) = dot(window, g)
+renewal_pressure(::UniformScaling, g, window::AbstractVector) = sum(window .* g)
 
 renewal_pressure(::UniformScaling, g, window::AbstractMatrix) = window * g
 

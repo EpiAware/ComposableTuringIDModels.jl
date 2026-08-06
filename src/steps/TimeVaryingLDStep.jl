@@ -21,7 +21,7 @@ struct TimeVaryingLDStep <: AbstractAccumulationStep end
 
 function (::TimeVaryingLDStep)(state, input)
     ϵ, rev_pmf_t = input
-    val = dot(rev_pmf_t, state.current)
+    val = sum(rev_pmf_t .* state.current)
     current = vcat(state.current[2:end], ϵ)
     return (; val, current)
 end
