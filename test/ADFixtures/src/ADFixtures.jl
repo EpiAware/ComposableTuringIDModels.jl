@@ -320,6 +320,59 @@ function _models()
     y_recordexp = sim(recordexp, n)
     y_prefixmods = sim(prefixmods, n)
 
+    # --- coupled / stratified 'patch' models (the patch-models tutorial) -----
+    # Stratified latent seams (2-D `Dims{2}` shapes): a shared `RandomWalk` with
+    # partially pooled per-stratum deviations (`Stratify`), and fully independent
+    # per-stratum paths (`Replicate`).
+    strat_lat = as_turing_model(
+        Stratify(RandomWalk(), Hierarchy(; across = IID(Normal(0.0, 0.3)))),
+        (3, 8))
+    repl_lat = as_turing_model(Replicate(RandomWalk()), (3, 8))
+    # A fixed diagonally-dominant off-diagonal coupling matrix and a `Gravity`
+    # operator with inferred exponent priors, the two `mixing` choices.
+    patch_K = [1.0 0.1 0.05
+               0.1 1.0 0.1
+               0.05 0.1 1.0]
+    patch_pop = [1.0e5, 5.0e4, 2.0e5]
+    patch_dist = [0.0 10.0 30.0
+                  10.0 0.0 25.0
+                  30.0 25.0 0.0]
+    rt_process = Stratify(RandomWalk(),
+        Hierarchy(; across = IID(Normal(0.0, 0.3))))
+    # Stratified `Renewal` posteriors over a 3-stratum x 12-time panel:
+    # independent patches, shared/partially-pooled `R_t`, fixed `K` mixing,
+    # `Gravity` mixing, and stratified exogenous `ImportedCases`.
+    strat_panel = (3, 12)
+    patch_independent = IDModel(
+        Renewal(; generation_time = gen_int, rt = Replicate(RandomWalk()),
+            initialisation = Normal(log(50.0), 0.2)),
+        PoissonError())
+    patch_pooled = IDModel(
+        Renewal(; generation_time = gen_int, rt = rt_process,
+            initialisation = Normal(log(50.0), 0.2)),
+        PoissonError())
+    patch_mixk = IDModel(
+        Renewal(; generation_time = gen_int, rt = rt_process,
+            initialisation = Normal(log(50.0), 0.2), mixing = patch_K),
+        PoissonError())
+    patch_mixg = IDModel(
+        Renewal(; generation_time = gen_int, rt = rt_process,
+            initialisation = Normal(log(50.0), 0.2),
+            mixing = Gravity(patch_pop, patch_dist; α = HalfNormal(1.0),
+                β = HalfNormal(1.0), γ = HalfNormal(2.0))),
+        PoissonError())
+    patch_imports = IDModel(
+        Renewal(
+            gen_int, ImportedCases(
+                Stratify(FixedIntercept(-2.0), IID(Normal(0.0, 0.3))));
+            rt = rt_process, initialisation = Normal(log(50.0), 0.2)),
+        PoissonError())
+    y_independent = sim(patch_independent, strat_panel)
+    y_pooled = sim(patch_pooled, strat_panel)
+    y_mixk = sim(patch_mixk, strat_panel)
+    y_mixg = sim(patch_mixg, strat_panel)
+    y_imports = sim(patch_imports, strat_panel)
+
     return [
         # latent-process log-joints
         ("RandomWalk latent logjoint", rw),
@@ -381,7 +434,20 @@ function _models()
             as_turing_model(binom_obs, (y = y_binom, N = N_b), Ybase_b)),
         # unified Split observation composition
         ("Renewal+Split cascade posterior",
-            as_turing_model(split, y_split, n))
+            as_turing_model(split, y_split, n)),
+        # coupled / stratified 'patch' models (the patch-models tutorial)
+        ("Stratify latent logjoint", strat_lat),
+        ("Replicate latent logjoint", repl_lat),
+        ("Renewal+IndependentPatches posterior",
+            as_turing_model(patch_independent, y_independent, strat_panel)),
+        ("Renewal+StratifiedRt posterior",
+            as_turing_model(patch_pooled, y_pooled, strat_panel)),
+        ("Renewal+FixedMixingK posterior",
+            as_turing_model(patch_mixk, y_mixk, strat_panel)),
+        ("Renewal+GravityMixing posterior",
+            as_turing_model(patch_mixg, y_mixg, strat_panel)),
+        ("Renewal+StratifiedImportedCases posterior",
+            as_turing_model(patch_imports, y_imports, strat_panel))
     ]
 end
 
@@ -412,15 +478,16 @@ end
     backends()
 
 The AD backends exercised against the scenarios, as `(; name, backend)` named
-tuples: ForwardDiff (the reference), ReverseDiff (tape), Mooncake reverse,
-Mooncake forward, Enzyme reverse, and Enzyme forward — the full six-backend
-matrix `ad.yaml` runs in CI. Per-backend brokenness is recorded honestly in
-[`backend_broken_scenarios`](@ref) / [`broken_scenario_names`](@ref) rather than
-by trimming this list.
+tuples: ForwardDiff (the reference), ReverseDiff (compiled), ReverseDiff (tape),
+Mooncake reverse, Mooncake forward, Enzyme reverse, and Enzyme forward — the
+full seven-backend matrix `ad.yaml` runs in CI. Per-backend brokenness is
+recorded honestly in [`backend_broken_scenarios`](@ref) /
+[`broken_scenario_names`](@ref) rather than by trimming this list.
 """
 function backends()
     return [
         (name = "ForwardDiff", backend = _forwarddiff()),
+        (name = "ReverseDiff (compiled)", backend = _reversediff_compiled()),
         (name = "ReverseDiff (tape)", backend = _reversediff()),
         (name = "Mooncake reverse", backend = _mooncake()),
         (name = "Mooncake forward", backend = _mooncake_forward()),
@@ -433,6 +500,11 @@ end
 # required when that backend is actually requested (the AD env loads them all,
 # but this keeps the registry importable without every backend present).
 _forwarddiff() = AutoForwardDiff()
+function _reversediff_compiled()
+    ADTypes = Base.require(Base.PkgId(
+        Base.UUID("47edcb42-4c32-4615-8424-f2b9edc5f35b"), "ADTypes"))
+    return ADTypes.AutoReverseDiff(; compile = true)
+end
 function _reversediff()
     ADTypes = Base.require(Base.PkgId(
         Base.UUID("47edcb42-4c32-4615-8424-f2b9edc5f35b"), "ADTypes"))
@@ -497,7 +569,8 @@ local run.
 | Backend          | Result                                   |
 |------------------|-------------------------------------------|
 | ForwardDiff      | reference backend; not listed broken     |
-| ReverseDiff      | not listed broken                        |
+| ReverseDiff (tape) | not listed broken                        |
+| ReverseDiff (compiled) | all 43 broken (PullbackFast gap)     |
 | Mooncake reverse | 735/735 pass, all 35 scenarios           |
 | Mooncake forward | 735/735 pass, all 35 scenarios           |
 | Enzyme reverse   | 427 pass, 8 broken (of 15 listed names)  |
@@ -539,6 +612,13 @@ Genuine Enzyme failures, grouped by cause:
     `DirectInfections+PrefixModifiers` are not among the 8 genuine
     Enzyme-reverse failures; there is no prefix-threading blocker.
     Established.
+
+ReverseDiff compiled fails uniformly on every scenario because
+`DI.gradient` for `AutoReverseDiff{true}` dispatches to the `PullbackFast`
+path, which has no method for DynamicPPL's log-density function type (a
+known DifferentiationInterface/ReverseDiff limitation, not a package
+defect — the compiled mode only supports `PullbackSlow`). All 43 scenario
+names are listed broken below; see the `reversediff_compiled` set.
 
 Unresolved causes are tracked in #97.
 """
@@ -620,9 +700,62 @@ function backend_broken_scenarios()
         "Renewal+UncertainGenInterval posterior",
         "Renewal+Split cascade posterior"
     ])
+    # ReverseDiff (compiled) fails on every scenario with the same
+    # `_prepare_pullback_aux` `MethodError`: `DI.gradient` on
+    # `AutoReverseDiff{true}` requires the `PullbackFast` path, which has no
+    # method for DynamicPPL log-density functions. This is a
+    # DifferentiationInterface/ReverseDiff gap, not a package defect — the
+    # compiled mode only supports `PullbackSlow`. Listing every scenario keeps
+    # the CI green while documenting that the compiled mode does not work yet.
+    reversediff_compiled = Set([
+        "RandomWalk latent logjoint",
+        "AR latent logjoint",
+        "ARIMA latent logjoint",
+        "HilbertSpaceGP latent logjoint",
+        "HilbertSpaceGP Matern latent logjoint",
+        "ExactGP latent logjoint",
+        "MA latent logjoint",
+        "HierarchicalNormal latent logjoint",
+        "DiffLatentModel(RandomWalk) latent logjoint",
+        "ARMA latent logjoint",
+        "BroadcastLatentModel day-of-week latent logjoint",
+        "BroadcastLatentModel weekly latent logjoint",
+        "ConcatLatentModels latent logjoint",
+        "CombineLatentModels latent logjoint",
+        "Hierarchy latent logjoint",
+        "AR vector-prior latent logjoint",
+        "AR latent-model-as-prior latent logjoint",
+        "DirectInfections+Poisson posterior",
+        "Renewal+NegativeBinomial posterior",
+        "Renewal+ImportedCases posterior",
+        "ExpGrowthRate+Poisson posterior",
+        "Renewal+RightTruncate nowcast posterior",
+        "Renewal+ReportTriangle posterior",
+        "Renewal+LatentDelay posterior",
+        "Renewal+UncertainLatentDelay posterior",
+        "Renewal+TimeVaryingLatentDelay posterior",
+        "Renewal+UncertainGenInterval posterior",
+        "DirectInfections+Ascertainment day-of-week posterior",
+        "DirectInfections+Aggregate posterior",
+        "DirectInfections+PartiallyMissing posterior",
+        "DirectInfections+TransformObservation posterior",
+        "DirectInfections+NormalError posterior",
+        "DirectInfections+RecordExpected posterior",
+        "DirectInfections+PrefixModifiers posterior",
+        "BinomialError ascertainment posterior",
+        "Renewal+Split cascade posterior",
+        "Stratify latent logjoint",
+        "Replicate latent logjoint",
+        "Renewal+IndependentPatches posterior",
+        "Renewal+StratifiedRt posterior",
+        "Renewal+FixedMixingK posterior",
+        "Renewal+GravityMixing posterior",
+        "Renewal+StratifiedImportedCases posterior"
+    ])
     return Dict{String, Set{String}}(
         "Enzyme reverse" => enzyme_reverse,
-        "Enzyme forward" => enzyme_forward)
+        "Enzyme forward" => enzyme_forward,
+        "ReverseDiff (compiled)" => reversediff_compiled)
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."

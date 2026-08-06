@@ -10,6 +10,10 @@
     test_working_backend("ForwardDiff")
 end
 
+@testitem "ReverseDiff compiled gradients (marginal)" tags=[:ad, :reversediff_compiled] setup=[ADHelpers] begin
+    test_working_backend("ReverseDiff (compiled)")
+end
+
 @testitem "ReverseDiff gradients (marginal)" tags=[:ad, :reversediff] setup=[ADHelpers] begin
     test_working_backend("ReverseDiff (tape)")
 end

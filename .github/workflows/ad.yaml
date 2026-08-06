@@ -13,7 +13,7 @@ name: AD
 on:
   push:
     branches: [main]
-    # Don't fire the 6-backend AD sweep (the heaviest, slowest matrix) for
+    # Don't fire the 7-backend AD sweep (the heaviest, slowest matrix) for
     # changes that cannot alter a gradient result. Only clearly AD-irrelevant
     # paths are ignored: prose docs and markdown. Anything touching src/,
     # ext/, test/, Project.toml, benchmark/ or the workflow itself still
@@ -38,5 +38,5 @@ jobs:
   ad:
     uses: EpiAware/.github/.github/workflows/ad.yml@383486033b4ae93561695411c9033f204df75d12
     with:
-      backends: '[{"name":"ForwardDiff","tag":"forwarddiff","flag":"ad-forwarddiff"},{"name":"ReverseDiff (tape)","tag":"reversediff","flag":"ad-reversediff"},{"name":"Enzyme forward","tag":"enzyme_forward","flag":"ad-enzyme-forward"},{"name":"Enzyme reverse","tag":"enzyme_reverse","flag":"ad-enzyme-reverse"},{"name":"Mooncake reverse","tag":"mooncake_reverse","flag":"ad-mooncake-reverse"},{"name":"Mooncake forward","tag":"mooncake_forward","flag":"ad-mooncake-forward"}]'
+      backends: '[{"name":"ForwardDiff","tag":"forwarddiff","flag":"ad-forwarddiff"},{"name":"ReverseDiff (compiled)","tag":"reversediff_compiled","flag":"ad-reversediff-compiled"},{"name":"ReverseDiff (tape)","tag":"reversediff","flag":"ad-reversediff"},{"name":"Enzyme forward","tag":"enzyme_forward","flag":"ad-enzyme-forward"},{"name":"Enzyme reverse","tag":"enzyme_reverse","flag":"ad-enzyme-reverse"},{"name":"Mooncake reverse","tag":"mooncake_reverse","flag":"ad-mooncake-reverse"},{"name":"Mooncake forward","tag":"mooncake_forward","flag":"ad-mooncake-forward"}]'
     secrets: inherit  # pragma: allowlist secret
