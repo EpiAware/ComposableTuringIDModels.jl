@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   pre-commit:
-    uses: EpiAware/.github/.github/workflows/format-check.yml@383486033b4ae93561695411c9033f204df75d12
+    uses: EpiAware/.github/.github/workflows/format-check.yml@d024dc6927cc3523292a159dc0d4a45193c9c65d
     # Pin the CI formatter to the same version as the local pre-commit hook and
     # the isolated formatter env (single source: `2.10.1`).
     # Without this the shared workflow installs its own default and reformats
