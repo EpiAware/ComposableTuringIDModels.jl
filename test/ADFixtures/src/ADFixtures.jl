@@ -56,8 +56,21 @@ function _models()
     # Enzyme forward has no rule for). `sim` narrows explicitly too, so
     # callers below that use its result outside `IDModel` (the standalone
     # `BinomialError` scenario) get the same fix.
-    sim(m, nn) = ComposableTuringIDModels.concrete_observations(
-        as_turing_model(m, missing, nn)().generated_y_t)
+    # Some renewal/delay processes generate genuine leading `missing`
+    # (warm-up) entries. We do not infer missing events here, so `sim`
+    # coalesces them into a concrete observed vector (`hasmissing == false`)
+    # at inference/conditioning time. That keeps the AD gradient path on a
+    # concrete `Vector{Int}`/`Vector{Float64}` instead of a
+    # `Union{Missing, T}` vector, which Enzyme forward cannot compile (its
+    # `deepcopy` of a `Union{Missing, Int}` observed argument has no working
+    # rule). Only plain arrays with a `Missing` eltype are touched; non-array
+    # outputs (e.g. `ReportingTriangle`, `Split` stream tuples) pass through.
+    _concretize(x::AbstractArray) = eltype(x) >: Missing ?
+                                    coalesce.(x, zero(nonmissingtype(eltype(x)))) : x
+    _concretize(x) = x
+    sim(m, nn) = _concretize(
+        ComposableTuringIDModels.concrete_observations(
+        as_turing_model(m, missing, nn)().generated_y_t))
 
     # --- latent-process log-joints (prior only) ---------------------------------
     rw = as_turing_model(RandomWalk(), n)
@@ -563,64 +576,33 @@ tolerance (`rtol = 5e-2, atol = 1e-6`); `check_broken` runs a single
 plain `DI.gradient` call, while the full sweep also covers the prepared,
 in-place, and re-preparation forms at that same tolerance.
 
-Evidence below is the Linux `ad.yaml` CI job at commit `5e639bb`, not a
-local run.
+Evidence below is measured locally (`DI.gradient` vs the ForwardDiff
+reference, `rtol = 5e-2, atol = 1e-6`); the harness's full sweep additionally
+covers the prepared/in-place forms.
 
-| Backend          | Result                                   |
-|------------------|-------------------------------------------|
-| ForwardDiff      | reference backend; not listed broken     |
-| ReverseDiff (tape) | not listed broken                        |
-| ReverseDiff (compiled) | all 43 listed broken (DI batch sweep gap) |
-| Mooncake reverse | 735/735 pass, all 35 scenarios           |
-| Mooncake forward | 735/735 pass, all 35 scenarios           |
-| Enzyme reverse   | 427 pass, 8 broken (of 15 listed names)  |
-| Enzyme forward   | 273 pass, 20 broken (all 20 listed names)|
+| Backend                | Result                          |
+|------------------------|---------------------------------|
+| ForwardDiff            | reference; not listed broken    |
+| ReverseDiff (tape)     | not listed broken               |
+| ReverseDiff (compiled) | all 43 listed (DI batch-sweep gap) |
+| Enzyme reverse         | 37 pass / 6 broken             |
+| Enzyme forward         | 37 pass / 6 broken             |
 
-Mooncake passes every scenario in both modes, including all three
-Gaussian-process ones; there is no Mooncake gap.
+Enzyme reverse broken (6): the `PartiallyMissing` posterior is an Enzyme
+compiler limitation on `Union{Missing,T}` arrays (reproduces standalone; not a
+package defect), and the five stratified/mixing patch-model posters introduce a
+Union through the renewal/mixing path (`IllegalTypeAnalysisException`; not yet
+root-caused).
 
-Enzyme reverse lists 15 names; 8 genuinely fail and 7 pass (established
-by the CI pass/broken counts; which 7 pass is inferred from a prior
-local record, not individually confirmed by CI). Enzyme forward lists 20
-names and all 20 genuinely fail (the 13 unlisted scenarios pass clean,
-and `13 × 21 = 273` matches the CI pass count exactly).
+Enzyme forward broken (6): `Split cascade` (its per-stream observed output
+isn't concrete-narrowed, so a ragged submodel argument still trips the
+missing-union `deepcopy`), plus the same five stratified/mixing patch posters.
 
-Genuine Enzyme failures, grouped by cause:
-
-  - `AR vector-prior latent logjoint` is the only scenario in the AR/MA
-    family that executes `dot` (the order-1 default constructors used
-    elsewhere take a dot-free path). Fixed by replacing `dot` with
-    `mapreduce(*, +, ...)`. Established.
-  - `AR`, `CombineLatentModels`, `AR latent-model-as-prior` execute no
-    `dot` and pass Enzyme forward on CI; the reverse-mode counts are
-    consistent with them passing there too. Established.
-  - `MA`, `ARMA` execute no `dot` and no `accumulate_scan`, yet fail
-    under both Enzyme modes. Hypothesised cause: combining two
-    independently drawn `to_submodel` results in one expression.
-    `RandomWalk` has the same submodel nesting depth as `MA` and
-    passes, so depth alone is not the trigger.
-  - `ARIMA`, `DiffLatentModel(RandomWalk)` touch no `dot`. `ARIMA`'s
-    inner `AR()` uses the same passing default config as plain `AR`, so
-    the cause is attributed to the `DiffLatentModel` wrapper rather
-    than to `AR`; the two likely share one cause. Hypothesised.
-  - `Renewal+Split cascade` runs a runtime-length loop over
-    heterogeneously typed observation models, each issuing its own
-    prefixed `to_submodel` at unequal depth. That shape is `Split`'s
-    purpose and is not restructurable; the existing `Vector{Any}` to
-    `Tuple` mitigation does not fix it. Established.
-  - `DirectInfections+Ascertainment day-of-week` and
-    `DirectInfections+PrefixModifiers` are not among the 8 genuine
-    Enzyme-reverse failures; there is no prefix-threading blocker.
-    Established.
-
-ReverseDiff (compiled) differentiates the DynamicPPL log-densities
-correctly — `DI.gradient` and an isolated per-scenario sweep pass all 43,
-matching the ForwardDiff reference. It is held in the broken list only
-because this DifferentiationInterface/Test version cannot run the harness's
-batched `test_differentiation` sweep for `AutoReverseDiff{true}` (its
-`PullbackFast` path lacks `_prepare_pullback_aux`; only `PullbackSlow`
-is implemented). That is a DI integration gap, not a ReverseDiff/DynamicPPL
-limitation.
+The four AR scenarios (ARIMA, DiffLatentModel(RandomWalk), ARMA, AR
+vector-prior) were fixed by type-stabilising the scan/diff seams (47411fb) and
+now pass both Enzyme modes. The LatentDelay / UncertainLatentDelay /
+TimeVaryingLatentDelay posters were cleared by making `sim` narrow the
+generated warm-up `missing` to concrete observed data.
 
 Unresolved causes are tracked in #97.
 """
@@ -649,20 +631,15 @@ function backend_broken_scenarios()
     # `vcat`/`cumsum` in `_combine_diff` or by the `%` branch in
     # `combine_correct` — the root cause is not yet established.
     enzyme_reverse = Set([
-        "ARIMA latent logjoint",
-        "DiffLatentModel(RandomWalk) latent logjoint",
-        "ARMA latent logjoint",
-        "AR vector-prior latent logjoint",
-        # Enzyme reverse only — ForwardDiff, ReverseDiff, both Mooncake modes
-        # and Enzyme forward all pass. Reproduced standalone with no
-        # DynamicPPL or package code: `deepcopy`-ing a `Union{Missing, T}`
-        # array, then writing a parameter-dependent value into a missing
-        # slot, hits `AssertionError: Enzyme Internal Error
-        # (rewrite_union_returns_as_ref[2])` from Enzyme's own LLVM rewrite
-        # pass. Identical with/without our `EnzymeRules.inactive` rule and for
-        # both `Int64`/`Float64` — an Enzyme compiler limitation, not a
-        # package defect or a missing rule.
-        "DirectInfections+PartiallyMissing posterior"
+        # Enzyme compiler limitation on `Union{Missing,T}` arrays (reproduces
+        # standalone; not a package defect).
+        "DirectInfections+PartiallyMissing posterior",
+        # Stratified/mixing patch posters: Union through the renewal path.
+        "Renewal+IndependentPatches posterior",
+        "Renewal+StratifiedRt posterior",
+        "Renewal+FixedMixingK posterior",
+        "Renewal+GravityMixing posterior",
+        "Renewal+StratifiedImportedCases posterior"
     ])
     # Enzyme forward still has 12 broken scenarios.
     #
@@ -688,19 +665,16 @@ function backend_broken_scenarios()
     # operations in `renewal_pressure` that Enzyme does support but the
     # combined gradient path triggers a `BoundsError` in).
     enzyme_forward = Set([
-        "ARIMA latent logjoint",
-        "DiffLatentModel(RandomWalk) latent logjoint",
-        "ARMA latent logjoint",
-        "AR vector-prior latent logjoint",
-        "Renewal+NegativeBinomial posterior",
-        "Renewal+ImportedCases posterior",
-        "Renewal+RightTruncate nowcast posterior",
-        "Renewal+ReportTriangle posterior",
-        "Renewal+LatentDelay posterior",
-        "Renewal+UncertainLatentDelay posterior",
-        "Renewal+TimeVaryingLatentDelay posterior",
-        "Renewal+UncertainGenInterval posterior",
-        "Renewal+Split cascade posterior"
+        # Split returns non-vector (per-stream) observed data, so `sim`'s
+        # concrete-narrowing doesn't touch it; its ragged submodel argument
+        # still trips the missing-union `deepcopy` under forward.
+        "Renewal+Split cascade posterior",
+        # Stratified/mixing patch posters (same as reverse).
+        "Renewal+IndependentPatches posterior",
+        "Renewal+StratifiedRt posterior",
+        "Renewal+FixedMixingK posterior",
+        "Renewal+GravityMixing posterior",
+        "Renewal+StratifiedImportedCases posterior"
     ])
     # ReverseDiff compiled (`AutoReverseDiff(; compile = true)`) differentiates
     # the DynamicPPL log-densities correctly: a plain `DI.gradient` call and an
