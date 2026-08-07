@@ -580,21 +580,22 @@ covers the prepared/in-place forms.
 | ForwardDiff            | reference; not listed broken    |
 | ReverseDiff (tape)     | not listed broken               |
 | ReverseDiff (compiled) | all 43 listed (DI batch-sweep gap) |
-| Enzyme reverse         | 39 pass / 4 broken             |
-| Enzyme forward         | 39 pass / 4 broken             |
+| Enzyme reverse         | 42 pass / 1 broken             |
+| Enzyme forward         | 42 pass / 1 broken             |
 
-Both modes share the same 4 remaining broken scenarios: the stratified patch
-posters (`Renewal+IndependentPatches`, `Renewal+StratifiedRt`, `Renewal+
-StratifiedImportedCases`) and `Renewal+GravityMixing`. They fail with
-`IllegalTypeAnalysisException` (a Union through the Stratify/Replicate renewal
-path); Gravity additionally surfaces a `BigFloat`/`rewrite_union_returns_as_ref`
-issue. Root cause not yet established.
+Both modes share the same single remaining broken scenario: `Renewal+
+GravityMixing`, which is numerically unstable — with population ~1e5 and an
+unconstrained linked Gravity exponent, `pop^α` overflows to BigFloat/BigInt and
+the ForwardDiff reference itself is non-finite (gradient ~1e57). It needs a
+data/scenario-stability fix (tamer populations or bounded exponents), not a
+type fix.
 
-Previously fixed along the way: the four AR scenarios (type-stabilised
-scan/diff seams, 47411fb); the LatentDelay / UncertainLatentDelay /
-TimeVaryingLatentDelay posters and `PartiallyMissing` / `Split cascade` (making
-observed data concrete at inference time); and `Renewal+FixedMixingK` plus the
-delay-convolution scenarios (dot-free reductions).
+Previously fixed in this PR: the four AR scenarios (type-stabilised scan/diff
+seams, 47411fb); LatentDelay / UncertainLatentDelay / TimeVaryingLatentDelay,
+PartiallyMissing, Split cascade and the delay/dot-convolution posters (concrete
+observed data + dot-free reductions, 79b9cea); and the three other stratified
+patch posters (IndependentPatches / StratifiedRt / StratifiedImportedCases,
+`collect`-typed matrix scan columns, 0f41d8f).
 
 Unresolved causes are tracked in #97.
 """
@@ -623,12 +624,11 @@ function backend_broken_scenarios()
     # `vcat`/`cumsum` in `_combine_diff` or by the `%` branch in
     # `combine_correct` — the root cause is not yet established.
     enzyme_reverse = Set([
-        # Stratified/mixing patch posters: Union through the renewal path
-        # (Gravity also surfaces a `BigFloat`/`rewrite_union_returns_as_ref`
-        # issue). Not yet root-caused.
-        "Renewal+IndependentPatches posterior",
-        "Renewal+StratifiedRt posterior",
-        "Renewal+StratifiedImportedCases posterior",
+    # `Renewal+GravityMixing` is numerically unstable: with population ~1e5
+    # and an unconstrained linked Gravity exponent, `pop^α` overflows to
+    # BigFloat/BigInt and the ForwardDiff reference itself is non-finite
+    # (gradient ~1e57). A scenario/data-stability fix is required, not a
+    # type fix — see the Gravity patch-model scenario.
         "Renewal+GravityMixing posterior"
     ])
     # Enzyme forward still has 12 broken scenarios.
@@ -655,11 +655,7 @@ function backend_broken_scenarios()
     # operations in `renewal_pressure` that Enzyme does support but the
     # combined gradient path triggers a `BoundsError` in).
     enzyme_forward = Set([
-        # Stratified/mixing patch posters (same as reverse): Union through the
-        # Stratify/Replicate/bernoulli renewal path; Gravity also BigFloat.
-        "Renewal+IndependentPatches posterior",
-        "Renewal+StratifiedRt posterior",
-        "Renewal+StratifiedImportedCases posterior",
+    # `Renewal+GravityMixing` — numerically unstable (see reverse note).
         "Renewal+GravityMixing posterior"
     ])
     # ReverseDiff compiled (`AutoReverseDiff(; compile = true)`) differentiates

@@ -135,7 +135,7 @@ end
 # Drive a scan one time step at a time: a path by its elements, a
 # strata × time matrix by its columns.
 _steps(Rt::AbstractVector) = Rt
-_steps(Rt::AbstractMatrix) = eachcol(Rt)
+_steps(Rt::AbstractMatrix) = collect.(eachcol(Rt))
 
 # The initial-infections seed: one value for a single series, one per stratum
 # otherwise. A bare `Distribution` in the slot draws one scalar; `only` on a
