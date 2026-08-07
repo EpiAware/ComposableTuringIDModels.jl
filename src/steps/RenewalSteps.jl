@@ -62,7 +62,9 @@ function renewal_pressure end
 
 renewal_pressure(::UniformScaling, g, window::AbstractVector) = sum(window .* g)
 
-renewal_pressure(::UniformScaling, g, window::AbstractMatrix) = window * g
+function renewal_pressure(::UniformScaling, g, window::AbstractMatrix)
+    vec(sum(window .* reshape(g, 1, :); dims = 2))
+end
 
 # A `strata × lags` generation interval: each stratum convolves its own row of
 # the window with its own interval.
@@ -74,7 +76,7 @@ end
 # A mixing matrix redistributes the convolved histories, whichever generation
 # interval produced them.
 function renewal_pressure(K::AbstractMatrix, g, window::AbstractMatrix)
-    return K * renewal_pressure(I, g, window)
+    return vec(sum(K .* reshape(renewal_pressure(I, g, window), 1, :); dims = 2))
 end
 
 # A per-pair generation interval, `K[g, h, i]` being the weight stratum `h`
@@ -166,7 +168,7 @@ _series(v::AbstractVector{<:AbstractVector}) = reduce(hcat, v)
 # Drop the oldest entry and commit the new incidence.
 _advance(window::AbstractVector, new) = vcat(window[2:end], new)
 function _advance(window::AbstractMatrix, new)
-    return hcat(view(window, :, 2:size(window, 2)), new)
+    return hcat(collect(view(window, :, 2:size(window, 2))), new)
 end
 
 # The number of lags a generation interval covers.

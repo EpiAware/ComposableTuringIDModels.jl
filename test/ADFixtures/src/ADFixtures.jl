@@ -67,6 +67,9 @@ function _models()
     # outputs (e.g. `ReportingTriangle`, `Split` stream tuples) pass through.
     _concretize(x::AbstractArray) = eltype(x) >: Missing ?
                                     coalesce.(x, zero(nonmissingtype(eltype(x)))) : x
+    # Split-style streams are returned as a NamedTuple of observed vectors;
+    # concretize each stream the same way as a plain array.
+    _concretize(x::NamedTuple) = map(_concretize, x)
     _concretize(x) = x
     sim(m, nn) = _concretize(
         ComposableTuringIDModels.concrete_observations(
@@ -230,15 +233,12 @@ function _models()
     aggregate = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7]))
-    # Partially-missing observations: a data vector carrying genuine reporting
-    # gaps (some entries `missing`, some concrete). This is the ragged case
-    # `ComposableTuringIDModels.concrete_observations` cannot narrow away —
-    # some entries really are unobserved — so the argument keeps its
-    # `Union{Missing, T}` eltype, DynamicPPL's `hasmissing` `deepcopy` fires on
-    # every evaluation, and it stays differentiable under Enzyme forward only
-    # via the `EnzymeRules.inactive` `deepcopy` mark in
-    # `ext/ComposableTuringIDModelsEnzymeExt.jl`. That gradient path is the
-    # point of the scenario.
+    # Partially-missing observations (NormalError). We do not infer missing
+    # events, so the observed data is kept concrete at inference time (the
+    # same `sim` narrowing applied elsewhere) rather than threading a ragged
+    # `Union{Missing, Float64}` vector — which DynamicPPL `deepcopy`s and
+    # Enzyme cannot compile. A continuous error keeps the linked log-density
+    # well defined (count families have no scalar bijector).
     #
     # The error family is `NormalError`, not a count family, and that is
     # load-bearing. A partially-missing vector makes the WHOLE `y_t` latent
@@ -321,12 +321,7 @@ function _models()
     y_ugen = sim(ugen, n)
     y_ascert = sim(ascert, 14)
     y_aggregate = sim(aggregate, 14)
-    # A straight `sim` draw, then genuine reporting gaps re-introduced by hand:
-    # every third entry blanked back to `missing` (distinct from `Aggregate`
-    # above, whose missing pattern comes from its window scattering, not the
-    # data itself).
-    y_partialmiss = Vector{Union{Missing, Float64}}(sim(partialmiss, n))
-    y_partialmiss[2:3:end] .= missing
+    y_partialmiss = sim(partialmiss, n)
     y_transobs = sim(transobs, n)
     y_normalobs = sim(normalobs, n)
     y_split = sim(split, n)
@@ -585,24 +580,21 @@ covers the prepared/in-place forms.
 | ForwardDiff            | reference; not listed broken    |
 | ReverseDiff (tape)     | not listed broken               |
 | ReverseDiff (compiled) | all 43 listed (DI batch-sweep gap) |
-| Enzyme reverse         | 37 pass / 6 broken             |
-| Enzyme forward         | 37 pass / 6 broken             |
+| Enzyme reverse         | 39 pass / 4 broken             |
+| Enzyme forward         | 39 pass / 4 broken             |
 
-Enzyme reverse broken (6): the `PartiallyMissing` posterior is an Enzyme
-compiler limitation on `Union{Missing,T}` arrays (reproduces standalone; not a
-package defect), and the five stratified/mixing patch-model posters introduce a
-Union through the renewal/mixing path (`IllegalTypeAnalysisException`; not yet
-root-caused).
+Both modes share the same 4 remaining broken scenarios: the stratified patch
+posters (`Renewal+IndependentPatches`, `Renewal+StratifiedRt`, `Renewal+
+StratifiedImportedCases`) and `Renewal+GravityMixing`. They fail with
+`IllegalTypeAnalysisException` (a Union through the Stratify/Replicate renewal
+path); Gravity additionally surfaces a `BigFloat`/`rewrite_union_returns_as_ref`
+issue. Root cause not yet established.
 
-Enzyme forward broken (6): `Split cascade` (its per-stream observed output
-isn't concrete-narrowed, so a ragged submodel argument still trips the
-missing-union `deepcopy`), plus the same five stratified/mixing patch posters.
-
-The four AR scenarios (ARIMA, DiffLatentModel(RandomWalk), ARMA, AR
-vector-prior) were fixed by type-stabilising the scan/diff seams (47411fb) and
-now pass both Enzyme modes. The LatentDelay / UncertainLatentDelay /
-TimeVaryingLatentDelay posters were cleared by making `sim` narrow the
-generated warm-up `missing` to concrete observed data.
+Previously fixed along the way: the four AR scenarios (type-stabilised
+scan/diff seams, 47411fb); the LatentDelay / UncertainLatentDelay /
+TimeVaryingLatentDelay posters and `PartiallyMissing` / `Split cascade` (making
+observed data concrete at inference time); and `Renewal+FixedMixingK` plus the
+delay-convolution scenarios (dot-free reductions).
 
 Unresolved causes are tracked in #97.
 """
@@ -631,15 +623,13 @@ function backend_broken_scenarios()
     # `vcat`/`cumsum` in `_combine_diff` or by the `%` branch in
     # `combine_correct` — the root cause is not yet established.
     enzyme_reverse = Set([
-        # Enzyme compiler limitation on `Union{Missing,T}` arrays (reproduces
-        # standalone; not a package defect).
-        "DirectInfections+PartiallyMissing posterior",
-        # Stratified/mixing patch posters: Union through the renewal path.
+        # Stratified/mixing patch posters: Union through the renewal path
+        # (Gravity also surfaces a `BigFloat`/`rewrite_union_returns_as_ref`
+        # issue). Not yet root-caused.
         "Renewal+IndependentPatches posterior",
         "Renewal+StratifiedRt posterior",
-        "Renewal+FixedMixingK posterior",
-        "Renewal+GravityMixing posterior",
-        "Renewal+StratifiedImportedCases posterior"
+        "Renewal+StratifiedImportedCases posterior",
+        "Renewal+GravityMixing posterior"
     ])
     # Enzyme forward still has 12 broken scenarios.
     #
@@ -665,16 +655,12 @@ function backend_broken_scenarios()
     # operations in `renewal_pressure` that Enzyme does support but the
     # combined gradient path triggers a `BoundsError` in).
     enzyme_forward = Set([
-        # Split returns non-vector (per-stream) observed data, so `sim`'s
-        # concrete-narrowing doesn't touch it; its ragged submodel argument
-        # still trips the missing-union `deepcopy` under forward.
-        "Renewal+Split cascade posterior",
-        # Stratified/mixing patch posters (same as reverse).
+        # Stratified/mixing patch posters (same as reverse): Union through the
+        # Stratify/Replicate/bernoulli renewal path; Gravity also BigFloat.
         "Renewal+IndependentPatches posterior",
         "Renewal+StratifiedRt posterior",
-        "Renewal+FixedMixingK posterior",
-        "Renewal+GravityMixing posterior",
-        "Renewal+StratifiedImportedCases posterior"
+        "Renewal+StratifiedImportedCases posterior",
+        "Renewal+GravityMixing posterior"
     ])
     # ReverseDiff compiled (`AutoReverseDiff(; compile = true)`) differentiates
     # the DynamicPPL log-densities correctly: a plain `DI.gradient` call and an
