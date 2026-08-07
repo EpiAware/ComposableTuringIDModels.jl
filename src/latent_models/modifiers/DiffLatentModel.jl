@@ -67,7 +67,7 @@ end
 end
 
 function _combine_diff(init, diff, d)
-    combined = vcat(init, diff)
+    combined = vcat(collect(init), collect(diff))
     for _ in 1:d
         combined = cumsum(combined)
     end
