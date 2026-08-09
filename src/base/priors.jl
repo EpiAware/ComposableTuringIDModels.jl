@@ -84,40 +84,15 @@ as_turing_submodel(d::Distribution, ::ModelShape; prefix::Bool = false) = d
 function as_turing_submodel(
         v::AbstractVector{<:Distribution}, n::Int; prefix::Bool = false)
     @assert length(v)==n "a length-$(length(v)) prior vector cannot produce a length-$n prior"
-    # Unconditionally `product_distribution`, never a runtime
-    # `homogeneous ? filldist(...) : product_distribution(...)` ternary.
-    # `product_distribution` (not DynamicPPL's `arraydist`, which routes a
-    # vector of univariates through the deprecated `Distributions.Product`
-    # constructor): the deprecation path pulls in `Base.depwarn`/`invokelatest`
-    # world-age machinery that Enzyme reverse cannot shadow
-    # (`EnzymeNoShadowError`), while `product_distribution` builds the
-    # identical `Product` without it.
+    # `product_distribution`, not `arraydist`: `arraydist` routes univariates
+    # through the deprecated `Distributions.Product`, whose depwarn world-age
+    # machinery Enzyme reverse cannot shadow (`EnzymeNoShadowError`).
     #
-    # A runtime ternary used to live here, since `filldist`'s `Fill`-based
-    # construction is the more specialised choice when every element is
-    # identical. But Julia cannot know at compile time which branch a given
-    # call takes (it depends on comparing distribution *values*, not types),
-    # so it infers the return as a small `Union` of the two differently-typed
-    # results and lowers it to LLVM's small-union return convention — a
-    # `select` between two differently-shaped pointers Enzyme's strict type
-    # analysis cannot resolve (`IllegalTypeAnalysisException`). Worse,
-    # `@model` bodies that branch on a runtime `q`/`p` (see `MA`'s `q == 1`
-    # vs `q > 1` prior draw) compile BOTH branches regardless of which one a
-    # given instance actually takes, so the union was reachable by Enzyme's
-    # whole-function analysis even for scenarios that never exercise the
-    # vector-prior branch at runtime.
-    #
-    # The cost of dropping `filldist`: verified bit-identical linked
-    # log-density (`link(VarInfo(m), m)` then `LogDensityFunction`, the exact
-    # quantity every scenario differentiates) between the two constructions
-    # for a homogeneous vector, both bounded and unbounded — see the PR
-    # description. `v` is already a materialised `Vector`, so nothing extra
-    # is allocated by preferring `product_distribution`; the only thing given
-    # up is `logpdf`'s internal `Fill`-based specialisation for repeated
-    # marginals, which is not a real cost at the vector lengths this prior
-    # slot is used at (AR/MA lag orders, `DiffLatentModel` differencing
-    # orders — a handful of elements). The `Benchmark (main)`/`Benchmark
-    # (pr)` CI jobs are the backstop if that assumption is ever wrong.
+    # No `filldist`/`product_distribution` ternary either. Which branch runs
+    # depends on distribution values, not types, so the return infers as a
+    # `Union` that Enzyme's type analysis rejects. Dropping `filldist` gives
+    # up its `Fill` logpdf specialisation, which is immaterial at the lengths
+    # this slot sees (lag orders, differencing orders).
     return product_distribution(v)
 end
 
@@ -181,8 +156,7 @@ end
 Sample a vector of prior `Distribution`s as a length-`n` prior submodel, one
 independent draw per element.
 
-The length is fixed by the vector, so `n` must match it. A homogeneous vector uses
-`filldist` and a heterogeneous one `product_distribution`. This is the explicit
+The length is fixed by the vector, so `n` must match it. This is the explicit
 way a prior slot asks for `n` independent draws with per-element priors (e.g. an
 `AR`'s per-lag damping coefficients).
 
@@ -199,10 +173,8 @@ as_turing_model([Normal(0, 1), Normal(5, 0.1)], 2)()
 "
 @model function as_turing_model(prior::AbstractVector{<:Distribution}, n::Int)
     @assert length(prior)==n "a length-$(length(prior)) prior vector cannot produce a length-$n prior"
-    # One i.i.d. draw per element; `filldist` for a homogeneous vector,
-    # `product_distribution` otherwise (not `arraydist`, whose deprecated
-    # `Distributions.Product` path breaks Enzyme reverse — see the note in
-    # `as_turing_submodel`'s vector method).
+    # One i.i.d. draw per element. See `as_turing_submodel`'s vector method
+    # for why this is `product_distribution` and not `arraydist`.
     product_dist = product_distribution(prior)
     θ ~ product_dist
     return θ

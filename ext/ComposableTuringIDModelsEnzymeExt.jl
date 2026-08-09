@@ -1,10 +1,7 @@
-# Enzyme AD-safety machinery.
-#
-# DynamicPPL `deepcopy`s a model argument whenever its type `hasmissing`, and
-# Enzyme has no `deepcopy` rule for a `Vector{Union{Missing,T}}`. The `deepcopy`
-# is of observed conditioning data — it carries no tangent — so we mark it
-# `inactive`. Generic DynamicPPL/Enzyme machinery; ideally lives in
-# `EpiAwareADTools.jl`.
+# Enzyme AD-safety machinery: `deepcopy` of missing-bearing conditioning data
+# is marked inactive, and forward-mode `dot` gets a rule BLAS does not provide.
+# Both are generic DynamicPPL/Enzyme fixes rather than package-specific, so
+# they belong in `EpiAwareADTools.jl` (EpiAware/ComposableTuringIDModels.jl#250).
 module ComposableTuringIDModelsEnzymeExt
 
 using Enzyme: Enzyme
@@ -20,12 +17,14 @@ function EnzymeRules.inactive(::typeof(deepcopy),
     return nothing
 end
 
-# Forward-mode rule for `LinearAlgebra.dot` (renewal / delay-convolution path).
-# Under Enzyme forward a BLAS `dot` raises `EnzymeNoDerivativeError`; reverse
-# already works and is deliberately left untouched (only `forward` is defined).
-# `∂dot(x,y)/∂x = y`, `∂/∂y = x`, exact and side-effect free, so the rule is safe.
-# Bounded to `AbstractVector{<:Real}` to avoid intercepting unrelated `dot`
-# overloads. Pitched upstream once Enzyme forwards runtime-activity BLAS `dot`.
+# Forward-mode rule for `dot`: BLAS `dot` raises `EnzymeNoDerivativeError`
+# under forward mode, while reverse already works and is left alone.
+# `∂/∂x = y`, `∂/∂y = x`, exact and side-effect free. Bounded to
+# `AbstractVector{<:Real}` so unrelated `dot` overloads are not intercepted.
+#
+# This rule does not cover every case: Enzyme still inlines BLAS `dot` in the
+# renewal and delay convolutions before the rule can fire, which is why those
+# steps avoid `dot` in the model code (see #250).
 
 # Un-batched: both `x` and `y` are `Const` or plain `Duplicated`.
 function EnzymeRules.forward(config::EnzymeRules.FwdConfig,

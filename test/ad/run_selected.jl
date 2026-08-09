@@ -67,8 +67,10 @@ function main()
         for b in sel_backends
             try
                 g = DifferentiationInterface.gradient(s.f, b.backend, s.x)
-                ok = length(g) == length(ref) &&
-                     maximum(abs.(g .- ref)) <= max(1e-6, 5e-2 * maximum(abs.(ref)))
+                # Same test as the harness's `check_broken`, so a PASS here
+                # cannot disagree with CI.
+                ok = g isa AbstractVector && ref !== nothing &&
+                     isapprox(g, ref; rtol = 5e-2, atol = 1e-6)
                 if ok && all(isfinite, g)
                     npass += 1
                     println(rpad(String(s.name), 46), rpad(b.name, 22), "PASS")

@@ -40,6 +40,11 @@ end
     # A scalar `missing` (the "simulate from the prior" sentinel) passes
     # through unchanged.
     @test concrete_observations(missing) === missing
+
+    # An already-concrete array is returned as-is, not copied, so a caller
+    # holding the array keeps its identity.
+    y_concrete = [1, 2, 3]
+    @test concrete_observations(y_concrete) === y_concrete
 end
 
 @testitem "composed model: as_turing_model narrows y_t automatically" begin

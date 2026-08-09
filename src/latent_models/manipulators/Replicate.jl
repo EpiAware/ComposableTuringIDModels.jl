@@ -59,9 +59,8 @@ end
 
 @model function as_turing_model(m::Replicate, n::Dims{2})
     n_strata, n_time = n
-    # Draw the first stratum first to determine the concrete element type, so
-    # the collection is a concrete `Vector{T}` rather than a boxed `Vector{Any}`
-    # that Enzyme's type analysis cannot resolve (IllegalTypeAnalysisException).
+    # Draw stratum 1 up front to fix the element type: a boxed `Vector{Any}`
+    # defeats Enzyme's type analysis.
     drawn_1 ~ to_submodel(
         prefix(as_turing_model(m.model, n_time), Symbol(:stratum, 1)),
         false)

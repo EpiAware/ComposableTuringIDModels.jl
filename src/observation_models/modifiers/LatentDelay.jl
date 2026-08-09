@@ -256,33 +256,20 @@ keeps every pmf the same length.
             prefix(as_turing_model(u.params[i], n), Symbol(:param, i)), false)
         params[i] = drawn
     end
-    # Freeze the heterogeneous draws into a `Tuple` before `_at` reads them
-    # back: a `Vector{Any}` keeps every element boxed as `Any` all the way
-    # through the closure below, so Enzyme's activity analysis cannot resolve
-    # a shadow per element and instead boxes each one in a `Base.RefValue`
-    # that `_at` cannot index (`MethodError: no method matching
-    # _at(::RefValue, ::Int)`). A `Tuple`'s element types are fixed by its
-    # runtime contents, so each draw reaches `_at` as a concrete `Number` or
-    # `Vector` — a real type-stability fix, independent of Enzyme.
+    # Freeze into a `Tuple`: a `Vector{Any}` keeps every element boxed, so the
+    # draws reach `_at` as `Base.RefValue`s it cannot index. A tuple fixes the
+    # element types to concrete `Number`/`Vector`.
     params_t = Tuple(params)
     return map(1:n) do t
-        # `_at_all` (head/tail recursion below), not `ntuple(i -> _at(params_t[i],
-        # t), np)` or a `(... for i in 1:np)` generator: `params_t` is
-        # heterogeneous (e.g. `Tuple{Vector{Float64}, Float64}`), so indexing it
-        # with a runtime `i` returns a `Union` of the element types — the same
-        # "use of a Union type" `IllegalTypeAnalysisException` Enzyme reverse
-        # raises for a packed-union-eltype *array* (see `Split._split_models`),
-        # just reached via a runtime-indexed heterogeneous *tuple* instead.
-        # `_at_all` recurses on `first`/`Base.tail`, so each element is read at
-        # its own statically-known position — no runtime index, no `Union`.
+        # `_at_all` reads each element at a static position. Indexing a
+        # heterogeneous tuple with a runtime `i` would return a `Union`, which
+        # Enzyme's type analysis rejects.
         θs = _at_all(params_t, t)
         _discretised_pmf(u.family(θs...); Δd = u.Δd, D = u.D)
     end
 end
 
-# Read every drawn parameter at time `t` via `_at`, one static tuple position
-# at a time (`first`/`Base.tail` recursion) — see the comment above the call
-# site for why this replaces a runtime-indexed loop over `params_t`.
+# Read every drawn parameter at time `t`, one static tuple position at a time.
 _at_all(::Tuple{}, t) = ()
 function _at_all(params::Tuple, t)
     return (_at(first(params), t), _at_all(Base.tail(params), t)...)
