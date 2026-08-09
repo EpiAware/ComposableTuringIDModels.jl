@@ -13,11 +13,17 @@ relative to stratum `g`'s own. The diagonal is `within`, so the default of `1.0`
 makes the diagonal the uncoupled model and the off-diagonals the extra imported
 pressure on top of it.
 
-The result is deliberately **not** normalised. Row-normalising it would cancel
-``\alpha`` entirely, since a common row factor divides out.
-Normalisation is therefore left to the caller. For a row-stochastic operator
-use `K ./ sum(K; dims = 2)`. For the usual local-plus-travel form use
-`(1 - ε) * I(n) + ε * K ./ sum(K; dims = 2)`.
+The result is **not** normalised by default, so the scale of `pop` carries
+straight through: raw counts of ~1e5 give off-diagonals many orders of
+magnitude above a `within` of `1.0`, which makes coupling swamp within-stratum
+transmission and overflows a renewal recursion. Either pass `pop` in scaled
+units or set `normalise = true`.
+
+`normalise = true` divides each row by its sum, giving a row-stochastic
+operator that conserves total force of infection. ``\alpha`` stays identifiable
+as long as `within` is non-zero, because it does not divide out of the diagonal
+term. For the usual local-plus-travel form use
+`(1 - ε) * I(n) + ε * gravity(pop, dist; normalise = true)`.
 
 # Arguments
 
@@ -31,6 +37,7 @@ use `K ./ sum(K; dims = 2)`. For the usual local-plus-travel form use
   - `β`: the exponent on the origin population (default `1.0`).
   - `γ`: the exponent on distance (default `2.0`).
   - `within`: the diagonal, own-stratum weight (default `1.0`).
+  - `normalise`: row-normalise the operator (default `false`).
 
 # Examples
 ```@example gravity
@@ -40,11 +47,13 @@ dist = [0.0 50.0; 50.0 0.0]
 gravity(pop, dist; α = 0.0, β = 1.0, γ = 2.0)
 ```
 "
-function gravity(pop, dist; α = 1.0, β = 1.0, γ = 2.0, within = 1.0)
+function gravity(pop, dist; α = 1.0, β = 1.0, γ = 2.0, within = 1.0,
+        normalise = false)
     n = length(pop)
     @assert size(dist)==(n, n) "`dist` must be $n x $n for $n strata"
-    return [g == h ? within : pop[g]^α * pop[h]^β / dist[g, h]^γ
-            for g in 1:n, h in 1:n]
+    K = [g == h ? within : pop[g]^α * pop[h]^β / dist[g, h]^γ
+         for g in 1:n, h in 1:n]
+    return normalise ? K ./ sum(K; dims = 2) : K
 end
 
 @doc raw"
@@ -72,6 +81,8 @@ so they cannot drift.
   - `β`: prior for the exponent on the origin population.
   - `γ`: prior for the exponent on distance.
   - `within`: the diagonal, own-stratum weight.
+  - `normalise`: row-normalise the operator. Prefer this, or populations in
+    scaled units, over raw counts. See [`gravity`](@ref).
 
 # Examples
 ```@example Gravity
@@ -83,7 +94,7 @@ g = Gravity(pop, dist; α = Normal(0, 0.5), β = Normal(0, 0.5),
 size(as_turing_model(g, (2, 20))())
 ```
 "
-struct Gravity{P, D, A <: PriorLike, B <: PriorLike, C <: PriorLike, W} <:
+struct Gravity{P, D, A <: PriorLike, B <: PriorLike, C <: PriorLike, W, N} <:
        AbstractMixingModel
     "The population of each stratum."
     pop::P
@@ -97,11 +108,14 @@ struct Gravity{P, D, A <: PriorLike, B <: PriorLike, C <: PriorLike, W} <:
     γ::C
     "The diagonal, own-stratum weight."
     within::W
+    "Whether to row-normalise the operator."
+    normalise::N
 end
 
 function Gravity(pop, dist; α = Normal(0, 0.5), β = Normal(0, 0.5),
-        γ = truncated(Normal(2, 0.5), 0, Inf), within = 1.0)
-    return Gravity(pop, dist, α, β, γ, within)
+        γ = truncated(Normal(2, 0.5), 0, Inf), within = 1.0,
+        normalise = false)
+    return Gravity(pop, dist, α, β, γ, within, normalise)
 end
 
 @model function as_turing_model(m::Gravity, n)
@@ -109,7 +123,7 @@ end
     β ~ as_turing_submodel(m.β, 1; prefix = true)
     γ ~ as_turing_submodel(m.γ, 1; prefix = true)
     return gravity(m.pop, m.dist; α = only(α), β = only(β), γ = only(γ),
-        within = m.within)
+        within = m.within, normalise = m.normalise)
 end
 
 @doc raw"

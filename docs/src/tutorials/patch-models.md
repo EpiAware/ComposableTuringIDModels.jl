@@ -116,7 +116,7 @@ dist = [0.0 10.0 30.0
         30.0 25.0 0.0]
 
 movement = Gravity(pop, dist; α = HalfNormal(1.0), β = HalfNormal(1.0),
-    γ = HalfNormal(2.0))
+    γ = HalfNormal(2.0), normalise = true)
 gravity_model = Renewal(gen_int; rt = rt_process,
     initialisation = Normal(log(50.0), 0.2), mixing = movement)
 size(as_turing_model(gravity_model, (n_strata, n_time))().I_t)
@@ -128,6 +128,14 @@ size(as_turing_model(gravity_model, (n_strata, n_time))().I_t)
 That own weight is the `within` keyword, default `1.0`.
 `Gravity` draws priors on `α`, `β` and `γ`, then calls the same function
 inside the model, so the fixed and inferred paths cannot drift.
+
+`normalise = true` matters here.
+Without it the operator is unnormalised, so raw population counts give
+off-diagonal weights many orders of magnitude above the `within` diagonal of
+`1.0`.
+Coupling then swamps within-patch transmission and the recursion overflows.
+Row-normalising conserves the total force of infection instead.
+Passing `pop` in scaled units works too.
 
 ## Many-to-one observation: age bands into one stream
 

@@ -110,6 +110,26 @@ end
     @test within[1, 1] == 0.5 == within[2, 2]
 end
 
+@testitem "gravity row-normalises when asked" begin
+    using ComposableTuringIDModels
+    pop = [1e6, 2e5]
+    dist = [0.0 50.0; 50.0 0.0]
+    K = gravity(pop, dist; normalise = true)
+    @test all(≈(1.0), sum(K; dims = 2))
+    # Unnormalised, raw counts put the off-diagonals far above the diagonal.
+    raw = gravity(pop, dist)
+    @test raw[1, 2] > 1e6 * raw[1, 1]
+end
+
+@testitem "a drawn Gravity passes normalise through to the operator" begin
+    using ComposableTuringIDModels, Distributions, Random
+    pop = [1e6, 2e5, 5e5]
+    dist = [0.0 50.0 30.0; 50.0 0.0 20.0; 30.0 20.0 0.0]
+    m = Gravity(pop, dist; normalise = true)
+    K = as_turing_model(m, (3, 5))(MersenneTwister(1))
+    @test all(≈(1.0), sum(K; dims = 2))
+end
+
 @testitem "gravity rejects a dist matrix that doesn't match pop" begin
     using ComposableTuringIDModels
     @test_throws AssertionError gravity(
