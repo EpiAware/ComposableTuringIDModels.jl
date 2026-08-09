@@ -508,11 +508,14 @@ over-listing is safe and under-listing reds CI. Listing every scenario for a
 backend is not safe in a different sense: it empties the set the full
 correctness sweep runs over, so that backend stops being tested.
 
-All seven backends currently differentiate all 43 scenarios, so every set is
-empty. Add an entry only with a measured failure and a tracked issue.
+Add an entry only with a measured failure and a tracked issue.
 """
 function backend_broken_scenarios()
-    return Dict{String, Set{String}}()
+    # Enzyme reverse cannot accumulate a `Missing` observation: DynamicPPL's
+    # `accumulate_into` has no method for the shadow it builds. Enzyme forward
+    # and the other five backends differentiate this scenario. See #251.
+    return Dict{String, Set{String}}(
+        "Enzyme reverse" => Set(["DirectInfections+PartiallyMissing posterior"]))
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."
