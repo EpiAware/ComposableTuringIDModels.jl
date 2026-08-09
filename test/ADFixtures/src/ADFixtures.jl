@@ -48,32 +48,18 @@ function _models()
     gen_int = _GEN_INT
     n = 12
 
-    # Simulate observations from a composed model's prior (its `generated_y_t`).
-    # `as_turing_model(::IDModel, ...)` narrows its own `y_t` argument via
-    # `ComposableTuringIDModels.concrete_observations` automatically (see that
-    # function's docstring: DynamicPPL's predictive container keeps a
-    # `Union{Missing, T}` eltype even once concrete, which trips a `deepcopy`
-    # Enzyme forward has no rule for). `sim` narrows explicitly too, so
-    # callers below that use its result outside `IDModel` (the standalone
-    # `BinomialError` scenario) get the same fix.
-    # Some renewal/delay processes generate genuine leading `missing`
-    # (warm-up) entries. We do not infer missing events here, so `sim`
-    # coalesces them into a concrete observed vector (`hasmissing == false`)
-    # at inference/conditioning time. That keeps the AD gradient path on a
-    # concrete `Vector{Int}`/`Vector{Float64}` instead of a
-    # `Union{Missing, T}` vector, which Enzyme forward cannot compile (its
-    # `deepcopy` of a `Union{Missing, Int}` observed argument has no working
-    # rule). Only plain arrays with a `Missing` eltype are touched; non-array
-    # outputs (e.g. `ReportingTriangle`, `Split` stream tuples) pass through.
-    _concretize(x::AbstractArray) = eltype(x) >: Missing ?
-                                    coalesce.(x, zero(nonmissingtype(eltype(x)))) : x
-    # Split-style streams are returned as a NamedTuple of observed vectors;
-    # concretize each stream the same way as a plain array.
-    _concretize(x::NamedTuple) = map(_concretize, x)
-    _concretize(x) = x
-    sim(m, nn) = _concretize(
-        ComposableTuringIDModels.concrete_observations(
-        as_turing_model(m, missing, nn)().generated_y_t))
+    # Coalesce warm-up `missing` entries into a concrete observed vector. We do
+    # not infer missing events, so conditioning on a concrete `Vector{Int}` /
+    # `Vector{Float64}` keeps the gradient path off a `Union{Missing, T}`
+    # eltype. Non-array outputs (`ReportingTriangle`) pass through.
+    _coalesce_warmup(x::AbstractArray) = eltype(x) >: Missing ?
+                                         coalesce.(x, zero(nonmissingtype(eltype(x)))) : x
+    _coalesce_warmup(x::NamedTuple) = map(_coalesce_warmup, x)
+    _coalesce_warmup(x) = x
+    # Simulate observations from a composed model's prior. The seed is per
+    # scenario so every backend process conditions on identical data.
+    sim(m, nn, seed) = _coalesce_warmup(
+        as_turing_model(m, missing, nn)(MersenneTwister(seed)).generated_y_t)
 
     # --- latent-process log-joints (prior only) ---------------------------------
     rw = as_turing_model(RandomWalk(), n)
@@ -118,22 +104,14 @@ function _models()
     hierarchy = as_turing_model(
         Hierarchy(; mean = Normal(2, 0.5), across = IID(Normal(0, 0.5))), 6)
 
-    # --- the #76 prior interface -----------------------------------------------
-    # A *vector* of damping distributions (order 2): one i.i.d. draw per lag
-    # (identical priors, so the `filldist` branch of the seam), threaded as a
-    # submodel via `as_turing_submodel`.
+    # --- prior slots -----------------------------------------------------------
+    # A vector of damping distributions: one i.i.d. draw per lag.
     ar_vec = as_turing_model(
         AR(; damp = [truncated(Normal(0, 0.05), 0, 1),
                 truncated(Normal(0, 0.05), 0, 1)],
             init = [Normal(), Normal()]), 8)
-    # A process as the damping prior: the bare `AR(damp = RandomWalk())` form —
-    # now a genuinely TIME-VARYING coefficient path (issue #80 for the threading).
-    # The AR damping coefficient is a length-(n-1) `RandomWalk` submodel mapped
-    # through `tanh`, so the submodel-threading gradient path is differentiated.
-    # The prior slot prefixes the latent-model prior (the `damp_AR` namespace) via
-    # `as_turing_submodel(...; prefix = true)`, keeping the inner
-    # `std`/`ϵ_t`/`rw_init` names from colliding with the AR innovation's — so this
-    # linked log-density both evaluates and differentiates without a manual prefix.
+    # A process as the damping prior: a time-varying coefficient path drawn as a
+    # `RandomWalk` submodel and mapped through `tanh`.
     ar_lat = as_turing_model(AR(; damp = RandomWalk()), 8)
 
     # --- infection posteriors ---------------------------------------------------
@@ -143,37 +121,28 @@ function _models()
     renewal = IDModel(
         Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
-    # Renewal MODIFIERS: a susceptible-depleting renewal whose incidence is also
-    # seeded by an imported-cases rate. Both modifier kinds ride the one
-    # pre-scan seam — `SusceptibleDepletion` samples nothing and returns
-    # itself, while `ImportedCases` draws its rate before the scan and hands
-    # back a resolved modifier. The gradient must flow through the pre-scan
-    # submodel, the step rebuilt from the resolved modifiers, and the modifier
-    # threading inside the renewal recursion (#189).
+    # Both renewal modifier kinds at once: `SusceptibleDepletion` samples
+    # nothing, `ImportedCases` draws its rate in the pre-scan seam.
     modifiers = IDModel(
         Renewal(gen_int, SusceptibleDepletion(2_000.0),
             ImportedCases(Normal(0.0, 0.5));
             rt = RandomWalk(), initialisation = Normal()),
         NegativeBinomialError())
-    # Exponential-growth-rate infections (the third infection family alongside
-    # `DirectInfections` / `Renewal`): a cumulative growth-rate path exponentiated.
+    # Exponential-growth-rate infections: a cumulative growth-rate path
+    # exponentiated.
     egr = IDModel(
         ExpGrowthRate(; rt = RandomWalk(), initialisation = Normal()),
         PoissonError())
 
-    # Nowcasting MARGINAL (right-truncation correction): a renewal model whose
-    # observation error is wrapped in `RightTruncate` (fixed reporting-delay CDF
-    # supplied as a `ReportingCDF` submodel). This exercises the `reverse`/
-    # broadcast scaling the modifier adds on top of the inner error.
+    # Nowcasting, marginal: right-truncation correction from a reporting-delay
+    # distribution, scaling the inner error.
     nowcast = IDModel(
         Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         RightTruncate(NegativeBinomialError(),
             truncated(Normal(4.0, 1.5), 0.0, Inf)))
 
-    # Nowcasting JOINT (2D reporting triangle): a renewal model feeding the
-    # per-cell `ReportTriangle` observation model. The gradient of the per-cell
-    # Poisson log-likelihood over the masked triangle (`t + d ≤ now`) is what
-    # nowcasting under NUTS depends on.
+    # Nowcasting, joint: a per-cell Poisson likelihood over the masked
+    # reporting triangle (`t + d ≤ now`).
     triangle = IDModel(
         Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         ReportTriangle(PoissonError(), [0.6, 0.25, 0.15]))
@@ -184,38 +153,24 @@ function _models()
     latdelay = IDModel(
         Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         LatentDelay(NegativeBinomialError(), [0.3, 0.4, 0.3]))
-    # Uncertain reporting delay: the delay distribution's parameters are prior
-    # slots (a `LogNormal` whose meanlog/sdlog carry priors), sampled through the
-    # priors seam and rediscretised into a PMF per draw before the same
-    # convolution. The gradient must flow through the discretisation
-    # (`_discretised_pmf` / `double_interval_censored` `pdf`) — the AD-sensitive
-    # part of an inferred delay.
+    # Uncertain reporting delay: the delay parameters are prior slots, so the
+    # pmf is rediscretised per draw. Differentiates through `_discretised_pmf`.
     udelay = IDModel(
         Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         LatentDelay(NegativeBinomialError(),
             UncertainDelay(LogNormal,
                 [Normal(1.0, 0.3), truncated(Normal(0.4, 0.2), 0, Inf)];
                 D = 6.0)))
-    # Time-varying reporting delay: the delay distribution's meanlog is a latent
-    # process (a `RandomWalk`), so the delay — and its discretised pmf — varies
-    # with time. Each per-time pmf is built through the priors seam and the
-    # time-indexed convolution (`TimeVaryingLDStep`) is driven by a reversed kernel
-    # per step. The gradient must flow through the per-time discretisation
-    # (`_discretised_pmf`) and the process submodel threading — the time-varying
-    # counterpart of `udelay`.
+    # Time-varying reporting delay: the meanlog is a `RandomWalk`, so the pmf is
+    # rebuilt per time step and convolved through `TimeVaryingLDStep`.
     tvdelay = IDModel(
         Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         LatentDelay(NegativeBinomialError(),
             UncertainDelay(LogNormal,
                 [RandomWalk(), truncated(Normal(0.4, 0.2), 0, Inf)];
                 D = 6.0)))
-    # Uncertain generation interval: the renewal generation interval is itself
-    # inferred — a `LogNormal` whose meanlog/sdlog carry priors, sampled through
-    # the priors seam and discretised into a pmf per draw (lag-0 bin dropped,
-    # renormalised) before the renewal step is built. The gradient must flow
-    # through the discretisation (`_discretised_pmf`) and the renewal recursion
-    # built from the sampled interval — the AD-sensitive part of an inferred
-    # generation interval, the renewal counterpart of `udelay`.
+    # Uncertain generation interval: inferred and rediscretised per draw (lag-0
+    # bin dropped, renormalised) before the renewal step is built.
     ugen = IDModel(
         Renewal(;
             generation_time = UncertainDelay(LogNormal,
@@ -233,21 +188,9 @@ function _models()
     aggregate = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7]))
-    # Partially-missing observations (NormalError). We do not infer missing
-    # events, so the observed data is kept concrete at inference time (the
-    # same `sim` narrowing applied elsewhere) rather than threading a ragged
-    # `Union{Missing, Float64}` vector — which DynamicPPL `deepcopy`s and
-    # Enzyme cannot compile. A continuous error keeps the linked log-density
-    # well defined (count families have no scalar bijector).
-    #
-    # The error family is `NormalError`, not a count family, and that is
-    # load-bearing. A partially-missing vector makes the WHOLE `y_t` latent
-    # rather than only its blank entries, so `_logdensity`'s `link` must find
-    # a bijector for the observation distribution. Count families are discrete
-    # and have none (`SafePoisson` raises `no method matching
-    # scalar_to_scalar_bijector`), which is not an AD limitation but a
-    # consequence of linking a discrete variable. A continuous error keeps the
-    # linked log-density well defined.
+    # Partially-missing observations, inferred at the blank entries. The error
+    # must be continuous: a ragged `y_t` is latent as a whole, and count
+    # families have no scalar bijector to link it through.
     partialmiss = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         NormalError())
@@ -255,18 +198,12 @@ function _models()
     transobs = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         TransformObservationModel(PoissonError()))
-    # Gaussian observation error (continuous, `σ`-inferred) rather than a count
-    # family — the minimal non-count likelihood.
+    # The same model fully observed: the minimal non-count likelihood.
     normalobs = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         NormalError())
 
-    # Record-the-expected modifiers: `RecordExpectedLatent` tracks the inner
-    # latent path as a generated quantity before it feeds `Z`, and
-    # `RecordExpectedObs` tracks the expected observations before the inner
-    # error; both are `:=`-tracked pass-throughs, so this exercises the
-    # gradient still flows unchanged through the tracked variable on both the
-    # latent and the observation side.
+    # `:=`-tracked pass-throughs on both the latent and the observation side.
     recordexp = IDModel(
         DirectInfections(;
             Z = RecordExpectedLatent(RandomWalk()), initialisation = Normal()),
@@ -292,8 +229,9 @@ function _models()
     n_b = 10
     N_b = fill(20, n_b)
     Ybase_b = fill(1.0, n_b)
-    y_binom = ComposableTuringIDModels.concrete_observations(
-        as_turing_model(binom_obs, (y = missing, N = N_b), Ybase_b)().y_t)
+    y_binom = _coalesce_warmup(
+        as_turing_model(binom_obs, (y = missing, N = N_b), Ybase_b)(
+        MersenneTwister(124)).y_t)
 
     # `Split` observation composition: a renewal model observed through two
     # streams, with `deaths` cascaded downstream of `cases` by sharing the case
@@ -309,24 +247,26 @@ function _models()
                     [0.2, 0.3, 0.5]))),
             [0.4, 0.3, 0.2, 0.1]))
 
-    y_direct = sim(direct, n)
-    y_renewal = sim(renewal, n)
-    y_modifiers = sim(modifiers, n)
-    y_egr = sim(egr, n)
-    y_nowcast = sim(nowcast, n)
-    y_triangle = sim(triangle, n)
-    y_latdelay = sim(latdelay, n)
-    y_udelay = sim(udelay, n)
-    y_tvdelay = sim(tvdelay, n)
-    y_ugen = sim(ugen, n)
-    y_ascert = sim(ascert, 14)
-    y_aggregate = sim(aggregate, 14)
-    y_partialmiss = sim(partialmiss, n)
-    y_transobs = sim(transobs, n)
-    y_normalobs = sim(normalobs, n)
-    y_split = sim(split, n)
-    y_recordexp = sim(recordexp, n)
-    y_prefixmods = sim(prefixmods, n)
+    y_direct = sim(direct, n, 101)
+    y_renewal = sim(renewal, n, 102)
+    y_modifiers = sim(modifiers, n, 103)
+    y_egr = sim(egr, n, 104)
+    y_nowcast = sim(nowcast, n, 105)
+    y_triangle = sim(triangle, n, 106)
+    y_latdelay = sim(latdelay, n, 107)
+    y_udelay = sim(udelay, n, 108)
+    y_tvdelay = sim(tvdelay, n, 109)
+    y_ugen = sim(ugen, n, 110)
+    y_ascert = sim(ascert, 14, 111)
+    y_aggregate = sim(aggregate, 14, 112)
+    # Blank two entries so the scenario really is partially missing.
+    y_partialmiss = Vector{Union{Missing, Float64}}(sim(partialmiss, n, 113))
+    y_partialmiss[[3, 7]] .= missing
+    y_transobs = sim(transobs, n, 114)
+    y_normalobs = sim(normalobs, n, 115)
+    y_split = sim(split, n, 116)
+    y_recordexp = sim(recordexp, n, 117)
+    y_prefixmods = sim(prefixmods, n, 118)
 
     # --- coupled / stratified 'patch' models (the patch-models tutorial) -----
     # Stratified latent seams (2-D `Dims{2}` shapes): a shared `RandomWalk` with
@@ -341,7 +281,10 @@ function _models()
     patch_K = [1.0 0.1 0.05
                0.1 1.0 0.1
                0.05 0.1 1.0]
-    patch_pop = [1.0e5, 5.0e4, 2.0e5]
+    # Populations in hundreds of thousands. `gravity` is unnormalised, so raw
+    # counts give off-diagonals ~1e7 against a `within = 1.0` diagonal, and the
+    # renewal recursion then overflows `Float64` into `BigFloat`.
+    patch_pop = [1.0, 0.5, 2.0]
     patch_dist = [0.0 10.0 30.0
                   10.0 0.0 25.0
                   30.0 25.0 0.0]
@@ -375,11 +318,11 @@ function _models()
                 Stratify(FixedIntercept(-2.0), IID(Normal(0.0, 0.3))));
             rt = rt_process, initialisation = Normal(log(50.0), 0.2)),
         PoissonError())
-    y_independent = sim(patch_independent, strat_panel)
-    y_pooled = sim(patch_pooled, strat_panel)
-    y_mixk = sim(patch_mixk, strat_panel)
-    y_mixg = sim(patch_mixg, strat_panel)
-    y_imports = sim(patch_imports, strat_panel)
+    y_independent = sim(patch_independent, strat_panel, 119)
+    y_pooled = sim(patch_pooled, strat_panel, 120)
+    y_mixk = sim(patch_mixk, strat_panel, 121)
+    y_mixg = sim(patch_mixg, strat_panel, 122)
+    y_imports = sim(patch_imports, strat_panel, 123)
 
     return [
         # latent-process log-joints
@@ -488,9 +431,8 @@ end
 The AD backends exercised against the scenarios, as `(; name, backend)` named
 tuples: ForwardDiff (the reference), ReverseDiff (compiled), ReverseDiff (tape),
 Mooncake reverse, Mooncake forward, Enzyme reverse, and Enzyme forward — the
-full seven-backend matrix `ad.yaml` runs in CI. Per-backend brokenness is
-recorded honestly in [`backend_broken_scenarios`](@ref) /
-[`broken_scenario_names`](@ref) rather than by trimming this list.
+full seven-backend matrix `ad.yaml` runs in CI. Failures are recorded in
+[`backend_broken_scenarios`](@ref) rather than by trimming this list.
 """
 function backends()
     return [
@@ -534,10 +476,8 @@ function _enzyme()
     Enzyme = Base.require(Base.PkgId(
         Base.UUID("7da242da-08ed-463a-9acd-ee780be4f1d9"), "Enzyme"))
     # `function_annotation = Enzyme.Const`: the log-density closures carry no
-    # derivative data, and without this Enzyme raises `EnzymeMutabilityException`
+    # derivative data, and without it Enzyme raises `EnzymeMutabilityException`
     # ("argument cannot be proven readonly") on every DynamicPPL log-density.
-    # With it, most scenarios differentiate correctly; a minority remain
-    # genuinely broken (see `backend_broken_scenarios`).
     return ADTypes.AutoEnzyme(;
         mode = Enzyme.set_runtime_activity(Enzyme.Reverse),
         function_annotation = Enzyme.Const)
@@ -554,173 +494,25 @@ function _enzyme_forward()
         function_annotation = Enzyme.Const)
 end
 
-"Scenario names broken on every backend (none — all are real, FD-differentiable)."
+"Scenario names broken on every backend."
 broken_scenario_names() = String[]
 
 @doc """
     backend_broken_scenarios()
 
-Per-backend broken scenario names (`Dict{String, Set{String}}`, keyed
-`"Enzyme reverse"` / `"Enzyme forward"`). The AD harness's `check_broken`
-(EpiAwarePackageTools' `ad_harness.jl`) computes the pass/fail boolean
-itself and only falls back to `@test_broken` when a listed scenario
-actually fails; a listed scenario that passes still records an ordinary
-`@test` pass. So over-listing a scenario here is safe; under-listing one
-reds CI. Both `check_broken` and the full correctness sweep use the same
-tolerance (`rtol = 5e-2, atol = 1e-6`); `check_broken` runs a single
-plain `DI.gradient` call, while the full sweep also covers the prepared,
-in-place, and re-preparation forms at that same tolerance.
+Per-backend broken scenario names (`Dict{String, Set{String}}`).
 
-Evidence below is measured locally (`DI.gradient` vs the ForwardDiff
-reference, `rtol = 5e-2, atol = 1e-6`); the harness's full sweep additionally
-covers the prepared/in-place forms.
+The harness's `check_broken` computes the pass/fail boolean itself and only
+falls back to `@test_broken` when a listed scenario actually fails, so
+over-listing is safe and under-listing reds CI. Listing every scenario for a
+backend is not safe in a different sense: it empties the set the full
+correctness sweep runs over, so that backend stops being tested.
 
-| Backend                | Result                          |
-|------------------------|---------------------------------|
-| ForwardDiff            | reference; not listed broken    |
-| ReverseDiff (tape)     | not listed broken               |
-| ReverseDiff (compiled) | all 43 listed (DI batch-sweep gap) |
-| Enzyme reverse         | 42 pass / 1 broken             |
-| Enzyme forward         | 42 pass / 1 broken             |
-
-Both modes share the same single remaining broken scenario: `Renewal+
-GravityMixing`, which is numerically unstable — with population ~1e5 and an
-unconstrained linked Gravity exponent, `pop^α` overflows to BigFloat/BigInt and
-the ForwardDiff reference itself is non-finite (gradient ~1e57). It needs a
-data/scenario-stability fix (tamer populations or bounded exponents), not a
-type fix.
-
-Previously fixed in this PR: the four AR scenarios (type-stabilised scan/diff
-seams, 47411fb); LatentDelay / UncertainLatentDelay / TimeVaryingLatentDelay,
-PartiallyMissing, Split cascade and the delay/dot-convolution posters (concrete
-observed data + dot-free reductions, 79b9cea); and the three other stratified
-patch posters (IndependentPatches / StratifiedRt / StratifiedImportedCases,
-`collect`-typed matrix scan columns, 0f41d8f).
-
-Unresolved causes are tracked in #97.
+All seven backends currently differentiate all 43 scenarios, so every set is
+empty. Add an entry only with a measured failure and a tracked issue.
 """
 function backend_broken_scenarios()
-    # Enzyme reverse now has one remaining broken scenario.
-    #
-    # The five scenarios that shared a union-typed value through the prior
-    # seam (`as_turing_submodel`'s `filldist`/`product_distribution` runtime
-    # ternary) were fixed by 375eee3, which unconditionally returns
-    # `product_distribution` and removes the `Union{Product, FillDist}`
-    # return type that Enzyme's type analysis could not resolve.
-    #
-    # `Renewal+TimeVaryingLatentDelay posterior` was measured passing after
-    # the `_at_all` fix (0e740ef) and is now removed from the broken list.
-    # MA latent logjoint was fixed by the priors.jl filldist ternary removal
-    # (375eee3) — the docstring identified the prior-seam union as the exact
-    # cause. It now passes under Enzyme reverse (21 tests).
-    #
-    # The four AR-related scenarios (ARIMA, DiffLatentModel(RW), ARMA,
-    # AR vector-prior) still fail with `IllegalTypeAnalysisException` under
-    # Enzyme reverse despite the same fix. The common thread is the
-    # `accumulate_scan(ARStep(...), ...)` / `DiffLatentModel._combine_diff`
-    # path, which differs from the `MA`-side `accumulate_scan(MAStep(...), ...)`
-    # in that it composes further accumulation steps (AR inside ARMA inside
-    # DiffLatentModel). The remaining union type is likely introduced by
-    # `vcat`/`cumsum` in `_combine_diff` or by the `%` branch in
-    # `combine_correct` — the root cause is not yet established.
-    enzyme_reverse = Set([
-    # `Renewal+GravityMixing` is numerically unstable: with population ~1e5
-    # and an unconstrained linked Gravity exponent, `pop^α` overflows to
-    # BigFloat/BigInt and the ForwardDiff reference itself is non-finite
-    # (gradient ~1e57). A scenario/data-stability fix is required, not a
-    # type fix — see the Gravity patch-model scenario.
-        "Renewal+GravityMixing posterior"
-    ])
-    # Enzyme forward still has 12 broken scenarios.
-    #
-    # The four AR-related scenarios (ARIMA, DiffLatentModel(RW), ARMA,
-    # AR vector-prior) fail with `IllegalTypeAnalysisException` (same cause
-    # as Enzyme reverse — the `accumulate_scan(ARStep(...), ...)` path).
-    #
-    # The eight renewal/delay-convolution scenarios fail with
-    # `EnzymeNoDerivativeError` from the BLAS `dot` call in
-    # `renewal_foi`/`LDStep`/`TimeVaryingLDStep`. The `EnzymeRules.forward`
-    # rule for `LinearAlgebra.dot` (375eee3) is loaded and works for simple
-    # cases, but Enzyme inlines the BLAS `cblas_ddot64_` call before the
-    # rule can intercept it, so the fallback BLAS replacement fires instead.
-    # This is a known gap — either the rule needs a narrower type signature
-    # that Enzyme can match before inlining, or the model code needs to avoid
-    # `dot` on BLAS-visible vector lengths (the `mapreduce` alternative used
-    # in `ARStep`/`MAStep` regressed ReverseDiff — see the revert in
-    # f69939f — but a fresh approach may work).
-    #
-    # `Renewal+ImportedCases posterior` is also listed as broken: 12 of 21
-    # differentiation tests fail (the `pairwise_gen_int` gravity-coupling
-    # path likely hits the same `dot` BLAS gap, plus the dense `*` matrix
-    # operations in `renewal_pressure` that Enzyme does support but the
-    # combined gradient path triggers a `BoundsError` in).
-    enzyme_forward = Set([
-    # `Renewal+GravityMixing` — numerically unstable (see reverse note).
-        "Renewal+GravityMixing posterior"
-    ])
-    # ReverseDiff compiled (`AutoReverseDiff(; compile = true)`) differentiates
-    # the DynamicPPL log-densities correctly: a plain `DI.gradient` call and an
-    # isolated per-scenario `DifferentiationInterfaceTest.test_differentiation`
-    # run both pass all 43 scenarios, matching the ForwardDiff reference. It is
-    # still listed broken below because this DifferentiationInterface/
-    # DifferentiationInterfaceTest version cannot run the harness's batched
-    # `test_differentiation` correctness sweep for `AutoReverseDiff{true}`: the
-    # `PullbackFast` path it selects has no `_prepare_pullback_aux` method for
-    # these closure types (only `PullbackSlow` is implemented). That is a
-    # DifferentiationInterface integration gap, not a ReverseDiff or DynamicPPL
-    # limitation — with ReverseDiff properly loaded the compiled mode works, as
-    # it does in packages that drive it outside DI's batched sweep. Listing all
-    # 43 keeps the harness green (over-listed entries still record an ordinary
-    # `@test` pass via `check_broken`).
-    reversediff_compiled = Set([
-        "RandomWalk latent logjoint",
-        "AR latent logjoint",
-        "ARIMA latent logjoint",
-        "HilbertSpaceGP latent logjoint",
-        "HilbertSpaceGP Matern latent logjoint",
-        "ExactGP latent logjoint",
-        "MA latent logjoint",
-        "HierarchicalNormal latent logjoint",
-        "DiffLatentModel(RandomWalk) latent logjoint",
-        "ARMA latent logjoint",
-        "BroadcastLatentModel day-of-week latent logjoint",
-        "BroadcastLatentModel weekly latent logjoint",
-        "ConcatLatentModels latent logjoint",
-        "CombineLatentModels latent logjoint",
-        "Hierarchy latent logjoint",
-        "AR vector-prior latent logjoint",
-        "AR latent-model-as-prior latent logjoint",
-        "DirectInfections+Poisson posterior",
-        "Renewal+NegativeBinomial posterior",
-        "Renewal+ImportedCases posterior",
-        "ExpGrowthRate+Poisson posterior",
-        "Renewal+RightTruncate nowcast posterior",
-        "Renewal+ReportTriangle posterior",
-        "Renewal+LatentDelay posterior",
-        "Renewal+UncertainLatentDelay posterior",
-        "Renewal+TimeVaryingLatentDelay posterior",
-        "Renewal+UncertainGenInterval posterior",
-        "DirectInfections+Ascertainment day-of-week posterior",
-        "DirectInfections+Aggregate posterior",
-        "DirectInfections+PartiallyMissing posterior",
-        "DirectInfections+TransformObservation posterior",
-        "DirectInfections+NormalError posterior",
-        "DirectInfections+RecordExpected posterior",
-        "DirectInfections+PrefixModifiers posterior",
-        "BinomialError ascertainment posterior",
-        "Renewal+Split cascade posterior",
-        "Stratify latent logjoint",
-        "Replicate latent logjoint",
-        "Renewal+IndependentPatches posterior",
-        "Renewal+StratifiedRt posterior",
-        "Renewal+FixedMixingK posterior",
-        "Renewal+GravityMixing posterior",
-        "Renewal+StratifiedImportedCases posterior"
-    ])
-    return Dict{String, Set{String}}(
-        "Enzyme reverse" => enzyme_reverse,
-        "Enzyme forward" => enzyme_forward,
-        "ReverseDiff (compiled)" => reversediff_compiled)
+    return Dict{String, Set{String}}()
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."
