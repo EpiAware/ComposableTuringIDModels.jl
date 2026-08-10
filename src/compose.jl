@@ -65,9 +65,14 @@ differentiable via the `EnzymeRules.inactive` mark on `deepcopy` in the Enzyme
 extension. An array already concretely typed is returned as-is, so nothing is
 copied unnecessarily.
 
+The `deepcopy` only affects array arguments: `DynamicPPL.hasmissing` recurses
+through `AbstractArray` but not `NamedTuple`, so a bundle of streams never
+trips it. The `NamedTuple` method is here for the element-type stability the
+streams need downstream, not for the copy.
+
 [`as_turing_model(::IDModel, y_t, n)`](@ref as_turing_model) applies this to
 its `y_t` automatically. It is exposed (not exported) for data built elsewhere
-by simulating from a prior, including a `NamedTuple` of streams.
+by simulating from a prior.
 
 # Arguments
 
