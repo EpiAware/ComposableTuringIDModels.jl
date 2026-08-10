@@ -43,12 +43,21 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
     @assert diff_t>=0 "The observation vector must be at least as long as the expected observation vector"
 
     pad_Y_t = Y_t .+ 1e-6
+    # A partly-observed series is scored only where it is observed. Each blank
+    # entry is conditionally independent of the parameters given `Y_t`, so its
+    # term integrates to one and leaving it out gives the same parameter
+    # posterior without adding it to the sampler. Blanks stay `missing` in the
+    # returned series for a predictive pass to fill. A series that is entirely
+    # `missing` is a predictive draw, so every entry is sampled.
+    score_all = !_partly_observed(y_t)
     for i in eachindex(Y_t)
         # Read each sampled prior at step `i` via `_at`, so a scalar prior stays
         # constant while a length-`n` prior (drawn from a process slot) makes the
         # error parameter time-varying — one loop serves both.
-        y_t[i + diff_t] ~ observation_error(
-            obs_model, pad_Y_t[i], map(p -> _at(p, i), values(priors))...)
+        if score_all || !ismissing(y_t[i + diff_t])
+            y_t[i + diff_t] ~ observation_error(
+                obs_model, pad_Y_t[i], map(p -> _at(p, i), values(priors))...)
+        end
     end
     return (; y_t, expected = Y_t)
 end
@@ -80,6 +89,14 @@ define_y_t(PoissonError(), [1, 2, 3], fill(10.0, 3)),
 define_y_t(PoissonError(), (y = [1, 2, 3],), fill(10.0, 3))
 ```
 "
+# Whether a series carries both observations and blanks. A concrete element
+# type rules it out at compile time, so a fully-observed series keeps an
+# unbranched scoring loop.
+_partly_observed(_) = false
+function _partly_observed(y::AbstractArray{T}) where {T >: Missing}
+    return any(ismissing, y) && any(!ismissing, y)
+end
+
 function define_y_t(::AbstractObservationErrorModel, y_t, Y_t)
     # A NamedTuple carries the counts in its `y` field; a plain value is the
     # counts directly. Either way, a `missing` count series becomes a length-`Y_t`
