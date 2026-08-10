@@ -24,12 +24,12 @@ end
 # its shadow to its primal, so a rule that reads `dval` unconditionally adds the
 # primal to the derivative instead of a tangent. Every aliasing argument must
 # therefore be treated as `Const`, the same test Enzyme's own `mul!` rules use.
-_rt_const(::EnzymeRules.FwdConfig, ::Enzyme.Const) = true
-function _rt_const(config::EnzymeRules.FwdConfig, x)
+function _rt_const(config, x)
+    x isa Enzyme.Const && return true
     return EnzymeRules.runtime_activity(config) && x.dval === x.val
 end
-_rt_const(::EnzymeRules.FwdConfig, ::Enzyme.Const, ::Int) = true
-function _rt_const(config::EnzymeRules.FwdConfig, x, i::Int)
+function _rt_const(config, x, i::Int)
+    x isa Enzyme.Const && return true
     return EnzymeRules.runtime_activity(config) && x.dval[i] === x.val
 end
 

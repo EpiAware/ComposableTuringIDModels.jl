@@ -123,6 +123,7 @@ end
     # `Z_{t-i}`, matching the documented recursion `Z_t = Σ ρ_i Z_{t-i}`. Without
     # the reversal `damp_AR[1]` was applied to the *longest* lag; identical for the
     # default i.i.d. priors, but wrong for heterogeneous per-lag priors.
-    ar = accumulate_scan(ARStep(reverse(damp_AR)), ar_init, ϵ_t)
+    ar = accumulate_scan(
+        ARStep(reverse(damp_AR)), (; val = last(ar_init), window = ar_init), ϵ_t)
     return ar
 end

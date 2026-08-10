@@ -12,27 +12,28 @@
     window = [1.0, 2.0, 3.0]
     Rt = 1.4
     # The extracted FOI is exactly the new-incidence term the step commits.
-    @test renewal_foi(step, window, Rt) ≈ step(window, Rt)[end]
+    state = (; val = last(window), window = window)
+    @test renewal_foi(step, window, Rt) ≈ step(state, Rt).val
 end
 
 @testitem "RenewalStep with no modifiers matches the plain renewal core" begin
     using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
-                                    accumulate_scan, _renewal_init_state
+                                    accumulate_scan, renewal_init_state
     rev_gen = reverse([0.2, 0.3, 0.5])
     core = ConstantRenewalStep(rev_gen)
     step = RenewalStep(core)   # no modifiers -> plain renewal
     Rt = [1.5, 1.2, 1.0, 0.8]
-    init = _renewal_init_state(step, 5.0, 0.1, length(rev_gen))
-    init_core = _renewal_init_state(core, 5.0, 0.1, length(rev_gen))
-    # Bare-window state and identical output: the default path is unchanged.
-    @test init == init_core
-    @test accumulate_scan(step, init, Rt) == accumulate_scan(core, init_core, Rt)
+    init = renewal_init_state(step, 5.0, 0.1, length(rev_gen))
+    init_core = renewal_init_state(core, 5.0, 0.1, length(rev_gen))
+    # Identical window and identical output: the default path is unchanged.
+    @test init.window == init_core
+    @test accumulate_scan(step, init, Rt) == accumulate_scan(core, init, Rt)
 end
 
 @testitem "RenewalStep with depletion matches the reference recurrence" begin
     using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
                                     SusceptibleDepletion, accumulate_scan,
-                                    _renewal_init_state
+                                    renewal_init_state
     using LinearAlgebra: dot
     rev_gen = reverse([0.2, 0.3, 0.5])
     N = 1000.0
@@ -40,7 +41,7 @@ end
 
     core = ConstantRenewalStep(rev_gen)
     step = RenewalStep(core, (SusceptibleDepletion(N),))
-    init = _renewal_init_state(step, 5.0, 0.1, length(rev_gen))
+    init = renewal_init_state(step, 5.0, 0.1, length(rev_gen))
     comp = accumulate_scan(step, init, Rt)
 
     # Explicit reference: the S/N-scaled renewal recurrence, hand-rolled. Guards
@@ -57,19 +58,20 @@ end
         end
         return ref
     end
-    ref = depletion_reference(Rt, init[1], init[2], rev_gen, N)
+    ref = depletion_reference(Rt, init.window, only(init.substates), rev_gen, N)
 
     @test comp ≈ ref
-    @test init[2] ≈ N          # seeded with the full population
+    @test only(init.substates) ≈ N          # seeded with the full population
     # Depletion never raises incidence above the unconstrained renewal path.
-    plain = accumulate_scan(core, init[1], Rt)
+    plain = accumulate_scan(
+        core, (; val = last(init.window), window = init.window), Rt)
     @test all(comp .<= plain .+ 1e-8)
 end
 
 @testitem "RenewalStep with depletion is ForwardDiff-differentiable" begin
     using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
                                     SusceptibleDepletion, accumulate_scan,
-                                    _renewal_init_state
+                                    renewal_init_state
     using ForwardDiff
     rev_gen = reverse([0.2, 0.3, 0.5])
     N = 1000.0
@@ -77,7 +79,7 @@ end
     # Differentiate the summed infection path with respect to the Rt path; the
     # composed recurrence must stay AD-friendly (no mutation of tracked state).
     f = function (Rt)
-        init = _renewal_init_state(step, 5.0, 0.1, length(rev_gen))
+        init = renewal_init_state(step, 5.0, 0.1, length(rev_gen))
         sum(accumulate_scan(step, init, Rt))
     end
     g = ForwardDiff.gradient(f, [1.6, 1.4, 1.2, 1.0])

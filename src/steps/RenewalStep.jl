@@ -154,7 +154,7 @@ generation interval by default) with a tuple of `modifiers`
 window.
 
 With no modifiers it is a plain renewal recurrence. With modifiers its state is
-`[window, substate₁, …, substateₙ]` — the incidence window followed by one
+`(; val, window, substates)` — the newest incidence, the shared window, and one
 substate per modifier; each step computes the core force of infection, threads it
 through the modifiers (each transforming the incidence and updating its own
 substate), then advances the shared window once with the final incidence.
@@ -180,8 +180,8 @@ const _PlainRenewalStep = RenewalStep{<:AbstractConstantRenewalStep, Tuple{}}
 
 (step::_PlainRenewalStep)(state, Rt) = step.core(state, Rt)
 
-function _renewal_init_state(step::_PlainRenewalStep, I₀, r_approx, len_gen_int)
-    return _renewal_init_state(step.core, I₀, r_approx, len_gen_int)
+function renewal_init_state(step::_PlainRenewalStep, I₀, r_approx, len_gen_int)
+    return renewal_init_state(step.core, I₀, r_approx, len_gen_int)
 end
 
 function get_state(step::_PlainRenewalStep, initial_state, state)
@@ -200,22 +200,21 @@ function _thread_modifiers(mods::Tuple, incidence, substates::Tuple)
 end
 
 function (step::RenewalStep)(state, Rt)
-    window = state[1]
-    substates = ntuple(i -> state[i + 1], length(step.modifiers))
-    foi = renewal_foi(step.core, window, Rt)
-    new_incidence, new_substates = _thread_modifiers(step.modifiers, foi, substates)
-    new_window = _advance(window, new_incidence)
-    return [new_window, new_substates...]
+    foi = renewal_foi(step.core, state.window, Rt)
+    new_incidence, new_substates = _thread_modifiers(
+        step.modifiers, foi, state.substates)
+    new_window = _advance(state.window, new_incidence)
+    return (; val = new_incidence, window = new_window, substates = new_substates)
 end
 
-function _renewal_init_state(step::RenewalStep, I₀, r_approx, len_gen_int)
-    window = _renewal_init_state(step.core, I₀, r_approx, len_gen_int)
+function renewal_init_state(step::RenewalStep, I₀, r_approx, len_gen_int)
+    window = renewal_init_window(step.core, I₀, r_approx, len_gen_int)
     substates = map(mod -> modifier_init_state(mod, window), step.modifiers)
-    return [window, substates...]
+    return (; val = _newest(window), window = window, substates = substates)
 end
 
 function get_state(::RenewalStep, initial_state, state)
-    return _series([_newest(s[1]) for s in state])
+    return _series(state .|> x -> x.val)
 end
 
 # --- the pre-scan seam ------------------------------------------------------

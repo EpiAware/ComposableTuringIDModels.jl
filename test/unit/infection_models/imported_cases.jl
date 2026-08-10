@@ -344,7 +344,7 @@ end
     using ComposableTuringIDModels, Distributions, ForwardDiff
     using ComposableTuringIDModels: ImportedRate, RenewalStep,
                                     ConstantRenewalStep, SusceptibleDepletion,
-                                    accumulate_scan, _renewal_init_state
+                                    accumulate_scan, renewal_init_state
     gen_int = [0.2, 0.3, 0.5]
     core = ConstantRenewalStep(reverse(gen_int))
     n = 20
@@ -353,7 +353,7 @@ end
     function total(θ)
         step = RenewalStep(core,
             (SusceptibleDepletion(1000.0), ImportedRate(fill(θ[2], n))))
-        init = _renewal_init_state(step, 1.0, 0.0, length(gen_int))
+        init = renewal_init_state(step, 1.0, 0.0, length(gen_int))
         return sum(accumulate_scan(step, init, fill(θ[1], n)))
     end
     g = ForwardDiff.gradient(total, [1.1, 0.5])

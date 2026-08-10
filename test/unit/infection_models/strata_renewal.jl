@@ -55,7 +55,8 @@ end
     # per-stratum generation interval alone.
     window0 = [1.0 2.0 3.0; 1.0 2.0 3.0]
     Rt = [fill(1.5, 2) for _ in 1:10]
-    I_t = accumulate_scan(core, window0, Rt)
+    I_t = accumulate_scan(
+        core, (; val = window0[:, end], window = window0), Rt)
     @test size(I_t) == (2, 10)
     @test I_t[1, :] != I_t[2, :]
 end
@@ -92,19 +93,20 @@ end
 @testitem "SusceptibleDepletion, scalar pop_size: one pool, all strata" begin
     using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
                                     SusceptibleDepletion, accumulate_scan,
-                                    _renewal_init_state
+                                    renewal_init_state
     rev_gen = reverse([0.2, 0.3, 0.5])
     core = ConstantRenewalStep(rev_gen)
     step = RenewalStep(core, (SusceptibleDepletion(1000.0),))
     n_strata = 2
     I0, r = fill(5.0, n_strata), fill(0.1, n_strata)
-    init = _renewal_init_state(step, I0, r, length(rev_gen))
+    init = renewal_init_state(step, I0, r, length(rev_gen))
     # The scalar pool is spread to a separate, equal-sized copy per stratum.
-    @test init[2] == fill(1000.0, n_strata)
+    @test only(init.substates) == fill(1000.0, n_strata)
 
     Rt = [fill(1.6, n_strata) for _ in 1:10]
     I_t = accumulate_scan(step, init, Rt)
-    plain = accumulate_scan(core, init[1], Rt)
+    plain = accumulate_scan(
+        core, (; val = init.window[:, end], window = init.window), Rt)
     @test size(I_t) == (n_strata, 10)
     @test all(I_t .<= plain .+ 1e-8)
 end
@@ -112,18 +114,19 @@ end
 @testitem "SusceptibleDepletion, per-stratum pop_size: separate pools" begin
     using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
                                     SusceptibleDepletion, accumulate_scan,
-                                    _renewal_init_state
+                                    renewal_init_state
     rev_gen = reverse([0.2, 0.3, 0.5])
     core = ConstantRenewalStep(rev_gen)
     pop = [200.0, 20_000.0]
     step = RenewalStep(core, (SusceptibleDepletion(pop),))
     I0, r = fill(5.0, 2), fill(0.2, 2)
-    init = _renewal_init_state(step, I0, r, length(rev_gen))
-    @test init[2] == pop
+    init = renewal_init_state(step, I0, r, length(rev_gen))
+    @test only(init.substates) == pop
 
     Rt = [fill(1.6, 2) for _ in 1:20]
     I_t = accumulate_scan(step, init, Rt)
-    plain = accumulate_scan(core, init[1], Rt)
+    plain = accumulate_scan(
+        core, (; val = init.window[:, end], window = init.window), Rt)
     @test all(I_t .<= plain .+ 1e-8)
     # The small pool depletes harder: it ends further below the unconstrained
     # path than the (barely touched) large pool.
@@ -132,7 +135,7 @@ end
     @test rel_small < rel_large
 
     mismatched = RenewalStep(core, (SusceptibleDepletion([1.0, 2.0, 3.0]),))
-    @test_throws AssertionError _renewal_init_state(
+    @test_throws AssertionError renewal_init_state(
         mismatched, I0, r, length(rev_gen))
 end
 

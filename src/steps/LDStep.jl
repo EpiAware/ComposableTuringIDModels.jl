@@ -9,7 +9,7 @@ struct LDStep{D <: AbstractVector{<:Real}} <: AbstractAccumulationStep
 end
 
 function (ld::LDStep)(state, ϵ)
-    val = _wsum(ld.rev_pmf, state.current)
+    val = dot(ld.rev_pmf, state.current)
     current = vcat(state.current[2:end], ϵ)
     return (; val, current)
 end

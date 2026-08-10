@@ -218,11 +218,11 @@ end
 
 @testitem "an unresolved MixingStep says so instead of a MethodError" begin
     using ComposableTuringIDModels, Distributions
-    using ComposableTuringIDModels: MixingStep, _renewal_init_state
+    using ComposableTuringIDModels: MixingStep, renewal_init_state
     step = MixingStep(reverse([0.2, 0.3, 0.5]),
         Gravity([1e6, 2e5], [0.0 1.0; 1.0 0.0]))
     @test_throws "has no scan interface" step([1.0 2.0; 1.0 2.0], [1.0, 1.0])
-    @test_throws "has no scan interface" _renewal_init_state(
+    @test_throws "has no scan interface" renewal_init_state(
         step, [1.0, 1.0], [0.1, 0.1], 3)
 end
 

@@ -158,7 +158,8 @@ end
     ρ = [0.6, 0.3]
     init = [0.0, 1.0]        # oldest→newest: Z1 = 0, Z2 = 1
     ϵ = [0.0, 0.0, 0.0]
-    ar = accumulate_scan(ARStep(reverse(ρ)), init, ϵ)
+    ar = accumulate_scan(
+        ARStep(reverse(ρ)), (; val = last(init), window = init), ϵ)
     z3 = 0.6 * 1.0 + 0.3 * 0.0
     z4 = 0.6 * z3 + 0.3 * 1.0
     z5 = 0.6 * z4 + 0.3 * z3

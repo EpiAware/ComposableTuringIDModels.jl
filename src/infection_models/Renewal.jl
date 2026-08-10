@@ -234,7 +234,7 @@ _stack_pmfs(ps) = permutedims(reduce(hcat, ps))
 # it to a per-stratum seed, `R_t` and/or generation interval.
 function _make_renewal_init(step::AbstractConstantRenewalStep, gen_int, I₀, Rt₀)
     r_approx = _init_rate(Rt₀, gen_int)
-    return _renewal_init_state(step, I₀, r_approx, _n_lags(gen_int))
+    return renewal_init_state(step, I₀, r_approx, _n_lags(gen_int))
 end
 
 @model function as_turing_model(infection::Renewal, n::ModelShape)

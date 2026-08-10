@@ -58,7 +58,7 @@ end
 
 (step::MixingStep)(window, Rt) = _unresolved_mixing(step)
 
-function _renewal_init_state(step::MixingStep, I₀, r_approx, len_gen_int)
+function renewal_init_state(step::MixingStep, I₀, r_approx, len_gen_int)
     return _unresolved_mixing(step)
 end
 
