@@ -1,7 +1,7 @@
 # Enzyme AD-safety machinery: `deepcopy` of missing-bearing conditioning data
 # is marked inactive, and forward-mode `dot` gets a rule BLAS does not provide.
-# Both are generic DynamicPPL/Enzyme fixes rather than package-specific, so
-# they belong in `EpiAwareADTools.jl` (EpiAware/ComposableTuringIDModels.jl#250).
+# Both are generic DynamicPPL/Enzyme fixes, so they belong in
+# `EpiAwareADTools.jl`.
 module ComposableTuringIDModelsEnzymeExt
 
 using Enzyme: Enzyme
@@ -17,14 +17,9 @@ function EnzymeRules.inactive(::typeof(deepcopy),
     return nothing
 end
 
-# Forward-mode rule for `dot`: BLAS `dot` raises `EnzymeNoDerivativeError`
-# under forward mode, while reverse already works and is left alone.
+# Forward-mode rule for `dot`, which BLAS leaves without a derivative.
 # `∂/∂x = y`, `∂/∂y = x`, exact and side-effect free. Bounded to
 # `AbstractVector{<:Real}` so unrelated `dot` overloads are not intercepted.
-#
-# This rule does not cover every case: Enzyme still inlines BLAS `dot` in the
-# renewal and delay convolutions before the rule can fire, which is why those
-# steps avoid `dot` in the model code (see #250).
 
 # Un-batched: both `x` and `y` are `Const` or plain `Duplicated`.
 function EnzymeRules.forward(config::EnzymeRules.FwdConfig,

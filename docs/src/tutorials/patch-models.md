@@ -110,7 +110,7 @@ A fixed `K` is one choice.
 pairwise distances.
 
 ```@example patches
-pop = [1.0e5, 5.0e4, 2.0e5]
+pop = [1.0, 0.5, 2.0]   # hundreds of thousands
 dist = [0.0 10.0 30.0
         10.0 0.0 25.0
         30.0 25.0 0.0]
@@ -129,13 +129,18 @@ That own weight is the `within` keyword, default `1.0`.
 `Gravity` draws priors on `α`, `β` and `γ`, then calls the same function
 inside the model, so the fixed and inferred paths cannot drift.
 
-`normalise = true` matters here.
-Without it the operator is unnormalised, so raw population counts give
-off-diagonal weights many orders of magnitude above the `within` diagonal of
-`1.0`.
-Coupling then swamps within-patch transmission and the recursion overflows.
-Row-normalising conserves the total force of infection instead.
-Passing `pop` in scaled units works too.
+The units of `pop` matter here.
+`gravity` is unnormalised, so `pop^α` carries its scale straight into `K`.
+Raw counts of `1e5` give off-diagonal weights around `1e7` against a `within`
+diagonal of `1.0`, and the recursion overflows.
+Scaling `pop` keeps both sides comparable, which is why it is in hundreds of
+thousands above.
+
+`normalise = true` then makes each row sum to one, so the operator conserves
+the total force of infection.
+It is not a substitute for scaling.
+Normalising raw counts bounds the total but leaves the diagonal at around
+`1e-7`, which says a patch infects itself essentially never.
 
 ## Many-to-one observation: age bands into one stream
 

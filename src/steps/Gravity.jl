@@ -13,17 +13,16 @@ relative to stratum `g`'s own. The diagonal is `within`, so the default of `1.0`
 makes the diagonal the uncoupled model and the off-diagonals the extra imported
 pressure on top of it.
 
-The result is **not** normalised by default, so the scale of `pop` carries
-straight through: raw counts of ~1e5 give off-diagonals many orders of
-magnitude above a `within` of `1.0`, which makes coupling swamp within-stratum
-transmission and overflows a renewal recursion. Either pass `pop` in scaled
-units or set `normalise = true`.
+The result is **not** normalised, so the scale of `pop` carries straight
+through. Raw counts of ~1e5 give off-diagonals around 1e7 against a `within` of
+`1.0`, which swamps within-stratum transmission and overflows a renewal
+recursion. Pass `pop` in scaled units so `pop^α` stays comparable to `within`.
 
 `normalise = true` divides each row by its sum, giving a row-stochastic
-operator that conserves total force of infection. ``\alpha`` stays identifiable
-as long as `within` is non-zero, because it does not divide out of the diagonal
-term. For the usual local-plus-travel form use
-`(1 - ε) * I(n) + ε * gravity(pop, dist; normalise = true)`.
+operator that conserves total force of infection. It bounds the total but does
+not rescue raw counts: normalising the example above leaves a diagonal of ~1e-7,
+so scale `pop` regardless. ``\alpha`` stays identifiable while `within` is
+non-zero, since it does not divide out of the diagonal term.
 
 # Arguments
 

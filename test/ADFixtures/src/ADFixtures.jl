@@ -208,11 +208,8 @@ function _models()
         DirectInfections(;
             Z = RecordExpectedLatent(RandomWalk()), initialisation = Normal()),
         RecordExpectedObs(PoissonError()))
-    # Prefix modifiers: `PrefixLatentModel` and `PrefixObservationModel` rename
-    # an inner model's sampled variables via `DynamicPPL.prefix` before
-    # threading it as a submodel (the same mechanism `Split` and the #76 prior
-    # seam use inline); this exercises the two standalone wrapper structs
-    # directly rather than only their inline call sites.
+    # `PrefixLatentModel` / `PrefixObservationModel` as standalone wrappers,
+    # rather than the prefixing `Split` and the prior seam do inline.
     prefixmods = IDModel(
         DirectInfections(;
             Z = PrefixLatentModel(; model = RandomWalk(), prefix = "zpre"),
@@ -341,7 +338,7 @@ function _models()
         ("ConcatLatentModels latent logjoint", concat),
         ("CombineLatentModels latent logjoint", combine),
         ("Hierarchy latent logjoint", hierarchy),
-        # the #76 prior interface
+        # prior slots
         ("AR vector-prior latent logjoint", ar_vec),
         ("AR latent-model-as-prior latent logjoint", ar_lat),
         # infection posteriors
@@ -513,7 +510,7 @@ Add an entry only with a measured failure and a tracked issue.
 function backend_broken_scenarios()
     # Enzyme reverse cannot accumulate a `Missing` observation: DynamicPPL's
     # `accumulate_into` has no method for the shadow it builds. Enzyme forward
-    # and the other five backends differentiate this scenario. See #251.
+    # and the other five backends differentiate this scenario.
     return Dict{String, Set{String}}(
         "Enzyme reverse" => Set(["DirectInfections+PartiallyMissing posterior"]))
 end

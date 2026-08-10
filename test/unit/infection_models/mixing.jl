@@ -112,13 +112,25 @@ end
 
 @testitem "gravity row-normalises when asked" begin
     using ComposableTuringIDModels
-    pop = [1e6, 2e5]
-    dist = [0.0 50.0; 50.0 0.0]
+    pop = [1.0, 0.2]
+    dist = [0.0 2.0; 2.0 0.0]
     K = gravity(pop, dist; normalise = true)
     @test all(≈(1.0), sum(K; dims = 2))
-    # Unnormalised, raw counts put the off-diagonals far above the diagonal.
-    raw = gravity(pop, dist)
-    @test raw[1, 2] > 1e6 * raw[1, 1]
+    # At a comparable scale the stratum keeps most of its own weight.
+    @test K[1, 1] > 0.5
+end
+
+@testitem "gravity scale, not normalise, controls the diagonal" begin
+    using ComposableTuringIDModels
+    raw_pop = [1e6, 2e5]
+    scaled_pop = [10.0, 2.0]
+    dist = [0.0 50.0; 50.0 0.0]
+    # Unnormalised raw counts swamp the `within` diagonal.
+    @test gravity(raw_pop, dist)[1, 2] > 1e6
+    # Normalising bounds the row but leaves the diagonal negligible, so it is
+    # not a substitute for passing `pop` in scaled units.
+    @test gravity(raw_pop, dist; normalise = true)[1, 1] < 1e-6
+    @test gravity(scaled_pop, dist; normalise = true)[1, 1] > 0.05
 end
 
 @testitem "a drawn Gravity passes normalise through to the operator" begin

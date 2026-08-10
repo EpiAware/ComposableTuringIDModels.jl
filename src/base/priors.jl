@@ -84,15 +84,9 @@ as_turing_submodel(d::Distribution, ::ModelShape; prefix::Bool = false) = d
 function as_turing_submodel(
         v::AbstractVector{<:Distribution}, n::Int; prefix::Bool = false)
     @assert length(v)==n "a length-$(length(v)) prior vector cannot produce a length-$n prior"
-    # `product_distribution`, not `arraydist`: `arraydist` routes univariates
-    # through the deprecated `Distributions.Product`, whose depwarn world-age
-    # machinery Enzyme reverse cannot shadow (`EnzymeNoShadowError`).
-    #
-    # No `filldist`/`product_distribution` ternary either. Which branch runs
-    # depends on distribution values, not types, so the return infers as a
-    # `Union` that Enzyme's type analysis rejects. Dropping `filldist` gives
-    # up its `Fill` logpdf specialisation, which is immaterial at the lengths
-    # this slot sees (lag orders, differencing orders).
+    # `product_distribution` unconditionally: `arraydist`'s deprecated
+    # `Distributions.Product` path breaks Enzyme reverse, and choosing
+    # `filldist` at runtime returns a `Union` its type analysis rejects.
     return product_distribution(v)
 end
 

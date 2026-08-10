@@ -1,28 +1,14 @@
 #!/usr/bin/env julia
-# PACKAGE-OWNED — selectively run a subset of AD scenarios against a subset of
-# backends for fast diagnosis/fix iteration, without a full per-backend suite.
-#
-# Usage (run from the repo, in the AD env):
-#   julia --project=test/ad test/ad/run_selected.jl \
-#       --backend "Enzyme forward" \
-#       --backend "ReverseDiff (tape)" \
-#       --scenario "LatentDelay" \
-#       --scenario "ARIMA"
-#
-# `--backend` and `--scenario` are repeatable, case-insensitive SUBSTRING
-# filters. Omit a filter to select everything. For each selected scenario the
-# script runs each selected backend's `gradient` against the scenario's
-# ForwardDiff reference and prints PASS / MISMATCH / ERROR (with a snippet of
-# the error). This is a diagnostic helper only; it is not part of the CI suite
-# (`test/ad/runtests.jl` + the ad.yaml matrix drive CI).
+# PACKAGE-OWNED — run selected AD scenarios against selected backends, for
+# diagnosis. CI is driven by `runtests.jl` and the ad.yaml matrix.
 #
 #   julia --project=test/ad test/ad/run_selected.jl --backend enzyme --scenario AR
-#     # enzyme reverse + forward over every scenario whose name contains "AR"
+#
+# `--backend` and `--scenario` are repeatable case-insensitive substring
+# filters; omit one to select everything.
 
 using ADFixtures, ADTypes, DifferentiationInterface
-# `using` the backend packages so DifferentiationInterface registers each
-# backend's extension (without this, `gradient` falls back to an
-# unloaded-extension `_prepare_pullback_aux`/`_prepare_pushforward_aux` error).
+# Load the backends so DifferentiationInterface registers their extensions.
 using ForwardDiff, ReverseDiff, Enzyme, Mooncake
 
 function main()
