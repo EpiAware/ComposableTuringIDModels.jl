@@ -205,6 +205,13 @@ A new renewal step implements this if it seeds its window differently, and
   - `I₀`: the initial incidence, one value or one per stratum.
   - `r`: the growth rate implied by ``R_0``.
   - `len_gen_int`: the number of lags the generation interval covers.
+
+# Examples
+```@example renewal_init_window
+using ComposableTuringIDModels
+step = ComposableTuringIDModels.ConstantRenewalStep(reverse([0.2, 0.3, 0.5]))
+ComposableTuringIDModels.renewal_init_window(step, 10.0, 0.1, 3)
+```
 "
 function renewal_init_window(::ConstantRenewalStep, I₀::Real, r, len_gen_int)
     return I₀ * [exp(-r * t) for t in (len_gen_int - 1):-1:0]
@@ -232,6 +239,13 @@ A new renewal step implements this, usually by wrapping
   - `I₀`: the initial incidence, one value or one per stratum.
   - `r`: the growth rate implied by ``R_0``.
   - `len_gen_int`: the number of lags the generation interval covers.
+
+# Examples
+```@example renewal_init_state
+using ComposableTuringIDModels
+step = ComposableTuringIDModels.ConstantRenewalStep(reverse([0.2, 0.3, 0.5]))
+ComposableTuringIDModels.renewal_init_state(step, 10.0, 0.1, 3)
+```
 "
 function renewal_init_state(step::ConstantRenewalStep, I₀, r, len_gen_int)
     window = renewal_init_window(step, I₀, r, len_gen_int)
