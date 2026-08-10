@@ -67,7 +67,7 @@ function main()
             catch e
                 msg = replace(sprint(showerror, e), '\n' => ' ')
                 println(rpad(String(s.name), 46), rpad(b.name, 22),
-                    "ERROR: ", msg[1:min(end, 90)])
+                    "ERROR: ", first(msg, 90))
             end
         end
     end

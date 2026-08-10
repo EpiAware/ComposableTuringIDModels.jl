@@ -110,13 +110,13 @@ A fixed `K` is one choice.
 pairwise distances.
 
 ```@example patches
-pop = [1.0, 0.5, 2.0]   # hundreds of thousands
+pop = [1.0e5, 5.0e4, 2.0e5]
 dist = [0.0 10.0 30.0
         10.0 0.0 25.0
         30.0 25.0 0.0]
 
 movement = Gravity(pop, dist; α = HalfNormal(1.0), β = HalfNormal(1.0),
-    γ = HalfNormal(2.0), normalise = true)
+    γ = HalfNormal(2.0))
 gravity_model = Renewal(gen_int; rt = rt_process,
     initialisation = Normal(log(50.0), 0.2), mixing = movement)
 size(as_turing_model(gravity_model, (n_strata, n_time))().I_t)
@@ -129,18 +129,16 @@ That own weight is the `within` keyword, default `1.0`.
 `Gravity` draws priors on `α`, `β` and `γ`, then calls the same function
 inside the model, so the fixed and inferred paths cannot drift.
 
-The units of `pop` matter here.
-`gravity` is unnormalised, so `pop^α` carries its scale straight into `K`.
-Raw counts of `1e5` give off-diagonal weights around `1e7` against a `within`
-diagonal of `1.0`, and the recursion overflows.
-Scaling `pop` keeps both sides comparable, which is why it is in hundreds of
-thousands above.
+`pop` is in whatever units you have.
+`gravity` works in units of the mean population and returns rows that sum to
+one, so `K` says only where each patch's force comes from.
+`R_t` carries its size.
+Without that split the two are confounded, since any overall scale on `K` is
+the same as scaling `R_t`.
 
-`normalise = true` then makes each row sum to one, so the operator conserves
-the total force of infection.
-It is not a substitute for scaling.
-Normalising raw counts bounds the total but leaves the diagonal at around
-`1e-7`, which says a patch infects itself essentially never.
+`within` sets how much of a patch's force is its own, relative to a typical
+pairwise term.
+It has to be non-zero for `α` to be identifiable.
 
 ## Many-to-one observation: age bands into one stream
 

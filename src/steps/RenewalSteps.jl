@@ -60,8 +60,10 @@ renewal_pressure(I, g, window)       # uncoupled
 "
 function renewal_pressure end
 
-renewal_pressure(::UniformScaling, g, window::AbstractVector) = sum(window .* g)
+renewal_pressure(::UniformScaling, g, window::AbstractVector) = _wsum(window, g)
 
+# Row-wise reductions rather than `window * g` / `K * v`: Enzyme forward has no
+# rule for the BLAS `gemv` those lower to.
 function renewal_pressure(::UniformScaling, g, window::AbstractMatrix)
     vec(sum(window .* reshape(g, 1, :); dims = 2))
 end

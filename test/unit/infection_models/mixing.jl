@@ -101,44 +101,50 @@ end
 @testitem "gravity builds an asymmetric matrix from pop and distance" begin
     using ComposableTuringIDModels
     pop = [1e6, 2e5]
-    dist = [0.0 50.0; 50.0 0.0]
+    dist = [0.0 1.0; 1.0 0.0]
     K = gravity(pop, dist; α = 1.0, β = 1.0, γ = 2.0, within = 1.0)
-    @test K[1, 1] == 1.0 == K[2, 2]
-    @test K[1, 2] ≈ pop[1]^1.0 * pop[2]^1.0 / dist[1, 2]^2.0
-    @test K[2, 1] ≈ pop[2]^1.0 * pop[1]^1.0 / dist[2, 1]^2.0
-    within = gravity(pop, dist; within = 0.5)
-    @test within[1, 1] == 0.5 == within[2, 2]
+    # Rows are normalised, so compare each entry against the unnormalised term
+    # divided by its row sum. `p` is the population in units of its mean.
+    p = pop ./ (sum(pop) / length(pop))
+    raw12 = p[1] * p[2] / dist[1, 2]^2.0
+    raw21 = p[2] * p[1] / dist[2, 1]^2.0
+    @test K[1, 2] ≈ raw12 / (1.0 + raw12)
+    @test K[2, 1] ≈ raw21 / (1.0 + raw21)
+    @test K[1, 1] ≈ 1.0 / (1.0 + raw12)
+    # A smaller `within` leaves the stratum less of its own force.
+    @test gravity(pop, dist; within = 0.5)[1, 1] < K[1, 1]
 end
 
-@testitem "gravity row-normalises when asked" begin
+@testitem "gravity rows sum to one and are scale free" begin
     using ComposableTuringIDModels
-    pop = [1.0, 0.2]
-    dist = [0.0 2.0; 2.0 0.0]
-    K = gravity(pop, dist; normalise = true)
+    # Close enough that coupling is material against `within`.
+    dist = [0.0 1.0; 1.0 0.0]
+    K = gravity([1e6, 2e5], dist)
     @test all(≈(1.0), sum(K; dims = 2))
-    # At a comparable scale the stratum keeps most of its own weight.
-    @test K[1, 1] > 0.5
+    @test 0.05 < K[1, 1] < 0.95
+    # Rescaling every population leaves the operator unchanged: only the ratios
+    # are identifiable, since an overall scale is absorbed by `R_t`.
+    @test gravity([1e6, 2e5] .* 37.0, dist) ≈ K
+    # Raw counts stay bounded whatever the distances.
+    @test all(≤(1.0), gravity([1e6, 2e5], [0.0 50.0; 50.0 0.0]))
 end
 
-@testitem "gravity scale, not normalise, controls the diagonal" begin
+@testitem "gravity within controls the own-stratum share" begin
     using ComposableTuringIDModels
-    raw_pop = [1e6, 2e5]
-    scaled_pop = [10.0, 2.0]
-    dist = [0.0 50.0; 50.0 0.0]
-    # Unnormalised raw counts swamp the `within` diagonal.
-    @test gravity(raw_pop, dist)[1, 2] > 1e6
-    # Normalising bounds the row but leaves the diagonal negligible, so it is
-    # not a substitute for passing `pop` in scaled units.
-    @test gravity(raw_pop, dist; normalise = true)[1, 1] < 1e-6
-    @test gravity(scaled_pop, dist; normalise = true)[1, 1] > 0.05
+    dist = [0.0 1.0; 1.0 0.0]
+    @test gravity([1e6, 2e5], dist; within = 10.0)[1, 1] >
+          gravity([1e6, 2e5], dist; within = 1.0)[1, 1]
+    # At `within = 0` a stratum takes none of its own force and α cancels.
+    K0 = gravity([1e6, 2e5], dist; within = 0.0)
+    @test K0[1, 1] == 0.0
+    @test K0 ≈ gravity([1e6, 2e5], dist; within = 0.0, α = 3.0)
 end
 
-@testitem "a drawn Gravity passes normalise through to the operator" begin
+@testitem "a drawn Gravity returns a row-normalised operator" begin
     using ComposableTuringIDModels, Distributions, Random
     pop = [1e6, 2e5, 5e5]
     dist = [0.0 50.0 30.0; 50.0 0.0 20.0; 30.0 20.0 0.0]
-    m = Gravity(pop, dist; normalise = true)
-    K = as_turing_model(m, (3, 5))(MersenneTwister(1))
+    K = as_turing_model(Gravity(pop, dist), (3, 5))(MersenneTwister(1))
     @test all(≈(1.0), sum(K; dims = 2))
 end
 
@@ -160,7 +166,7 @@ end
     K2 = as_turing_model(g, (3, 10))()
     @test size(K1) == (3, 3)
     @test K1 != K2   # different seeds draw different exponents
-    @test all(==(1.0), diag(K1))       # default `within`
+    @test all(≈(1.0), sum(K1; dims = 2))   # rows are normalised
 end
 
 @testitem "fixing Gravity's exponents matches the plain gravity matrix" begin

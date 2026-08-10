@@ -8,10 +8,9 @@ using Enzyme: Enzyme
 using Enzyme.EnzymeRules: EnzymeRules
 using LinearAlgebra: dot
 
-# `T <: Real` is load-bearing (do not widen): `Union{Missing, Any}` collapses to
-# `Any`, so an unbounded signature would also match `deepcopy(::Vector{Any})` —
-# a differentiable boxed shape — and mark it inactive, silently dropping a real
-# tangent.
+# Keep the `T <: Real` bound. `Union{Missing, Any}` collapses to `Any`, so a
+# wider signature would also match `deepcopy(::Vector{Any})` and silently zero a
+# real tangent.
 function EnzymeRules.inactive(::typeof(deepcopy),
         ::AbstractArray{Union{Missing, T}}) where {T <: Real}
     return nothing
@@ -44,9 +43,7 @@ function EnzymeRules.forward(config::EnzymeRules.FwdConfig,
     end
 end
 
-# Batched: at least one of `x`/`y` is `BatchDuplicated`
-# (DifferentiationInterface's Enzyme-forward gradient batches all `dim(θ)`
-# seed directions in one pass).
+# Batched: DifferentiationInterface seeds every direction in one pass.
 function EnzymeRules.forward(config::EnzymeRules.FwdConfig,
         func::Enzyme.Const{typeof(dot)},
         RT::Type{<:Union{Enzyme.BatchDuplicatedNoNeed, Enzyme.BatchDuplicated}},

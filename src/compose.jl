@@ -54,25 +54,18 @@ end
 Narrow a data argument to a concrete element type before conditioning a model
 on it, when nothing in it is actually `missing`.
 
-A container simulated from a model's prior keeps a `Union{Missing, T}` element
-type even once every entry is concrete. Conditioning on it leaves the data
-argument `hasmissing`, so `DynamicPPL.convert_model_argument` `deepcopy`s it on
-every evaluation, and Enzyme forward has no `deepcopy` rule for that eltype.
-Narrowing avoids both.
+Data simulated from a model's prior keeps a `Union{Missing, T}` element type
+even once every entry is concrete. Conditioning on that makes DynamicPPL
+`deepcopy` the argument on every evaluation, which Enzyme forward cannot
+differentiate. Narrowing avoids both the copy and the failure.
 
-Data that really is missing in places is returned unchanged; it stays
-differentiable via the `EnzymeRules.inactive` mark on `deepcopy` in the Enzyme
-extension. An array already concretely typed is returned as-is, so nothing is
-copied unnecessarily.
-
-The `deepcopy` only affects array arguments: `DynamicPPL.hasmissing` recurses
-through `AbstractArray` but not `NamedTuple`, so a bundle of streams never
-trips it. The `NamedTuple` method is here for the element-type stability the
-streams need downstream, not for the copy.
+Data that really is missing is returned unchanged, and so is an array whose
+element type is already concrete. A `NamedTuple` of streams is narrowed
+field-wise, so each per-stream submodel receives a concrete array.
 
 [`as_turing_model(::IDModel, y_t, n)`](@ref as_turing_model) applies this to
-its `y_t` automatically. It is exposed (not exported) for data built elsewhere
-by simulating from a prior.
+its `y_t` automatically. It is exposed for data built elsewhere by simulating
+from a prior.
 
 # Arguments
 

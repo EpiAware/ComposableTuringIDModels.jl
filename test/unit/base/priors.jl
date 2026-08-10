@@ -64,8 +64,8 @@ end
 @testitem "as_turing_model over a vector gives one draw per element" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(102)
-    # Homogeneous vector: filldist path — two INDEPENDENT draws (not one shared
-    # value repeated). This is the AR/MA per-lag coefficient semantics.
+    # A homogeneous vector still gives two independent draws, not one shared
+    # value repeated. This is the AR/MA per-lag coefficient semantics.
     vh = as_turing_model([Normal(), Normal()], 2)()
     @test length(vh) == 2
     @test vh[1] != vh[2]

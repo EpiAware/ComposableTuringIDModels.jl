@@ -188,9 +188,9 @@ function _models()
     aggregate = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7]))
-    # Partially-missing observations, inferred at the blank entries. The error
-    # must be continuous: a ragged `y_t` is latent as a whole, and count
-    # families have no scalar bijector to link it through.
+    # Partially-missing observations: only the blank entries are latent. The
+    # error must be continuous, since a count family has no scalar bijector to
+    # link them through.
     partialmiss = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         NormalError())
@@ -278,10 +278,7 @@ function _models()
     patch_K = [1.0 0.1 0.05
                0.1 1.0 0.1
                0.05 0.1 1.0]
-    # Populations in hundreds of thousands. `gravity` is unnormalised, so raw
-    # counts give off-diagonals ~1e7 against a `within = 1.0` diagonal, and the
-    # renewal recursion then overflows `Float64` into `BigFloat`.
-    patch_pop = [1.0, 0.5, 2.0]
+    patch_pop = [1.0e5, 5.0e4, 2.0e5]
     patch_dist = [0.0 10.0 30.0
                   10.0 0.0 25.0
                   30.0 25.0 0.0]
@@ -505,7 +502,7 @@ over-listing is safe and under-listing reds CI. Listing every scenario for a
 backend is not safe in a different sense: it empties the set the full
 correctness sweep runs over, so that backend stops being tested.
 
-Add an entry only with a measured failure and a tracked issue.
+Add an entry only with a measured failure.
 """
 function backend_broken_scenarios()
     # Enzyme reverse cannot accumulate a `Missing` observation: DynamicPPL's

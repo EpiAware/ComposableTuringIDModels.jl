@@ -60,9 +60,9 @@ end
     y = as_turing_model(model, missing, n)().generated_y_t
     @test eltype(y) >: Missing
 
-    # Conditioning on it still builds and evaluates a valid model: the
-    # narrowing happens automatically inside `as_turing_model`.
+    # `as_turing_model` narrows it before storing it as a model argument.
     posterior = as_turing_model(model, y, n)
+    @test !(eltype(posterior.args.y_t) >: Missing)
     @test posterior isa DynamicPPL.Model
     @test isfinite(logjoint(posterior, rand(posterior)))
 end
