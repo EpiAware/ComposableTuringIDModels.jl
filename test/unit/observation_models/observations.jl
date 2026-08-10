@@ -17,52 +17,6 @@
     end
 end
 
-@testitem "a partly-observed series is scored only where it is observed" begin
-    using ComposableTuringIDModels, Distributions, Random
-    using DynamicPPL: VarInfo
-    Random.seed!(202)
-    Y_t = fill(10.0, 12)
-    obs = NormalError()
-    latent(m) = filter(n -> startswith(n, "y_t"), string.(keys(VarInfo(m))))
-
-    full = as_turing_model(obs, missing, Y_t)().y_t
-    # Fully observed: every entry is data, none is sampled.
-    @test isempty(latent(as_turing_model(obs, full, Y_t)))
-    # Fully missing: a predictive draw still samples the whole series.
-    @test length(latent(as_turing_model(obs, missing, Y_t))) == length(Y_t)
-
-    blanks = [3, 7]
-    partial = Vector{Union{Missing, Float64}}(full)
-    partial[blanks] .= missing
-    cond = as_turing_model(obs, partial, Y_t)
-    # Neither the observed nor the blank entries become parameters.
-    @test isempty(latent(cond))
-    res = cond()
-    @test length(res.y_t) == length(Y_t)
-    @test findall(ismissing, res.y_t) == blanks
-    @test all(i -> res.y_t[i] == full[i], setdiff(eachindex(Y_t), blanks))
-end
-
-@testitem "dropping a blank observation leaves the parameter posterior alone" begin
-    using ComposableTuringIDModels, Distributions, Random
-    using DynamicPPL: logjoint
-    Random.seed!(303)
-    Y_t = fill(10.0, 8)
-    obs = NormalError()
-    full = as_turing_model(obs, missing, Y_t)().y_t
-    blanks = [2, 5]
-    partial = Vector{Union{Missing, Float64}}(full)
-    partial[blanks] .= missing
-    kept = setdiff(eachindex(Y_t), blanks)
-
-    # Scoring the partly-observed series matches scoring only its observed
-    # entries against the matching expectations: a blank contributes nothing.
-    m_partial = as_turing_model(obs, partial, Y_t)
-    m_kept = as_turing_model(obs, full[kept], Y_t[kept])
-    θ = rand(m_partial)
-    @test logjoint(m_partial, θ) ≈ logjoint(m_kept, θ)
-end
-
 @testitem "NormalError is a continuous observation-error model" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(111)

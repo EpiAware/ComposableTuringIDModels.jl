@@ -505,11 +505,9 @@ correctness sweep runs over, so that backend stops being tested.
 Add an entry only with a measured failure.
 """
 function backend_broken_scenarios()
-    # DynamicPPL `deepcopy`s a model argument whose type admits `Missing`,
-    # before the model body runs. Enzyme's generic reverse path differentiates
-    # that copy without consulting the `inactive` rule the package ships for
-    # it, and raises `FieldError: type Const has no field dval`. Forward mode
-    # takes the rule, so it and the other five backends differentiate this.
+    # Enzyme reverse cannot accumulate a `Missing` observation: DynamicPPL's
+    # `accumulate_into` has no method for the shadow it builds. Enzyme forward
+    # and the other five backends differentiate this scenario.
     return Dict{String, Set{String}}(
         "Enzyme reverse" => Set(["DirectInfections+PartiallyMissing posterior"]))
 end
