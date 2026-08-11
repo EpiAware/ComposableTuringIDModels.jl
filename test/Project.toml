@@ -34,4 +34,5 @@ ComposableTuringIDModels = {path = ".."}
 EpiAwarePackageTools = {rev = "main", url = "https://github.com/EpiAware/EpiAwarePackageTools.jl"}
 
 [compat]
+Runic = "=1.7.0"
 TestItems = "1.0.0"
