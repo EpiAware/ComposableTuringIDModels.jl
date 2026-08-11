@@ -661,12 +661,7 @@ correctness sweep runs over, so that backend stops being tested.
 Add an entry only with a measured failure.
 """
 function backend_broken_scenarios()
-    # Enzyme reverse cannot accumulate a `Missing` observation: DynamicPPL's
-    # `accumulate_into` has no method for the shadow it builds. Enzyme forward
-    # and the other five backends differentiate this scenario.
-    return Dict{String, Set{String}}(
-        "Enzyme reverse" => Set(["DirectInfections+PartiallyMissing posterior"])
-    )
+    return Dict{String, Set{String}}()
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."

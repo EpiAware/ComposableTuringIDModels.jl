@@ -56,12 +56,18 @@ on it, when nothing in it is actually `missing`.
 
 Data simulated from a model's prior keeps a `Union{Missing, T}` element type
 even once every entry is concrete. Conditioning on that makes DynamicPPL
-`deepcopy` the argument on every evaluation, which Enzyme forward cannot
-differentiate. Narrowing avoids both the copy and the failure.
+`deepcopy` the argument on every evaluation, which Enzyme cannot differentiate
+in reverse mode. Narrowing avoids both the copy and the failure.
 
-Data that really is missing is returned unchanged, and so is an array whose
-element type is already concrete. A `NamedTuple` of streams is narrowed
-field-wise, so each per-stream submodel receives a concrete array.
+A genuinely partially-missing vector (some entries observed, some `missing`)
+is split into a [`MissingObservations`](@ref) carrier instead: a concrete
+value vector plus a presence mask, neither of which admits `Missing` in its
+type. A fully missing vector, a partially- or fully-missing matrix (the
+strata data a data-driven [`Split`](@ref) reads shape from), and a scalar
+`missing`, are returned unchanged, and so is an array whose element type is
+already concrete. A `NamedTuple` of streams is narrowed field-wise, so each
+per-stream submodel receives a concrete vector (or a `MissingObservations`
+carrier).
 
 [`as_turing_model(::IDModel, y_t, n)`](@ref as_turing_model) applies this to
 its `y_t` automatically. It is exposed for data built elsewhere by simulating
@@ -75,6 +81,15 @@ from a prior.
 function concrete_observations(y::AbstractArray)
     eltype(y) >: Missing || return y
     return any(ismissing, y) ? y : identity.(y)
+end
+function concrete_observations(y::AbstractVector)
+    eltype(y) >: Missing || return y
+    any(ismissing, y) || return identity.(y)
+    all(ismissing, y) && return y
+    T = nonmissingtype(eltype(y))
+    present = .!ismissing.(y)
+    value = identity.(coalesce.(y, zero(T)))
+    return MissingObservations(value, present)
 end
 concrete_observations(y::NamedTuple) = map(concrete_observations, y)
 concrete_observations(y) = y

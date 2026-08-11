@@ -119,6 +119,18 @@ end
     @test all(ismissing, define_y_t(PoissonError(), (y = missing,), Y_t))
     # BinomialError shares the default unpacking for its `y` field.
     @test define_y_t(BinomialError(), (y = [3, 4], N = 10), fill(0.5, 2)) == [3, 4]
+
+    # A `MissingObservations` carrier (what `concrete_observations` returns for
+    # a partially-missing vector) is rebuilt into the ragged vector, at the top
+    # level and unpacked from a `y` field alike.
+    using ComposableTuringIDModels: MissingObservations
+    carrier = MissingObservations([1, 0, 3, 4, 5], Bool[1, 0, 1, 1, 1])
+    rebuilt = define_y_t(PoissonError(), carrier, Y_t)
+    @test isequal(rebuilt, [1, missing, 3, 4, 5])
+    @test isequal(
+        define_y_t(PoissonError(), (y = carrier,), Y_t),
+        [1, missing, 3, 4, 5]
+    )
 end
 
 @testitem "LatentDelay shortens expectations and wraps an error model" begin

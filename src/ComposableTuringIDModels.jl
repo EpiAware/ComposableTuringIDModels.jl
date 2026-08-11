@@ -135,7 +135,8 @@ export IDProblem, NUTSampler, DirectSample,
 public ModelShape, across_shape, infection_strata,
     AbstractAccumulationStep, AbstractConstantRenewalStep,
     ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
-    apply_modifier, renewal_foi, renewal_init_state, renewal_init_window
+    apply_modifier, renewal_foi, renewal_init_state, renewal_init_window,
+    MissingObservations
 
 # --- core architecture ---
 include("base/base.jl")

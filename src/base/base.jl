@@ -82,3 +82,25 @@ function as_turing_model(model, args...; kwargs...)
         )
     )
 end
+
+@doc raw"
+A partially-missing observation vector split into a concrete value vector and
+a presence mask, so it carries no `Missing` in its type.
+
+`value[i]` is the observed entry at `i` when `present[i]` is `true`, and an
+unused placeholder otherwise. Defined here (rather than in `compose.jl`, where
+[`concrete_observations`](@ref) builds one) so that it loads before the
+observation-error models that score one directly, further down the include
+order.
+
+# Examples
+```@example MissingObservations
+using ComposableTuringIDModels: MissingObservations
+carrier = MissingObservations([1.0, 0.0, 3.0], [true, false, true])
+carrier.value[carrier.present]
+```
+"
+struct MissingObservations{V <: AbstractVector, M <: AbstractVector{Bool}}
+    value::V
+    present::M
+end

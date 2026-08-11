@@ -19,7 +19,7 @@
 end
 
 @testitem "concrete_observations narrows only when nothing is missing" begin
-    using ComposableTuringIDModels: concrete_observations
+    using ComposableTuringIDModels: concrete_observations, MissingObservations
 
     # Fully concrete data (no `missing` left) is narrowed to a concrete eltype.
     y = Vector{Union{Missing, Int}}([1, 2, 3])
@@ -27,10 +27,20 @@ end
     @test narrowed == [1, 2, 3]
     @test eltype(narrowed) == Int
 
-    # A real `missing` must survive unchanged: narrowing it away would drop
-    # genuine reporting gaps.
+    # A genuine gap in a vector is split into a `MissingObservations` carrier:
+    # a concrete value vector plus a presence mask, so no `Missing` survives in
+    # either field's type (narrowing the gap away would drop it entirely).
     y_gap = Vector{Union{Missing, Int}}([1, missing, 3])
-    @test concrete_observations(y_gap) === y_gap
+    split = concrete_observations(y_gap)
+    @test split isa MissingObservations
+    @test !(eltype(split.value) >: Missing)
+    @test split.present == [true, false, true]
+    @test split.value[[1, 3]] == [1, 3]
+
+    # A fully missing vector survives unchanged: there is nothing concrete to
+    # split out.
+    y_allgap = Vector{Union{Missing, Int}}(missing, 3)
+    @test concrete_observations(y_allgap) === y_allgap
 
     # A `NamedTuple` of data streams (e.g. `BinomialError`'s `(y, N)`, or a
     # `Split` observation's per-stream series) is narrowed field-wise.
@@ -46,6 +56,11 @@ end
     # holding the array keeps its identity.
     y_concrete = [1, 2, 3]
     @test concrete_observations(y_concrete) === y_concrete
+
+    # A partially-missing MATRIX (the data-driven `Split` strata shape) is left
+    # unchanged: only vectors are split into a `MissingObservations` carrier.
+    y_mat_gap = Matrix{Union{Missing, Int}}([1 2; missing 4])
+    @test concrete_observations(y_mat_gap) === y_mat_gap
 end
 
 @testitem "composed model: as_turing_model narrows y_t automatically" begin
