@@ -23,21 +23,21 @@ struct HalfNormal{T <: Real} <: ContinuousUnivariateDistribution
 end
 
 function Base.rand(rng::AbstractRNG, d::HalfNormal{T}) where {T <: Real}
-    abs(rand(rng, Normal(0, d.μ * sqrt(π / 2))))
+    return abs(rand(rng, Normal(0, d.μ * sqrt(π / 2))))
 end
 
 function Distributions.logpdf(d::HalfNormal{T}, x::Real) where {T <: Real}
-    x < 0 ? -Inf : logpdf(Normal(0, d.μ * sqrt(π / 2)), x) - log(2)
+    return x < 0 ? -Inf : logpdf(Normal(0, d.μ * sqrt(π / 2)), x) - log(2)
 end
 
 function Distributions.cdf(d::HalfNormal{T}, x::Real) where {T <: Real}
-    x < 0 ? 0.0 :
-    cdf(Normal(0, d.μ * sqrt(π / 2)), x) -
-    cdf(Normal(0, d.μ * sqrt(π / 2)), -x)
+    return x < 0 ? 0.0 :
+        cdf(Normal(0, d.μ * sqrt(π / 2)), x) -
+        cdf(Normal(0, d.μ * sqrt(π / 2)), -x)
 end
 
 function Distributions.quantile(d::HalfNormal{T}, q::Real) where {T <: Real}
-    quantile(Normal(0, d.μ * sqrt(π / 2)), q + (1 - q) / 2)
+    return quantile(Normal(0, d.μ * sqrt(π / 2)), q + (1 - q) / 2)
 end
 
 Base.minimum(d::HalfNormal) = 0.0

@@ -13,7 +13,6 @@ DynamicPPL = "366bfd00-2699-11ea-058f-f148b4cae6d8"
 EpiAwarePackageTools = "7aaea248-0d11-4a0d-a7dc-86da30abb951"
 ExplicitImports = "7d51a73a-1435-4ff3-83d9-f097790105c7"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
-JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
 KernelFunctions = "ec8451be-7e33-11e9-00cf-bbf324bd1392"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LogDensityProblems = "6fdf6af0-433a-55f7-b3ed-c6c6e0b8df7c"
@@ -35,5 +34,4 @@ ComposableTuringIDModels = {path = ".."}
 EpiAwarePackageTools = {rev = "main", url = "https://github.com/EpiAware/EpiAwarePackageTools.jl"}
 
 [compat]
-JuliaFormatter = "=2.10.1"
 TestItems = "1.0.0"

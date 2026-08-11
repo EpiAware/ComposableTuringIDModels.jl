@@ -127,9 +127,11 @@ struct ImportedCases{I <: PriorLike, F <: Function} <: AbstractRenewalModifier
     transformation::F
 
     function ImportedCases(
-            importation_rate::PriorLike; transformation::Function = exp)
+            importation_rate::PriorLike; transformation::Function = exp
+        )
         return new{typeof(importation_rate), typeof(transformation)}(
-            importation_rate, transformation)
+            importation_rate, transformation
+        )
     end
 end
 

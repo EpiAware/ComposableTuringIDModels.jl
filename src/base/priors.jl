@@ -82,8 +82,9 @@ end
 as_turing_submodel(d::Distribution, ::ModelShape; prefix::Bool = false) = d
 
 function as_turing_submodel(
-        v::AbstractVector{<:Distribution}, n::Int; prefix::Bool = false)
-    @assert length(v)==n "a length-$(length(v)) prior vector cannot produce a length-$n prior"
+        v::AbstractVector{<:Distribution}, n::Int; prefix::Bool = false
+    )
+    @assert length(v) == n "a length-$(length(v)) prior vector cannot produce a length-$n prior"
     # `product_distribution` unconditionally: `arraydist`'s deprecated
     # `Distributions.Product` path breaks Enzyme reverse, and choosing
     # `filldist` at runtime returns a `Union` its type analysis rejects.
@@ -108,8 +109,10 @@ prior). Bounding a widened slot to `PriorLike` keeps the fail-fast role guard â€
 wrong-role component (an observation or infection model) is rejected at
 construction â€” while accepting a bare distribution alongside a process.
 "
-const PriorLike = Union{Distribution, AbstractVector{<:Distribution},
-    AbstractPriorModel}
+const PriorLike = Union{
+    Distribution, AbstractVector{<:Distribution},
+    AbstractPriorModel,
+}
 
 @doc raw"
 Sample a raw prior `Distribution` as a **single scalar** RV.
@@ -166,7 +169,7 @@ as_turing_model([Normal(0, 1), Normal(5, 0.1)], 2)()
 ```
 "
 @model function as_turing_model(prior::AbstractVector{<:Distribution}, n::Int)
-    @assert length(prior)==n "a length-$(length(prior)) prior vector cannot produce a length-$n prior"
+    @assert length(prior) == n "a length-$(length(prior)) prior vector cannot produce a length-$n prior"
     # One i.i.d. draw per element. See `as_turing_submodel`'s vector method
     # for why this is `product_distribution` and not `arraydist`.
     product_dist = product_distribution(prior)
@@ -211,7 +214,7 @@ _prior_order(::AbstractPriorModel) = 1
 # distribution or a richer prior model broadcasts to `k` and imposes no
 # constraint.
 function _assert_prior_length(p::AbstractVector{<:Distribution}, k, what)
-    @assert length(p)==k "$what prior length $(length(p)) must equal $k"
+    @assert length(p) == k "$what prior length $(length(p)) must equal $k"
     return nothing
 end
 _assert_prior_length(_, k, what) = nothing

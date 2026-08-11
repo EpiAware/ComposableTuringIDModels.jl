@@ -27,7 +27,7 @@ independent draws. It is composed through [`as_turing_submodel`](@ref).
   - `transform`: the transformation function applied to the latent vector.
 "
 struct TransformLatentModel{M <: PriorLike, F <: Function} <:
-       AbstractLatentModel
+    AbstractLatentModel
     "The latent model to transform."
     model::M
     "The transformation function."
@@ -37,7 +37,7 @@ struct TransformLatentModel{M <: PriorLike, F <: Function} <:
         # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
         # an `Intercept` (a constant inner path), never left as a scalar.
         wrapped = _path_prior(model)
-        new{typeof(wrapped), F}(wrapped, transform)
+        return new{typeof(wrapped), F}(wrapped, transform)
     end
 end
 

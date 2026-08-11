@@ -27,7 +27,7 @@ rand(mdl)
   - `prefix`: the string prefix applied to the inner model's variables.
 "
 @kwdef struct PrefixObservationModel{M <: AbstractObservationModel, P <: String} <:
-              AbstractObservationModel
+    AbstractObservationModel
     "The observation model."
     model::M
     "The prefix for the observation model."
@@ -38,7 +38,10 @@ end
     # The inner model already returns the uniform `(; y_t, expected)` tuple; the
     # prefix only renames its sampled variables, so pass the return value through.
     submodel ~ to_submodel(
-        prefix(as_turing_model(observation_model.model, y_t, Y_t),
-            Symbol(observation_model.prefix)), false)
+        prefix(
+            as_turing_model(observation_model.model, y_t, Y_t),
+            Symbol(observation_model.prefix)
+        ), false
+    )
     return (; y_t = submodel.y_t, expected = submodel.expected)
 end

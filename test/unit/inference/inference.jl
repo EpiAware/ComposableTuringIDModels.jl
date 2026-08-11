@@ -4,7 +4,8 @@
     problem = IDProblem(
         infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         observation_model = PoissonError(),
-        tspan = (1, 20))
+        tspan = (1, 20)
+    )
     m = as_turing_model(problem, (; y_t = missing))
     sim = m()
     @test length(sim.generated_y_t) == 20
@@ -47,10 +48,13 @@ end
     problem_map = IDProblem(
         infection = DirectInfections(;
             Z = Stratify(
-                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))),
-            initialisation = Normal(log(20), 0.2)),
+                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))
+            ),
+            initialisation = Normal(log(20), 0.2)
+        ),
         observation_model = Split(PoissonError(), [1.0 1.0 1.0]),
-        tspan = (1, T))
+        tspan = (1, T)
+    )
     Y = Matrix{Union{Missing, Float64}}(missing, 1, T)
     sim_map = as_turing_model(problem_map, (; y_t = Y))()
     @test size(sim_map.I_t) == (3, T)
@@ -60,21 +64,25 @@ end
     problem_named = IDProblem(
         infection = DirectInfections(;
             Z = Stratify(
-                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))),
-            initialisation = Normal(log(20), 0.2)),
+                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))
+            ),
+            initialisation = Normal(log(20), 0.2)
+        ),
         observation_model = Split((a = PoissonError(), b = PoissonError())),
-        tspan = (1, T))
+        tspan = (1, T)
+    )
     sim_named = as_turing_model(problem_named, (; y_t = missing))()
     @test size(sim_named.I_t) == (2, T)
 end
 
-@testitem "apply_method runs a NUTSampler over an IDProblem" tags=[:sample] begin
+@testitem "apply_method runs a NUTSampler over an IDProblem" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(72)
     problem = IDProblem(
         infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         observation_model = PoissonError(),
-        tspan = (1, 20))
+        tspan = (1, 20)
+    )
     ydata = as_turing_model(problem, (; y_t = missing))().generated_y_t
     res = apply_method(problem, NUTSampler(; ndraws = 40, nchains = 1), (; y_t = ydata))
     @test res isa IDObservables
@@ -85,7 +93,7 @@ end
     @test res.generated !== missing
 end
 
-@testitem "spread_draws produces tidy draw/chain/iteration columns" tags=[:sample] begin
+@testitem "spread_draws produces tidy draw/chain/iteration columns" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, MCMCChains, Random
     Random.seed!(74)
     @model f() = (x ~ Normal())
@@ -101,7 +109,9 @@ end
     m = as_turing_model(
         IDModel(
             DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-            PoissonError()), missing, 10)
+            PoissonError()
+        ), missing, 10
+    )
     obs = generated_observables(m, (; y_t = missing), rand(m))
     @test obs isa IDObservables
     @test obs.model === m
@@ -115,16 +125,18 @@ end
     using ComposableTuringIDModels, Distributions
     model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-        PoissonError())
+        PoissonError()
+    )
     @test_throws ArgumentError forecast(model, fill(5, 10), :chain, 0)
 end
 
-@testitem "forecast extends a RandomWalk model over the horizon" tags=[:sample] begin
+@testitem "forecast extends a RandomWalk model over the horizon" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(101)
     model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal(1.0, 0.5)),
-        PoissonError())
+        PoissonError()
+    )
     T, h = 15, 6
     y = as_turing_model(model, fill(missing, T), T)().generated_y_t
     chain = sample(as_turing_model(model, y, T), Prior(), 40; progress = false)
@@ -138,14 +150,22 @@ end
     # The extended latent path continues the fitted trajectory rather than
     # overwriting it: in-sample Zₜ is unchanged and the path reaches T + h.
     gens_fit = vec(returned(as_turing_model(model, y, T), chain))
-    gens_fc = vec(returned(as_turing_model(model, vcat(y, fill(missing, h)),
-            T + h), fc))
+    gens_fc = vec(
+        returned(
+            as_turing_model(
+                model, vcat(y, fill(missing, h)),
+                T + h
+            ), fc
+        )
+    )
     @test length(gens_fc[1].Z_t) == T + h
-    @test all(d -> isapprox(gens_fit[d].Z_t, gens_fc[d].Z_t[1:T]; atol = 1e-8),
-        1:10)
+    @test all(
+        d -> isapprox(gens_fit[d].Z_t, gens_fc[d].Z_t[1:T]; atol = 1.0e-8),
+        1:10
+    )
 end
 
-@testitem "forecast refuses a correlated (non-iid) latent stream" tags=[:sample] begin
+@testitem "forecast refuses a correlated (non-iid) latent stream" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random, LinearAlgebra
     Random.seed!(104)
     # A deliberately correlated latent: its stored stream is a smooth MvNormal,
@@ -159,65 +179,84 @@ end
     end
     model = IDModel(
         DirectInfections(; Z = CorrLatent(), initialisation = Normal()),
-        PoissonError())
+        PoissonError()
+    )
     T, h = 15, 5
     y = as_turing_model(model, fill(missing, T), T)().generated_y_t
     chain = sample(as_turing_model(model, y, T), Prior(), 30; progress = false)
     @test_throws ErrorException forecast(model, y, chain, h)
 end
 
-@testitem "forecast works through an IDProblem and an AR latent" tags=[:sample] begin
+@testitem "forecast works through an IDProblem and an AR latent" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(102)
     problem = IDProblem(
         infection = DirectInfections(; Z = AR(), initialisation = Normal()),
         observation_model = PoissonError(),
-        tspan = (1, 18))
+        tspan = (1, 18)
+    )
     T, h = 18, 5
     y = as_turing_model(problem, (; y_t = missing))().generated_y_t
-    chain = sample(as_turing_model(problem, (; y_t = y)), Prior(), 30;
-        progress = false)
+    chain = sample(
+        as_turing_model(problem, (; y_t = y)), Prior(), 30;
+        progress = false
+    )
     fc = forecast(problem, y, chain, h)
     @test size(fc, 1) == 30
     @test length(vec(fc[@varname(y_t[T + h])])) == 30
 end
 
-@testitem "forecast extends a stratified model given a matrix y" tags=[:sample] begin
+@testitem "forecast extends a stratified model given a matrix y" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(105)
     model = IDModel(
-        DirectInfections(; Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
-            initialisation = IID(Normal(log(20.0), 0.3))),
-        PoissonError())
+        DirectInfections(;
+            Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
+            initialisation = IID(Normal(log(20.0), 0.3))
+        ),
+        PoissonError()
+    )
     n_strata, T, h = 2, 12, 4
     y = as_turing_model(
-        model, fill(missing, n_strata, T), (n_strata, T))().generated_y_t
+        model, fill(missing, n_strata, T), (n_strata, T)
+    )().generated_y_t
     chain = sample(
         as_turing_model(model, y, (n_strata, T)), Prior(), 30;
-        progress = false)
+        progress = false
+    )
     fc = forecast(model, y, chain, h)
     @test size(fc, 1) == 30
     # Rebuilding at the extended shape and reading the generated quantities
     # back off the forecast draws confirms the matrix-shaped `y` was resolved
     # to the right stratified shape throughout (build, sample, and forecast).
-    gens_fc = vec(returned(
-        as_turing_model(model, hcat(y, fill(missing, n_strata, h)),
-            (n_strata, T + h)), fc))
+    gens_fc = vec(
+        returned(
+            as_turing_model(
+                model, hcat(y, fill(missing, n_strata, h)),
+                (n_strata, T + h)
+            ), fc
+        )
+    )
     @test all(d -> size(gens_fc[d].I_t) == (n_strata, T + h), 1:10)
 end
 
-@testitem "forecast extends a stratified model given a NamedTuple y" tags=[:sample] begin
+@testitem "forecast extends a stratified model given a NamedTuple y" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(106)
     model = IDModel(
-        DirectInfections(; Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
-            initialisation = IID(Normal(log(20.0), 0.3))),
-        Split((a = PoissonError(), b = PoissonError())))
+        DirectInfections(;
+            Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
+            initialisation = IID(Normal(log(20.0), 0.3))
+        ),
+        Split((a = PoissonError(), b = PoissonError()))
+    )
     T, h = 12, 4
     y = as_turing_model(
-        model, (a = missing, b = missing), (2, T))().generated_y_t
+        model, (a = missing, b = missing), (2, T)
+    )().generated_y_t
     chain = sample(
-        as_turing_model(model, y, (2, T)), Prior(), 30; progress = false)
+        as_turing_model(model, y, (2, T)), Prior(), 30; progress = false
+    )
     fc = forecast(model, y, chain, h)
     @test size(fc, 1) == 30
     y_ext = map(v -> vcat(v, fill(missing, h)), y)
@@ -225,19 +264,24 @@ end
     @test all(d -> size(gens_fc[d].I_t) == (2, T + h), 1:10)
 end
 
-@testitem "forecast extends a renewal with an inferred generation interval" tags=[:sample] begin
+@testitem "forecast extends a renewal with an inferred generation interval" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(103)
     # An INFERRED generation interval (its distribution parameters carry priors)
     # must not break forecasting: the interval's only RV is the fixed-length
     # parameter draw `θ`, not a per-time stream, so the non-centred horizon
     # extension leaves it untouched.
-    gen = UncertainDelay(LogNormal,
-        [Normal(1.9, 0.2), truncated(Normal(0.5, 0.2), 0, Inf)]; D = 10.0)
+    gen = UncertainDelay(
+        LogNormal,
+        [Normal(1.9, 0.2), truncated(Normal(0.5, 0.2), 0, Inf)]; D = 10.0
+    )
     model = IDModel(
-        Renewal(; generation_time = gen, rt = RandomWalk(),
-            initialisation = Normal()),
-        PoissonError())
+        Renewal(;
+            generation_time = gen, rt = RandomWalk(),
+            initialisation = Normal()
+        ),
+        PoissonError()
+    )
     T, h = 18, 5
     y = as_turing_model(model, fill(missing, T), T)().generated_y_t
     chain = sample(as_turing_model(model, y, T), Prior(), 30; progress = false)
@@ -253,12 +297,14 @@ end
     m = as_turing_model(
         IDModel(
             DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-            PoissonError()), missing, 10)
+            PoissonError()
+        ), missing, 10
+    )
     # A solution `returned` cannot consume (here a bare marker) has no generated
     # quantities, so the field stays `missing`.
     obs = generated_observables(m, (; y_t = missing), :no_solution)
     @test obs.generated === missing
     # And the untyped fallback: a non-model `model` also yields `missing`.
     @test generated_observables(:not_a_model, (; y_t = missing), :no_solution).generated ===
-          missing
+        missing
 end

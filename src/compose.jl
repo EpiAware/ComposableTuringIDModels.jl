@@ -43,7 +43,7 @@ rand(mdl)
 ```
 "
 struct IDModel{I <: AbstractInfectionModel, O <: AbstractObservationModel} <:
-       AbstractComposableModel
+    AbstractComposableModel
     "Infection process model generating ``I_t`` (and its internal latent ``Z_t``)."
     infection_model::I
     "Observation model mapping ``I_t`` to ``y_t``."
@@ -94,7 +94,7 @@ concrete_observations(y) = y
 end
 
 function as_turing_model(model::IDModel, y_t, n)
-    _as_turing_model_idmodel(model, concrete_observations(y_t), n)
+    return _as_turing_model_idmodel(model, concrete_observations(y_t), n)
 end
 
 @doc raw"
@@ -131,7 +131,7 @@ function as_turing_model(model::IDModel, Y::AbstractMatrix)
 end
 
 function _shape(model::IDModel, Y::AbstractMatrix)
-    (infection_strata(model.observation_model, size(Y, 1)), size(Y, 2))
+    return (infection_strata(model.observation_model, size(Y, 1)), size(Y, 2))
 end
 
 @doc raw"
@@ -158,5 +158,5 @@ ComposableTuringIDModels.infection_strata(
 "
 infection_strata(obs, n_obs_strata::Int) = n_obs_strata
 function infection_strata(s::Split, n_obs_strata::Int)
-    s.map === nothing ? n_obs_strata : size(s.map, 2)
+    return s.map === nothing ? n_obs_strata : size(s.map, 2)
 end

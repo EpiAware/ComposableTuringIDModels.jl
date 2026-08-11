@@ -46,7 +46,7 @@ end
     constant_offset = Stratify(RandomWalk(), Hierarchy())
     out1 = as_turing_model(constant_offset, (3, 15))()
     diffs1 = out1[1, :] .- out1[2, :]
-    @test all(x -> isapprox(x, diffs1[1]; atol = 1e-8), diffs1)
+    @test all(x -> isapprox(x, diffs1[1]; atol = 1.0e-8), diffs1)
 
     Random.seed!(602)
     # `Replicate` spans both axes (across_shape ⇒ full shape), so the gap
@@ -54,7 +54,7 @@ end
     time_varying_offset = Stratify(RandomWalk(), Replicate(RandomWalk()))
     out2 = as_turing_model(time_varying_offset, (3, 15))()
     diffs2 = out2[1, :] .- out2[2, :]
-    @test !all(x -> isapprox(x, diffs2[1]; atol = 1e-6), diffs2)
+    @test !all(x -> isapprox(x, diffs2[1]; atol = 1.0e-6), diffs2)
 end
 
 @testitem "across_shape is a third-party extension point" begin
@@ -71,19 +71,20 @@ end
     end
     ComposableTuringIDModels.across_shape(::TimeVaryingAcross, n::Dims{2}) = n
     Turing.@model function ComposableTuringIDModels.as_turing_model(
-            m::TimeVaryingAcross, n::Dims{2})
+            m::TimeVaryingAcross, n::Dims{2}
+        )
         out ~ as_turing_submodel(m.model, n)
         return out
     end
 
     @test across_shape(TimeVaryingAcross(Replicate(RandomWalk())), (4, 10)) ==
-          (4, 10)
+        (4, 10)
 
     strat = Stratify(RandomWalk(), TimeVaryingAcross(Replicate(RandomWalk())))
     out = as_turing_model(strat, (3, 15))()
     @test size(out) == (3, 15)
     diffs = out[1, :] .- out[2, :]
-    @test !all(x -> isapprox(x, diffs[1]; atol = 1e-6), diffs)
+    @test !all(x -> isapprox(x, diffs[1]; atol = 1.0e-6), diffs)
 end
 
 @testitem "a path model at a strata shape errors, naming Stratify" begin

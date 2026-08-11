@@ -56,7 +56,7 @@ define_y_t(::BinomialError, y_t, Y_t) = define_y_t(PoissonError(), y_t, Y_t)
 # Resolve the number of trials carried in the data to a per-time-point vector.
 _binomial_trials(N::Integer, n) = fill(N, n)
 function _binomial_trials(N::AbstractVector{<:Integer}, n)
-    @assert length(N)==n "The number-of-trials vector `N` (length $(length(N))) must match the expected-observation series length ($n)"
+    @assert length(N) == n "The number-of-trials vector `N` (length $(length(N))) must match the expected-observation series length ($n)"
     return N
 end
 
@@ -69,11 +69,11 @@ end
     y_t = define_y_t(obs_model, y_t, Y_t)
 
     diff_t = length(y_t) - length(Y_t)
-    @assert diff_t>=0 "The observation vector must be at least as long as the expected observation vector"
+    @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
 
     # `Y_t` is the success probability; clamp away from 0/1 to avoid a degenerate
     # likelihood, mirroring the count families' `Y_t .+ 1e-6` nudge.
-    p_t = clamp.(Y_t, 1e-6, 1 - 1e-6)
+    p_t = clamp.(Y_t, 1.0e-6, 1 - 1.0e-6)
 
     for i in eachindex(Y_t)
         y_t[i + diff_t] ~ observation_error(obs_model, p_t[i], N_t[i])

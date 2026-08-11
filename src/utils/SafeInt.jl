@@ -10,11 +10,12 @@ integer-typed inside a `Turing` model even when `rand` is called.
 "
 struct SafeIntValued <: Distributions.ValueSupport end
 function Base.eltype(::Type{<:Distributions.Sampleable{F, SafeIntValued}}) where {F}
-    SafeInt
+    return SafeInt
 end
 
 const SafeDiscreteUnivariateDistribution = Distributions.Distribution{
-    Distributions.Univariate, SafeIntValued}
+    Distributions.Univariate, SafeIntValued,
+}
 
 function _safe_int_floor(x::Real)
     Tf = typeof(x)

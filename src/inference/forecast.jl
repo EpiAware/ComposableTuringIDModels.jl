@@ -63,8 +63,10 @@ fc = forecast(model, y, chain, 7)
 size(fc)
 ```
 "
-function forecast(model::IDModel, y, chain, horizon::Integer;
-        rng::AbstractRNG = default_rng())
+function forecast(
+        model::IDModel, y, chain, horizon::Integer;
+        rng::AbstractRNG = default_rng()
+    )
     horizon ≥ 1 ||
         throw(ArgumentError("horizon must be ≥ 1, got $horizon"))
     n_time = _series_time_length(y)
@@ -96,8 +98,10 @@ Forecast from a fitted [`IDProblem`](@ref); see [`forecast`](@ref) for the model
 method. The observation model and infection process are taken from the problem,
 and the horizon extends the problem's `tspan`.
 "
-function forecast(problem::IDProblem, y, chain, horizon::Integer;
-        rng::AbstractRNG = default_rng())
+function forecast(
+        problem::IDProblem, y, chain, horizon::Integer;
+        rng::AbstractRNG = default_rng()
+    )
     model = IDModel(problem.infection, problem.observation_model)
     return forecast(model, y, chain, horizon; rng = rng)
 end
@@ -150,7 +154,8 @@ function _extend_latent_draws(rng::AbstractRNG, fc_model, chain)
             full = prior[key.name]
             length(full) > fit_len || continue
             data[key][i, j] = vcat(
-                data[key][i, j], full[(fit_len + 1):end])
+                data[key][i, j], full[(fit_len + 1):end]
+            )
         end
     end
     return extended
@@ -171,26 +176,34 @@ const _FORECAST_INDEP_TOL = 0.5
 
 function _assert_factorised(rng::AbstractRNG, fc_model, resized)
     n_probe = 256
-    draws = [Dict(vn => val for (vn, val) in pairs(rand(rng, fc_model)))
-             for _ in 1:n_probe]
+    draws = [
+        Dict(vn => val for (vn, val) in pairs(rand(rng, fc_model)))
+            for _ in 1:n_probe
+    ]
     for (key, fit_len) in resized
         full_len = length(draws[1][key.name])
         full_len > fit_len || continue
         mat = reduce(vcat, (permutedims(d[key.name]) for d in draws))
         head = vec(Statistics.mean(view(mat, :, 1:fit_len); dims = 2))
-        tail = vec(Statistics.mean(
-            view(mat, :, (fit_len + 1):full_len); dims = 2))
+        tail = vec(
+            Statistics.mean(
+                view(mat, :, (fit_len + 1):full_len); dims = 2
+            )
+        )
         adjacent = Statistics.cor(
-            view(mat, :, fit_len), view(mat, :, fit_len + 1))
+            view(mat, :, fit_len), view(mat, :, fit_len + 1)
+        )
         block = Statistics.cor(head, tail)
         corr = maximum(
-            c -> isfinite(c) ? abs(c) : 0.0, (adjacent, block))
+            c -> isfinite(c) ? abs(c) : 0.0, (adjacent, block)
+        )
         corr < _FORECAST_INDEP_TOL || error(
             "forecast: latent stream `$(key.name)` is correlated across the " *
-            "forecast boundary (|corr| ≈ $(round(corr; digits = 2))), so " *
-            "extending it with independent prior draws would be incorrect. " *
-            "Forecasting a jointly-correlated latent (e.g. an exact-GP) needs " *
-            "conditional extension, which is not yet supported.")
+                "forecast boundary (|corr| ≈ $(round(corr; digits = 2))), so " *
+                "extending it with independent prior draws would be incorrect. " *
+                "Forecasting a jointly-correlated latent (e.g. an exact-GP) needs " *
+                "conditional extension, which is not yet supported."
+        )
     end
     return nothing
 end

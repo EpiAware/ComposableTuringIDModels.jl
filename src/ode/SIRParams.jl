@@ -72,7 +72,7 @@ rand(as_turing_model(sirparams, 0))
   - `initial_prop_infected`: prior for the initial infected proportion.
 "
 struct SIRParams{P <: ODEProblem, D <: Sampleable, E <: Sampleable, F <: Sampleable} <:
-       AbstractLatentModel
+    AbstractLatentModel
     "The `ODEProblem` instance for the SIR model."
     prob::P
     "Prior for the infectiousness parameter."
@@ -83,12 +83,17 @@ struct SIRParams{P <: ODEProblem, D <: Sampleable, E <: Sampleable, F <: Samplea
     initial_prop_infected::F
 end
 
-function SIRParams(; tspan, infectiousness::Distribution, recovery_rate::Distribution,
-        initial_prop_infected::Distribution)
+function SIRParams(;
+        tspan, infectiousness::Distribution, recovery_rate::Distribution,
+        initial_prop_infected::Distribution
+    )
     sir_prob = ODEProblem(_sir_function, [0.99, 0.01, 0.0], tspan)
-    return SIRParams{typeof(sir_prob), typeof(infectiousness),
-        typeof(recovery_rate), typeof(initial_prop_infected)}(
-        sir_prob, infectiousness, recovery_rate, initial_prop_infected)
+    return SIRParams{
+        typeof(sir_prob), typeof(infectiousness),
+        typeof(recovery_rate), typeof(initial_prop_infected),
+    }(
+        sir_prob, infectiousness, recovery_rate, initial_prop_infected
+    )
 end
 
 @model function as_turing_model(params::SIRParams, n::Union{Int, Nothing})

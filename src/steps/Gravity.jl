@@ -49,10 +49,12 @@ gravity(pop, dist; α = 0.0, β = 1.0, γ = 2.0)
 "
 function gravity(pop, dist; α = 1.0, β = 1.0, γ = 2.0, within = 1.0)
     n = length(pop)
-    @assert size(dist)==(n, n) "`dist` must be $n x $n for $n strata"
+    @assert size(dist) == (n, n) "`dist` must be $n x $n for $n strata"
     p = pop ./ (sum(pop) / n)
-    K = [g == h ? within : p[g]^α * p[h]^β / dist[g, h]^γ
-         for g in 1:n, h in 1:n]
+    K = [
+        g == h ? within : p[g]^α * p[h]^β / dist[g, h]^γ
+            for g in 1:n, h in 1:n
+    ]
     return K ./ sum(K; dims = 2)
 end
 
@@ -93,7 +95,7 @@ size(as_turing_model(g, (2, 20))())
 ```
 "
 struct Gravity{P, D, A <: PriorLike, B <: PriorLike, C <: PriorLike, W} <:
-       AbstractMixingModel
+    AbstractMixingModel
     "The population of each stratum."
     pop::P
     "The `strata × strata` distance matrix."
@@ -108,8 +110,10 @@ struct Gravity{P, D, A <: PriorLike, B <: PriorLike, C <: PriorLike, W} <:
     within::W
 end
 
-function Gravity(pop, dist; α = Normal(0, 0.5), β = Normal(0, 0.5),
-        γ = truncated(Normal(2, 0.5), 0, Inf), within = 1.0)
+function Gravity(
+        pop, dist; α = Normal(0, 0.5), β = Normal(0, 0.5),
+        γ = truncated(Normal(2, 0.5), 0, Inf), within = 1.0
+    )
     return Gravity(pop, dist, α, β, γ, within)
 end
 
@@ -117,8 +121,10 @@ end
     α ~ as_turing_submodel(m.α, 1; prefix = true)
     β ~ as_turing_submodel(m.β, 1; prefix = true)
     γ ~ as_turing_submodel(m.γ, 1; prefix = true)
-    return gravity(m.pop, m.dist; α = only(α), β = only(β), γ = only(γ),
-        within = m.within)
+    return gravity(
+        m.pop, m.dist; α = only(α), β = only(β), γ = only(γ),
+        within = m.within
+    )
 end
 
 @doc raw"
@@ -147,7 +153,7 @@ size(pairwise_gen_int(K, [0.2, 0.3, 0.5]))
 ```
 "
 function pairwise_gen_int(K::AbstractMatrix, G::AbstractArray{<:Any, 3})
-    @assert size(G)[1:2]==size(K) "`G` must be $(size(K)) x lags to match `K`"
+    @assert size(G)[1:2] == size(K) "`G` must be $(size(K)) x lags to match `K`"
     for idx in CartesianIndices(K)
         _assert_pmf(view(G, idx[1], idx[2], :))
     end
@@ -157,11 +163,12 @@ end
 function pairwise_gen_int(K::AbstractMatrix, g::AbstractVector)
     _assert_pmf(g)
     return pairwise_gen_int(
-        K, repeat(reshape(g, 1, 1, :), size(K, 1), size(K, 2)))
+        K, repeat(reshape(g, 1, 1, :), size(K, 1), size(K, 2))
+    )
 end
 
 function _assert_pmf(g)
     @assert all(>=(0), g) "A generation interval must be non-negative"
-    @assert sum(g)≈1 "A generation interval must sum to 1"
+    @assert sum(g) ≈ 1 "A generation interval must sum to 1"
     return nothing
 end

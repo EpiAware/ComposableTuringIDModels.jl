@@ -72,7 +72,8 @@ end
 # A `strata × lags` generation interval: each stratum convolves its own row of
 # the window with its own interval.
 function renewal_pressure(
-        ::UniformScaling, g::AbstractMatrix, window::AbstractMatrix)
+        ::UniformScaling, g::AbstractMatrix, window::AbstractMatrix
+    )
     return vec(sum(window .* g; dims = 2))
 end
 
@@ -87,10 +88,13 @@ end
 # is column `end - i + 1`; the reversed generation interval `g` is unused,
 # because the array carries the intervals itself.
 function renewal_pressure(
-        K::AbstractArray{<:Any, 3}, g, window::AbstractMatrix)
+        K::AbstractArray{<:Any, 3}, g, window::AbstractMatrix
+    )
     last_lag = size(window, 2)
-    return sum(view(K, :, :, i) * view(window, :, last_lag - i + 1)
-    for i in axes(K, 3))
+    return sum(
+        view(K, :, :, i) * view(window, :, last_lag - i + 1)
+            for i in axes(K, 3)
+    )
 end
 
 @doc raw"
@@ -218,7 +222,8 @@ function renewal_init_window(::ConstantRenewalStep, I₀::Real, r, len_gen_int)
 end
 
 function renewal_init_window(
-        ::ConstantRenewalStep, I₀::AbstractVector, r, len_gen_int)
+        ::ConstantRenewalStep, I₀::AbstractVector, r, len_gen_int
+    )
     return I₀ .* exp.(.-r .* permutedims((len_gen_int - 1):-1:0))
 end
 

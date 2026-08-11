@@ -21,15 +21,17 @@ end
 @testitem "latent models and latent manipulators are AbstractLatentModel" begin
     using ComposableTuringIDModels, Distributions
     # Concrete latent models.
-    for m in (IID(Normal()), HierarchicalNormal(), RandomWalk(), AR(), MA(),
-        Intercept(Normal()), FixedIntercept(0.1), Null(), HilbertSpaceGP(),
-        ExactGP())
+    for m in (
+            IID(Normal()), HierarchicalNormal(), RandomWalk(), AR(), MA(),
+            Intercept(Normal()), FixedIntercept(0.1), Null(), HilbertSpaceGP(),
+            ExactGP(),
+        )
         @test m isa AbstractLatentModel
     end
     # A wrapped/combined latent is still a latent (the key compositional contract).
     ar = AR()
     @test DiffLatentModel(; model = ar, init = [Normal(), Normal()]) isa
-          AbstractLatentModel
+        AbstractLatentModel
     @test TransformLatentModel(ar, x -> exp.(x)) isa AbstractLatentModel
     @test PrefixLatentModel(; model = ar, prefix = "P") isa AbstractLatentModel
     @test RecordExpectedLatent(ar) isa AbstractLatentModel
@@ -43,14 +45,18 @@ end
 @testitem "infection models are AbstractInfectionModel; ODE params are latent" begin
     using ComposableTuringIDModels, Distributions, OrdinaryDiffEq
     gen_int = [0.2, 0.3, 0.5]
-    for m in (DirectInfections(; Z = RandomWalk()), ExpGrowthRate(; rt = RandomWalk()),
-        Renewal(; generation_time = gen_int, rt = RandomWalk()))
+    for m in (
+            DirectInfections(; Z = RandomWalk()), ExpGrowthRate(; rt = RandomWalk()),
+            Renewal(; generation_time = gen_int, rt = RandomWalk()),
+        )
         @test m isa AbstractInfectionModel
     end
     # ODE parameter structs play the latent role (they feed an ODEProcess slot).
-    sir = SIRParams(tspan = (0.0, 30.0), infectiousness = LogNormal(log(0.3), 0.05),
+    sir = SIRParams(
+        tspan = (0.0, 30.0), infectiousness = LogNormal(log(0.3), 0.05),
         recovery_rate = LogNormal(log(0.1), 0.05),
-        initial_prop_infected = Beta(1, 99))
+        initial_prop_infected = Beta(1, 99)
+    )
     @test sir isa AbstractLatentModel
     proc = ODEProcess(; params = sir, sol2infs = sol -> sol[2, :])
     @test proc isa AbstractInfectionModel
@@ -68,10 +74,10 @@ end
     @test Aggregate(PoissonError(), [0, 7]) isa AbstractObservationModel
     @test TransformObservationModel(PoissonError()) isa AbstractObservationModel
     @test PrefixObservationModel(; model = PoissonError(), prefix = "P") isa
-          AbstractObservationModel
+        AbstractObservationModel
     @test RecordExpectedObs(PoissonError()) isa AbstractObservationModel
     @test Split((a = PoissonError(), b = PoissonError())) isa
-          AbstractObservationModel
+        AbstractObservationModel
     @test Split(PoissonError()) isa AbstractObservationModel
 end
 
@@ -91,11 +97,14 @@ end
     @test_throws MethodError IDModel(latent, obs)
     # IDProblem enforces the same role slots (keyword struct → TypeError).
     @test_throws Union{MethodError, TypeError} IDProblem(
-        infection = obs, observation_model = obs, tspan = (1, 10))
+        infection = obs, observation_model = obs, tspan = (1, 10)
+    )
     # A latent manipulator cannot wrap an observation model (slot is latent;
     # keyword constructor → TypeError).
-    @test_throws Union{MethodError, TypeError} DiffLatentModel(; model = obs,
-        init = [Normal(), Normal()])
+    @test_throws Union{MethodError, TypeError} DiffLatentModel(;
+        model = obs,
+        init = [Normal(), Normal()]
+    )
     # An observation modifier cannot wrap a latent model (slot is observation;
     # positional constructor → MethodError).
     @test_throws MethodError LatentDelay(latent, [0.5, 0.5])

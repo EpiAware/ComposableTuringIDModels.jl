@@ -11,8 +11,10 @@ using LinearAlgebra: dot
 # Keep the `T <: Real` bound. `Union{Missing, Any}` collapses to `Any`, so a
 # wider signature would also match `deepcopy(::Vector{Any})` and silently zero a
 # real tangent.
-function EnzymeRules.inactive(::typeof(deepcopy),
-        ::AbstractArray{Union{Missing, T}}) where {T <: Real}
+function EnzymeRules.inactive(
+        ::typeof(deepcopy),
+        ::AbstractArray{Union{Missing, T}}
+    ) where {T <: Real}
     return nothing
 end
 
@@ -34,14 +36,24 @@ function _rt_const(config, x, i::Int)
 end
 
 # Un-batched: both `x` and `y` are `Const` or plain `Duplicated`.
-function EnzymeRules.forward(config::EnzymeRules.FwdConfig,
+function EnzymeRules.forward(
+        config::EnzymeRules.FwdConfig,
         func::Enzyme.Const{typeof(dot)},
-        RT::Type{<:Union{Enzyme.Const, Enzyme.DuplicatedNoNeed,
-            Enzyme.Duplicated}},
-        x::Union{Enzyme.Const{<:AbstractVector{<:Real}},
-            Enzyme.Duplicated{<:AbstractVector{<:Real}}},
-        y::Union{Enzyme.Const{<:AbstractVector{<:Real}},
-            Enzyme.Duplicated{<:AbstractVector{<:Real}}})
+        RT::Type{
+            <:Union{
+                Enzyme.Const, Enzyme.DuplicatedNoNeed,
+                Enzyme.Duplicated,
+            },
+        },
+        x::Union{
+            Enzyme.Const{<:AbstractVector{<:Real}},
+            Enzyme.Duplicated{<:AbstractVector{<:Real}},
+        },
+        y::Union{
+            Enzyme.Const{<:AbstractVector{<:Real}},
+            Enzyme.Duplicated{<:AbstractVector{<:Real}},
+        }
+    )
     dres = zero(promote_type(eltype(x.val), eltype(y.val)))
     _rt_const(config, x) || (dres += dot(x.dval, y.val))
     _rt_const(config, y) || (dres += dot(x.val, y.dval))
@@ -57,13 +69,19 @@ function EnzymeRules.forward(config::EnzymeRules.FwdConfig,
 end
 
 # Batched: DifferentiationInterface seeds every direction in one pass.
-function EnzymeRules.forward(config::EnzymeRules.FwdConfig,
+function EnzymeRules.forward(
+        config::EnzymeRules.FwdConfig,
         func::Enzyme.Const{typeof(dot)},
         RT::Type{<:Union{Enzyme.BatchDuplicatedNoNeed, Enzyme.BatchDuplicated}},
-        x::Union{Enzyme.Const{<:AbstractVector{<:Real}},
-            Enzyme.BatchDuplicated{<:AbstractVector{<:Real}}},
-        y::Union{Enzyme.Const{<:AbstractVector{<:Real}},
-            Enzyme.BatchDuplicated{<:AbstractVector{<:Real}}})
+        x::Union{
+            Enzyme.Const{<:AbstractVector{<:Real}},
+            Enzyme.BatchDuplicated{<:AbstractVector{<:Real}},
+        },
+        y::Union{
+            Enzyme.Const{<:AbstractVector{<:Real}},
+            Enzyme.BatchDuplicated{<:AbstractVector{<:Real}},
+        }
+    )
     N = EnzymeRules.width(config)
     T = promote_type(eltype(x.val), eltype(y.val))
     dvals = ntuple(Val(N)) do i

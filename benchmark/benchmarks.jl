@@ -37,19 +37,23 @@ const N = 30
 function _eval_models()
     direct = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-        PoissonError())
+        PoissonError()
+    )
     renewal = IDModel(
         Renewal(; generation_time = GEN_INT, rt = RandomWalk(), initialisation = Normal()),
-        NegativeBinomialError())
+        NegativeBinomialError()
+    )
     y_direct = as_turing_model(direct, missing, N)(
-        MersenneTwister(1)).generated_y_t
+        MersenneTwister(1)
+    ).generated_y_t
     y_renewal = as_turing_model(renewal, missing, N)(
-        MersenneTwister(2)).generated_y_t
+        MersenneTwister(2)
+    ).generated_y_t
     return [
         ("AR latent", as_turing_model(AR(), N)),
         ("RandomWalk latent", as_turing_model(RandomWalk(), N)),
         ("DirectInfections+Poisson", as_turing_model(direct, y_direct, N)),
-        ("Renewal+NegativeBinomial", as_turing_model(renewal, y_renewal, N))
+        ("Renewal+NegativeBinomial", as_turing_model(renewal, y_renewal, N)),
     ]
 end
 
@@ -70,7 +74,8 @@ end
 let samp_grp = SUITE["Sampling"] = BenchmarkGroup()
     model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-        PoissonError())
+        PoissonError()
+    )
     y = as_turing_model(model, missing, N)(MersenneTwister(3)).generated_y_t
     cond = as_turing_model(model, y, N)
     # A short NUTS run; `seconds` in run.jl caps wall time, and a low draw count
@@ -91,7 +96,8 @@ let samp_grp = SUITE["Sampling"] = BenchmarkGroup()
     # cannot rule the collapse out, since runner contention alone can blow the
     # budget.
     samp_grp["NUTS (DirectInfections+Poisson, 50 draws)"] = @benchmarkable sample(
-        MersenneTwister(4), $cond, NUTS(), 50; progress = false)
+        MersenneTwister(4), $cond, NUTS(), 50; progress = false
+    )
 end
 
 # --- AD gradients -----------------------------------------------------------
@@ -108,26 +114,30 @@ end
 # hit a known Enzyme type-analysis limitation (see test/ADFixtures).
 const _ENZYME = AutoEnzyme(;
     mode = Enzyme.set_runtime_activity(Enzyme.Reverse),
-    function_annotation = Enzyme.Const)
+    function_annotation = Enzyme.Const
+)
 
 # (backend display name, backend, runs_on_AR-based-scenarios?)
 const _AD_BACKENDS = [
     ("ForwardDiff", AutoForwardDiff(), true),
     ("ReverseDiff (tape)", AutoReverseDiff(; compile = false), true),
     ("Mooncake reverse", AutoMooncake(; config = nothing), true),
-    ("Enzyme reverse", _ENZYME, false)
+    ("Enzyme reverse", _ENZYME, false),
 ]
 
 # (scenario name, model, is_AR_based?)
 function _ad_scenarios()
     direct = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-        PoissonError())
+        PoissonError()
+    )
     y = as_turing_model(direct, missing, N)().generated_y_t
     return [
         ("AR latent logjoint", as_turing_model(AR(), N), true),
-        ("DirectInfections+Poisson posterior",
-            as_turing_model(direct, y, N), false)
+        (
+            "DirectInfections+Poisson posterior",
+            as_turing_model(direct, y, N), false,
+        ),
     ]
 end
 
@@ -140,7 +150,8 @@ let ad_grp = SUITE["AD gradients"] = BenchmarkGroup()
             # `prep` is built once; the benchmark times the gradient itself.
             prep = DI.prepare_gradient(f, backend, θ0)
             ad_grp[sname][bname] = @benchmarkable DI.gradient(
-                $f, $prep, $backend, $θ0)
+                $f, $prep, $backend, $θ0
+            )
         end
     end
 end

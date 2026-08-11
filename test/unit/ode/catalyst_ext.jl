@@ -20,24 +20,30 @@ end
     # The fallback constructor lives in `src/`; without a `ReactionSystem` it
     # raises an informative error rather than a bare MethodError.
     using ComposableTuringIDModels
-    @test_throws ArgumentError CatalystODEParams(:not_a_reaction_system;
-        tspan = (0.0, 1.0), u0_priors = [], p_priors = [])
+    @test_throws ArgumentError CatalystODEParams(
+        :not_a_reaction_system;
+        tspan = (0.0, 1.0), u0_priors = [], p_priors = []
+    )
 end
 
 @testitem "CatalystODEParams samples (u0, p) for an arbitrary (SIR) network" begin
     using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq,
-          Distributions, Random
+        Distributions, Random
     Random.seed!(101)
 
     sir = @reaction_network begin
         β, S + I --> 2I
         γ, I --> R
     end
-    params = CatalystODEParams(sir;
+    params = CatalystODEParams(
+        sir;
         tspan = (0.0, 30.0),
         u0_priors = [sir.S => Beta(99, 1), sir.I => Beta(1, 99), sir.R => 0.0],
-        p_priors = [sir.β => LogNormal(log(0.3), 0.05),
-            sir.γ => LogNormal(log(0.1), 0.05)])
+        p_priors = [
+            sir.β => LogNormal(log(0.3), 0.05),
+            sir.γ => LogNormal(log(0.1), 0.05),
+        ]
+    )
 
     # Sampling returns symbolic `symbol => value` maps, one per species / rate.
     u0, p = as_turing_model(params, nothing)()
@@ -64,11 +70,15 @@ end
         γ, I --> R
     end
     # Missing the R species spec.
-    @test_throws ArgumentError CatalystODEParams(sir;
+    @test_throws ArgumentError CatalystODEParams(
+        sir;
         tspan = (0.0, 30.0),
         u0_priors = [sir.S => Beta(99, 1), sir.I => Beta(1, 99)],
-        p_priors = [sir.β => LogNormal(log(0.3), 0.05),
-            sir.γ => LogNormal(log(0.1), 0.05)])
+        p_priors = [
+            sir.β => LogNormal(log(0.3), 0.05),
+            sir.γ => LogNormal(log(0.1), 0.05),
+        ]
+    )
 end
 
 @testitem "Catalyst SEIR trajectory matches the hand-coded SEIR" begin
@@ -88,34 +98,44 @@ end
 
     # Fixed (Real) specs so the Catalyst trajectory is deterministic and matches
     # the hand-coded SEIR evaluated at the same states/rates.
-    catalyst = CatalystODEParams(seir;
+    catalyst = CatalystODEParams(
+        seir;
         tspan,
-        u0_priors = [seir.S => 1.0 - fixed.initial_infs, seir.E => E0,
-            seir.I => I0, seir.R => 0.0],
-        p_priors = [seir.β => fixed.β, seir.α => fixed.α, seir.γ => fixed.γ])
-    handcoded = SEIRParams(; tspan,
+        u0_priors = [
+            seir.S => 1.0 - fixed.initial_infs, seir.E => E0,
+            seir.I => I0, seir.R => 0.0,
+        ],
+        p_priors = [seir.β => fixed.β, seir.α => fixed.α, seir.γ => fixed.γ]
+    )
+    handcoded = SEIRParams(;
+        tspan,
         infectiousness = Dirac(fixed.β), incubation_rate = Dirac(fixed.α),
-        recovery_rate = Dirac(fixed.γ), initial_prop_infected = Dirac(fixed.initial_infs))
+        recovery_rate = Dirac(fixed.γ), initial_prop_infected = Dirac(fixed.initial_infs)
+    )
 
     # Symbolic solution indexing: pull the infectious compartment by its handle,
     # no stored-index lookup.
-    cat_proc = ODEProcess(params = catalyst, sol2infs = sol -> sol[seir.I, :],
-        solver_options = Dict(:saveat => 1.0))
-    hand_proc = ODEProcess(params = handcoded, sol2infs = sol -> sol[3, :],
-        solver_options = Dict(:saveat => 1.0))
+    cat_proc = ODEProcess(
+        params = catalyst, sol2infs = sol -> sol[seir.I, :],
+        solver_options = Dict(:saveat => 1.0)
+    )
+    hand_proc = ODEProcess(
+        params = handcoded, sol2infs = sol -> sol[3, :],
+        solver_options = Dict(:saveat => 1.0)
+    )
 
     cat_I = as_turing_model(cat_proc, nothing)().I_t
     hand_I = as_turing_model(hand_proc, nothing)().I_t
 
     @test length(cat_I) == length(hand_I)
     # #46 reported agreement to ≈3.5e-9 at matched priors/seed.
-    @test maximum(abs.(cat_I .- hand_I)) < 1e-6
-    @test isapprox(cat_I, hand_I; atol = 1e-7)
+    @test maximum(abs.(cat_I .- hand_I)) < 1.0e-6
+    @test isapprox(cat_I, hand_I; atol = 1.0e-7)
 end
 
 @testitem "CatalystODEParams composes into an ODEProcess and exposes no latent" begin
     using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq,
-          Distributions, LogExpFunctions, Random
+        Distributions, LogExpFunctions, Random
     Random.seed!(102)
 
     seir = @reaction_network begin
@@ -123,17 +143,25 @@ end
         α, E --> I
         γ, I --> R
     end
-    params = CatalystODEParams(seir;
+    params = CatalystODEParams(
+        seir;
         tspan = (0.0, 50.0),
-        u0_priors = [seir.S => 0.99, seir.E => 0.005,
-            seir.I => 0.005, seir.R => 0.0],
-        p_priors = [seir.β => LogNormal(log(0.3), 0.05),
+        u0_priors = [
+            seir.S => 0.99, seir.E => 0.005,
+            seir.I => 0.005, seir.R => 0.0,
+        ],
+        p_priors = [
+            seir.β => LogNormal(log(0.3), 0.05),
             seir.α => LogNormal(log(0.1), 0.05),
-            seir.γ => LogNormal(log(0.1), 0.05)])
+            seir.γ => LogNormal(log(0.1), 0.05),
+        ]
+    )
     N = 1000.0
-    proc = ODEProcess(params = params,
+    proc = ODEProcess(
+        params = params,
         sol2infs = sol -> softplus.(N .* sol[seir.I, :]),
-        solver_options = Dict(:saveat => 1.0))
+        solver_options = Dict(:saveat => 1.0)
+    )
 
     out = as_turing_model(proc, nothing)()
     @test length(out.I_t) == 51
@@ -145,9 +173,9 @@ end
     @test all(n -> n in nms, ["β", "α", "γ"])
 end
 
-@testitem "Catalyst SEIR + observation samples under ForwardDiff NUTS" tags=[:forwarddiff] begin
+@testitem "Catalyst SEIR + observation samples under ForwardDiff NUTS" tags = [:forwarddiff] begin
     using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq,
-          Distributions, LogExpFunctions, Turing, ADTypes, Random
+        Distributions, LogExpFunctions, Turing, ADTypes, Random
     using DynamicPPL: @varname
     Random.seed!(103)
 
@@ -158,16 +186,24 @@ end
         α, E --> I
         γ, I --> R
     end
-    params = CatalystODEParams(seir;
+    params = CatalystODEParams(
+        seir;
         tspan = (0.0, Float64(n_days)),
-        u0_priors = [seir.S => 0.99, seir.E => Beta(2, 200),
-            seir.I => Beta(2, 200), seir.R => 0.0],
-        p_priors = [seir.β => LogNormal(-0.5, 0.4),
-            seir.α => Gamma(8, 0.05), seir.γ => Gamma(8, 0.03125)])
+        u0_priors = [
+            seir.S => 0.99, seir.E => Beta(2, 200),
+            seir.I => Beta(2, 200), seir.R => 0.0,
+        ],
+        p_priors = [
+            seir.β => LogNormal(-0.5, 0.4),
+            seir.α => Gamma(8, 0.05), seir.γ => Gamma(8, 0.03125),
+        ]
+    )
     obs = TransformObservationModel(PoissonError(), x -> softplus.(N .* x))
-    process = ODEProcess(params = params,
+    process = ODEProcess(
+        params = params,
         sol2infs = sol -> sol[seir.I, :],
-        solver_options = Dict(:saveat => 1.0))
+        solver_options = Dict(:saveat => 1.0)
+    )
     model = IDModel(process, obs)
 
     sim = as_turing_model(model, fill(missing, n_days + 1), n_days + 1)()
@@ -178,8 +214,10 @@ end
     # Mooncake-driven NUTS through the solver is a separate, pre-existing gap.
     # `sample` returns a FlexiChains chain, indexed by variable name directly.
     # This exercises symbolic-map remake carrying ForwardDiff `Dual`s.
-    chain = sample(as_turing_model(model, y_obs, n_days + 1),
-        NUTS(; adtype = AutoForwardDiff()), 20; progress = false)
+    chain = sample(
+        as_turing_model(model, y_obs, n_days + 1),
+        NUTS(; adtype = AutoForwardDiff()), 20; progress = false
+    )
     βs = vec(chain[@varname(β)])
     @test length(βs) == 20
     @test all(isfinite, βs)

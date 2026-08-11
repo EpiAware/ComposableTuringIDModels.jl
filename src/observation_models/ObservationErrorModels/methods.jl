@@ -32,7 +32,8 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
 "
 @model function as_turing_model(obs_model::AbstractObservationErrorModel, y_t, Y_t)
     priors ~ to_submodel(
-        generate_observation_error_priors(obs_model, y_t, Y_t), false)
+        generate_observation_error_priors(obs_model, y_t, Y_t), false
+    )
 
     # Extract the count series scored by this model (plain vector, `missing`, or
     # a NamedTuple carrying extra data). Rebinding `y_t` keeps DynamicPPL treating
@@ -40,9 +41,9 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
     y_t = define_y_t(obs_model, y_t, Y_t)
 
     diff_t = length(y_t) - length(Y_t)
-    @assert diff_t>=0 "The observation vector must be at least as long as the expected observation vector"
+    @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
 
-    pad_Y_t = Y_t .+ 1e-6
+    pad_Y_t = Y_t .+ 1.0e-6
     # Every entry is scored, including a `missing` one. Sampling the blanks is
     # what `forecast` relies on: it pads the series with `missing` over the
     # horizon and reads the drawn values back out of the chain. Skipping them
@@ -52,7 +53,8 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
         # constant while a length-`n` prior (drawn from a process slot) makes the
         # error parameter time-varying — one loop serves both.
         y_t[i + diff_t] ~ observation_error(
-            obs_model, pad_Y_t[i], map(p -> _at(p, i), values(priors))...)
+            obs_model, pad_Y_t[i], map(p -> _at(p, i), values(priors))...
+        )
     end
     return (; y_t, expected = Y_t)
 end
@@ -110,7 +112,8 @@ rand(m)
 ```
 "
 @model function generate_observation_error_priors(
-        obs_model::AbstractObservationErrorModel, y_t, Y_t)
+        obs_model::AbstractObservationErrorModel, y_t, Y_t
+    )
     return NamedTuple()
 end
 

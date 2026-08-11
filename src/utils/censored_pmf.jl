@@ -8,12 +8,12 @@
 # When `D` is `nothing` it defaults to the `upper`th quantile rounded to a
 # multiple of `Δd`.
 function _discretised_pmf(dist::Distribution; Δd = 1.0, D = nothing, upper = 0.99)
-    @assert minimum(dist)>=0.0 "Distribution must be non-negative."
-    @assert Δd>0.0 "Δd must be positive."
+    @assert minimum(dist) >= 0.0 "Distribution must be non-negative."
+    @assert Δd > 0.0 "Δd must be positive."
     if isnothing(D)
         D = round(Int64, invlogcdf(dist, log(upper)) / Δd) * Δd
     end
-    @assert D>=Δd "D can't be shorter than Δd."
+    @assert D >= Δd "D can't be shorter than Δd."
     censored = double_interval_censored(dist; upper = D, interval = Δd)
     ts = 0.0:Δd:(D - Δd)
     probs = [pdf(censored, t) for t in ts]

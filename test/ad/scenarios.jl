@@ -6,31 +6,31 @@
 # managed `setup.jl`; the SCENARIOS come from the package's own `ADFixtures`
 # registry. Add/trim backends and categories to match the package.
 
-@testitem "ForwardDiff gradients (marginal)" tags=[:ad, :forwarddiff] setup=[ADHelpers] begin
+@testitem "ForwardDiff gradients (marginal)" tags = [:ad, :forwarddiff] setup = [ADHelpers] begin
     test_working_backend("ForwardDiff")
 end
 
-@testitem "ReverseDiff compiled gradients (marginal)" tags=[:ad, :reversediff_compiled] setup=[ADHelpers] begin
+@testitem "ReverseDiff compiled gradients (marginal)" tags = [:ad, :reversediff_compiled] setup = [ADHelpers] begin
     test_working_backend("ReverseDiff (compiled)")
 end
 
-@testitem "ReverseDiff gradients (marginal)" tags=[:ad, :reversediff] setup=[ADHelpers] begin
+@testitem "ReverseDiff gradients (marginal)" tags = [:ad, :reversediff] setup = [ADHelpers] begin
     test_working_backend("ReverseDiff (tape)")
 end
 
-@testitem "Enzyme reverse gradients (marginal)" tags=[:ad, :enzyme, :enzyme_reverse] setup=[ADHelpers] begin
+@testitem "Enzyme reverse gradients (marginal)" tags = [:ad, :enzyme, :enzyme_reverse] setup = [ADHelpers] begin
     test_working_backend("Enzyme reverse")
 end
 
-@testitem "Enzyme forward gradients (marginal)" tags=[:ad, :enzyme, :enzyme_forward] setup=[ADHelpers] begin
+@testitem "Enzyme forward gradients (marginal)" tags = [:ad, :enzyme, :enzyme_forward] setup = [ADHelpers] begin
     test_working_backend("Enzyme forward")
 end
 
-@testitem "Mooncake reverse gradients (marginal)" tags=[:ad, :mooncake, :mooncake_reverse] setup=[ADHelpers] begin
+@testitem "Mooncake reverse gradients (marginal)" tags = [:ad, :mooncake, :mooncake_reverse] setup = [ADHelpers] begin
     test_working_backend("Mooncake reverse")
 end
 
-@testitem "Mooncake forward gradients (marginal)" tags=[:ad, :mooncake, :mooncake_forward] setup=[ADHelpers] begin
+@testitem "Mooncake forward gradients (marginal)" tags = [:ad, :mooncake, :mooncake_forward] setup = [ADHelpers] begin
     test_working_backend("Mooncake forward")
 end
 

@@ -15,7 +15,7 @@ const HEAVY_TUTORIALS = String["ad-backends.jl"]
 const TUTORIALS_SUBDIR = joinpath("getting-started", "tutorials")
 
 const TUTORIAL_STUBS = Pair{String, String}[
-    "ad-backends.md" => "# [Automatic differentiation backends](@id ad-backends)"
+    "ad-backends.md" => "# [Automatic differentiation backends](@id ad-backends)",
 ]
 
 const FORCE_STUB_TUTORIALS = String[]
@@ -34,7 +34,7 @@ const ORG_BRANDING = true
 # branch merges and redeploys. Drop this entry once the file is on `main`.
 const LINKCHECK_IGNORE = Regex[
     r"blob/main/CITATION\.cff$",
-    r"dev/tutorials$"
+    r"dev/tutorials$",
 ]
 
 const _REPO_URL = "https://github.com/EpiAware/ComposableTuringIDModels.jl"
@@ -51,7 +51,7 @@ const _REPO_BLOB = "$(_REPO_URL)/blob/main"
 # series and the fit that follows differ from build to build.
 const INDEX_REWRITES = Pair{String, String}[
     "(NOTICE)" => "($(_REPO_BLOB)/NOTICE)",
-    "(LICENSE)" => "($(_REPO_BLOB)/LICENSE)"
+    "(LICENSE)" => "($(_REPO_BLOB)/LICENSE)",
 ]
 
 # Run the README's ```julia fences on the home page so every block shows its

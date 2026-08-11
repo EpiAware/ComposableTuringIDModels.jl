@@ -53,6 +53,8 @@ end
 ```
 "
 function as_turing_model(m::AbstractPriorModel, n::Dims{2})
-    error("$(nameof(typeof(m))) produces one path. Wrap it in a `Stratify` " *
-          "to give it a strata axis.")
+    error(
+        "$(nameof(typeof(m))) produces one path. Wrap it in a `Stratify` " *
+            "to give it a strata axis."
+    )
 end

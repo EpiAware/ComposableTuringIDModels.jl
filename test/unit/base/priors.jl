@@ -82,14 +82,20 @@ end
     Random.seed!(204)
     # Two identical per-lag priors draw two INDEPENDENT coefficients — a vector
     # prior is not a single shared coefficient repeated across lags.
-    d = rand(as_turing_model(
-        AR(; damp = [Normal(0.0, 1.0), Normal(0.0, 1.0)], init = Normal()), 8))
+    d = rand(
+        as_turing_model(
+            AR(; damp = [Normal(0.0, 1.0), Normal(0.0, 1.0)], init = Normal()), 8
+        )
+    )
     damp = reduce(vcat, [d[k] for k in keys(d) if occursin("damp_AR", string(k))])
     @test length(damp) == 2
     @test damp[1] != damp[2]
     Random.seed!(205)
-    dm = rand(as_turing_model(
-        MA(; θ = [Normal(0.0, 1.0), Normal(0.0, 1.0)]), 8))
+    dm = rand(
+        as_turing_model(
+            MA(; θ = [Normal(0.0, 1.0), Normal(0.0, 1.0)]), 8
+        )
+    )
     θ = reduce(vcat, [dm[k] for k in keys(dm) if occursin("θ", string(k))])
     @test length(θ) == 2
     @test θ[1] != θ[2]
@@ -112,8 +118,10 @@ end
     val = LDP.logdensity(ldf, zeros(LDP.dimension(ldf)))   # previously threw
     @test isfinite(val)
     # And it samples under NUTS end-to-end.
-    chn = sample(m, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 40;
-        progress = false)
+    chn = sample(
+        m, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 40;
+        progress = false
+    )
     @test size(chn, 1) == 40
 end
 
@@ -146,17 +154,21 @@ end
     @test Intercept(; intercept = Normal()).intercept isa Distribution
     @test HierarchicalNormal(truncated(Normal(0, 1), 0, Inf)).std isa Distribution
     # Vector prior slots hold the raw vector.
-    @test AR(; damp = [Normal(), Normal()],
-        init = [Normal(), Normal()]).damp isa AbstractVector
+    @test AR(;
+        damp = [Normal(), Normal()],
+        init = [Normal(), Normal()]
+    ).damp isa AbstractVector
     # A process prior slot holds the latent model unchanged.
     @test AR(; damp = RandomWalk()).damp isa RandomWalk
     # Positional bare-`Distribution` constructor forms build valid latents.
-    for m in (AR(Normal(), Normal()),
-        HierarchicalNormal(truncated(Normal(0, 1), 0, Inf)),
-        HierarchicalNormal(0.5, truncated(Normal(0, 1), 0, Inf)),
-        Intercept(; intercept = Normal()),
-        MA(truncated(Normal(0.0, 0.05), -1, 1)),
-        DiffLatentModel(RandomWalk(), Normal(); d = 2))
+    for m in (
+            AR(Normal(), Normal()),
+            HierarchicalNormal(truncated(Normal(0, 1), 0, Inf)),
+            HierarchicalNormal(0.5, truncated(Normal(0, 1), 0, Inf)),
+            Intercept(; intercept = Normal()),
+            MA(truncated(Normal(0.0, 0.05), -1, 1)),
+            DiffLatentModel(RandomWalk(), Normal(); d = 2),
+        )
         @test m isa AbstractLatentModel
     end
 end
@@ -174,15 +186,18 @@ end
     @test DirectInfections(; Z = Normal()).Z isa Intercept
     @test ExpGrowthRate(; rt = Normal()).rt isa Intercept
     @test Renewal(; generation_time = [0.2, 0.3, 0.5], rt = Normal()).rt isa
-          Intercept
+        Intercept
     # And the resulting model yields a length-`n` path, not a scalar.
     @test length(as_turing_model(RandomWalk(; ϵ_t = Normal()), 6)()) == 6
     @test length(as_turing_model(AR(; ϵ_t = Normal()), 6)()) == 6
     @test length(as_turing_model(MA(; ϵ_t = Normal()), 6)()) == 6
     @test length(as_turing_model(DirectInfections(; Z = Normal()), 6)().I_t) == 6
-    @test length(as_turing_model(
-        Renewal(; generation_time = [0.2, 0.3, 0.5], rt = Normal()), 8)().I_t) ==
-          8
+    @test length(
+        as_turing_model(
+            Renewal(; generation_time = [0.2, 0.3, 0.5], rt = Normal()), 8
+        )().I_t
+    ) ==
+        8
     # A process, an explicit `IID`, or an explicit `Intercept` passes through
     # unchanged (no double-wrapping).
     @test RandomWalk(; ϵ_t = RandomWalk()).ϵ_t isa RandomWalk
@@ -197,7 +212,8 @@ end
     @test DiffLatentModel(; model = Normal(), init = [Normal()]).model isa Intercept
     @test TransformLatentModel(Normal(), x -> x).model isa Intercept
     @test BroadcastLatentModel(
-        Normal(); period = 7, broadcast_rule = RepeatEach()).model isa Intercept
+        Normal(); period = 7, broadcast_rule = RepeatEach()
+    ).model isa Intercept
     @test RecordExpectedLatent(Normal()).model isa Intercept
     @test Hierarchy(; across = Normal()).across isa Intercept
     @test Hierarchy(; across = IID(Normal())).across isa IID   # process passes through

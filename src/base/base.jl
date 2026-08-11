@@ -74,8 +74,11 @@ function as_turing_model(model, args...; kwargs...)
     else
         ""
     end
-    throw(ArgumentError(
-        "no `as_turing_model` method is defined for $(typeof(model)) with " *
-        "$(length(args)) positional argument(s);$hint. Each model struct must " *
-        "implement `@model function as_turing_model(m::T, ...)`"))
+    throw(
+        ArgumentError(
+            "no `as_turing_model` method is defined for $(typeof(model)) with " *
+                "$(length(args)) positional argument(s);$hint. Each model struct must " *
+                "implement `@model function as_turing_model(m::T, ...)`"
+        )
+    )
 end

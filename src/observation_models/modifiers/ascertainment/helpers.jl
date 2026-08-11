@@ -28,8 +28,11 @@ mdl = as_turing_model(obs, missing, fill(10.0, 14))
 rand(mdl)
 ```
 "
-function ascertainment_dayofweek(model; latent_model = HierarchicalNormal(),
-        transform = (x, y) -> x .* y, latent_prefix = "DayofWeek")
+function ascertainment_dayofweek(
+        model; latent_model = HierarchicalNormal(),
+        transform = (x, y) -> x .* y, latent_prefix = "DayofWeek"
+    )
     return Ascertainment(
-        model, broadcast_dayofweek(latent_model), transform, latent_prefix)
+        model, broadcast_dayofweek(latent_model), transform, latent_prefix
+    )
 end

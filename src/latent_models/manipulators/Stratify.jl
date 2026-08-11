@@ -62,7 +62,7 @@ size(as_turing_model(strat, (3, 20))())
 ```
 "
 struct Stratify{S <: PriorLike, A <: PriorLike, F <: Function} <:
-       AbstractPriorModel
+    AbstractPriorModel
     "The path drawn once over the time axis."
     shared::S
     "The cross-stratum relationship generating the per-stratum offsets."
@@ -79,7 +79,8 @@ end
     n_strata, n_time = n
     shared ~ as_turing_submodel(m.shared, n_time)
     across ~ as_turing_submodel(
-        m.across, across_shape(m.across, n); prefix = true)
+        m.across, across_shape(m.across, n); prefix = true
+    )
     return m.combine.(across, permutedims(shared))
 end
 

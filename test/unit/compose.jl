@@ -3,7 +3,8 @@
     Random.seed!(21)
     model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-        PoissonError())
+        PoissonError()
+    )
     n = 20
     mdl = as_turing_model(model, missing, n)
 
@@ -53,7 +54,8 @@ end
     Random.seed!(24)
     model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-        PoissonError())
+        PoissonError()
+    )
     n = 10
     # Data simulated from the prior carries DynamicPPL's `Union{Missing, T}`
     # predictive eltype even though every entry is concrete.
@@ -73,7 +75,8 @@ end
     Random.seed!(22)
     model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-        PoissonError())
+        PoissonError()
+    )
     n = 20
     mdl = as_turing_model(model, missing, n)
 
@@ -88,12 +91,13 @@ end
     @test typeof(c1) == typeof(c2)
 end
 
-@testitem "composed model: short NUTS sample runs" tags=[:sample] begin
+@testitem "composed model: short NUTS sample runs" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(23)
     model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-        NegativeBinomialError())
+        NegativeBinomialError()
+    )
     n = 20
     y = as_turing_model(model, missing, n)()
     cond_model = as_turing_model(model, y.generated_y_t, n)
@@ -114,9 +118,12 @@ end
     model = IDModel(
         DirectInfections(;
             Z = Stratify(
-                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))),
-            initialisation = Normal(log(50.0), 0.2)),
-        Split(PoissonError()))
+                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))
+            ),
+            initialisation = Normal(log(50.0), 0.2)
+        ),
+        Split(PoissonError())
+    )
     for (n_time, n_groups) in ((24, 4), (12, 6))
         Ymiss = Matrix{Union{Missing, Float64}}(missing, n_groups, n_time)
         sim = as_turing_model(model, Ymiss)()
@@ -132,9 +139,12 @@ end
     model = IDModel(
         DirectInfections(;
             Z = Stratify(
-                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))),
-            initialisation = Normal()),
-        Split(PoissonError()))
+                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))
+            ),
+            initialisation = Normal()
+        ),
+        Split(PoissonError())
+    )
     Ymiss = Matrix{Union{Missing, Float64}}(missing, 3, 8)
     mdl = as_turing_model(model, Ymiss)
     names = string.(collect(keys(rand(mdl))))
@@ -142,24 +152,38 @@ end
     @test any(startswith(n, "group2.") for n in names)
 end
 
-@testitem "Stratify + Split panel samples under NUTS" tags=[:sample] begin
+@testitem "Stratify + Split panel samples under NUTS" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(388)
     model = IDModel(
         DirectInfections(;
-            Z = Stratify(RandomWalk(), Hierarchy(; mean = Normal(0.0, 0.5),
-                across = IID(Normal(0.0, 0.5)))),
-            initialisation = Normal(log(50.0), 0.2)),
-        Split(PoissonError()))
+            Z = Stratify(
+                RandomWalk(), Hierarchy(;
+                    mean = Normal(0.0, 0.5),
+                    across = IID(Normal(0.0, 0.5))
+                )
+            ),
+            initialisation = Normal(log(50.0), 0.2)
+        ),
+        Split(PoissonError())
+    )
 
     n_time, n_groups = 16, 5
     Ymiss = Matrix{Union{Missing, Float64}}(missing, n_groups, n_time)
     sim = as_turing_model(model, Ymiss)()
-    Ydata = Float64.(reduce(vcat, [permutedims(sim.generated_y_t[g])
-                                   for g in 1:n_groups]))
+    Ydata = Float64.(
+        reduce(
+            vcat, [
+                permutedims(sim.generated_y_t[g])
+                    for g in 1:n_groups
+            ]
+        )
+    )
 
     posterior = as_turing_model(model, Ydata)
-    chain = sample(posterior, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 30;
-        progress = false)
+    chain = sample(
+        posterior, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 30;
+        progress = false
+    )
     @test size(chain, 1) == 30
 end

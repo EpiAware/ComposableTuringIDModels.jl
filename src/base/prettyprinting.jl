@@ -58,8 +58,10 @@ function _print_component_tree(io::IO, children, prefix::AbstractString)
     n = length(children)
     for (i, (role, child)) in enumerate(children)
         is_last = i == n
-        print(io, '\n', prefix, is_last ? "└─ " : "├─ ",
-            role, ": ", nameof(typeof(child)))
+        print(
+            io, '\n', prefix, is_last ? "└─ " : "├─ ",
+            role, ": ", nameof(typeof(child))
+        )
         child_prefix = string(prefix, is_last ? "   " : "│  ")
         _print_component_tree(io, _component_children(child), child_prefix)
     end

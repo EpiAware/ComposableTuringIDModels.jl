@@ -28,7 +28,7 @@ vector of them).
   - `prefix`: the string prefix applied to the inner model's variables.
 "
 @kwdef struct PrefixLatentModel{M <: PriorLike, P <: String} <:
-              AbstractLatentModel
+    AbstractLatentModel
     "The latent model."
     model::M
     "The prefix for the latent model."
@@ -41,7 +41,8 @@ end
 # dispatch ambiguity against the `AbstractPriorModel`/`Dims{2}` guard.
 @model function _prefix_latent(model::PrefixLatentModel, n)
     submodel ~ to_submodel(
-        prefix(as_turing_model(model.model, n), Symbol(model.prefix)), false)
+        prefix(as_turing_model(model.model, n), Symbol(model.prefix)), false
+    )
     return submodel
 end
 as_turing_model(model::PrefixLatentModel, n::Int) = _prefix_latent(model, n)

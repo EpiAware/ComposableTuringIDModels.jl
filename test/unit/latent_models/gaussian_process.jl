@@ -45,8 +45,10 @@ end
     # Tolerances are the measured error at the top of each ladder, rounded up an
     # order of magnitude. They are deterministic (no RNG anywhere here), and the
     # squared-exponential floor is set by the basis, not by round-off.
-    for (kernel, tol) in ((SqExponentialKernel(), 1e-10),
-        (Matern32Kernel(), 1e-3), (Matern52Kernel(), 1e-4))
+    for (kernel, tol) in (
+            (SqExponentialKernel(), 1.0e-10),
+            (Matern32Kernel(), 1.0e-3), (Matern52Kernel(), 1.0e-4),
+        )
         errs = [relerr(m, c, kernel) for (m, c) in ladder]
         @test all(<(0), diff(errs))   # strictly better with more m and wider L
         @test errs[end] < tol
@@ -61,13 +63,13 @@ end
     # φ_j rescales the whole diagonal by α².
     Φ, sqrt_λ = hsgp_basis(50, 100, 3.0)
     K(σ) = Φ * Diagonal(spectral_density(SqExponentialKernel(), sqrt_λ, σ, 0.5)) *
-           Φ'
+        Φ'
     for σ in (0.5, 1.0, 3.0)
-        @test all(d -> isapprox(d, σ^2; rtol = 1e-6), diag(K(σ)))
+        @test all(d -> isapprox(d, σ^2; rtol = 1.0e-6), diag(K(σ)))
     end
     # The spectral density carries σ² as a bare factor, so the covariance scales
     # exactly quadratically in σ.
-    @test K(2.0)≈4 .* K(1.0) rtol=1e-12
+    @test K(2.0) ≈ 4 .* K(1.0) rtol = 1.0e-12
 end
 
 @testitem "HilbertSpaceGP rejects invalid m and c" begin
@@ -99,21 +101,23 @@ end
     # The nugget is there to keep the Cholesky factorisation defined, not to
     # change the model. Scaled by σ² it stays a fixed relative perturbation; a
     # nugget with an absolute floor would dominate the covariance at small σ.
-    n, ℓ, jitter = 15, 0.6, 1e-6
+    n, ℓ, jitter = 15, 0.6, 1.0e-6
     mdl = as_turing_model(ExactGP(; jitter = jitter), n)
-    for σ in (1e-3, 1e-2, 1.0, 1e2)
-        L = reduce(hcat,
+    for σ in (1.0e-3, 1.0e-2, 1.0, 1.0e2)
+        L = reduce(
+            hcat,
             begin
-                e = zeros(n)
-                e[j] = 1.0
-                fix(mdl, (ℓ = ℓ, σ = σ, z = e))()
-            end for j in 1:n)
+                    e = zeros(n)
+                    e[j] = 1.0
+                    fix(mdl, (ℓ = ℓ, σ = σ, z = e))()
+                end for j in 1:n
+        )
         inflation = maximum(diag(L * L')) / σ^2 - 1
         @test 0 <= inflation < 10 * jitter
     end
     # σ = 0 is degenerate but must still factorise rather than throw, leaving
     # only the absolute floor (√(jitter·eps) ≈ 1.5e-11) in the path.
-    @test all(<(1e-8) ∘ abs, fix(mdl, (ℓ = ℓ, σ = 0.0))())
+    @test all(<(1.0e-8) ∘ abs, fix(mdl, (ℓ = ℓ, σ = 0.0))())
 end
 
 @testitem "GP latents reject a hyperprior that strays off its support" begin
@@ -124,13 +128,16 @@ end
     for GP in (HilbertSpaceGP, ExactGP)
         @test_throws AssertionError GP(; length_scale = Normal())
         @test_throws AssertionError GP(;
-            length_scale = truncated(Normal(), -1, Inf))
+            length_scale = truncated(Normal(), -1, Inf)
+        )
         @test_throws AssertionError GP(; marginal_std = Normal())
         # the shipped defaults, and a hand-rolled prior whose support is open
         # at zero, both pass
         @test GP() isa GP
-        @test GP(; length_scale = Gamma(2, 0.2),
-            marginal_std = Exponential(1.0)) isa GP
+        @test GP(;
+            length_scale = Gamma(2, 0.2),
+            marginal_std = Exponential(1.0)
+        ) isa GP
     end
 end
 
@@ -164,7 +171,7 @@ end
         @test S[1] > S[end]
     end
     @test spectral_density(Matern32Kernel(), ω, σ, ℓ) !=
-          spectral_density(SqExponentialKernel(), ω, σ, ℓ)
+        spectral_density(SqExponentialKernel(), ω, σ, ℓ)
 end
 
 @testitem "spectral_density rejects a zero length scale rather than returning NaN" begin
@@ -195,9 +202,10 @@ end
         return 2 * step(τ) * (sum(f) - (f[1] + f[end]) / 2)   # 2∫₀^∞ suffices
     end
     for kernel in (SqExponentialKernel(), Matern32Kernel(), Matern52Kernel()),
-        ℓ in (0.4, 1.3), σ in (1.0, 2.5), ω in (0.0, 0.7, 3.1)
-        @test spectral_density(kernel, ω, σ, ℓ)≈fourier_transform(
-            kernel, ω, σ, ℓ) rtol=1e-6
+            ℓ in (0.4, 1.3), σ in (1.0, 2.5), ω in (0.0, 0.7, 3.1)
+        @test spectral_density(kernel, ω, σ, ℓ) ≈ fourier_transform(
+            kernel, ω, σ, ℓ
+        ) rtol = 1.0e-6
     end
 end
 
@@ -210,23 +218,26 @@ end
     # deterministic, with no Monte Carlo noise to loosen the tolerance for.
     n, ℓ, σ = 30, 0.5, 1.0
     function implied_cov(mdl, weight::Symbol, k)
-        A = reduce(hcat,
+        A = reduce(
+            hcat,
             begin
-                e = zeros(k)
-                e[j] = 1.0
-                fix(mdl, (ℓ = ℓ, σ = σ, weight => e))()
-            end for j in 1:k)
+                    e = zeros(k)
+                    e[j] = 1.0
+                    fix(mdl, (ℓ = ℓ, σ = σ, weight => e))()
+                end for j in 1:k
+        )
         return A * A'
     end
     ladder = ((10, 1.5), (20, 1.5), (40, 2.0), (120, 4.0))
     # `ExactGP` adds a relative nugget τ(σ² + 1) to its diagonal, so the two
     # cannot agree below about 2τ/σ² ≈ 2e-6 however large m gets.
-    for (kernel, tol) in ((SqExponentialKernel(), 1e-5), (Matern52Kernel(), 1e-4))
+    for (kernel, tol) in ((SqExponentialKernel(), 1.0e-5), (Matern52Kernel(), 1.0e-4))
         exact = implied_cov(as_turing_model(ExactGP(; kernel = kernel), n), :z, n)
         errs = map(ladder) do (m, c)
             hs = implied_cov(
                 as_turing_model(HilbertSpaceGP(; m = m, c = c, kernel = kernel), n),
-                :β, m)
+                :β, m
+            )
             return norm(hs - exact) / norm(exact)
         end
         @test all(<(0), diff(collect(errs)))
@@ -247,20 +258,24 @@ end
         K_exact = kernelmatrix(with_lengthscale(SqExponentialKernel(), ℓ), x)
         Φ, sqrt_λ = hsgp_basis(n, m, c)
         K_approx = Φ *
-                   Diagonal(spectral_density(SqExponentialKernel(), sqrt_λ, 1.0,
-                       ℓ)) * Φ'
+            Diagonal(
+            spectral_density(
+                SqExponentialKernel(), sqrt_λ, 1.0,
+                ℓ
+            )
+        ) * Φ'
         return norm(K_approx - K_exact) / norm(K_exact)
     end
     # A single basis function cannot represent the covariance at any ℓ.
     @test relerr(1, 1.5, 0.5) > 0.5
     # A short ℓ needs a larger m: the default m = 20 is 25% out at ℓ = 0.1.
     @test relerr(20, 1.5, 0.1) > 0.1
-    @test relerr(60, 1.5, 0.1) < 1e-3
+    @test relerr(60, 1.5, 0.1) < 1.0e-3
     # A long ℓ needs a larger c instead — adding basis functions does not help,
     # because the approximation is periodic on [-L, L]. Even at the smallest c
     # the constructor allows, a long ℓ has an error floor m cannot clear.
     @test relerr(400, 1.2, 1.5) > 0.05
-    @test relerr(80, 4.0, 1.5) < 1e-8
+    @test relerr(80, 4.0, 1.5) < 1.0e-8
     # The smallest well-defined basis (n = 2, m = 1) still evaluates.
     @test length(as_turing_model(HilbertSpaceGP(; m = 1), 2)()) == 2
 end
@@ -279,10 +294,12 @@ end
         K = Φ * Diagonal(spectral_density(kernel, sqrt_λ, 1.0, ℓ)) * Φ'
         return sqrt(sum(diag(K)) / size(K, 1))
     end
-    for (kernel, at_02, at_01) in ((SqExponentialKernel(), 0.99, 0.89),
-        (Matern32Kernel(), 0.95, 0.84), (Matern52Kernel(), 0.97, 0.86))
-        @test implied_sd(gp.m, 0.2, kernel)≈at_02 atol=0.02
-        @test implied_sd(gp.m, 0.1, kernel)≈at_01 atol=0.02
+    for (kernel, at_02, at_01) in (
+            (SqExponentialKernel(), 0.99, 0.89),
+            (Matern32Kernel(), 0.95, 0.84), (Matern52Kernel(), 0.97, 0.86),
+        )
+        @test implied_sd(gp.m, 0.2, kernel) ≈ at_02 atol = 0.02
+        @test implied_sd(gp.m, 0.1, kernel) ≈ at_01 atol = 0.02
         # It is m, not the kernel, that is the problem: a larger basis recovers
         # the marginal variance at the same ℓ.
         @test implied_sd(60, 0.1, kernel) > implied_sd(gp.m, 0.1, kernel)
@@ -299,11 +316,23 @@ end
     # the case study reads them out of the chain.
     for (gp, weight) in ((HilbertSpaceGP(; m = 5), :β), (ExactGP(), :z))
         model = IDModel(
-            Renewal(; generation_time = Gamma(6.5, 0.62), rt = gp,
-                initialisation = Normal(log(50), 0.1)),
-            NegativeBinomialError())
-        names = Symbol.(string.(keys(VarInfo(as_turing_model(
-            model, fill(missing, 8), 8)))))
+            Renewal(;
+                generation_time = Gamma(6.5, 0.62), rt = gp,
+                initialisation = Normal(log(50), 0.1)
+            ),
+            NegativeBinomialError()
+        )
+        names = Symbol.(
+            string.(
+                keys(
+                    VarInfo(
+                        as_turing_model(
+                            model, fill(missing, 8), 8
+                        )
+                    )
+                )
+            )
+        )
         @test :ℓ ∈ names
         @test :σ ∈ names
         @test weight ∈ names
@@ -328,7 +357,7 @@ end
     @test length(mdl()) == n
 end
 
-@testitem "HilbertSpaceGP samples in the DEFAULT ℓ/m regime" tags=[:sample] begin
+@testitem "HilbertSpaceGP samples in the DEFAULT ℓ/m regime" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(8)
     gp = HilbertSpaceGP()
@@ -345,7 +374,7 @@ end
     @test all(isfinite, path)
 end
 
-@testitem "HilbertSpaceGP composes into a renewal and recovers the latent" tags=[:sample] begin
+@testitem "HilbertSpaceGP composes into a renewal and recovers the latent" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     using DynamicPPL: InitFromPrior
     using Statistics: cor, mean
@@ -355,16 +384,21 @@ end
     # nothing about recovery is testable.
     n, ndraws = 40, 150
     model = IDModel(
-        Renewal(; generation_time = Gamma(6.5, 0.62),
+        Renewal(;
+            generation_time = Gamma(6.5, 0.62),
             rt = HilbertSpaceGP(m = 12),
-            initialisation = Normal(log(50), 0.1)),
-        NegativeBinomialError(cluster_factor = HalfNormal(0.1)))
+            initialisation = Normal(log(50), 0.1)
+        ),
+        NegativeBinomialError(cluster_factor = HalfNormal(0.1))
+    )
     prior = as_turing_model(model, fill(missing, n), n)
     sim = fix(prior, (ℓ = 0.5, σ = 0.5))()
     y_obs = sim.generated_y_t
     posterior = as_turing_model(model, y_obs, n)
-    chain = sample(posterior, NUTS(0.9), ndraws;
-        initial_params = InitFromPrior(), progress = false)
+    chain = sample(
+        posterior, NUTS(0.9), ndraws;
+        initial_params = InitFromPrior(), progress = false
+    )
     gen = vec(generated_observables(posterior, y_obs, chain).generated)
     @test length(gen) == ndraws
     @test all(g -> length(g.Z_t) == n && all(isfinite, g.Z_t), gen)
@@ -414,19 +448,23 @@ end
     x = standardised_index(n)
     # σ ≠ 1 deliberately: at σ = 1 the model would agree with the Gram matrix
     # just as well if it scaled the kernel by σ rather than σ².
-    for (σ, kernel) in ((2.5, SqExponentialKernel()), (0.4, Matern32Kernel()),
-        (1.7, Matern52Kernel()))
+    for (σ, kernel) in (
+            (2.5, SqExponentialKernel()), (0.4, Matern32Kernel()),
+            (1.7, Matern52Kernel()),
+        )
         K_exact = kernelmatrix(σ^2 * with_lengthscale(kernel, ℓ), x)
         mdl = as_turing_model(ExactGP(; kernel = kernel), n)
-        L = reduce(hcat,
+        L = reduce(
+            hcat,
             begin
-                e = zeros(n)
-                e[j] = 1.0
-                fix(mdl, (ℓ = ℓ, σ = σ, z = e))()
-            end for j in 1:n)
+                    e = zeros(n)
+                    e[j] = 1.0
+                    fix(mdl, (ℓ = ℓ, σ = σ, z = e))()
+                end for j in 1:n
+        )
         # `ExactGP` adds a relative nugget to the diagonal, so it reproduces the
         # Gram matrix only up to that; everything else must be exact.
-        @test norm(L * L' - K_exact) / norm(K_exact) < 1e-5
+        @test norm(L * L' - K_exact) / norm(K_exact) < 1.0e-5
     end
 end
 
@@ -452,7 +490,7 @@ end
     end
 end
 
-@testitem "ExactGP samples in the DEFAULT regime" tags=[:sample] begin
+@testitem "ExactGP samples in the DEFAULT regime" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(12)
     gp = ExactGP()
@@ -476,7 +514,7 @@ end
     # covariance is only numerically indefinite — mid-chain, which kills the
     # sampler rather than returning a bad draw.
     n = 40
-    for σ in (0.0, 1e-8, 1.0, 1e3, 1e5), ℓ in (0.05, 0.5, 5.0)
+    for σ in (0.0, 1.0e-8, 1.0, 1.0e3, 1.0e5), ℓ in (0.05, 0.5, 5.0)
 
         path = fix(as_turing_model(ExactGP(), n), (ℓ = ℓ, σ = σ))()
         @test length(path) == n
@@ -502,8 +540,8 @@ end
     using Statistics: mean, std
     x = standardised_index(40)
     @test length(x) == 40
-    @test mean(x)≈0 atol=1e-12
-    @test std(x)≈1 atol=1e-12
+    @test mean(x) ≈ 0 atol = 1.0e-12
+    @test std(x) ≈ 1 atol = 1.0e-12
     # The half-range approaches √3 from below as n grows, which is what makes a
     # fixed length-scale prior meaningful across series lengths.
     @test maximum(abs, x) < sqrt(3)
@@ -512,7 +550,7 @@ end
     @test_throws AssertionError standardised_index(1)
 end
 
-@testitem "ExactGP composes into a renewal and recovers the latent" tags=[:sample] begin
+@testitem "ExactGP composes into a renewal and recovers the latent" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     using DynamicPPL: InitFromPrior
     using Statistics: cor, mean
@@ -522,15 +560,20 @@ end
     # Gaussian-process case study drives this same composition under Mooncake.
     n, ndraws = 30, 150
     model = IDModel(
-        Renewal(; generation_time = Gamma(6.5, 0.62), rt = ExactGP(),
-            initialisation = Normal(log(50), 0.1)),
-        NegativeBinomialError(cluster_factor = HalfNormal(0.1)))
+        Renewal(;
+            generation_time = Gamma(6.5, 0.62), rt = ExactGP(),
+            initialisation = Normal(log(50), 0.1)
+        ),
+        NegativeBinomialError(cluster_factor = HalfNormal(0.1))
+    )
     prior = as_turing_model(model, fill(missing, n), n)
     sim = fix(prior, (ℓ = 0.5, σ = 0.5))()
     y_obs = sim.generated_y_t
     posterior = as_turing_model(model, y_obs, n)
-    chain = sample(posterior, NUTS(0.9), ndraws;
-        initial_params = InitFromPrior(), progress = false)
+    chain = sample(
+        posterior, NUTS(0.9), ndraws;
+        initial_params = InitFromPrior(), progress = false
+    )
     gen = vec(generated_observables(posterior, y_obs, chain).generated)
     @test length(gen) == ndraws
     @test all(g -> length(g.Z_t) == n && all(isfinite, g.Z_t), gen)

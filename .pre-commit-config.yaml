@@ -42,18 +42,13 @@ repos:
     types: [text]
 #####
 # Julia
-# Due to lack of first-class Julia support, this needs a local Julia install
-#  with JuliaFormatter.jl available. Keep `rev` in step with the pinned
-#  JuliaFormatter in the formatter test environment and `.JuliaFormatter.toml`.
-- repo: https://github.com/domluna/JuliaFormatter.jl
-  rev: v2.10.1
+# Runic builds its own hook environment from `additional_dependencies`, so keep
+# the pinned version in step with the formatter test environment.
+- repo: https://github.com/fredrikekre/runic-pre-commit
+  rev: v2.2.0
   hooks:
-  - id: julia-formatter
-    # A package that ships scaffold templates (e.g. EpiAwarePackageTools) keeps
-    # them under `templates/`; some carry `{{PLACEHOLDER}}` tokens that are not
-    # parseable Julia until substituted, so exclude that tree from formatting.
-    # The directory is absent in a normal package, where this is a no-op.
-    exclude: '^templates/'
+  - id: runic
+    additional_dependencies: ['Runic@1.7.0']
 #####
 # Secrets
 -   repo: https://github.com/Yelp/detect-secrets

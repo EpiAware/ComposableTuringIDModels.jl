@@ -125,13 +125,15 @@ scenario_list = ADFixtures.scenarios()
 ## The registry's optional bookkeeping accessors (see the ADRegistry
 ## contract): a missing accessor means no broken or skipped scenarios.
 function _optional(name, default)
-    isdefined(ADFixtures, name) ? getfield(ADFixtures, name)() : default
+    return isdefined(ADFixtures, name) ? getfield(ADFixtures, name)() : default
 end
 global_broken = Set(String.(_optional(:broken_scenario_names, String[])))
 backend_broken = _optional(
-    :backend_broken_scenarios, Dict{String, Set{String}}())
+    :backend_broken_scenarios, Dict{String, Set{String}}()
+)
 backend_skip = _optional(
-    :backend_skip_scenarios, Dict{String, Set{String}}());
+    :backend_skip_scenarios, Dict{String, Set{String}}()
+);
 
 md"""
 ```@raw html
@@ -176,15 +178,20 @@ md"""
 """
 
 bench_parts = map(backend_entries) do entry
-    excluded = union(global_broken,
+    excluded = union(
+        global_broken,
         get(backend_broken, entry.name, Set{String}()),
-        get(backend_skip, entry.name, Set{String}()))
+        get(backend_skip, entry.name, Set{String}())
+    )
     scens = filter(s -> !(s.name in excluded), scenario_list)
-    part = DataFrame(DIT.benchmark_differentiation(
-        [entry.backend], scens;
-        logging = false,
-        benchmark_test = false,
-        benchmark_seconds = 0.5))
+    part = DataFrame(
+        DIT.benchmark_differentiation(
+            [entry.backend], scens;
+            logging = false,
+            benchmark_test = false,
+            benchmark_seconds = 0.5
+        )
+    )
     ## Label rows with the registry's backend name, which distinguishes
     ## configurations (e.g. Enzyme forward vs reverse) that share a package.
     part[!, :backend_label] .= entry.name
@@ -197,7 +204,7 @@ bench_long = @chain raw_bench begin
     @rtransform begin
         :backend = :backend_label
         :scenario = :scenario.name
-        :time_us = :time * 1e6
+        :time_us = :time * 1.0e6
         :bytes_kb = :bytes / 1024
     end
     @rsubset isfinite(:time_us) && isfinite(:bytes_kb)
@@ -207,11 +214,11 @@ end;
 ## The baseline every cost is divided by: ForwardDiff when the registry has
 ## it (the org standard), otherwise the registry's first backend.
 baseline = any(e -> e.name == "ForwardDiff", backend_entries) ?
-           "ForwardDiff" : first(backend_entries).name
+    "ForwardDiff" : first(backend_entries).name
 
 ref = @chain bench_long begin
     @rsubset :backend == baseline
-    @select :scenario :ref_time=:time_us :ref_bytes=:bytes_kb
+    @select :scenario :ref_time = :time_us :ref_bytes = :bytes_kb
 end
 
 rel = @chain bench_long begin
@@ -227,7 +234,7 @@ end;
 ## scenario sending `log` to -Inf.
 function geomean(x)
     pos = filter(>(0), x)
-    isempty(pos) ? NaN : exp(mean(log.(pos)))
+    return isempty(pos) ? NaN : exp(mean(log.(pos)))
 end
 
 n_total = length(scenario_list)
@@ -243,7 +250,8 @@ summary_table = @chain rel begin
         :backend => "Backend",
         :rel_time => "Relative time",
         :rel_bytes => "Relative allocations",
-        :scenarios => "Scenarios")
+        :scenarios => "Scenarios"
+    )
 end;
 
 md"""
@@ -269,15 +277,17 @@ md"""
 """
 
 plot_df = @chain rel begin
-    stack([:rel_time, :rel_bytes],
-        variable_name = :metric, value_name = :value)
+    stack(
+        [:rel_time, :rel_bytes],
+        variable_name = :metric, value_name = :value
+    )
     @rsubset isfinite(:value) && :value > 0
     @rtransform begin
         :metric = :metric == "rel_time" ? "Relative time" :
-                  "Relative allocations"
+            "Relative allocations"
         :family = first(split(:backend))
         :mode = occursin("reverse", lowercase(:backend)) ? "reverse" :
-                "forward"
+            "forward"
     end
 end
 
@@ -286,11 +296,12 @@ metric_order = sorter(["Relative time", "Relative allocations"])
 
 fig_relative = draw(
     data(plot_df) *
-    mapping(
+        mapping(
         :backend => "",
         :value => "Cost relative to $baseline",
-        col = :metric => metric_order) *
-    visual(BoxPlot);
+        col = :metric => metric_order
+    ) *
+        visual(BoxPlot);
     figure = (size = (1200, 500),),
     axis = (yscale = log10, xticklabelrotation = pi / 4),
     facet = (; linkyaxes = :none)
@@ -321,13 +332,14 @@ md"""
 
 fig_scenarios = draw(
     data(plot_df) *
-    mapping(
+        mapping(
         :scenario => "",
         :value => "Cost relative to $baseline",
         color = :family => "Backend family",
         marker = :mode => "Mode",
-        col = :metric => metric_order) *
-    visual(Scatter, markersize = 11);
+        col = :metric => metric_order
+    ) *
+        visual(Scatter, markersize = 11);
     figure = (size = (1600, 800),),
     axis = (yscale = log10, xticklabelrotation = pi / 4),
     facet = (; linkyaxes = :none)

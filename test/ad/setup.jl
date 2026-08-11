@@ -31,8 +31,10 @@
 
     # Drive a working backend over the registry's scenarios for a category.
     function test_working_backend(name; category::Symbol = :marginal)
-        EpiAwarePackageTools.test_working_backend(REG, name;
-            scenario_kwargs = (; category = category))
+        EpiAwarePackageTools.test_working_backend(
+            REG, name;
+            scenario_kwargs = (; category = category)
+        )
     end
 
     # Drive a partial backend (every scenario through `check_broken`).

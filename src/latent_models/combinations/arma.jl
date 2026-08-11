@@ -19,8 +19,10 @@ model = arma(; θ = [truncated(Normal(0.0, 0.02), -1, 1)],
 rand(as_turing_model(model, 10))
 ```
 "
-function arma(; init = [Normal()], damp = [truncated(Normal(0.0, 0.05), 0, 1)],
-        θ = [truncated(Normal(0.0, 0.05), -1, 1)], ϵ_t = HierarchicalNormal())
+function arma(;
+        init = [Normal()], damp = [truncated(Normal(0.0, 0.05), 0, 1)],
+        θ = [truncated(Normal(0.0, 0.05), -1, 1)], ϵ_t = HierarchicalNormal()
+    )
     ma = MA(; θ = θ, ϵ_t = ϵ_t)
     return AR(; damp = damp, init = init, ϵ_t = ma)
 end

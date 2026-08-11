@@ -28,7 +28,7 @@ rand(mdl)
 ```
 "
 struct HierarchicalNormal{R <: Real, S <: PriorLike, M <: Bool} <:
-       AbstractLatentModel
+    AbstractLatentModel
     "Mean of the normal distribution."
     mean::R
     "Prior for the standard deviation."
@@ -37,8 +37,10 @@ struct HierarchicalNormal{R <: Real, S <: PriorLike, M <: Bool} <:
     add_mean::M
 end
 
-function HierarchicalNormal(; mean::Real = 0.0,
-        std = truncated(Normal(0, 0.1), 0, Inf), add_mean::Bool = mean != 0)
+function HierarchicalNormal(;
+        mean::Real = 0.0,
+        std = truncated(Normal(0, 0.1), 0, Inf), add_mean::Bool = mean != 0
+    )
     return HierarchicalNormal(mean, std, add_mean)
 end
 HierarchicalNormal(std::PriorLike) = HierarchicalNormal(; std = std)

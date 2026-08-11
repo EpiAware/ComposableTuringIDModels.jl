@@ -18,22 +18,22 @@ end
 
 @testitem "RenewalStep with no modifiers matches the plain renewal core" begin
     using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
-                                    accumulate_scan, renewal_init_state
+        accumulate_scan, renewal_init_state
     rev_gen = reverse([0.2, 0.3, 0.5])
     core = ConstantRenewalStep(rev_gen)
     step = RenewalStep(core)   # no modifiers -> plain renewal
     Rt = [1.5, 1.2, 1.0, 0.8]
     init = renewal_init_state(step, 5.0, 0.1, length(rev_gen))
     init_core = renewal_init_state(core, 5.0, 0.1, length(rev_gen))
-    # Identical window and identical output: the default path is unchanged.
-    @test init.window == init_core
+    # Identical seed state and identical output: the default path is unchanged.
+    @test init == init_core
     @test accumulate_scan(step, init, Rt) == accumulate_scan(core, init, Rt)
 end
 
 @testitem "RenewalStep with depletion matches the reference recurrence" begin
     using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
-                                    SusceptibleDepletion, accumulate_scan,
-                                    renewal_init_state
+        SusceptibleDepletion, accumulate_scan,
+        renewal_init_state
     using LinearAlgebra: dot
     rev_gen = reverse([0.2, 0.3, 0.5])
     N = 1000.0
@@ -51,7 +51,7 @@ end
         S = S0
         ref = similar(Rt)
         for (k, r) in enumerate(Rt)
-            inc = max(S / N, 1e-6) * r * dot(window, rev_gen)
+            inc = max(S / N, 1.0e-6) * r * dot(window, rev_gen)
             S -= inc
             window = vcat(window[2:end], inc)
             ref[k] = inc
@@ -64,14 +64,15 @@ end
     @test only(init.substates) ≈ N          # seeded with the full population
     # Depletion never raises incidence above the unconstrained renewal path.
     plain = accumulate_scan(
-        core, (; val = last(init.window), window = init.window), Rt)
-    @test all(comp .<= plain .+ 1e-8)
+        core, (; val = last(init.window), window = init.window), Rt
+    )
+    @test all(comp .<= plain .+ 1.0e-8)
 end
 
 @testitem "RenewalStep with depletion is ForwardDiff-differentiable" begin
     using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
-                                    SusceptibleDepletion, accumulate_scan,
-                                    renewal_init_state
+        SusceptibleDepletion, accumulate_scan,
+        renewal_init_state
     using ForwardDiff
     rev_gen = reverse([0.2, 0.3, 0.5])
     N = 1000.0
@@ -89,11 +90,13 @@ end
 
 @testitem "Renewal composes modifiers onto a RenewalStep" begin
     using ComposableTuringIDModels: RenewalStep, ConstantRenewalStep,
-                                    SusceptibleDepletion
+        SusceptibleDepletion
     gen_int = [0.2, 0.3, 0.5]
     plain = Renewal(gen_int; rt = RandomWalk())
-    depleting = Renewal(gen_int, SusceptibleDepletion(1000.0);
-        rt = RandomWalk())
+    depleting = Renewal(
+        gen_int, SusceptibleDepletion(1000.0);
+        rt = RandomWalk()
+    )
     @test plain.recurrent_step isa RenewalStep
     @test isempty(plain.recurrent_step.modifiers)
     @test depleting.recurrent_step isa RenewalStep
@@ -110,8 +113,10 @@ end
     # Pin R_t high and constant so, without depletion, incidence grows unbounded.
     logR = log(2.0)
     plain = Renewal(gen_int; rt = FixedIntercept(logR))
-    depleting = Renewal(gen_int, SusceptibleDepletion(500.0);
-        rt = FixedIntercept(logR))
+    depleting = Renewal(
+        gen_int, SusceptibleDepletion(500.0);
+        rt = FixedIntercept(logR)
+    )
     fixinit = (init_incidence = log(1.0),)
     I_plain = fix(as_turing_model(plain, 40), fixinit)().I_t
     I_dep = fix(as_turing_model(depleting, 40), fixinit)().I_t
@@ -124,14 +129,17 @@ end
     @test I_dep[end] < maximum(I_dep)
 end
 
-@testitem "Renewal with susceptible depletion samples under NUTS" tags=[:sample] begin
+@testitem "Renewal with susceptible depletion samples under NUTS" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(482)
     gen_int = [0.2, 0.3, 0.5]
     model = IDModel(
-        Renewal(gen_int, SusceptibleDepletion(1000.0);
-            rt = RandomWalk(), initialisation = Normal()),
-        PoissonError())
+        Renewal(
+            gen_int, SusceptibleDepletion(1000.0);
+            rt = RandomWalk(), initialisation = Normal()
+        ),
+        PoissonError()
+    )
     y = as_turing_model(model, missing, 20)().generated_y_t
     # A few NUTS steps exercise the composed-step gradient path (ForwardDiff).
     chn = sample(as_turing_model(model, y, 20), NUTS(), 30; progress = false)
