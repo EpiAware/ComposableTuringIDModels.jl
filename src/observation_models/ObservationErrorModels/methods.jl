@@ -36,13 +36,9 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
     )
 
     pad_Y_t = Y_t .+ 1.0e-6
-    # Read each sampled prior at step `i` via `_at`, so a scalar prior stays
-    # constant while a length-`n` prior (drawn from a process slot) makes the
-    # error parameter time-varying — one closure serves both loop bodies below.
-    dist(i) = observation_error(
-        obs_model, pad_Y_t[i], map(p -> _at(p, i), values(priors))...
-    )
-
+    # A concrete callable rather than a closure: a closure defined in a model
+    # body captures boxed locals, costing a dynamic dispatch per scored entry.
+    dist = _ErrorDist(obs_model, pad_Y_t, priors)
     y = y_t isa NamedTuple ? y_t.y : y_t
     if y isa MissingObservations
         diff_t = length(y.value) - length(Y_t)
@@ -87,7 +83,17 @@ end
 #
 # Returns the scored series (a plain `Vector`, the observed entries as given
 # and the rest overwritten with their fresh draws) and the updated `VarInfo`.
-function _score_missing_observations!!(context, varinfo, y::MissingObservations, diff_t, Y_t, dist)
+function (d::_ErrorDist)(i)
+    return observation_error(
+        d.obs_model, d.pad_Y_t[i], map(p -> _at(p, i), values(d.priors))...
+    )
+end
+
+(d::_TrialDist)(i) = observation_error(d.obs_model, d.p_t[i], d.N_t[i])
+
+function _score_missing_observations!!(
+        context, varinfo, y::MissingObservations, diff_t, Y_t, dist
+    )
     n = length(y.value)
     # A sampled draw's type follows the AD backend (e.g. a `ForwardDiff.Dual`,
     # not a `Float64`), which is not known until `tilde_assume!!` returns, so

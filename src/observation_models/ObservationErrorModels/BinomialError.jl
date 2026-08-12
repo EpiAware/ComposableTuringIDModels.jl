@@ -69,7 +69,7 @@ end
     # `Y_t` is the success probability; clamp away from 0/1 to avoid a degenerate
     # likelihood, mirroring the count families' `Y_t .+ 1e-6` nudge.
     p_t = clamp.(Y_t, 1.0e-6, 1 - 1.0e-6)
-    dist(i) = observation_error(obs_model, p_t[i], N_t[i])
+    dist = _TrialDist(obs_model, p_t, N_t)
 
     y = y_t.y
     if y isa MissingObservations
