@@ -1,19 +1,16 @@
 # MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 #
 # AD-harness driver. Wires the shared EpiAwarePackageTools AD harness to the
-# package's own AD-fixture registry (`ADFixtures` by convention), then exposes
-# `test_working_backend` / `test_partial_backend` / `check_broken` as thin
-# locals the scenario test items call. The registry — the actual scenarios,
-# backend list, and broken/skip bookkeeping — is PACKAGE-OWNED (see
-# `test/ad/scenarios.jl` and the package's `test/ADFixtures` registry); only
-# this wiring is standard.
+# package's own AD-fixture registry (`ADFixtures` by convention), then
+# exposes `test_working_backend` / `test_partial_backend` / `check_broken`
+# as thin locals the scenario test items call. The registry itself (the
+# scenarios, backend list, broken/skip bookkeeping) is PACKAGE-OWNED — see
+# `test/ad/scenarios.jl` and `test/ADFixtures`; only this wiring is standard.
 #
-# This file is force-managed: `update()` overwrites it with the generic driver
-# on every sync. A package whose ADFixtures registry predates the current
-# `ADRegistry` contract (its `scenarios` does not accept `category`) can keep a
-# package-owned driver while it migrates by adding the opt-out marker described
-# in `EpiAwarePackageTools.update`'s docstring (kit #162); `update()` then
-# preserves this file instead of clobbering it.
+# Force-managed: `update()` overwrites it on every sync. A package whose
+# `ADFixtures` registry predates the current `ADRegistry` contract can keep a
+# package-owned driver while it migrates via the opt-out marker described in
+# `EpiAwarePackageTools.update`'s docstring (#162).
 
 @testsnippet ADHelpers begin
     using ADTypes

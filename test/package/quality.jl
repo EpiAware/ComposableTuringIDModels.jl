@@ -1,12 +1,11 @@
 # MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 # Re-run `scaffold(pkgdir(MyPackage))` to update; the scheduled template-sync
-# regenerates this file. Package-specific inputs (ignore lists, extension names,
-# broken quarantines) live in the package-owned `qa_config.jl` this file reads.
+# regenerates this file. Package-specific inputs (ignore lists, extension
+# names, broken quarantines) live in the package-owned `qa_config.jl`.
 #
 # Standard package-quality testset. Routes every generic QA check through the
-# shared EpiAwarePackageTools helpers over the package's own module. The package
-# module and the QA config are supplied by `qa_config.jl`, which must define a
-# `QA_CONFIG` NamedTuple (see the template for its fields).
+# shared EpiAwarePackageTools helpers over the package's own module, supplied
+# by `qa_config.jl`'s `QA_CONFIG` NamedTuple (see the template for fields).
 
 @testitem "Quality: Aqua" tags = [:quality] begin
     using EpiAwarePackageTools
@@ -39,11 +38,9 @@ end
 @testitem "Quality: README sections" tags = [:quality] begin
     using EpiAwarePackageTools
     include(joinpath(@__DIR__, "qa_config.jl"))
-    # `readme` is a newer package-owned `QA_CONFIG` field; `qa_config.jl` is
-    # package-owned (not re-applied by `update`), so an adopter predating it has
-    # no `readme` key. Default to the repo-root README with the standard section
-    # requirements (#163) rather than erroring on the missing field. Warn, so a
-    # typoed key does not quietly revert to the defaults (#188).
+    # `readme` is a newer `QA_CONFIG` field; an adopter predating it has none.
+    # Default to the repo-root README with standard sections (#163) rather
+    # than erroring; warn so a typoed key doesn't silently revert (#188).
     cfg = if hasproperty(QA_CONFIG, :readme)
         QA_CONFIG.readme
     else
@@ -67,7 +64,20 @@ end
 @testitem "Quality: formatting" tags = [:quality] begin
     using EpiAwarePackageTools
     include(joinpath(@__DIR__, "qa_config.jl"))
-    test_formatting(QA_CONFIG.mod)
+    # `formatter_env` is a newer `QA_CONFIG` field; an adopter predating it
+    # has none. Fall back to the in-process check, which floats with the
+    # shared test environment's resolved Runic, rather than erroring; warn
+    # so a typoed key doesn't silently revert (#188, #321).
+    env = if hasproperty(QA_CONFIG, :formatter_env)
+        QA_CONFIG.formatter_env
+    else
+        @warn "QA_CONFIG has no `formatter_env` field; checking formatting " *
+            "in-process against the shared test environment, whose " *
+            "Runic version floats with the CI Julia in use. Add one to " *
+            "qa_config.jl to pin it via the isolated formatter env."
+        nothing
+    end
+    test_formatting(QA_CONFIG.mod; env = env)
 end
 
 @testitem "Quality: linting (JET)" tags = [:quality] begin

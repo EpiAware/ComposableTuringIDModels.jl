@@ -1,4 +1,4 @@
-# The renewal accumulation step (#48).
+# The renewal accumulation step.
 #
 # `RenewalStep` is the renewal step: an internal `ConstantRenewalStep` force-of-
 # infection core with modifiers composing on top. With no modifiers it matches the

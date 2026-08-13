@@ -23,4 +23,6 @@ ComposableTuringIDModels = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
 [sources]
 ADFixtures = {path = "../ADFixtures"}
 ComposableTuringIDModels = {path = "../.."}
-EpiAwarePackageTools = {url = "https://github.com/EpiAware/EpiAwarePackageTools.jl", rev = "main"}
+
+[compat]
+EpiAwarePackageTools = "0.3, 0.4"

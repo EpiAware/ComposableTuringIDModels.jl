@@ -101,12 +101,12 @@ end
     @test θ[1] != θ[2]
 end
 
-@testitem "bare latent-model-as-prior threads under a linked log-density (#80)" begin
+@testitem "bare latent-model-as-prior threads under a linked log-density" begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     using DynamicPPL: LogDensityFunction, VarInfo, link, getlogjoint
     import LogDensityProblems as LDP
     Random.seed!(180)
-    # The exact #80 repro: a bare `AR(damp = RandomWalk())` (now a time-varying
+    # A bare `AR(damp = RandomWalk())` is a time-varying
     # coefficient path) used to sample via `rand` but ERROR as a linked
     # log-density, because the damping RandomWalk's inner `std`/`ϵ_t`/`rw_init`
     # collided with the AR innovation's. The prior slot namespaces the whole

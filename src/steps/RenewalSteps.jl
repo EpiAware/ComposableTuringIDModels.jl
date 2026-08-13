@@ -92,8 +92,12 @@ function renewal_pressure(
     )
     last_lag = size(window, 2)
     return sum(
-        view(K, :, :, i) * view(window, :, last_lag - i + 1)
-            for i in axes(K, 3)
+        vec(
+                sum(
+                    view(K, :, :, i) .*
+                    reshape(view(window, :, last_lag - i + 1), 1, :); dims = 2
+                )
+            ) for i in axes(K, 3)
     )
 end
 

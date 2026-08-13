@@ -1,5 +1,5 @@
 # Tests for the ImportedCases renewal modifier and the generic pre-scan
-# modifier seam it uses (issue #189).
+# modifier seam it uses.
 
 @testitem "ImportedCases struct carries the importation prior" begin
     using ComposableTuringIDModels, Distributions

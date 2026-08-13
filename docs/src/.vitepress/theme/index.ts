@@ -11,17 +11,16 @@ import {
 } from '@nolebase/vitepress-plugin-enhanced-readabilities/client'
 
 import VersionPicker from "@/VersionPicker.vue"
-// GitHub-stars navbar widget (live star count + repo link). Mirrors
-// CensoredDistributions.jl.
+// GitHub-stars navbar widget (live star count + repo link).
 import StarUs from "@/StarUs.vue"
 
 import { enhanceAppWithTabs } from 'vitepress-plugin-tabs/client'
 
 import '@nolebase/vitepress-plugin-enhanced-readabilities/client/style.css'
 import './style.css'
-// DocumenterVitepress writes `docstrings.css` next to this file at build time;
-// importing it styles the API reference docstring blocks (matches
-// CensoredDistributions.jl). Without it the `@docs` blocks render unstyled.
+// DocumenterVitepress writes `docstrings.css` next to this file at build
+// time; importing it styles the API reference docstring blocks. Without it
+// the `@docs` blocks render unstyled.
 import './docstrings.css'
 
 export const Theme: ThemeConfig = {

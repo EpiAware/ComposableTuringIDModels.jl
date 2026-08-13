@@ -128,7 +128,7 @@ end
     hand_I = as_turing_model(hand_proc, nothing)().I_t
 
     @test length(cat_I) == length(hand_I)
-    # #46 reported agreement to ≈3.5e-9 at matched priors/seed.
+    # The two paths agree to about 3.5e-9 at matched priors and seed.
     @test maximum(abs.(cat_I .- hand_I)) < 1.0e-6
     @test isapprox(cat_I, hand_I; atol = 1.0e-7)
 end
@@ -210,7 +210,7 @@ end
     y_obs = sim.generated_y_t
     @test length(y_obs) == n_days + 1
 
-    # ForwardDiff is the supported AD path for ODE infection models (#46);
+    # ForwardDiff is the supported AD path for ODE infection models;
     # Mooncake-driven NUTS through the solver is a separate, pre-existing gap.
     # `sample` returns a FlexiChains chain, indexed by variable name directly.
     # This exercises symbolic-map remake carrying ForwardDiff `Dual`s.

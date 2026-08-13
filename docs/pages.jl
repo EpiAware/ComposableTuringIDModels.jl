@@ -26,7 +26,7 @@ pages = [
         "Internal API" => "lib/internals.md",
     ],
     "Benchmarks" => [
-        "Overview" => "benchmarks.md",
-        "Automatic differentiation" => "getting-started/tutorials/ad-backends.md",
+        "Performance over time" => "benchmarks/over-time.md",
+        "AD comparison" => "benchmarks/ad-comparison.md",
     ],
 ]

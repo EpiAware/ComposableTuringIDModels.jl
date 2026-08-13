@@ -10,15 +10,19 @@ const LIGHT_TUTORIALS = String["renewal-modifiers.jl"]
 
 # Names are relative to `TUTORIALS_SUBDIR`: `HEAVY_TUTORIALS` holds the Literate
 # `.jl` source names, `TUTORIAL_STUBS` is keyed by the rendered `.md` names.
-const HEAVY_TUTORIALS = String["ad-backends.jl"]
+const HEAVY_TUTORIALS = String[]
 
 const TUTORIALS_SUBDIR = joinpath("getting-started", "tutorials")
 
-const TUTORIAL_STUBS = Pair{String, String}[
-    "ad-backends.md" => "# [Automatic differentiation backends](@id ad-backends)",
-]
+const TUTORIAL_STUBS = Pair{String, String}[]
 
 const FORCE_STUB_TUTORIALS = String[]
+
+const HEAVY_BENCHMARKS = String["ad-comparison.jl"]
+
+const BENCHMARK_STUBS = Pair{String, String}[
+    "ad-comparison.md" => "# [AD backend comparison](@id ad-comparison)\n\n## [Choosing a backend](@id ad-backends)",
+]
 
 const ORG_BRANDING = true
 

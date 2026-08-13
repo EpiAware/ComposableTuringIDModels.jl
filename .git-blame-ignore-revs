@@ -1,2 +1,13 @@
+# managed:start
+# MANAGED by EpiAwarePackageTools.scaffold — do not edit between
+# the markers. Add a reformat commit's SHA after the closing
+# marker — it is preserved across updates.
+# Formatting-only commits (e.g. a Runic layout pass) touch every line without
+# changing behaviour, burying the real last-change commit under `git blame`.
+# List such a commit's SHA below this block to have it skipped. Configure git
+# to use this file once, locally:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# managed:end
+
 # Reformat with Runic (no behaviour change)
 2dc7031665d8e24f50e4d10a4a34558402ae988d

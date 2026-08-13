@@ -22,16 +22,13 @@ jobs:
       - name: Check if version changed
         id: version-check
         run: |
-          # Get the version from current commit
           CURRENT_VERSION=$(grep '^version = ' Project.toml | sed 's/version = "\(.*\)"/\1/')
           echo "Current version: $CURRENT_VERSION"
 
-          # Get the version from previous commit
           git show HEAD~1:Project.toml > Project.toml.prev
           PREV_VERSION=$(grep '^version = ' Project.toml.prev | sed 's/version = "\(.*\)"/\1/')
           echo "Previous version: $PREV_VERSION"
 
-          # Check if version changed
           if [ "$CURRENT_VERSION" = "$PREV_VERSION" ]; then
             echo "Version unchanged, need to increment"
             echo "needs_increment=true" >> $GITHUB_OUTPUT

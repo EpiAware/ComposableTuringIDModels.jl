@@ -387,7 +387,7 @@ end
 @testitem "ReportTriangle observed row-sums reconcile with RightTruncate marginal" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(74)
-    # #50's consistency check: the observed row-sums of the triangle are the
+    # Consistency check: the observed row-sums of the triangle are the
     # marginal that the right-truncation (CDF-scaling) nowcast conditions on. With
     # `now = n`, reference day `t` has age `a = n - t` and observed delays
     # `d = 0 … a`, so its expected observed row-sum is

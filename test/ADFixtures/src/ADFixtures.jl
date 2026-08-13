@@ -300,6 +300,68 @@ function _models()
         )
     )
 
+    # --- ODE infection family ---------------------------------------------------
+    # Differentiating through an ODE solve: the parameter model draws `(u0, p)`,
+    # the template problem is remade and solved. `CatalystODEParams` needs the
+    # Catalyst extension, which this environment does not load.
+    sir_params = SIRParams(;
+        tspan = (0.0, 7.0),
+        infectiousness = LogNormal(log(0.4), 0.1),
+        recovery_rate = LogNormal(log(0.2), 0.1),
+        initial_prop_infected = Beta(2, 98)
+    )
+    sir_process = ODEProcess(;
+        params = sir_params,
+        sol2infs = sol -> 1_000.0 .* sol[2, :],
+        solver_options = Dict(:saveat => 1.0)
+    )
+    sir = IDModel(sir_process, TransformObservationModel(PoissonError()))
+
+    # --- CombineInfections into a weighted Split --------------------------------
+    # Two separate infection processes stacked into one `strata x time` series,
+    # then aggregated many-to-one through a weight map (the `StrataMap`
+    # projection `Split` builds from it).
+    north = DirectInfections(;
+        Z = RandomWalk(), initialisation = Normal(log(30.0), 0.2)
+    )
+    south = DirectInfections(;
+        Z = RandomWalk(), initialisation = Normal(log(15.0), 0.2)
+    )
+    combine_strata = IDModel(
+        CombineInfections([north, south], ["north", "south"]),
+        Split((total = NegativeBinomialError(),), [1.0 1.0])
+    )
+
+    # --- SusceptibleDepletion on its own ----------------------------------------
+    # The depletion modifier alone: it samples nothing, and scales incidence by
+    # the remaining susceptible fraction inside the recursion.
+    deplete_only = IDModel(
+        Renewal(
+            gen_int, SusceptibleDepletion(3_000.0);
+            rt = RandomWalk(), initialisation = Normal()
+        ),
+        NegativeBinomialError()
+    )
+
+    # --- per-pair generation interval -------------------------------------------
+    # A coupled two-stratum renewal whose mixing is a `strata x strata x lags`
+    # array, so each pair carries its own interval.
+    K_mix = [0.9 0.1; 0.2 0.8]
+    pairwise = IDModel(
+        Renewal(;
+            generation_time = gen_int,
+            rt = Stratify(RandomWalk(), Hierarchy(; across = IID(Normal(0.0, 0.3)))),
+            initialisation = Normal(log(20.0), 0.3),
+            mixing = pairwise_gen_int(K_mix, gen_int)
+        ),
+        NegativeBinomialError()
+    )
+
+    # --- the `arima()` helper -----------------------------------------------------
+    # Differencing over an `arma()` inner process, so two nested scans. The
+    # function is qualified because a local `arima` names the plain-AR variant.
+    arima_helper = as_turing_model(ComposableTuringIDModels.arima(), 8)
+
     y_direct = sim(direct, n, 101)
     y_renewal = sim(renewal, n, 102)
     y_modifiers = sim(modifiers, n, 103)
@@ -320,6 +382,10 @@ function _models()
     y_split = sim(split, n, 116)
     y_recordexp = sim(recordexp, n, 117)
     y_prefixmods = sim(prefixmods, n, 118)
+    y_sir = sim(sir, 8, 130)
+    y_combine = sim(combine_strata, 10, 131)
+    y_deplete = sim(deplete_only, n, 132)
+    y_pairwise = sim(pairwise, (2, 8), 133)
 
     # --- coupled / stratified 'patch' models (the patch-models tutorial) -----
     # Stratified latent seams (2-D `Dims{2}` shapes): a shared `RandomWalk` with
@@ -415,6 +481,7 @@ function _models()
         ("ConcatLatentModels latent logjoint", concat),
         ("CombineLatentModels latent logjoint", combine),
         ("Hierarchy latent logjoint", hierarchy),
+        ("arima() composition-helper latent logjoint", arima_helper),
         # prior slots
         ("AR vector-prior latent logjoint", ar_vec),
         ("AR latent-model-as-prior latent logjoint", ar_lat),
@@ -520,6 +587,26 @@ function _models()
         (
             "Renewal+StratifiedImportedCases posterior",
             as_turing_model(patch_imports, y_imports, strat_panel),
+        ),
+        # ODE infection family
+        (
+            "SIR ODEProcess+Poisson posterior",
+            as_turing_model(sir, y_sir, 8),
+        ),
+        # CombineInfections + matrix-weight Split/StrataMap
+        (
+            "CombineInfections+Split many-to-one posterior",
+            as_turing_model(combine_strata, y_combine, 10),
+        ),
+        # SusceptibleDepletion alone
+        (
+            "Renewal+SusceptibleDepletion posterior",
+            as_turing_model(deplete_only, y_deplete, n),
+        ),
+        # per-pair generation interval mixing
+        (
+            "Renewal+PairwiseGenInt mixing posterior",
+            as_turing_model(pairwise, y_pairwise, (2, 8)),
         ),
     ]
 end
@@ -661,7 +748,23 @@ correctness sweep runs over, so that backend stops being tested.
 Add an entry only with a measured failure.
 """
 function backend_broken_scenarios()
-    return Dict{String, Set{String}}()
+    # Reverse-mode differentiation through an ODE solve needs
+    # SciMLSensitivity, which the package does not depend on; the two
+    # non-ForwardDiff forward modes fail inside their own compilers. Only
+    # ForwardDiff carries the ODE infection family.
+    ode = "SIR ODEProcess+Poisson posterior"
+    reverse_only = Set([ode])
+    return Dict{String, Set{String}}(
+        "ReverseDiff (tape)" => reverse_only,
+        "ReverseDiff (compiled)" => reverse_only,
+        "Mooncake reverse" => reverse_only,
+        "Mooncake forward" => reverse_only,
+        "Enzyme reverse" => reverse_only,
+        # Enzyme forward returns a finite but wrong gradient here, every entry
+        # offset by the same constant. Every other backend agrees with the
+        # reference, so the fault is in the backend rather than the model.
+        "Enzyme forward" => Set([ode, "CombineInfections+Split many-to-one posterior"]),
+    )
 end
 
 "Per-backend scenario names too unstable to even run (segfault/hang)."
