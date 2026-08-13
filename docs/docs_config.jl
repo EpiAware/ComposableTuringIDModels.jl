@@ -16,7 +16,14 @@ const TUTORIALS_SUBDIR = joinpath("getting-started", "tutorials")
 
 const TUTORIAL_STUBS = Pair{String, String}[]
 
-const FORCE_STUB_TUTORIALS = String[]
+## `ad-comparison.jl` benchmarks every (backend, scenario) pair in-process,
+## serially. This PR's own backend/scenario expansion (4 -> 7 backends,
+## 32 -> 43 scenarios) pushed that past 2h without finishing (#232). Stubbed
+## here as an interim measure pending an artefact-based redesign that reads
+## pre-computed per-backend CI benchmark output instead of running it live
+## during the docs build -- tracked upstream in EpiAwarePackageTools.jl.
+## Drop this entry once that lands and the page is cheap again.
+const FORCE_STUB_TUTORIALS = String["ad-comparison.jl"]
 
 const HEAVY_BENCHMARKS = String["ad-comparison.jl"]
 
