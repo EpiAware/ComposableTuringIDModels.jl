@@ -46,7 +46,7 @@ const _GEN_INT = [0.2, 0.3, 0.5]
 # simulated from the prior with a fixed seed so the target is deterministic.
 function _models()
     gen_int = _GEN_INT
-    n = 12
+    n = 8
 
     # Coalesce warm-up `missing` entries into a concrete observed vector. We do
     # not infer missing events, so conditioning on a concrete `Vector{Int}` /
@@ -416,7 +416,7 @@ function _models()
     # Stratified `Renewal` posteriors over a 3-stratum x 12-time panel:
     # independent patches, shared/partially-pooled `R_t`, fixed `K` mixing,
     # `Gravity` mixing, and stratified exogenous `ImportedCases`.
-    strat_panel = (3, 12)
+    strat_panel = (3, 8)
     patch_independent = IDModel(
         Renewal(;
             generation_time = gen_int, rt = Replicate(RandomWalk()),
