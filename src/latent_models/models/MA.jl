@@ -39,9 +39,9 @@ struct MA{C <: PriorLike, Q <: Int, E <: PriorLike} <: AbstractLatentModel
     ϵ_t::E
 
     function MA(θ, q::Int, ϵ_t)
-        @assert q>0 "q must be greater than 0"
+        @assert q > 0 "q must be greater than 0"
         _assert_prior_length(θ, q, "θ")
-        new{typeof(θ), typeof(q), typeof(ϵ_t)}(θ, q, ϵ_t)
+        return new{typeof(θ), typeof(q), typeof(ϵ_t)}(θ, q, ϵ_t)
     end
 end
 
@@ -49,15 +49,17 @@ function MA(θ::Distribution; q::Int = 1, ϵ_t = HierarchicalNormal())
     return MA(; θ = fill(θ, q), ϵ_t = ϵ_t)
 end
 
-function MA(; θ = [truncated(Normal(0.0, 0.05), -1, 1)],
-        ϵ_t = HierarchicalNormal())
+function MA(;
+        θ = [truncated(Normal(0.0, 0.05), -1, 1)],
+        ϵ_t = HierarchicalNormal()
+    )
     q = _prior_order(θ)
     return MA(θ, q, _path_prior(ϵ_t))
 end
 
-@model function as_turing_model(model::MA, n)
+@model function as_turing_model(model::MA, n::Int)
     q = model.q
-    @assert n>q "n must be longer than the order of the moving average process"
+    @assert n > q "n must be longer than the order of the moving average process"
     if q == 1
         # Order 1: draw the coefficient through the single seam — a `Distribution`
         # gives a scalar (constant), a process a length-`(n-1)` path. MA is not
@@ -73,6 +75,7 @@ end
     # `reverse(ϵ_t[1:q])` puts `ϵ_q` first, pairing `θ[1]` with the most recent
     # innovation. `get_state` reverses the output back to natural order.
     ma = accumulate_scan(
-        MAStep(θ), (; val = 0.0, state = reverse(ϵ_t[1:q])), ϵ_t[(q + 1):end])
+        MAStep(θ), (; val = 0.0, state = reverse(ϵ_t[1:q])), ϵ_t[(q + 1):end]
+    )
     return ma
 end

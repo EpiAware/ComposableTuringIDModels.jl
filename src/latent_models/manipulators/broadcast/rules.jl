@@ -15,7 +15,7 @@ struct RepeatEach <: AbstractBroadcastRule end
 broadcast_n(::RepeatEach, n, period) = period
 
 function broadcast_rule(::RepeatEach, latent, n, period)
-    @assert length(latent)==period "length(latent) must equal period"
+    @assert length(latent) == period "length(latent) must equal period"
     broadcast_latent = repeat(latent; outer = ceil(Int, n / period))
     return broadcast_latent[1:n]
 end
@@ -35,7 +35,7 @@ struct RepeatBlock <: AbstractBroadcastRule end
 broadcast_n(::RepeatBlock, n, period) = ceil(Int, n / period)
 
 function broadcast_rule(::RepeatBlock, latent, n, period)
-    @assert n<=period * length(latent) "n must be ≤ period * length(latent)"
+    @assert n <= period * length(latent) "n must be ≤ period * length(latent)"
     broadcast_latent = [latent[j] for j in 1:length(latent) for _ in 1:period]
     return broadcast_latent[1:n]
 end

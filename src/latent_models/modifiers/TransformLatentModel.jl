@@ -6,7 +6,8 @@ Apply a transformation function to the output of an inner latent model.
 # Arguments
 
   - `model`: the inner latent model whose output is transformed.
-  - `n`: the length of the latent series to generate.
+  - `n`: the shape to generate — a length or an `(n_strata, n_time)` shape,
+    whatever the inner model accepts.
 
 # Examples
 ```@example TransformLatentModel
@@ -26,7 +27,7 @@ independent draws. It is composed through [`as_turing_submodel`](@ref).
   - `transform`: the transformation function applied to the latent vector.
 "
 struct TransformLatentModel{M <: PriorLike, F <: Function} <:
-       AbstractLatentModel
+    AbstractLatentModel
     "The latent model to transform."
     model::M
     "The transformation function."
@@ -36,13 +37,23 @@ struct TransformLatentModel{M <: PriorLike, F <: Function} <:
         # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
         # an `Intercept` (a constant inner path), never left as a scalar.
         wrapped = _path_prior(model)
-        new{typeof(wrapped), F}(wrapped, transform)
+        return new{typeof(wrapped), F}(wrapped, transform)
     end
 end
 
 TransformLatentModel(; model, transform) = TransformLatentModel(model, transform)
 
-@model function as_turing_model(model::TransformLatentModel, n)
+# `TransformLatentModel` wraps whatever its inner model returns, so it serves
+# both a length-`n` path and an `(n_strata, n_time)` shape. The two methods
+# below delegate to one shared `@model`, which avoids both the duplication and
+# a dispatch ambiguity against the `AbstractPriorModel`/`Dims{2}` guard.
+@model function _transform_latent(model::TransformLatentModel, n)
     untransformed ~ as_turing_submodel(model.model, n)
     return model.transform(untransformed)
+end
+function as_turing_model(model::TransformLatentModel, n::Int)
+    return _transform_latent(model, n)
+end
+function as_turing_model(model::TransformLatentModel, n::Dims{2})
+    return _transform_latent(model, n)
 end

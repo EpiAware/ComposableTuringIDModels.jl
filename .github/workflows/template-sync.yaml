@@ -1,22 +1,24 @@
 # MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 #
-# Scheduled template-sync. Re-applies the managed EpiAware standard
-# (`update("."; ad = true, benchmarks = true, downgrade_compat = true)`) and, when the
-# committed infra has drifted from
-# the kit, opens (or refreshes) a PR with the refresh. This is the auto-refresh
-# half of the self-sync loop: the `self-drift` check guards every push/PR, and
-# this workflow proactively pulls the newest standard on a schedule so a repo
-# never silently falls behind.
+# Scheduled template-sync. Re-applies the managed EpiAware standard and, when
+# committed infra has drifted from the kit, opens (or refreshes) a PR with
+# the refresh, so a repo never silently falls behind.
 #
-# Refs are preserved: `update` keeps whatever reusable-workflow SHA Dependabot
-# has pinned in this repo, so a sync never reverts a Dependabot bump — it only
-# re-applies the rest of the managed standard.
+# Refs only move forwards: `update` keeps whatever reusable-workflow SHA
+# Dependabot has pinned, so a sync never reverts a Dependabot bump, and
+# `freshen_reusable_refs` (below) advances a pin that has fallen behind the
+# workflow it wraps.
 #
-# The sync only ever pushes to a branch it opened itself (#215), so it does no
-# work on a pull request. The `pull_request` trigger is kept only so the `sync`
-# check still reports on a Dependabot PR — as a clean green no-op, not the red
-# it used to be under Dependabot's restricted token (#256). Drift on a
-# Dependabot bump is caught by the next scheduled run.
+# The sync only ever pushes to a branch it opened itself (#215), so it does
+# no work on a pull request. The `pull_request` trigger is kept only so the
+# `sync` check still reports (clean, green, no-op) on a Dependabot PR rather
+# than red under Dependabot's restricted token (#256). Drift on a Dependabot
+# bump is caught by the next scheduled run.
+#
+# A scheduled run has no audience, so a failure that needs a human is
+# reported as an issue on this repo rather than a red X nobody opens (#352).
+# One issue, labelled `template-sync`, is edited in place on each failing run
+# and closed again by the first clean run.
 
 name: Template sync
 
@@ -25,8 +27,8 @@ on:
     # Weekly, Monday 04:00 UTC.
     - cron: '0 4 * * 1'
   workflow_dispatch:
-  # Present only so the `sync` check reports (green) on a Dependabot PR; the job
-  # is a no-op on any pull request (see the job's skip step, #256).
+  # Present only so `sync` reports green on a Dependabot PR; the job is a
+  # no-op on any pull request (see the skip step below, #256).
   pull_request:
 
 concurrency:
@@ -36,21 +38,21 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  # issues: write so a failing run can open, edit and close the single
+  # `template-sync` tracking issue.
+  issues: write
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      # On a Dependabot PR this job runs under Dependabot's restricted context
-      # (a read-only token, no access to Actions secrets). Every real step below
-      # — installing the kit, `update`, opening a PR — needs that
-      # access, so the job errored and every Dependabot PR carried a spurious
-      # red `sync` (#256). It also could never have *fixed* anything from a PR:
-      # the sync only pushes to a branch it opened itself (#215). So on a PR the
-      # job is a clean no-op — a green check, no work — and the weekly scheduled
-      # run is what actually detects drift and opens a `chore/template-sync` PR.
-      # Kept as a running (green) job rather than an `if`-skipped one so a
-      # required-check gate on `sync` stays satisfied on Dependabot PRs.
+      # On a Dependabot PR this job runs under Dependabot's restricted
+      # context (read-only token, no Actions secrets), so the real steps
+      # below would error and every Dependabot PR carried a spurious red
+      # `sync` (#256). The sync also only ever pushes to a branch it opened
+      # itself (#215), so it can fix nothing from a PR anyway. Hence a clean
+      # no-op here — kept as a running (green) job rather than `if`-skipped
+      # so a required-check gate on `sync` stays satisfied.
       - name: Skip on a pull request
         if: github.event_name == 'pull_request'
         run: |
@@ -70,37 +72,46 @@ jobs:
         if: github.event_name != 'pull_request'
       - name: Fetch gh-pages so the docs custom domain can be reconciled
         if: github.event_name != 'pull_request'
-        # update reconciles `docs/make.jl`'s deploy_url against the
-        # gh-pages CNAME (a Pages custom domain set out of band): a mismatch
-        # ships a CSS-less site that CI otherwise cannot see. The default
-        # checkout does not fetch gh-pages, so fetch it here. `|| true` keeps a
-        # repo with no gh-pages branch (docs never deployed) from failing.
+        # update reconciles docs/make.jl's deploy_url against the gh-pages
+        # CNAME (a Pages custom domain set out of band); a mismatch ships a
+        # CSS-less site. Default checkout doesn't fetch gh-pages, so fetch it
+        # here. `|| true` covers a repo with no gh-pages branch yet.
         run: git fetch --depth=1 origin gh-pages || true
       - name: Re-apply the managed EpiAware standard
         if: github.event_name != 'pull_request'
+        # `freshen_reusable_refs` moves each caller's EpiAware/.github pin
+        # forwards to the newest commit that touched the workflow it wraps,
+        # so a repo whose Dependabot is off or lagging still tracks the shared
+        # workflows. It only ever moves a pin forwards, so it cannot revert a
+        # Dependabot bump. It needs `gh` (preinstalled on the runner) and a
+        # token that can read the org's `.github`; without one the step still
+        # succeeds and keeps the committed pins.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           julia --color=yes -e '
               using Pkg
               Pkg.activate(; temp = true); Pkg.add(url = "https://github.com/EpiAware/EpiAwarePackageTools.jl", rev = "main")
               using EpiAwarePackageTools
-              res = EpiAwarePackageTools.update("."; ad = true, benchmarks = true, downgrade_compat = true)
-              println("re-applied ", length(res.updated), " managed files")'
-      # Mint a GitHub App token so the sync PR can carry workflow-file drift.
-      # The default `GITHUB_TOKEN` is forbidden from pushing anything under
-      # `.github/workflows/` (GitHub rejects the push: "refusing to allow a
-      # GitHub App to create or update workflow ... without workflows
-      # permission"), so when the kit changes a managed *workflow* the sync
-      # push failed and the weekly run went red. An App installation token
-      # carrying `workflows: write` can push those files. Configure the org
-      # (or repo) with a `TEMPLATE_SYNC_APP_ID` variable and a
-      # `TEMPLATE_SYNC_APP_PRIVATE_KEY` secret for an App granted contents,
-      # pull-requests and workflows write. When the App is not configured the
-      # step is skipped and the token falls back to `GITHUB_TOKEN` below —
-      # non-workflow drift still syncs; only workflow drift needs the App.
-      # The `permission-*` inputs cap the minted token at exactly what
-      # `create-pull-request` below needs (commit+push, open a PR, touch
-      # `.github/workflows/`), regardless of what else the App may be
-      # granted at install time.
+              res = EpiAwarePackageTools.update("."; ad = true, benchmarks = true, downgrade_compat = true, unregistered_sources = false, freshen_reusable_refs = true)
+              println("re-applied ", length(res.updated), " managed files")
+              # Gaps a sync cannot close itself: write-once seeds it cannot
+              # extend, and package-owned prose describing a retired standard.
+              # Printed here so they are in the job log as well as the PR body.
+              for w in res.warnings
+                  println("warning: ", w)
+              end'
+      # Mint a GitHub App token so the sync PR can carry workflow-file drift:
+      # the default `GITHUB_TOKEN` is forbidden from pushing under
+      # `.github/workflows/`, so a managed *workflow* change made the sync
+      # push fail. An App token with `workflows: write` can push those files.
+      # Configure `TEMPLATE_SYNC_APP_ID` (var) and
+      # `TEMPLATE_SYNC_APP_PRIVATE_KEY` (secret) for an App granted contents,
+      # pull-requests and workflows write; without it this step is skipped
+      # and the token falls back to `GITHUB_TOKEN` below (non-workflow drift
+      # still syncs). `permission-*` caps the minted token at exactly what
+      # `create-pull-request` below needs, regardless of the App's install
+      # grants.
       - name: Mint an App token that can push workflow files
         id: app-token
         if: ${{ github.event_name != 'pull_request' && vars.TEMPLATE_SYNC_APP_ID != '' }}
@@ -111,7 +122,6 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-workflows: write
-      # Schedule / manual: open or refresh a sync PR when the standard drifted.
       - name: Open a PR if the standard drifted
         if: github.event_name != 'pull_request'
         uses: peter-evans/create-pull-request@v8
@@ -125,8 +135,101 @@ jobs:
             ci
           body: |
             Automated re-apply of the managed EpiAwarePackageTools standard
-            (`update("."; ad = true, benchmarks = true, downgrade_compat = true)`).
+            (`update("."; ad = true, benchmarks = true, downgrade_compat = true, unregistered_sources = false, freshen_reusable_refs = true)`).
 
             Merge to bring this repo's managed infra back in line with the kit.
             Package-owned files (unit tests, `qa_config.jl`, AD scenarios,
             `LICENSE`) are never touched.
+
+            Because they are never touched, this sync can leave your own
+            documentation describing the standard as it was. Before merging,
+            check the README and the authored pages under `docs/src/` against
+            what changed here — a formatter, a task name, or a page that moved
+            is a common one. The job log lists any drift the sync could detect
+            but not fix.
+      # A clean run means any open tracker issue is stale, so close it.
+      - name: Close the drift issue once a sync lands cleanly
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # `gh` otherwise infers the repo from the checked-out git remote,
+          # absent if the run failed at or before checkout.
+          GH_REPO: ${{ github.repository }}
+        run: |
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          run_url="$run_url/actions/runs/$GITHUB_RUN_ID"
+          open=$(gh issue list --state open --label template-sync \
+            --json number --jq '.[0].number // empty' 2>/dev/null || true)
+          if [ -n "$open" ]; then
+            msg="Template sync ran cleanly, so this drift is resolved:"
+            # `|| true`: a transient API error here must not red a sync that
+            # otherwise worked (the failure reporter below is `if: failure()`).
+            gh issue close "$open" --comment "$msg $run_url" || true
+          fi
+      # A scheduled run has no audience, so report a failure as an issue
+      # instead of a red X nobody looks at (#352). Edited in place, not
+      # duplicated, so a failure repeating every Monday stays one issue.
+      - name: Report the drift as an issue when the sync fails
+        if: ${{ failure() && github.event_name != 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # `gh` otherwise infers the repo from the checked-out git remote,
+          # absent if the run failed at or before checkout.
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          run_url="$run_url/actions/runs/$GITHUB_RUN_ID"
+          # The kit lives at one fixed address, not under the adopting repo's
+          # own org, so this URL is a literal rather than a substituted org.
+          kit=https://github.com/EpiAware/EpiAwarePackageTools.jl
+          cat > "$RUNNER_TEMP/drift-issue.md" <<EOF
+          The scheduled template-sync could not bring this repository back in
+          line with the managed EpiAware standard, so its CI infrastructure is
+          drifting from the kit.
+
+          Failing run: $run_url
+
+          ## What to do
+
+          Take one of two routes. Editing the managed file to make the failure
+          go away is not one of them: the next sync re-applies the standard and
+          reverts it.
+
+          1. **Fix the drift here.** Re-apply the standard locally and commit
+             the result:
+
+                 julia -e 'using EpiAwarePackageTools;
+                 EpiAwarePackageTools.update("."; ad = true,
+                 benchmarks = true,
+                 downgrade_compat = true,
+                 unregistered_sources = false)'
+
+          2. **Ask the kit for the flexibility.** If \`update\` throws, or it
+             overwrites something this package legitimately needs to keep, that
+             is a gap in the kit rather than something to work around here.
+             Open an issue describing the usage that fails:
+             $kit/issues/new
+
+          Pushing a workflow file also needs the template-sync App configured
+          (\`TEMPLATE_SYNC_APP_ID\` variable and
+          \`TEMPLATE_SYNC_APP_PRIVATE_KEY\` secret); without it the sync can
+          only carry non-workflow drift.
+
+          ---
+
+          Opened and updated by the Template sync workflow. This one issue is
+          edited in place on each failing run, never duplicated, and closed
+          again by the first clean run.
+          EOF
+          gh label create template-sync --force --color ededed \
+            --description "Managed infra has drifted from the kit" >/dev/null
+          open=$(gh issue list --state open --label template-sync \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then
+            gh issue edit "$open" --body-file "$RUNNER_TEMP/drift-issue.md"
+          else
+            gh issue create --label template-sync \
+              --title "Template sync failed: managed infra has drifted" \
+              --body-file "$RUNNER_TEMP/drift-issue.md"
+          fi

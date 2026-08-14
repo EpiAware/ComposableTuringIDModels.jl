@@ -1,4 +1,4 @@
-# Imported (externally seeded) cases as a renewal modifier (#189).
+# Imported (externally seeded) cases as a renewal modifier.
 #
 # `ImportedCases` is the worked example of a modifier that carries priors. The
 # rate it adds is *sampled*, and a scan step is a deterministic function, so the
@@ -33,6 +33,12 @@ I_t = \iota_t + \mathcal R_t \sum_{i=1}^{n-1} I_{t-i} g_i,
 so infections can arrive from outside the modelled population — the mechanism
 behind a renewal process that would otherwise die out from a zero initial
 incidence, and behind reintroduction after local elimination.
+
+For infection arriving from another *modelled* stratum, rather than from
+outside the system altogether, use the renewal `mixing` slot instead (see
+[`renewal_pressure`](@ref)); handing this modifier a [`Stratify`](@ref) rate
+gives a `strata × time` importation rate, one exogenous stream per stratum,
+read per step with [`_at`](@ref) exactly as a shared rate is.
 
 `importation_rate` is a per-step parameter slot holding the **unconstrained**
 rate ``\tilde\iota_t``, read at step ``t`` with [`_at`](@ref): a bare
@@ -121,9 +127,11 @@ struct ImportedCases{I <: PriorLike, F <: Function} <: AbstractRenewalModifier
     transformation::F
 
     function ImportedCases(
-            importation_rate::PriorLike; transformation::Function = exp)
+            importation_rate::PriorLike; transformation::Function = exp
+        )
         return new{typeof(importation_rate), typeof(transformation)}(
-            importation_rate, transformation)
+            importation_rate, transformation
+        )
     end
 end
 
@@ -145,8 +153,9 @@ struct ImportedRate{V} <: AbstractRenewalModifier
 end
 
 # The substate is the step counter: a scan step has no clock of its own, so a
-# per-time modifier carries the index it has reached.
-modifier_init_state(::ImportedRate) = 0
+# per-time modifier carries the index it has reached. The window is unused —
+# a step counter has no shape of its own to match.
+modifier_init_state(::ImportedRate, window) = 0
 
 function apply_modifier(mod::ImportedRate, incidence, t)
     return incidence + _at(mod.rate, t + 1), t + 1

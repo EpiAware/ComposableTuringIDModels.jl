@@ -46,8 +46,7 @@ The coefficient is mapped through `transform` (default `tanh` for a process, so 
 unbounded path stays in the stationary band; `identity` for a bounded
 `Distribution`) and tracked as the generated quantity `ρ`, recoverable from the
 chain (`group(chain, :ρ)`). Higher-order (`p > 1`) coefficients are constant;
-time-varying higher-order AR is tracked in
-[#113](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/113).
+time-varying higher-order AR is not yet supported.
 
 # Examples
 ```@example AR
@@ -57,8 +56,10 @@ mdl = as_turing_model(ar, 10)
 rand(mdl)
 ```
 "
-struct AR{D <: PriorLike, I <: PriorLike, P <: Int, E <: PriorLike,
-    F <: Function} <: AbstractLatentModel
+struct AR{
+        D <: PriorLike, I <: PriorLike, P <: Int, E <: PriorLike,
+        F <: Function,
+    } <: AbstractLatentModel
     "Prior for the damping coefficients."
     damp::D
     "Prior for the initial conditions."
@@ -72,21 +73,27 @@ struct AR{D <: PriorLike, I <: PriorLike, P <: Int, E <: PriorLike,
     transform::F
 
     function AR(damp, init, p::Int, ϵ_t, transform)
-        @assert p>0 "p must be greater than 0"
+        @assert p > 0 "p must be greater than 0"
         _assert_prior_length(damp, p, "damp")
         _assert_prior_length(init, p, "init")
-        new{typeof(damp), typeof(init), typeof(p), typeof(ϵ_t),
-            typeof(transform)}(damp, init, p, ϵ_t, transform)
+        return new{
+            typeof(damp), typeof(init), typeof(p), typeof(ϵ_t),
+            typeof(transform),
+        }(damp, init, p, ϵ_t, transform)
     end
 end
 
-function AR(damp::Sampleable, init::Sampleable; p::Int = 1,
-        ϵ_t = HierarchicalNormal())
+function AR(
+        damp::Sampleable, init::Sampleable; p::Int = 1,
+        ϵ_t = HierarchicalNormal()
+    )
     return AR(; damp = fill(damp, p), init = fill(init, p), ϵ_t = ϵ_t)
 end
 
-function AR(; damp = truncated(Normal(0.0, 0.05), 0, 1), init = Normal(),
-        ϵ_t = HierarchicalNormal(), transform = _default_transform(damp))
+function AR(;
+        damp = truncated(Normal(0.0, 0.05), 0, 1), init = Normal(),
+        ϵ_t = HierarchicalNormal(), transform = _default_transform(damp)
+    )
     # Order `p` is fixed by the damping prior (a length-`k` vector ⇒ order `k`, a
     # single distribution / process ⇒ order 1). The order-`p` initial-conditions
     # slot needs `p` values, so a bare `Distribution` is sized to a length-`p`
@@ -97,24 +104,28 @@ function AR(; damp = truncated(Normal(0.0, 0.05), 0, 1), init = Normal(),
     return AR(damp, init, p, _path_prior(ϵ_t), transform)
 end
 
-@model function as_turing_model(model::AR, n)
+@model function as_turing_model(model::AR, n::Int)
     p = model.p
-    @assert n>p "n must be longer than the order of the autoregressive process"
+    @assert n > p "n must be longer than the order of the autoregressive process"
     ar_init ~ as_turing_submodel(model.init, p; prefix = true)
     if p == 1
         # Order 1: draw the coefficient through the single seam. A `Distribution`
         # gives a scalar (constant, no length-`n` allocation); a process gives a
         # length-`(n-1)` path. `TVARStep` reads it per step with `_at`, so one
         # recursion serves both.
-        damp_AR ~ as_turing_submodel(_order1_prior(model.damp), n - 1;
-            prefix = true)
+        damp_AR ~ as_turing_submodel(
+            _order1_prior(model.damp), n - 1;
+            prefix = true
+        )
         # Track the (possibly time-varying) coefficient as a generated quantity so
         # it is recoverable from the chain; `transform` broadcasts over a scalar or
         # a path.
         ρ := model.transform.(damp_AR)
         ϵ_t ~ as_turing_submodel(model.ϵ_t, n - 1)
-        z = accumulate_scan(TVARStep(ρ), only(ar_init),
-            collect(zip(1:(n - 1), ϵ_t)))
+        z = accumulate_scan(
+            TVARStep(ρ), only(ar_init),
+            collect(zip(1:(n - 1), ϵ_t))
+        )
         return z
     end
     damp_AR ~ as_turing_submodel(model.damp, p; prefix = true)
@@ -124,6 +135,8 @@ end
     # `Z_{t-i}`, matching the documented recursion `Z_t = Σ ρ_i Z_{t-i}`. Without
     # the reversal `damp_AR[1]` was applied to the *longest* lag; identical for the
     # default i.i.d. priors, but wrong for heterogeneous per-lag priors.
-    ar = accumulate_scan(ARStep(reverse(damp_AR)), ar_init, ϵ_t)
+    ar = accumulate_scan(
+        ARStep(reverse(damp_AR)), (; val = last(ar_init), window = ar_init), ϵ_t
+    )
     return ar
 end

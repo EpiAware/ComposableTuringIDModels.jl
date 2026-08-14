@@ -1,20 +1,3 @@
-@testitem "TimeVaryingAR is a thin alias over AR(damp = process)" begin
-    using ComposableTuringIDModels, Random
-    Random.seed!(1)
-    tv = TimeVaryingAR()
-    # No separate type: TimeVaryingAR builds an AR with a process damp slot.
-    @test tv isa AR
-    @test tv isa AbstractLatentModel
-    @test tv.damp isa RandomWalk
-    @test tv.p == 1
-    @test tv.transform === tanh
-    z = as_turing_model(tv, 12)()
-    @test z isa AbstractVector
-    @test length(z) == 12
-    # n must exceed 1 (there is at least one transition)
-    @test_throws Exception as_turing_model(TimeVaryingAR(), 1)()
-end
-
 @testitem "TVARStep threads a per-step coefficient through the recursion" begin
     using ComposableTuringIDModels
     using ComposableTuringIDModels: TVARStep, accumulate_scan
@@ -54,9 +37,12 @@ end
     # A length-2 vector damping prior still gives an order-2 (constant) AR (init
     # length must match the order).
     @test AR(;
-        damp = [truncated(Normal(0.5, 0.1), 0, 1),
-            truncated(Normal(0.2, 0.1), 0, 1)],
-        init = [Normal(), Normal()]).p == 2
+        damp = [
+            truncated(Normal(0.5, 0.1), 0, 1),
+            truncated(Normal(0.2, 0.1), 0, 1),
+        ],
+        init = [Normal(), Normal()]
+    ).p == 2
 end
 
 @testitem "AR constant damp stays a scalar RV (no length-n allocation)" begin
@@ -78,20 +64,23 @@ end
     @test length(pk) > 1
 end
 
-@testitem "TimeVaryingAR composes as a latent in the stack" begin
+@testitem "AR(damp = RandomWalk()) composes as a latent in the stack" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(2)
     # It returns a numeric path, so it drops into a bare-vector latent slot such as
     # a Renewal's rt inside a composed IDModel.
     idmodel = IDModel(
-        Renewal(; generation_time = [0.2, 0.3, 0.5], rt = TimeVaryingAR(),
-            initialisation = Normal()),
-        PoissonError())
+        Renewal(;
+            generation_time = [0.2, 0.3, 0.5],
+            rt = AR(; damp = RandomWalk()), initialisation = Normal()
+        ),
+        PoissonError()
+    )
     y = as_turing_model(idmodel, missing, 12)().generated_y_t
     @test length(y) == 12
 end
 
-@testitem "TimeVaryingAR differentiates under ForwardDiff" begin
+@testitem "AR(damp = RandomWalk()) differentiates under ForwardDiff" begin
     using ComposableTuringIDModels, Turing
     using DynamicPPL: LogDensityFunction, VarInfo, link, getlogjoint
     import LogDensityProblems as LDP
@@ -105,7 +94,7 @@ end
     @test all(isfinite, grad)
 end
 
-@testitem "AR(damp = RandomWalk()) recovers a time-varying damping path" tags=[:sample] begin
+@testitem "AR(damp = RandomWalk()) recovers a time-varying damping path" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
     using Turing: to_submodel
     Random.seed!(80)
@@ -125,12 +114,20 @@ end
         end
     end
     model = observe_path(z, n)
-    chain = sample(model, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 300;
-        progress = false)
+    chain = sample(
+        model, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 300;
+        progress = false
+    )
     # ρ is tracked (via `:=`) so it is recovered from the chain: `chain[:ρ]` is a
     # per-draw vector of the coefficient path.
     ρ_draws = reduce(hcat, vec(chain[:ρ]))   # (n-1) × draws
     ρ_mean = vec(mean(ρ_draws; dims = 2))
     @test length(ρ_mean) == n - 1
     @test cor(ρ_mean, ρ_true) > 0.6
+end
+
+@testitem "AR rejects a series shorter than its order" begin
+    using ComposableTuringIDModels, Distributions
+    # `n` must leave at least one step after the order-p initial conditions.
+    @test_throws AssertionError as_turing_model(AR(; damp = RandomWalk()), 1)()
 end

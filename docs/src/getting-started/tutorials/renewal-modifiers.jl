@@ -37,8 +37,10 @@ n = 60
 pop_size = 2_000.0
 
 function renewal(modifiers...)
-    Renewal(gen_int, modifiers...;
-        rt = FixedIntercept(log(1.3)), initialisation = Normal())
+    return Renewal(
+        gen_int, modifiers...;
+        rt = FixedIntercept(log(1.3)), initialisation = Normal()
+    )
 end
 nothing # hide
 
@@ -50,7 +52,8 @@ with negative-binomial noise — a [`LatentDelay`](@ref) wrapped around a
 
 delay = [0.1, 0.4, 0.3, 0.2]
 obs = LatentDelay(
-    NegativeBinomialError(cluster_factor = HalfNormal(0.1)), delay)
+    NegativeBinomialError(cluster_factor = HalfNormal(0.1)), delay
+)
 
 md"""
 ## Three models
@@ -65,9 +68,13 @@ models = (
     plain = IDModel(renewal(), obs),
     depleting = IDModel(renewal(SusceptibleDepletion(pop_size)), obs),
     seeded = IDModel(
-        renewal(SusceptibleDepletion(pop_size),
-            ImportedCases(FixedIntercept(log(2.0)))),
-        obs))
+        renewal(
+            SusceptibleDepletion(pop_size),
+            ImportedCases(FixedIntercept(log(2.0)))
+        ),
+        obs
+    ),
+)
 nothing # hide
 
 md"""
@@ -75,8 +82,10 @@ Simulating from each model with `missing` observations and the same fixed
 initial incidence returns its infections and reported cases.
 """
 
-simulate(model) = fix(as_turing_model(model, missing, n),
-    (init_incidence = log(1.0),))()
+simulate(model) = fix(
+    as_turing_model(model, missing, n),
+    (init_incidence = log(1.0),)
+)()
 
 sims = map(simulate, models)
 nothing # hide
@@ -96,13 +105,19 @@ fig = Figure(; size = (760, 560))
 ax1 = Axis(fig[1, 1]; ylabel = "Infections Iₜ", yscale = log10)
 ax2 = Axis(fig[2, 1]; xlabel = "Day", ylabel = "Reported cases", yscale = log10)
 colours = (plain = :grey30, depleting = :purple, seeded = :teal)
-labels = (plain = "renewal", depleting = "+ susceptible depletion",
-    seeded = "+ importation")
+labels = (
+    plain = "renewal", depleting = "+ susceptible depletion",
+    seeded = "+ importation",
+)
 for k in keys(sims)
-    lines!(ax1, 1:n, sims[k].I_t; color = colours[k], linewidth = 2,
-        label = labels[k])
-    scatter!(ax2, obs_days, max.(sims[k].generated_y_t[obs_days], 1);
-        color = colours[k], markersize = 7)
+    lines!(
+        ax1, 1:n, sims[k].I_t; color = colours[k], linewidth = 2,
+        label = labels[k]
+    )
+    scatter!(
+        ax2, obs_days, max.(sims[k].generated_y_t[obs_days], 1);
+        color = colours[k], markersize = 7
+    )
 end
 axislegend(ax1; position = :lt)
 fig
@@ -117,9 +132,11 @@ and spends the susceptible pool sooner.
 """
 
 function summarise(sim)
-    (; peak_day = argmax(sim.I_t),
+    return (;
+        peak_day = argmax(sim.I_t),
         peak = round(maximum(sim.I_t); digits = 1),
-        final = round(last(sim.I_t); digits = 1))
+        final = round(last(sim.I_t); digits = 1),
+    )
 end
 map(summarise, (depleting = sims.depleting, seeded = sims.seeded))
 
@@ -135,26 +152,37 @@ while a seeded one levels off where importation and decay balance — at
 """
 
 function subcritical(modifiers...)
-    fix(
+    return fix(
         as_turing_model(
             IDModel(
-                Renewal(gen_int, modifiers...; rt = FixedIntercept(log(0.8)),
-                    initialisation = Normal()),
-                obs),
-            missing, n),
-        (init_incidence = log(50.0),))()
+                Renewal(
+                    gen_int, modifiers...; rt = FixedIntercept(log(0.8)),
+                    initialisation = Normal()
+                ),
+                obs
+            ),
+            missing, n
+        ),
+        (init_incidence = log(50.0),)
+    )()
 end
 
 sub_plain = subcritical()
 sub_seeded = subcritical(ImportedCases(FixedIntercept(log(2.0))))
 
 fig2 = Figure(; size = (760, 300))
-ax3 = Axis(fig2[1, 1]; xlabel = "Day", ylabel = "Infections Iₜ",
-    yscale = log10)
-lines!(ax3, 1:n, sub_plain.I_t; color = :grey30, linewidth = 2,
-    label = "Rₜ = 0.8")
-lines!(ax3, 1:n, sub_seeded.I_t; color = :teal, linewidth = 2,
-    label = "Rₜ = 0.8 + importation")
+ax3 = Axis(
+    fig2[1, 1]; xlabel = "Day", ylabel = "Infections Iₜ",
+    yscale = log10
+)
+lines!(
+    ax3, 1:n, sub_plain.I_t; color = :grey30, linewidth = 2,
+    label = "Rₜ = 0.8"
+)
+lines!(
+    ax3, 1:n, sub_seeded.I_t; color = :teal, linewidth = 2,
+    label = "Rₜ = 0.8 + importation"
+)
 axislegend(ax3; position = :rt)
 fig2
 
@@ -175,13 +203,18 @@ sampled rather than conditioned on.
 """
 
 model = IDModel(
-    renewal(SusceptibleDepletion(pop_size),
-        ImportedCases(Normal(0.0, 1.0))),
-    obs)
+    renewal(
+        SusceptibleDepletion(pop_size),
+        ImportedCases(Normal(0.0, 1.0))
+    ),
+    obs
+)
 y_obs = sims.seeded.generated_y_t
-chain = sample(as_turing_model(model, y_obs, n),
+chain = sample(
+    as_turing_model(model, y_obs, n),
     NUTS(0.95; adtype = AutoMooncake(; config = nothing)), 250;
-    progress = false)
+    progress = false
+)
 nothing # hide
 
 md"""
@@ -192,8 +225,10 @@ the true value was two.
 """
 
 import_draws = exp.(vec(chain[@varname(modifier_2.import_rates)]))
-(posterior = round.(quantile(import_draws, [0.05, 0.5, 0.95]), digits = 2),
-    truth = 2.0)
+(
+    posterior = round.(quantile(import_draws, [0.05, 0.5, 0.95]), digits = 2),
+    truth = 2.0,
+)
 
 md"""
 The posterior predictive then tracks the simulated series.
@@ -205,14 +240,22 @@ quantiles(i) = quantile(y_draws(i), [0.05, 0.5, 0.95])
 bands = reduce(hcat, map(quantiles, obs_days))
 
 fig3 = Figure(; size = (760, 300))
-ax4 = Axis(fig3[1, 1]; xlabel = "Day", ylabel = "Reported cases",
-    yscale = log10)
-band!(ax4, obs_days, max.(bands[1, :], 1), max.(bands[3, :], 1);
-    color = (:teal, 0.25))
-lines!(ax4, obs_days, max.(bands[2, :], 1); color = :teal, linewidth = 2,
-    label = "posterior predictive")
-scatter!(ax4, obs_days, max.(y_obs[obs_days], 1); color = :black,
-    markersize = 7, label = "simulated")
+ax4 = Axis(
+    fig3[1, 1]; xlabel = "Day", ylabel = "Reported cases",
+    yscale = log10
+)
+band!(
+    ax4, obs_days, max.(bands[1, :], 1), max.(bands[3, :], 1);
+    color = (:teal, 0.25)
+)
+lines!(
+    ax4, obs_days, max.(bands[2, :], 1); color = :teal, linewidth = 2,
+    label = "posterior predictive"
+)
+scatter!(
+    ax4, obs_days, max.(y_obs[obs_days], 1); color = :black,
+    markersize = 7, label = "simulated"
+)
 axislegend(ax4; position = :lt)
 fig3
 

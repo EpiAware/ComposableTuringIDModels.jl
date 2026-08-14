@@ -84,7 +84,10 @@ end
 # Fallback constructor: the real `ReactionSystem` method lives in the Catalyst
 # extension. Reaching this means `Catalyst`/`ModelingToolkit` are not loaded.
 function CatalystODEParams(rn; kw...)
-    throw(ArgumentError(
-        "CatalystODEParams requires the Catalyst extension. Run " *
-        "`using Catalyst, ModelingToolkit` and pass a ReactionSystem."))
+    throw(
+        ArgumentError(
+            "CatalystODEParams requires the Catalyst extension. Run " *
+                "`using Catalyst, ModelingToolkit` and pass a ReactionSystem."
+        )
+    )
 end

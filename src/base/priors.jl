@@ -30,7 +30,7 @@ variable names flat. Two kinds of call site pass `prefix = true`:
 
   - a **prior slot** (a component's `damp` / `init` / `θ` etc.), so the slot's
     left-hand name namespaces the whole prior submodel and a process-valued prior
-    can never collide with the host's own variables (issue #80);
+    can never collide with the host's own variables;
   - the **deliberately-prefixing** components ([`PrefixLatentModel`](@ref),
     [`Split`](@ref)), which stream their children under an explicit name.
 
@@ -76,21 +76,19 @@ end
 # method above — the length-`n`, e.g. time-varying / hierarchical, path. A
 # component consumes whichever it gets with [`_at`](@ref), so supplying a process
 # makes the parameter vary with no rewiring while a `Distribution` keeps its clean
-# constant name. `n` is ignored for the scalar case.
+# constant name. `n` is ignored for the scalar case, whatever shape it is asked
+# for.
 
-as_turing_submodel(d::Distribution, ::Int; prefix::Bool = false) = d
+as_turing_submodel(d::Distribution, ::ModelShape; prefix::Bool = false) = d
 
 function as_turing_submodel(
-        v::AbstractVector{<:Distribution}, n::Int; prefix::Bool = false)
-    @assert length(v)==n "a length-$(length(v)) prior vector cannot produce a length-$n prior"
-    # `filldist` for a homogeneous vector, `product_distribution` otherwise.
-    # `product_distribution` (not DynamicPPL's `arraydist`, which routes a
-    # vector of univariates through the deprecated `Distributions.Product`
-    # constructor): the deprecation path pulls in `Base.depwarn`/`invokelatest`
-    # world-age machinery that Enzyme reverse cannot shadow
-    # (`EnzymeNoShadowError`), while `product_distribution` builds the identical
-    # `Product` without it.
-    return all(first(v) .== v) ? filldist(first(v), n) : product_distribution(v)
+        v::AbstractVector{<:Distribution}, n::Int; prefix::Bool = false
+    )
+    @assert length(v) == n "a length-$(length(v)) prior vector cannot produce a length-$n prior"
+    # `product_distribution` unconditionally: `arraydist`'s deprecated
+    # `Distributions.Product` path breaks Enzyme reverse, and choosing
+    # `filldist` at runtime returns a `Union` its type analysis rejects.
+    return product_distribution(v)
 end
 
 # A bare `Distribution` in a length-`n` PATH slot (an innovation or a latent
@@ -111,8 +109,10 @@ prior). Bounding a widened slot to `PriorLike` keeps the fail-fast role guard �
 wrong-role component (an observation or infection model) is rejected at
 construction — while accepting a bare distribution alongside a process.
 "
-const PriorLike = Union{Distribution, AbstractVector{<:Distribution},
-    AbstractPriorModel}
+const PriorLike = Union{
+    Distribution, AbstractVector{<:Distribution},
+    AbstractPriorModel,
+}
 
 @doc raw"
 Sample a raw prior `Distribution` as a **single scalar** RV.
@@ -121,11 +121,12 @@ Giving `as_turing_model` a `Distribution` method lets a **bare distribution** fl
 through [`as_turing_submodel`](@ref) exactly like a full model, so a component's
 parameter slot samples `θ ~ as_turing_submodel(model.slot, n)` uniformly whether
 the slot holds a bare distribution or a process. A bare distribution draws ONE
-scalar value (a constant, no length-`n` allocation); `n` is ignored. A component
-then reads a possibly-time-varying parameter per step with [`_at`](@ref), so the
-scalar stays constant while a process-valued slot varies — this is the single seam
-behind [`AR`](@ref)'s optionally-time-varying damping and the other per-step
-parameters.
+scalar value (a constant, no length-`n` allocation) whatever shape it is asked
+for — `n` is ignored, whether it is a length or an `(n_strata, n_time)` shape.
+A component then reads a possibly-time-varying parameter per step with
+[`_at`](@ref), so the scalar stays constant while a process-valued slot
+varies — this is the single seam behind [`AR`](@ref)'s optionally-time-varying
+damping and the other per-step parameters.
 
 For `n` **independent** draws (a white-noise process) use the explicit
 [`IID`](@ref) component; for a **single shared** value broadcast to length `n` use
@@ -134,7 +135,8 @@ For `n` **independent** draws (a white-noise process) use the explicit
 # Arguments
 
   - `prior`: the prior distribution.
-  - `n`: accepted for a uniform seam signature; ignored (the draw is scalar).
+  - `n`: accepted for a uniform seam signature; ignored (the draw is scalar
+    whatever shape is asked for).
 
 # Examples
 ```@example as_turing_model_distribution
@@ -142,7 +144,7 @@ using ComposableTuringIDModels, Distributions
 as_turing_model(Normal(), 3)()   # a single scalar draw
 ```
 "
-@model function as_turing_model(prior::Distribution, n::Int)
+@model function as_turing_model(prior::Distribution, n::ModelShape)
     θ ~ prior
     return θ
 end
@@ -151,8 +153,7 @@ end
 Sample a vector of prior `Distribution`s as a length-`n` prior submodel, one
 independent draw per element.
 
-The length is fixed by the vector, so `n` must match it. A homogeneous vector uses
-`filldist` and a heterogeneous one `product_distribution`. This is the explicit
+The length is fixed by the vector, so `n` must match it. This is the explicit
 way a prior slot asks for `n` independent draws with per-element priors (e.g. an
 `AR`'s per-lag damping coefficients).
 
@@ -168,13 +169,10 @@ as_turing_model([Normal(0, 1), Normal(5, 0.1)], 2)()
 ```
 "
 @model function as_turing_model(prior::AbstractVector{<:Distribution}, n::Int)
-    @assert length(prior)==n "a length-$(length(prior)) prior vector cannot produce a length-$n prior"
-    # One i.i.d. draw per element; `filldist` for a homogeneous vector,
-    # `product_distribution` otherwise (not `arraydist`, whose deprecated
-    # `Distributions.Product` path breaks Enzyme reverse — see the note in
-    # `as_turing_submodel`'s vector method).
-    product_dist = all(first(prior) .== prior) ? filldist(first(prior), n) :
-                   product_distribution(prior)
+    @assert length(prior) == n "a length-$(length(prior)) prior vector cannot produce a length-$n prior"
+    # One i.i.d. draw per element. See `as_turing_submodel`'s vector method
+    # for why this is `product_distribution` and not `arraydist`.
+    product_dist = product_distribution(prior)
     θ ~ product_dist
     return θ
 end
@@ -203,6 +201,8 @@ allocation).
 "
 _at(p::Number, t) = p
 _at(p::AbstractVector, t) = p[t]
+# A strata × time parameter read at step `t` is that step's column.
+_at(p::AbstractMatrix, t) = view(p, :, t)
 
 # Order (p / q / d) implied by a prior: a vector fixes it to the vector length; a
 # single distribution or a richer prior model defaults to order 1.
@@ -214,7 +214,7 @@ _prior_order(::AbstractPriorModel) = 1
 # distribution or a richer prior model broadcasts to `k` and imposes no
 # constraint.
 function _assert_prior_length(p::AbstractVector{<:Distribution}, k, what)
-    @assert length(p)==k "$what prior length $(length(p)) must equal $k"
+    @assert length(p) == k "$what prior length $(length(p)) must equal $k"
     return nothing
 end
 _assert_prior_length(_, k, what) = nothing

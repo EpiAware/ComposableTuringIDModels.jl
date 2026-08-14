@@ -50,7 +50,7 @@ infectious compartments using the constant-incidence equilibrium proportions
 # Arguments
 
   - `params`: the [`SEIRParams`](@ref) struct.
-  - `n`: unused size argument; accepted for the common `as_turing_model`
+  - `n`: unused `Int` size argument; accepted for the common `as_turing_model`
     signature.
 
 # Keyword Arguments
@@ -70,7 +70,7 @@ seirparams = SEIRParams(
     incubation_rate = LogNormal(log(0.1), 0.05),
     recovery_rate = LogNormal(log(0.1), 0.05),
     initial_prop_infected = Beta(1, 99))
-rand(as_turing_model(seirparams, nothing))
+rand(as_turing_model(seirparams, 0))
 ```
 
 ## Fields
@@ -81,8 +81,10 @@ rand(as_turing_model(seirparams, nothing))
   - `recovery_rate`: prior for ``\gamma``.
   - `initial_prop_infected`: prior for the initial infected proportion.
 "
-struct SEIRParams{P <: ODEProblem, D <: Sampleable, E <: Sampleable,
-    F <: Sampleable, G <: Sampleable} <: AbstractLatentModel
+struct SEIRParams{
+        P <: ODEProblem, D <: Sampleable, E <: Sampleable,
+        F <: Sampleable, G <: Sampleable,
+    } <: AbstractLatentModel
     "The `ODEProblem` instance for the SEIR model."
     prob::P
     "Prior for the infectiousness parameter."
@@ -95,22 +97,30 @@ struct SEIRParams{P <: ODEProblem, D <: Sampleable, E <: Sampleable,
     initial_prop_infected::G
 end
 
-function SEIRParams(; tspan, infectiousness::Distribution, incubation_rate::Distribution,
-        recovery_rate::Distribution, initial_prop_infected::Distribution)
+function SEIRParams(;
+        tspan, infectiousness::Distribution, incubation_rate::Distribution,
+        recovery_rate::Distribution, initial_prop_infected::Distribution
+    )
     seir_prob = ODEProblem(_seir_function, [0.99, 0.05, 0.05, 0.0], tspan)
-    return SEIRParams{typeof(seir_prob), typeof(infectiousness),
+    return SEIRParams{
+        typeof(seir_prob), typeof(infectiousness),
         typeof(incubation_rate), typeof(recovery_rate),
-        typeof(initial_prop_infected)}(seir_prob, infectiousness,
-        incubation_rate, recovery_rate, initial_prop_infected)
+        typeof(initial_prop_infected),
+    }(
+        seir_prob, infectiousness,
+        incubation_rate, recovery_rate, initial_prop_infected
+    )
 end
 
-@model function as_turing_model(params::SEIRParams, n)
+@model function as_turing_model(params::SEIRParams, n::Union{Int, Nothing})
     β ~ params.infectiousness
     α ~ params.incubation_rate
     γ ~ params.recovery_rate
     initial_infs ~ params.initial_prop_infected
-    u0 = [1.0 - initial_infs, initial_infs * γ / (α + γ),
-        initial_infs * α / (α + γ), 0.0]
+    u0 = [
+        1.0 - initial_infs, initial_infs * γ / (α + γ),
+        initial_infs * α / (α + γ), 0.0,
+    ]
     p = [β, α, γ]
     return (u0, p)
 end

@@ -10,6 +10,34 @@
     @test length(as_turing_model(rec, 5)()) == 5
 end
 
+@testitem "shape-transparent manipulators pass through a (strata, time) shape" begin
+    using ComposableTuringIDModels, Distributions, Random
+    # `TransformLatentModel`, `PrefixLatentModel`, `RecordExpectedLatent` and
+    # `CombineLatentModels` all wrap whatever their inner model returns, so
+    # each has its own `as_turing_model(m, n::Dims{2})` method delegating to
+    # the same shared `@model` used at `n::Int`. None of the four is ever
+    # called at that shape elsewhere, so each is checked here directly.
+    n = (3, 8)
+    inner() = Stratify(RandomWalk(), Hierarchy())
+
+    Random.seed!(311)
+    trans = TransformLatentModel(inner(), x -> exp.(x))
+    @test size(as_turing_model(trans, n)()) == n
+    @test all(>(0), as_turing_model(trans, n)())
+
+    Random.seed!(312)
+    pm = PrefixLatentModel(inner(), "Strata")
+    @test size(as_turing_model(pm, n)()) == n
+
+    Random.seed!(313)
+    rec = RecordExpectedLatent(inner())
+    @test size(as_turing_model(rec, n)()) == n
+
+    Random.seed!(314)
+    combined = CombineLatentModels([inner(), inner()])
+    @test size(as_turing_model(combined, n)()) == n
+end
+
 @testitem "latent modifiers accept a Distribution / IID / process member" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(310)
@@ -21,13 +49,15 @@ end
     @test TransformLatentModel(Normal(), x -> exp.(x)).model isa Intercept
     @test RecordExpectedLatent(Normal()).model isa Intercept
     @test BroadcastLatentModel(Normal(), 7, RepeatEach()).model isa Intercept
-    @test BroadcastLatentModel(Normal(); period = 7,
-        broadcast_rule = RepeatEach()).model isa Intercept
+    @test BroadcastLatentModel(
+        Normal(); period = 7,
+        broadcast_rule = RepeatEach()
+    ).model isa Intercept
     # `PrefixLatentModel` is a transparent naming wrapper (it only renames its
     # member's variables), so it stores a bare `Distribution` member raw.
     @test PrefixLatentModel(Normal(), "Test").model isa Distribution
     @test PrefixLatentModel(; model = Normal(), prefix = "Test").model isa
-          Distribution
+        Distribution
 
     # For a length-n member use IID() (n i.i.d.) or a process; it composes like a
     # model and produces a length-n path.
@@ -114,11 +144,14 @@ end
     q = 2
     ϵ = [1.0, 2.0, 3.0, 4.0, 5.0]
     ma = accumulate_scan(
-        MAStep(θ), (; val = 0.0, state = reverse(ϵ[1:q])), ϵ[(q + 1):end])
-    expected = [1.0, 2.0,
+        MAStep(θ), (; val = 0.0, state = reverse(ϵ[1:q])), ϵ[(q + 1):end]
+    )
+    expected = [
+        1.0, 2.0,
         3.0 + 0.5 * 2.0 + 0.2 * 1.0,
         4.0 + 0.5 * 3.0 + 0.2 * 2.0,
-        5.0 + 0.5 * 4.0 + 0.2 * 3.0]
+        5.0 + 0.5 * 4.0 + 0.2 * 3.0,
+    ]
     @test ma ≈ expected
 end
 
@@ -130,7 +163,9 @@ end
     ρ = [0.6, 0.3]
     init = [0.0, 1.0]        # oldest→newest: Z1 = 0, Z2 = 1
     ϵ = [0.0, 0.0, 0.0]
-    ar = accumulate_scan(ARStep(reverse(ρ)), init, ϵ)
+    ar = accumulate_scan(
+        ARStep(reverse(ρ)), (; val = last(init), window = init), ϵ
+    )
     z3 = 0.6 * 1.0 + 0.3 * 0.0
     z4 = 0.6 * z3 + 0.3 * 1.0
     z5 = 0.6 * z4 + 0.3 * z3

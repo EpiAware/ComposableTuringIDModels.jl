@@ -8,13 +8,13 @@ ComposableTuringIDModels = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
 
 [sources]
 ComposableTuringIDModels = {path = "../.."}
-# Until EpiAwarePackageTools is registered, it is pinned by git so
-# the env resolves out of the box. Switch to a local path to
-# develop the kit alongside this package.
-EpiAwarePackageTools = {url = "https://github.com/EpiAware/EpiAwarePackageTools.jl", rev = "main"}
 
-# Pin JET to its current 0.x series so a new minor (which is a breaking bump
-# under Julia's 0.x semver) cannot silently tighten static analysis and turn
-# the managed check red without a deliberate bump (see kit #77, #60, #73).
+# Pin JET to the 0.x minors this environment has actually been run against, so
+# a new minor (which is a breaking bump under Julia's 0.x semver) cannot
+# silently tighten static analysis and turn the managed check red without a
+# deliberate bump (see kit #77, #60, #73). Dependabot now watches this file
+# (see .github/dependabot.yml), so the bump arrives as a reviewable PR rather
+# than as drift between this pin and the one in ../Project.toml.
 [compat]
-JET = "0.11"
+EpiAwarePackageTools = "0.3, 0.4"
+JET = "0.11, 0.12"

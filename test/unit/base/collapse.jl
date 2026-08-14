@@ -15,14 +15,17 @@ end
     # infection rt / Z process slots take a process (IID for iid)
     gen_int = [0.2, 0.3, 0.5]
     @test Renewal(; generation_time = gen_int, rt = IID(Normal())) isa
-          AbstractInfectionModel
+        AbstractInfectionModel
     @test DirectInfections(; Z = RandomWalk()) isa AbstractInfectionModel
     @test ExpGrowthRate(; rt = RandomWalk()) isa AbstractInfectionModel
     # a fixed vector of per-element distributions still sets the AR order
     @test AR(;
-        damp = [truncated(Normal(0.5, 0.1), 0, 1),
-            truncated(Normal(0.2, 0.1), 0, 1)],
-        init = [Normal(), Normal()]).p == 2
+        damp = [
+            truncated(Normal(0.5, 0.1), 0, 1),
+            truncated(Normal(0.2, 0.1), 0, 1),
+        ],
+        init = [Normal(), Normal()]
+    ).p == 2
     # a bare Distribution in a per-step PARAMETER slot is a scalar constant
     @test AR(; damp = Normal()).p == 1
 end
@@ -35,13 +38,18 @@ end
     # iid Rt via IID() inside a composed model
     gen_int = [0.2, 0.3, 0.5]
     idmodel = IDModel(
-        Renewal(; generation_time = gen_int, rt = IID(Normal()),
-            initialisation = Normal()),
-        PoissonError())
+        Renewal(;
+            generation_time = gen_int, rt = IID(Normal()),
+            initialisation = Normal()
+        ),
+        PoissonError()
+    )
     y = as_turing_model(idmodel, missing, 8)().generated_y_t
     @test length(y) == 8
-    chain = sample(as_turing_model(idmodel, y, 8),
-        NUTS(0.8; adtype = Turing.AutoForwardDiff()), 30; progress = false)
+    chain = sample(
+        as_turing_model(idmodel, y, 8),
+        NUTS(0.8; adtype = Turing.AutoForwardDiff()), 30; progress = false
+    )
     @test size(chain, 1) == 30
 end
 

@@ -8,6 +8,11 @@ struct ARStep{D <: AbstractVector{<:Real}} <: AbstractAccumulationStep
 end
 
 function (ar::ARStep)(state, ϵ)
-    new_val = dot(ar.damp_AR, state) + ϵ
-    return vcat(state[2:end], new_val)
+    new_val = dot(ar.damp_AR, state.window) + ϵ
+    new_window = vcat(state.window[2:end], new_val)
+    return (; val = new_val, window = new_window)
+end
+
+function get_state(::ARStep, initial_state, state)
+    return vcat(collect(initial_state.window), state .|> x -> x.val)
 end

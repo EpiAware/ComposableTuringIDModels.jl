@@ -55,7 +55,7 @@ function R_to_r(R₀, w::AbstractVector{T}; newton_steps = 2, Δd = 1.0) where {
     r_approx = (R₀ - 1) / (R₀ * mean_gen_time)
     for _ in 1:newton_steps
         r_approx -= (R₀ * neg_MGF(r_approx, w) - 1) /
-                    (R₀ * _dneg_MGF_dr(r_approx, w))
+            (R₀ * _dneg_MGF_dr(r_approx, w))
     end
     return r_approx
 end
@@ -65,17 +65,22 @@ end
 # so there is no single interval for these deterministic summaries to use.
 function _fixed_gen_int(infection::Renewal)
     infection.gen_int isa AbstractVector && return infection.gen_int
-    throw(ArgumentError(
-        "`R_to_r`/`expected_Rt` need a fixed generation interval, but this " *
-        "`Renewal` has an inferred (uncertain) generation interval that varies " *
-        "per draw. Summarise the sampled interval per posterior draw instead."))
+    throw(
+        ArgumentError(
+            "`R_to_r`/`expected_Rt` need a fixed generation interval, but this " *
+                "`Renewal` has an inferred (uncertain) generation interval that varies " *
+                "per draw. Summarise the sampled interval per posterior draw instead."
+        )
+    )
 end
 
 # Only `Renewal` carries a generation interval, so the model-typed method
 # dispatches on it specifically (the other infection models have no `gen_int`).
 function R_to_r(R₀, infection::Renewal; newton_steps = 2, Δd = 1.0)
-    return R_to_r(R₀, _fixed_gen_int(infection); newton_steps = newton_steps,
-        Δd = Δd)
+    return R_to_r(
+        R₀, _fixed_gen_int(infection); newton_steps = newton_steps,
+        Δd = Δd
+    )
 end
 
 @doc raw"
@@ -100,9 +105,11 @@ expected_Rt([0.2, 0.3, 0.5], [100.0, 200, 300, 400, 500])
 "
 function expected_Rt(gen_int::AbstractVector, infections::Vector{<:Real})
     n = length(gen_int)
-    @assert n<length(infections) "Infections vector must be longer than the generation interval"
-    denom_Rt = [dot(reverse(gen_int), infections[(t - n):(t - 1)])
-                for t in (n + 1):length(infections)]
+    @assert n < length(infections) "Infections vector must be longer than the generation interval"
+    denom_Rt = [
+        dot(reverse(gen_int), infections[(t - n):(t - 1)])
+            for t in (n + 1):length(infections)
+    ]
     return infections[(n + 1):end] ./ denom_Rt
 end
 
@@ -127,4 +134,34 @@ r_to_R(0.1, [0.2, 0.3, 0.5])
 "
 function r_to_R(r, w::AbstractVector)
     return 1 / neg_MGF(r, w)
+end
+
+# Shape helpers shared by `Renewal`, `DirectInfections` and `ExpGrowthRate`: how
+# the initial-infections seed and the latent path are read at a `ModelShape`.
+
+# Drive a scan one time step at a time: a path by its elements, a
+# strata × time matrix by its columns.
+_steps(Rt::AbstractVector) = Rt
+_steps(Rt::AbstractMatrix) = collect.(eachcol(Rt))
+
+# The initial-infections seed: one value for a single series, one per stratum
+# otherwise. A bare `Distribution` in the slot draws one scalar; `only` on a
+# `Number` (or a length-1 vector) returns it unchanged, so it also covers the
+# `n::Int` case directly. Broadcast against `n::Dims{2}` gives the same seed to
+# every stratum.
+_seed(x, ::Int) = only(x)
+_seed(x::Real, n::Dims{2}) = fill(x, n[1])
+function _seed(x::AbstractVector, n::Dims{2})
+    @assert length(x) == n[1] "`initialisation` drew $(length(x)) values but the model has $(n[1]) strata"
+    return x
+end
+
+# The implied initial growth rate from a seed `R_t` and generation interval,
+# widened to a per-stratum `R_t` and/or a per-stratum generation interval: a
+# shared interval broadcasts across strata (`Ref(w)`), a per-stratum interval
+# (one row per stratum) is read row by row.
+_init_rate(Rt₀::Real, w::AbstractVector) = R_to_r(Rt₀, w)
+_init_rate(Rt₀::AbstractVector, w::AbstractVector) = R_to_r.(Rt₀, Ref(w))
+function _init_rate(Rt₀::AbstractVector, w::AbstractMatrix)
+    return [R_to_r(Rt₀[g], view(w, g, :)) for g in eachindex(Rt₀)]
 end

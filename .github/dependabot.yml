@@ -7,11 +7,14 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-    # Bundle every github-actions bump (third-party actions + the EpiAware
-    # reusable-workflow SHAs) into a single grouped PR per run, so one
-    # EpiAware/.github change no longer spawns a separate PR per workflow file
-    # that references it (#249).
+      # Daily, so a fix in shared workflows arrives within a day rather than
+      # a week. Grouping (below) makes this affordable: a daily run refreshes
+      # the one open grouped PR instead of opening more, at the cost of more
+      # CI runs than a weekly batch — a deliberate trade (#312).
+      interval: "daily"
+    # Bundle every github-actions bump into a single grouped PR per run, so
+    # one EpiAware/.github change doesn't spawn a PR per referencing
+    # workflow file (#249).
     groups:
       github-actions:
         patterns:
@@ -29,11 +32,60 @@ updates:
   - package-ecosystem: "julia"
     directory: "/"
     schedule:
-      interval: "weekly"
+      # Daily, as above (#312). This ecosystem's refresh costs the most CI
+      # (the full test matrix reruns), so a package that would rather trade
+      # latency for runner time can set this back to `weekly` — the grouping
+      # below is what actually matters.
+      interval: "daily"
     # One grouped PR per run for all Julia dependency bumps across the
     # workspace environments, rather than a separate PR per package (#249).
     groups:
       julia:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "seabbs"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # The isolated test environments (`test/jet`, `test/formatter`, and with
+  # `ad = true` also `test/ad` and `test/ADFixtures`). These exist precisely so
+  # a heavy QA dependency's own pins cannot clash with the shared test deps, so
+  # they are deliberately NOT `[workspace]` members of the root Project.toml —
+  # which means the `directory: "/"` entry above has never seen them. Left
+  # unwatched, their pins drift away from the compat entries in
+  # `test/Project.toml`: a bump there goes green while the environment that
+  # actually runs the check stays on the old version, so the green tells you
+  # nothing about the new one.
+  #
+  # A glob rather than an explicit list because which of these directories
+  # exist is per-package: a `noad` package has no `test/ad` or
+  # `test/ADFixtures`, and an explicit path that does not exist fails the
+  # Dependabot run.
+  #
+  # Kept as its own entry, and its own group, so these land in a separate PR
+  # from the workspace bumps. That is the point: a JET or Runic minor
+  # is a breaking bump under 0.x semver and wants reviewing on its own, not
+  # bundled into a grouped PR alongside routine workspace updates.
+  - package-ecosystem: "julia"
+    directories:
+      - "/test/*"
+      # The docs project, and one environment per tutorial that needs its own.
+      # A tutorial environment resolves standalone rather than joining the
+      # root `[workspace]`, which is what lets two tutorials hold
+      # incompatible versions, and also what leaves nothing else watching
+      # them. Both depths are listed so an environment tree may mirror the
+      # tutorial tree: `*` is documented, `**` is not, so the recursive
+      # pattern is additive rather than relied on.
+      - "/docs"
+      - "/docs/environments/*"
+      - "/docs/environments/**"
+    schedule:
+      interval: "daily"
+    groups:
+      julia-isolated:
         patterns:
           - "*"
     open-pull-requests-limit: 10

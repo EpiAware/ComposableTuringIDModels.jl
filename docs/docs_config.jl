@@ -3,22 +3,33 @@
 # Package-specific configuration read by the managed `make.jl`.
 
 # `renewal-modifiers.jl` is light: Literate emits `@example` blocks that
-# Documenter runs in-process, exactly as the case studies do, so the page also
+# Documenter runs in-process, exactly as the tutorials do, so the page also
 # renders under `--skip-notebooks`. Its fit is deliberately small (n = 60, 250
 # draws) to keep that cheap.
 const LIGHT_TUTORIALS = String["renewal-modifiers.jl"]
 
 # Names are relative to `TUTORIALS_SUBDIR`: `HEAVY_TUTORIALS` holds the Literate
 # `.jl` source names, `TUTORIAL_STUBS` is keyed by the rendered `.md` names.
-const HEAVY_TUTORIALS = String["ad-backends.jl"]
+const HEAVY_TUTORIALS = String[]
 
 const TUTORIALS_SUBDIR = joinpath("getting-started", "tutorials")
 
-const TUTORIAL_STUBS = Pair{String, String}[
-    "ad-backends.md" => "# [Automatic differentiation backends](@id ad-backends)"
-]
+const TUTORIAL_STUBS = Pair{String, String}[]
 
-const FORCE_STUB_TUTORIALS = String[]
+## `ad-comparison.jl` benchmarks every (backend, scenario) pair in-process,
+## serially. This PR's own backend/scenario expansion (4 -> 7 backends,
+## 32 -> 43 scenarios) pushed that past 2h without finishing (#232). Stubbed
+## here as an interim measure pending an artefact-based redesign that reads
+## pre-computed per-backend CI benchmark output instead of running it live
+## during the docs build -- tracked upstream in EpiAwarePackageTools.jl.
+## Drop this entry once that lands and the page is cheap again.
+const FORCE_STUB_TUTORIALS = String["ad-comparison.jl"]
+
+const HEAVY_BENCHMARKS = String["ad-comparison.jl"]
+
+const BENCHMARK_STUBS = Pair{String, String}[
+    "ad-comparison.md" => "# [AD backend comparison](@id ad-comparison)\n\n## [Choosing a backend](@id ad-backends)",
+]
 
 const ORG_BRANDING = true
 
@@ -27,8 +38,14 @@ const ORG_BRANDING = true
 # unconditionally. This change adds the file, but linkcheck resolves the link
 # against `main`, so it stays a 404 until this branch lands. Drop this entry
 # once the file is on `main`.
+#
+# `dev/tutorials` is the same self-reference problem: the README now points at
+# the renamed Tutorials section, but linkcheck resolves it against the *live*
+# deployed site, which still serves the old `case-studies` paths until this
+# branch merges and redeploys. Drop this entry once the file is on `main`.
 const LINKCHECK_IGNORE = Regex[
-    r"blob/main/CITATION\.cff$"
+    r"blob/main/CITATION\.cff$",
+    r"dev/tutorials$",
 ]
 
 const _REPO_URL = "https://github.com/EpiAware/ComposableTuringIDModels.jl"
@@ -45,7 +62,7 @@ const _REPO_BLOB = "$(_REPO_URL)/blob/main"
 # series and the fit that follows differ from build to build.
 const INDEX_REWRITES = Pair{String, String}[
     "(NOTICE)" => "($(_REPO_BLOB)/NOTICE)",
-    "(LICENSE)" => "($(_REPO_BLOB)/LICENSE)"
+    "(LICENSE)" => "($(_REPO_BLOB)/LICENSE)",
 ]
 
 # Run the README's ```julia fences on the home page so every block shows its

@@ -14,13 +14,11 @@ concurrency:
 
 jobs:
   coverage:
-    uses: EpiAware/.github/.github/workflows/coverage.yml@383486033b4ae93561695411c9033f204df75d12
+    uses: EpiAware/.github/.github/workflows/coverage.yml@8c1e09003b9cf0d2eb3cbec7aa726855bb365ac5
     with:
       julia_version: '1'
-      # Hard-fail the coverage check on an upload error. This is intentional:
-      # a repo with no CODECOV_TOKEN cannot upload on a protected branch
-      # ('Token required because branch is protected'), so CI goes red as a
-      # loud reminder to add the secret. Add CODECOV_TOKEN (repo or org secret)
-      # to make coverage upload — and report — for real.
+      # Hard-fail the coverage check on an upload error: a repo with no
+      # CODECOV_TOKEN cannot upload on a protected branch, so CI goes red as
+      # a reminder to add the secret (repo or org).
       fail_ci_if_error: true
     secrets: inherit  # pragma: allowlist secret

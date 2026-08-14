@@ -40,12 +40,12 @@ struct DiffLatentModel{M <: PriorLike, P <: PriorLike} <: AbstractLatentModel
     d::Int
 
     function DiffLatentModel(model, init, d::Int)
-        @assert d>0 "d must be greater than 0"
+        @assert d > 0 "d must be greater than 0"
         _assert_prior_length(init, d, "init")
         # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
         # an `Intercept` (a constant inner path), never left as a scalar.
         wrapped = _path_prior(model)
-        new{typeof(wrapped), typeof(init)}(wrapped, init, d)
+        return new{typeof(wrapped), typeof(init)}(wrapped, init, d)
     end
 end
 
@@ -58,16 +58,16 @@ function DiffLatentModel(; model, init = [Normal()])
     return DiffLatentModel(model, init, d)
 end
 
-@model function as_turing_model(model::DiffLatentModel, n)
+@model function as_turing_model(model::DiffLatentModel, n::Int)
     d = model.d
-    @assert n>d "n must be longer than d"
+    @assert n > d "n must be longer than d"
     latent_init ~ as_turing_submodel(model.init, d; prefix = true)
     diff_latent ~ as_turing_submodel(model.model, n - d)
     return _combine_diff(latent_init, diff_latent, d)
 end
 
 function _combine_diff(init, diff, d)
-    combined = vcat(init, diff)
+    combined = vcat(collect(init), collect(diff))
     for _ in 1:d
         combined = cumsum(combined)
     end

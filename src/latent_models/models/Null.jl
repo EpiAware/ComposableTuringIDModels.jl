@@ -17,6 +17,6 @@ true
 "
 struct Null <: AbstractLatentModel end
 
-@model function as_turing_model(model::Null, n)
+@model function as_turing_model(model::Null, n::Int)
     return nothing
 end

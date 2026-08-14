@@ -26,10 +26,12 @@ Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [weakdeps]
 Catalyst = "479239e8-5488-4da2-87a7-35f2df7eef83"
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 
 [extensions]
 ComposableTuringIDModelsCatalystExt = ["Catalyst", "ModelingToolkit"]
+ComposableTuringIDModelsEnzymeExt = "Enzyme"
 
 [compat]
 ADTypes = "1.22.1"
@@ -41,6 +43,7 @@ DataFramesMeta = "0.15.6"
 Distributions = "0.25.128"
 DocStringExtensions = "0.9.5"
 DynamicPPL = "0.42.1"
+Enzyme = "0.13"
 FlexiChains = "0.6.13"
 KernelFunctions = "0.10.65, 0.11"
 LinearAlgebra = "1.11, 1.12"

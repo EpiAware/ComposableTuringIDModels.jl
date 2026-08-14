@@ -75,8 +75,10 @@ independent draws. It is composed through [`as_turing_submodel`](@ref).
   - `period`: the broadcast period.
   - `broadcast_rule`: the [`AbstractBroadcastRule`](@ref) applied.
 "
-struct BroadcastLatentModel{M <: PriorLike, P <: Integer,
-    B <: AbstractBroadcastRule} <: AbstractLatentModel
+struct BroadcastLatentModel{
+        M <: PriorLike, P <: Integer,
+        B <: AbstractBroadcastRule,
+    } <: AbstractLatentModel
     "The underlying latent model."
     model::M
     "The period of the broadcast."
@@ -84,23 +86,28 @@ struct BroadcastLatentModel{M <: PriorLike, P <: Integer,
     "The broadcast rule applied."
     broadcast_rule::B
 
-    function BroadcastLatentModel(model, period::Integer,
-            broadcast_rule::B) where {B <: AbstractBroadcastRule}
-        @assert period>0 "period must be greater than 0"
+    function BroadcastLatentModel(
+            model, period::Integer,
+            broadcast_rule::B
+        ) where {B <: AbstractBroadcastRule}
+        @assert period > 0 "period must be greater than 0"
         # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
         # an `Intercept` (a constant inner path), never left as a scalar.
         wrapped = _path_prior(model)
-        new{typeof(wrapped), typeof(period), typeof(broadcast_rule)}(
-            wrapped, period, broadcast_rule)
+        return new{typeof(wrapped), typeof(period), typeof(broadcast_rule)}(
+            wrapped, period, broadcast_rule
+        )
     end
 end
 
-function BroadcastLatentModel(model; period::Integer,
-        broadcast_rule::AbstractBroadcastRule)
+function BroadcastLatentModel(
+        model; period::Integer,
+        broadcast_rule::AbstractBroadcastRule
+    )
     return BroadcastLatentModel(model, period, broadcast_rule)
 end
 
-@model function as_turing_model(model::BroadcastLatentModel, n)
+@model function as_turing_model(model::BroadcastLatentModel, n::Int)
     m = broadcast_n(model.broadcast_rule, n, model.period)
     latent_period ~ as_turing_submodel(model.model, m)
     return broadcast_rule(model.broadcast_rule, latent_period, n, model.period)

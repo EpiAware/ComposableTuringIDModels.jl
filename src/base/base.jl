@@ -74,8 +74,48 @@ function as_turing_model(model, args...; kwargs...)
     else
         ""
     end
-    throw(ArgumentError(
-        "no `as_turing_model` method is defined for $(typeof(model)) with " *
-        "$(length(args)) positional argument(s);$hint. Each model struct must " *
-        "implement `@model function as_turing_model(m::T, ...)`"))
+    throw(
+        ArgumentError(
+            "no `as_turing_model` method is defined for $(typeof(model)) with " *
+                "$(length(args)) positional argument(s);$hint. Each model struct must " *
+                "implement `@model function as_turing_model(m::T, ...)`"
+        )
+    )
+end
+
+@doc raw"
+A partially-missing observation vector split into a concrete value vector and
+a presence mask, so it carries no `Missing` in its type.
+
+`value[i]` is the observed entry at `i` when `present[i]` is `true`, and an
+unused placeholder otherwise. Defined here (rather than in `compose.jl`, where
+[`concrete_observations`](@ref) builds one) so that it loads before the
+observation-error models that score one directly, further down the include
+order.
+
+# Examples
+```@example MissingObservations
+using ComposableTuringIDModels: MissingObservations
+carrier = MissingObservations([1.0, 0.0, 3.0], [true, false, true])
+carrier.value[carrier.present]
+```
+"
+struct MissingObservations{V <: AbstractVector, M <: AbstractVector{Bool}}
+    value::V
+    present::M
+end
+
+# Per-time-point error distributions, as concrete callables. A closure defined
+# inside a `@model` body captures boxed locals, which costs a dynamic dispatch
+# on every entry of a scoring loop; a struct stays inferable.
+struct _ErrorDist{M, P, R}
+    obs_model::M
+    pad_Y_t::P
+    priors::R
+end
+
+struct _TrialDist{M, P, N}
+    obs_model::M
+    p_t::P
+    N_t::N
 end

@@ -82,8 +82,10 @@ function LatentDelay(model::AbstractObservationModel, pmf::AbstractVector{<:Real
 end
 
 # Fixed continuous distribution: discretise once at construction.
-function LatentDelay(model::AbstractObservationModel, distribution::C;
-        D = nothing, Δd = 1.0) where {C <: ContinuousDistribution}
+function LatentDelay(
+        model::AbstractObservationModel, distribution::C;
+        D = nothing, Δd = 1.0
+    ) where {C <: ContinuousDistribution}
     pmf = _discretised_pmf(distribution; Δd = Δd, D = D)
     return LatentDelay(model, pmf)
 end
@@ -91,14 +93,16 @@ end
 # Deterministic time-varying delay: a per-time sequence of delay PMFs (one PMF per
 # time point, all the same length). Each is validated and the sequence is stored
 # forward (reversed per step in the `@model` for the `TimeVaryingLDStep`).
-function LatentDelay(model::AbstractObservationModel,
-        pmfs::AbstractVector{<:AbstractVector{<:Real}})
+function LatentDelay(
+        model::AbstractObservationModel,
+        pmfs::AbstractVector{<:AbstractVector{<:Real}}
+    )
     @assert !isempty(pmfs) "Delay PMF sequence must be non-empty"
     d = length(first(pmfs))
     for pmf in pmfs
         @assert all(>=(0), pmf) "Each delay PMF must be non-negative"
         @assert isapprox(sum(pmf), 1) "Each delay PMF must sum to 1"
-        @assert length(pmf)==d "All delay PMFs must have the same length"
+        @assert length(pmf) == d "All delay PMFs must have the same length"
     end
     return LatentDelay{typeof(model), typeof(pmfs)}(model, pmfs)
 end
@@ -180,15 +184,16 @@ end
 
 function UncertainDelay(family, params::AbstractVector; D, Δd = 1.0)
     @assert !isnothing(D) "UncertainDelay needs a fixed horizon `D` so the delay PMF length is constant across draws"
-    @assert Δd>0.0 "Δd must be positive"
+    @assert Δd > 0.0 "Δd must be positive"
     @assert all(p -> p isa Distribution || p isa AbstractPriorModel, params) "Each UncertainDelay parameter must be a `Distribution` (constant → uncertain) or a process (an `AbstractPriorModel` → time-varying)"
     Dp, Δdp = promote(float(D), float(Δd))
-    @assert Dp>=Δdp "D can't be shorter than Δd"
+    @assert Dp >= Δdp "D can't be shorter than Δd"
     # A process-valued parameter makes the delay time-varying; recorded as a type
     # parameter so the `LatentDelay` convolution branch stays type-stable.
     tv = any(p -> p isa AbstractPriorModel, params)
     return UncertainDelay{typeof(params), typeof(family), typeof(Dp), tv}(
-        params, family, Dp, Δdp)
+        params, family, Dp, Δdp
+    )
 end
 
 # All-constant delay (every parameter a `Distribution`): a single time-invariant
@@ -201,14 +206,37 @@ end
     return _discretised_pmf(u.family(θ...); Δd = u.Δd, D = u.D)
 end
 
+@doc raw"
+Sample a **constant-parameter** [`UncertainDelay`](@ref) over an axis,
+returning the same pmf at every point.
+
+Every parameter is a `Distribution` (uncertain but constant), so one pmf is
+drawn — through the no-`n` method above — and copied across the axis. This is
+what lets a stratified renewal's generation-interval slot take a fully
+constant `UncertainDelay`: drawn at `n_strata`, every stratum gets the same
+(uncertain) interval, with no new component. Give one of the parameters a
+[`Hierarchy`](@ref) instead for a **partially pooled** per-stratum interval —
+that makes the delay time-varying (see the method below) rather than needing
+this one.
+"
+@model function as_turing_model(
+        u::UncertainDelay{P, F, T, false}, n::Int
+    ) where {P, F, T}
+    pmf ~ to_submodel(as_turing_model(u), false)
+    return [pmf for _ in 1:n]
+end
+
 # A time-varying delay yields a pmf per time point, so it needs a series length and
 # cannot stand in for a single time-invariant pmf.
 function as_turing_model(u::UncertainDelay{P, F, T, true}) where {P, F, T}
-    throw(ArgumentError(
-        "A time-varying UncertainDelay (a process-valued parameter) yields a " *
-        "pmf per time point and needs a series length `n`; it cannot be used " *
-        "where a single time-invariant pmf is required (e.g. a Renewal " *
-        "generation interval)."))
+    throw(
+        ArgumentError(
+            "A time-varying UncertainDelay (a process-valued parameter) yields a " *
+                "pmf per time point and needs a series length `n`; it cannot be used " *
+                "where a single time-invariant pmf is required (e.g. a Renewal " *
+                "generation interval)."
+        )
+    )
 end
 
 @doc raw"
@@ -223,7 +251,8 @@ distribution — and its discretised pmf — varies with time. The fixed horizon
 keeps every pmf the same length.
 "
 @model function as_turing_model(u::UncertainDelay{P, F, T, true}, n::Int) where {
-        P, F, T}
+        P, F, T,
+    }
     np = length(u.params)
     # Draw each parameter through the seam: a `Distribution` gives a scalar
     # (constant), a process gives a length-`n` path. Each parameter's submodel is
@@ -234,13 +263,27 @@ keeps every pmf the same length.
     params = Vector{Any}(undef, np)
     for i in 1:np
         drawn ~ to_submodel(
-            prefix(as_turing_model(u.params[i], n), Symbol(:param, i)), false)
+            prefix(as_turing_model(u.params[i], n), Symbol(:param, i)), false
+        )
         params[i] = drawn
     end
+    # Freeze into a `Tuple`: a `Vector{Any}` keeps every element boxed, so the
+    # draws reach `_at` as `Base.RefValue`s it cannot index. A tuple fixes the
+    # element types to concrete `Number`/`Vector`.
+    params_t = Tuple(params)
     return map(1:n) do t
-        _discretised_pmf(
-            u.family((_at(params[i], t) for i in 1:np)...); Δd = u.Δd, D = u.D)
+        # `_at_all` reads each element at a static position. Indexing a
+        # heterogeneous tuple with a runtime `i` would return a `Union`, which
+        # Enzyme's type analysis rejects.
+        θs = _at_all(params_t, t)
+        _discretised_pmf(u.family(θs...); Δd = u.Δd, D = u.D)
     end
+end
+
+# Read every drawn parameter at time `t`, one static tuple position at a time.
+_at_all(::Tuple{}, t) = ()
+function _at_all(params::Tuple, t)
+    return (_at(first(params), t), _at_all(Base.tail(params), t)...)
 end
 
 # Whether a `delay` field yields per-time kernels (time-varying) or a single
@@ -276,14 +319,15 @@ _delay_timevarying(::UncertainDelay{P, F, T, TV}) where {P, F, T, TV} = TV
         else
             pmfs = spec
         end
-        @assert length(pmfs)==n "A per-time delay needs one PMF per time point (length must equal the observation vector)"
+        @assert length(pmfs) == n "A per-time delay needs one PMF per time point (length must equal the observation vector)"
         rev_pmfs = reverse.(pmfs)
         d = length(first(rev_pmfs))
-        @assert d<=n "The delay PMF must be no longer than the observation vector"
+        @assert d <= n "The delay PMF must be no longer than the observation vector"
         expected_obs = accumulate_scan(
             TimeVaryingLDStep(),
             (; val = 0, current = Y_t[1:d]),
-            collect(zip(vcat(Y_t[(d + 1):end], 0.0), rev_pmfs[d:end])))
+            collect(zip(vcat(Y_t[(d + 1):end], 0.0), rev_pmfs[d:end]))
+        )
     else
         # Time-invariant: a single reversed pmf drives `LDStep` (the fast path). A
         # fixed PMF vector is already stored reversed and used directly; an
@@ -296,11 +340,12 @@ _delay_timevarying(::UncertainDelay{P, F, T, TV}) where {P, F, T, TV} = TV
             rev_pmf = spec
         end
         d = length(rev_pmf)
-        @assert d<=n "The delay PMF must be no longer than the observation vector"
+        @assert d <= n "The delay PMF must be no longer than the observation vector"
         expected_obs = accumulate_scan(
             LDStep(rev_pmf),
             (; val = 0, current = Y_t[1:d]),
-            vcat(Y_t[(d + 1):end], 0.0))
+            vcat(Y_t[(d + 1):end], 0.0)
+        )
     end
 
     inner ~ as_turing_submodel(obs_model.model, y_t, expected_obs)

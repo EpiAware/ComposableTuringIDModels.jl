@@ -1,3 +1,8 @@
+<!-- epiaware-standards:start MANAGED by EpiAwarePackageTools.scaffold -->
+
+See [AGENTS.md](AGENTS.md).
+<!-- epiaware-standards:end -->
+
 # ComposableTuringIDModels.jl
 
 Composable probabilistic infectious disease modelling in Julia.

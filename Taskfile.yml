@@ -1,10 +1,10 @@
 # MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 version: '3'
 
-# Standard EpiAware package development tasks. Generalised from
-# CensoredDistributions.jl; package-specific assumptions (a particular
-# extension, a fixed package name) are kept out so this drops into any package.
-# A package can override `PACKAGE` below, otherwise it is read from Project.toml.
+# Standard EpiAware package development tasks. Package-specific assumptions
+# (a particular extension, a fixed package name) are kept out so this drops
+# into any package. Override `PACKAGE` below, or leave it read from
+# Project.toml.
 
 vars:
   PACKAGE:
@@ -49,7 +49,7 @@ tasks:
       - echo "✅ JET analysis completed"
 
   test-formatting:
-    desc: Run the JuliaFormatter check directly (isolated environment)
+    desc: Run the Runic check directly (isolated environment)
     cmds:
       - echo "🎨 Checking code formatting..."
       - julia --project=test/formatter -e 'using Pkg; Pkg.instantiate()'
@@ -83,20 +83,20 @@ tasks:
       - julia --project=docs --quiet -e 'using {{.PACKAGE}}; println("✅ Package + docs env loaded")'
 
   format:
-    desc: Format code with JuliaFormatter (fixes formatting issues)
+    desc: Format code with Runic (fixes formatting issues)
     cmds:
-      - echo "🎨 Formatting code with JuliaFormatter..."
+      - echo "🎨 Formatting code with Runic..."
       - julia --project=test/formatter -e 'using Pkg; Pkg.instantiate()' 2>/dev/null
-      - julia --project=test/formatter --quiet -e 'using JuliaFormatter; for d in ("src", "test", "docs", "benchmark"); isdir(d) && format(d; verbose=false, overwrite=true); end'
+      - julia --project=test/formatter --quiet -e 'using Runic; dirs = filter(isdir, ["src", "test", "docs", "benchmark", "ext"]); Runic.main(["-i", dirs...])'
       - echo "✅ Code formatting completed"
 
   coverage:
     desc: Run tests with coverage and generate an lcov report
     cmds:
       - echo "📊 Running tests with coverage..."
-      - julia --project=. --code-coverage=user -e 'using Pkg; Pkg.test(test_args=["skip_quality"])'
+      - julia --project=. -e 'using Pkg; Pkg.test(coverage=true, test_args=["skip_quality"])'
       - echo "📊 Processing coverage data..."
-      - julia --project=test -e 'using Pkg; Pkg.add("Coverage"); using Coverage; LCOV.writefile("lcov.info", process_folder())'
+      - julia --project=@coverage -e 'using Pkg; Pkg.add("Coverage"); using Coverage; LCOV.writefile("lcov.info", process_folder())'
       - echo "✅ Coverage report generated (lcov.info)"
 
   coverage-ad:
@@ -117,14 +117,14 @@ tasks:
     desc: Build the documentation
     cmds:
       - echo "📚 Building documentation..."
-      - julia --project=docs docs/make.jl
+      - JULIA_NUM_THREADS=auto julia --project=docs docs/make.jl
       - echo "✅ Documentation built successfully"
 
   docs-fast:
     desc: Build documentation quickly (skip notebook processing)
     cmds:
       - echo "📚 Building documentation (skipping notebooks)..."
-      - julia --project=docs docs/make.jl --skip-notebooks
+      - JULIA_NUM_THREADS=auto julia --project=docs docs/make.jl --skip-notebooks
       - echo "✅ Fast documentation build completed"
 
   # === DEVELOPMENT SETUP ===

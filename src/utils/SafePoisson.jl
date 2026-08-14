@@ -66,9 +66,11 @@ end
 function _log1pmx_kernel(x::Float64)
     r = x / (x + 2.0)
     t = r * r
-    w = @evalpoly(t, 6.66666666666666667e-1, 4.00000000000000000e-1,
+    w = @evalpoly(
+        t, 6.66666666666666667e-1, 4.0e-1,
         2.85714285714285714e-1, 2.22222222222222222e-1, 1.81818181818181818e-1,
-        1.53846153846153846e-1, 1.33333333333333333e-1, 1.17647058823529412e-1)
+        1.53846153846153846e-1, 1.33333333333333333e-1, 1.17647058823529412e-1
+    )
     hxsq = 0.5 * x * x
     return r * (hxsq + w * t) - hxsq
 end
@@ -78,7 +80,7 @@ function _log1pmx(x::Float64)
         return log1p(x) - x
     elseif x > 0.315
         u = (x - 0.5) / 1.5
-        return _log1pmx_kernel(u) - 9.45348918918356180e-2 - 0.5 * u
+        return _log1pmx_kernel(u) - 9.4534891891835618e-2 - 0.5 * u
     elseif x > -0.227
         return _log1pmx_kernel(x)
     elseif x > -0.4
@@ -144,8 +146,9 @@ function _ad_rand(rng::AbstractRNG, λ)
             return K
         end
     end
+    return
 end
 
 function Base.rand(rng::AbstractRNG, d::SafePoisson)
-    d.λ < 6 ? _count_rand(rng, d.λ) : _ad_rand(rng, d.λ)
+    return d.λ < 6 ? _count_rand(rng, d.λ) : _ad_rand(rng, d.λ)
 end

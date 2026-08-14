@@ -80,8 +80,10 @@ gp_matern = ExactGP(kernel = Matern32Kernel())
 length(as_turing_model(gp_matern, 30)())
 ```
 "
-struct ExactGP{L <: UnivariateDistribution, S <: UnivariateDistribution,
-    K <: Kernel} <: AbstractPriorModel
+struct ExactGP{
+        L <: UnivariateDistribution, S <: UnivariateDistribution,
+        K <: Kernel,
+    } <: AbstractPriorModel
     "Prior for the length scale ``\\ell``; puts no mass below zero."
     length_scale::L
     "Prior for ``\\sigma``; puts no mass below zero."
@@ -91,20 +93,25 @@ struct ExactGP{L <: UnivariateDistribution, S <: UnivariateDistribution,
     "Relative Cholesky nugget: the amount added is ``\\tau\\sigma^2``."
     jitter::Float64
 
-    function ExactGP(length_scale::UnivariateDistribution,
-            marginal_std::UnivariateDistribution, kernel::Kernel, jitter::Real)
-        @assert jitter>0 "jitter must be greater than 0"
+    function ExactGP(
+            length_scale::UnivariateDistribution,
+            marginal_std::UnivariateDistribution, kernel::Kernel, jitter::Real
+        )
+        @assert jitter > 0 "jitter must be greater than 0"
         _check_hyperprior_support(length_scale, marginal_std)
-        new{typeof(length_scale), typeof(marginal_std), typeof(kernel)}(
-            length_scale, marginal_std, kernel, Float64(jitter))
+        return new{typeof(length_scale), typeof(marginal_std), typeof(kernel)}(
+            length_scale, marginal_std, kernel, Float64(jitter)
+        )
     end
 end
 
 function ExactGP(;
         length_scale::UnivariateDistribution = truncated(
-            Normal(0.0, 0.4), _DEFAULT_LENGTH_SCALE_FLOOR, Inf),
+            Normal(0.0, 0.4), _DEFAULT_LENGTH_SCALE_FLOOR, Inf
+        ),
         marginal_std::UnivariateDistribution = truncated(Normal(0.0, 1.0), 0, Inf),
-        kernel::Kernel = SqExponentialKernel(), jitter::Real = 1e-6)
+        kernel::Kernel = SqExponentialKernel(), jitter::Real = 1.0e-6
+    )
     return ExactGP(length_scale, marginal_std, kernel, jitter)
 end
 
@@ -113,8 +120,10 @@ end
 # log-density / gradient evaluation, exactly as `HilbertSpaceGP` does with its
 # basis. What is left inside the differentiated path is the part that genuinely
 # depends on the sampled parameters: the covariance and its Cholesky factor.
-@model function _exact_gp_model(kernel::Kernel, x, jitter,
-        length_scale, marginal_std)
+@model function _exact_gp_model(
+        kernel::Kernel, x, jitter,
+        length_scale, marginal_std
+    )
     ℓ ~ length_scale
     σ ~ marginal_std
     z ~ filldist(Normal(), length(x))
@@ -133,16 +142,21 @@ end
     # sampler can represent, and is only there to keep the factorisation
     # defined at σ = 0 exactly, where K itself vanishes.
     L = cholesky(Symmetric(K + (jitter * (σ^2 + eps())) * I)).L
-    gp = L * z
+    # Densify `L`: the triangular BLAS path (`trmv`) has no Enzyme forward
+    # rule, a plain `gemv` does. Same maths to within a rounding order, and an
+    # O(n^2) copy against the O(n^3) factorisation already paid.
+    gp = Matrix(L) * z
     return gp
 end
 
 # See the architecture note in HilbertSpaceGP.jl: `as_turing_model` is a plain
 # function that hoists the parameter-independent work and delegates to a single
 # inner `@model`, keeping the one `as_turing_model(model, n)` entry point.
-function as_turing_model(model::ExactGP, n)
-    @assert n>1 "n must be greater than 1"
+function as_turing_model(model::ExactGP, n::Int)
+    @assert n > 1 "n must be greater than 1"
     x = standardised_index(n)
-    return _exact_gp_model(model.kernel, x, model.jitter,
-        model.length_scale, model.marginal_std)
+    return _exact_gp_model(
+        model.kernel, x, model.jitter,
+        model.length_scale, model.marginal_std
+    )
 end

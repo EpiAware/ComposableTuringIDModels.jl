@@ -43,7 +43,7 @@ rand(mdl)
 ```
 "
 struct IDModel{I <: AbstractInfectionModel, O <: AbstractObservationModel} <:
-       AbstractComposableModel
+    AbstractComposableModel
     "Infection process model generating ``I_t`` (and its internal latent ``Z_t``)."
     infection_model::I
     "Observation model mapping ``I_t`` to ``y_t``."
@@ -51,72 +51,53 @@ struct IDModel{I <: AbstractInfectionModel, O <: AbstractObservationModel} <:
 end
 
 @doc raw"
-Build a grouped/panel `IDModel`: one shared infection process observed by
-several groups, each reporting it at its own partially pooled level.
+Narrow a data argument to a concrete element type before conditioning a model
+on it, when nothing in it is actually `missing`.
 
-The same `IDModel(...)` call that builds a single-group model also builds a
-panel, distinguished only by passing a `group_effect` prior between the
-infection and observation arguments. It composes [`GroupedInfections`](@ref)
-(the shared curve replicated per group) with `Split(observation_model)`
-(every group observed through the same observation model, namespaced by
-group):
+Data simulated from a model's prior keeps a `Union{Missing, T}` element type
+even once every entry is concrete. Conditioning on that makes DynamicPPL
+`deepcopy` the argument on every evaluation, which Enzyme cannot differentiate
+in reverse mode. Narrowing avoids both the copy and the failure.
 
-```julia
-IDModel(infection_model, group_effect, observation_model) ==
-    IDModel(GroupedInfections(infection_model, group_effect),
-        Split(observation_model))
-```
+A genuinely partially-missing vector (some entries observed, some `missing`)
+is split into a [`MissingObservations`](@ref) carrier instead: a concrete
+value vector plus a presence mask, neither of which admits `Missing` in its
+type. A fully missing vector, a partially- or fully-missing matrix (the
+strata data a data-driven [`Split`](@ref) reads shape from), and a scalar
+`missing`, are returned unchanged, and so is an array whose element type is
+already concrete. A `NamedTuple` of streams is narrowed field-wise, so each
+per-stream submodel receives a concrete vector (or a `MissingObservations`
+carrier).
 
-Sample it with `as_turing_model(model, Y, (n_time, n_groups))`, or the
-convenience `as_turing_model(model, Y)` that reads `n_time` and `n_groups`
-from the shape of the data matrix `Y` (`n_groups x n_time`, one row per group).
+[`as_turing_model(::IDModel, y_t, n)`](@ref as_turing_model) applies this to
+its `y_t` automatically. It is exposed for data built elsewhere by simulating
+from a prior.
 
-# Examples
-```@example IDModel_grouped
-using ComposableTuringIDModels, Distributions
-model = IDModel(
-    DirectInfections(; Z = RandomWalk(), initialisation = Normal(log(50.0), 0.2)),
-    Hierarchy(; mean = Normal(0.0, 0.5), across = IID(Normal(0.0, 0.5))),
-    PoissonError())
-Ymiss = Matrix{Union{Missing, Float64}}(missing, 3, 12)   # 3 groups, 12 time steps
-sim = as_turing_model(model, Ymiss)()
-size(sim.I_t)
-```
+# Arguments
 
-## Arguments
-
-  - `infection_model`: the shared infection process, drawn once for all groups.
-  - `group_effect`: the prior over the grouping axis (a [`Hierarchy`](@ref), a
-    latent process, or a bare `Distribution`).
-  - `observation_model`: the observation model each group is observed through.
-
-## Keyword Arguments
-
-  - `combiner`: the function `(I_t, level_g)` mapping the shared curve and a
-    group's effect to that group's row (default: multiplicative on the
-    exponential scale).
+  - `y`: the data argument to narrow — an `AbstractArray`, a `NamedTuple` of
+    them, or a scalar (e.g. `missing`, returned unchanged).
 "
-function IDModel(infection_model::AbstractInfectionModel, group_effect,
-        observation_model::AbstractObservationModel;
-        combiner = _grouped_combiner)
-    return IDModel(GroupedInfections(infection_model, group_effect; combiner),
-        Split(observation_model))
+function concrete_observations(y::AbstractArray)
+    eltype(y) >: Missing || return y
+    return any(ismissing, y) ? y : identity.(y)
 end
-
-@doc raw"
-Lift an existing `IDModel` (a shared infection + observation) to a grouped/panel
-model by adding a per-group effect over the grouping axis.
-
-Equivalent to `IDModel(idmodel.infection_model, group_effect,
-idmodel.observation_model; combiner)`; see the other [`IDModel`](@ref) grouped
-constructor for the full grouped-model behaviour.
-"
-function IDModel(idmodel::IDModel, group_effect; combiner = _grouped_combiner)
-    return IDModel(idmodel.infection_model, group_effect,
-        idmodel.observation_model; combiner)
+function concrete_observations(y::AbstractVector)
+    eltype(y) >: Missing || return y
+    any(ismissing, y) || return identity.(y)
+    all(ismissing, y) && return y
+    T = nonmissingtype(eltype(y))
+    present = .!ismissing.(y)
+    value = identity.(coalesce.(y, zero(T)))
+    return MissingObservations(value, present)
 end
+concrete_observations(y::NamedTuple) = map(concrete_observations, y)
+concrete_observations(y) = y
 
-@model function as_turing_model(model::IDModel, y_t, n)
+# Narrowing must happen before `y_t` is stored on the `Model`: DynamicPPL's
+# `hasmissing`/`deepcopy` check runs on the stored argument, so doing it inside
+# this body would be too late. Hence the private `@model` plus the wrapper.
+@model function _as_turing_model_idmodel(model::IDModel, y_t, n)
     infections ~ as_turing_submodel(model.infection_model, n)
     I_t = infections.I_t
     Z_t = infections.Z_t
@@ -127,13 +108,70 @@ end
     return (; generated_y_t, expected_y_t, I_t, Z_t)
 end
 
+function as_turing_model(model::IDModel, y_t, n)
+    return _as_turing_model_idmodel(model, concrete_observations(y_t), n)
+end
+
 @doc raw"
-Convenience 2-argument form for a grouped `IDModel` (one built with
-[`GroupedInfections`](@ref)): reads `n_time` and `n_groups` from the shape of
-the data matrix `Y` (`n_groups x n_time`, one row per group) instead of
-requiring them to be supplied explicitly.
+Convenience 2-argument form: read the infection process's shape from the data.
+
+The observation model and the data together fix the shape of the infection
+process, so nothing about it needs to be supplied explicitly or stored on the
+model. `as_turing_model(model, Y)` is `as_turing_model(model, Y, shape)` with
+`shape` resolved via [`infection_strata`](@ref): the number of infection
+strata the observation model consumes given the data's row count, paired with
+the data's time length.
+
+Three age strata observed as one hospitalisation stream is
+`Split(NegativeBinomialError(), [1.0 1.0 1.0])`; a `1 x T` data matrix then
+builds a 3-stratum infection process.
+
+# Examples
+```@example IDModel_shape
+using ComposableTuringIDModels, Distributions
+model = IDModel(
+    DirectInfections(;
+        Z = Stratify(RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))),
+        initialisation = Normal(log(50), 0.2)),
+    Split(PoissonError(), [1.0 1.0 1.0]))
+# One observation stream, 12 time steps: the three infection strata come
+# from the weight matrix, not from the data.
+Ymiss = Matrix{Union{Missing, Float64}}(missing, 1, 12)
+sim = as_turing_model(model, Ymiss)()
+size(sim.I_t)
+```
 "
-function as_turing_model(model::IDModel{<:GroupedInfections}, Y::AbstractMatrix)
-    n_groups, n_time = size(Y)
-    return as_turing_model(model, Y, (n_time = n_time, n_groups = n_groups))
+function as_turing_model(model::IDModel, Y::AbstractMatrix)
+    return as_turing_model(model, Y, _shape(model, Y))
+end
+
+function _shape(model::IDModel, Y::AbstractMatrix)
+    return (infection_strata(model.observation_model, size(Y, 1)), size(Y, 2))
+end
+
+@doc raw"
+The number of infection strata an observation model consumes.
+
+The seam an observation model uses to say how many infection strata it
+consumes, given the number of observation streams in the data. The default
+passes the observation stream count straight through (a one-to-one mapping).
+[`Split`](@ref) with a weight `map` overrides it with the map's column count,
+so a many-to-one or many-to-many mapping can build the right-shaped infection
+process from the data alone.
+
+# Arguments
+
+  - `obs`: the observation model.
+  - `n_obs_strata`: the number of observation streams in the data.
+
+# Examples
+```@example infection_strata
+using ComposableTuringIDModels
+ComposableTuringIDModels.infection_strata(
+    Split(PoissonError(), [1.0 1.0 1.0]), 1)
+```
+"
+infection_strata(obs, n_obs_strata::Int) = n_obs_strata
+function infection_strata(s::Split, n_obs_strata::Int)
+    return s.map === nothing ? n_obs_strata : size(s.map, 2)
 end

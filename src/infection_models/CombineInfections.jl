@@ -1,8 +1,7 @@
 # Stack several (possibly different) infection processes into one
-# infection-strata x time `I_t` matrix — the "different many" many-to-many
-# infection-side mapping (issue #180). Complements `Split`/`StrataMap`, which
-# already carry the observation-side mapping from an `inf_strata x time`
-# matrix onto observation streams.
+# infection-strata x time `I_t` matrix. Complements `Split`/`StrataMap`, which
+# carry the observation-side mapping from an `inf_strata x time` matrix onto
+# observation streams.
 
 @doc raw"
 Combine several infection processes into one `n_strata x n_time` `I_t` matrix.
@@ -24,6 +23,12 @@ both naming their innovation `ϵ_t`), so this is one of the components that
 prefixes on purpose rather than following the package's flat, prefix-off
 default.
 
+`n` stays a plain `Int` here. The stratum count is fixed by how many models
+`models` holds, not by a shape argument, and each model runs its own
+independent scan, so there is no shared incidence window for a `mixing`
+operator to couple. See [`Renewal`](@ref)'s `mixing` slot and [Coupled patch
+models](@ref case-study-patches) for the couplable case.
+
 ## Fields
 
   - `models`: the vector of infection models, one per stratum.
@@ -41,16 +46,17 @@ size(sim.I_t)   # 2 strata x 12 time points
 ```
 "
 struct CombineInfections{M <: AbstractVector, P <: AbstractVector{<:String}} <:
-       AbstractInfectionModel
+    AbstractInfectionModel
     "The vector of infection models, one per stratum."
     models::M
     "The stratum names (submodel prefix and `Z_t` keys)."
     names::P
 
     function CombineInfections(
-            models::M, names::P) where {M <: AbstractVector, P <: AbstractVector{<:String}}
+            models::M, names::P
+        ) where {M <: AbstractVector, P <: AbstractVector{<:String}}
         @assert !isempty(models) "CombineInfections needs at least one model"
-        @assert length(models)==length(names) "The number of models ($(length(models))) and names ($(length(names))) must be equal"
+        @assert length(models) == length(names) "The number of models ($(length(models))) and names ($(length(names))) must be equal"
         return new{M, P}(models, names)
     end
 end
@@ -67,7 +73,8 @@ end
     for i in 1:n_strata
         res ~ to_submodel(
             prefix(as_turing_model(model.models[i], n), Symbol(model.names[i])),
-            false)
+            false
+        )
         Is[i] = res.I_t
         Zs[i] = res.Z_t
     end

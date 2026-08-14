@@ -39,9 +39,9 @@ Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 [sources]
 ADFixtures = {path = "../test/ADFixtures"}
 ComposableTuringIDModels = {path = ".."}
-EpiAwarePackageTools = {url = "https://github.com/EpiAware/EpiAwarePackageTools.jl.git"}
 
 [compat]
+EpiAwarePackageTools = "0.3, 0.4"
 ADTypes = "1"
 AbstractGPs = "0.5"
 AlgebraOfGraphics = "0.12, 0.13"

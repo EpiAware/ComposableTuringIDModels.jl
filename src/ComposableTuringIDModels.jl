@@ -28,11 +28,11 @@ module ComposableTuringIDModels
 # surface to the package's own exports.
 
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
-                  returned
+    returned
 using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
-using LinearAlgebra: dot, cholesky, Symmetric, I
+using LinearAlgebra: dot, cholesky, Symmetric, I, UniformScaling
 using LogExpFunctions: softmax, xexpy, log1pexp
 using OrdinaryDiffEq: ODEProblem, ODEFunction, solve, remake, AutoVern7, Rodas5P
 using Random: AbstractRNG, randexp, default_rng
@@ -41,7 +41,7 @@ using Random: AbstractRNG, randexp, default_rng
 # by `HilbertSpaceGP`; the package adds only the 1-D spectral densities those
 # kernels need for the Hilbert-space approximation (see HilbertSpaceGP.jl).
 using KernelFunctions: Kernel, SqExponentialKernel, Matern32Kernel,
-                       Matern52Kernel, with_lengthscale, kernelmatrix
+    Matern52Kernel, with_lengthscale, kernelmatrix
 
 # Inference-layer dependencies.
 using ADTypes: ADTypes, AutoForwardDiff
@@ -54,62 +54,67 @@ using Tables: rowtable
 # Distributions names used (and, for many, extended) by the package, imported
 # explicitly (not reexported).
 using Distributions: Distributions, Distribution, Sampleable,
-                     UnivariateDistribution,
-                     ContinuousUnivariateDistribution, ContinuousDistribution,
-                     Normal, Poisson, NegativeBinomial, Binomial, Gamma, truncated,
-                     cdf, ccdf, logcdf, logccdf, invlogcdf, pdf, logpdf, quantile,
-                     params, mean, var, std, mode, skewness, kurtosis,
-                     product_distribution
+    UnivariateDistribution,
+    ContinuousUnivariateDistribution, ContinuousDistribution,
+    Normal, Poisson, NegativeBinomial, Binomial, Gamma, truncated,
+    cdf, ccdf, logcdf, logccdf, invlogcdf, pdf, logpdf, quantile,
+    params, mean, var, std, mode, skewness, kurtosis,
+    product_distribution
 using Statistics: Statistics
 
 # --- core architecture ---
 export AbstractComposableModel, as_turing_model
 export AbstractPriorModel, AbstractLatentModel, AbstractInfectionModel,
-       AbstractObservationModel, AbstractObservationErrorModel
+    AbstractObservationModel, AbstractObservationErrorModel
 export implements_prior_interface,
-       implements_infection_interface, implements_observation_interface
+    implements_infection_interface, implements_observation_interface
 export as_turing_submodel
 
 # --- utilities and distributions ---
 # (double-interval censoring is provided by CensoredDistributions.jl, used
 # internally by `Renewal` / `LatentDelay`; it is not re-exported here.)
 export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial,
-       NegativeBinomialMeanClust, condition_model
+    NegativeBinomialMeanClust, condition_model
 
 # --- latent models ---
-export IID, HierarchicalNormal, RandomWalk, AR, TimeVaryingAR, MA, Intercept,
-       FixedIntercept,
-       Null, DiffLatentModel, HilbertSpaceGP, ExactGP
+export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept,
+    FixedIntercept,
+    Null, DiffLatentModel, HilbertSpaceGP, ExactGP
 # Covariance kernels for `HilbertSpaceGP` / `ExactGP` are re-exported from
 # KernelFunctions.jl (the ecosystem standard); `spectral_density` adds the
 # Hilbert-space weights those kernels need.
 export SqExponentialKernel, Matern32Kernel, Matern52Kernel, spectral_density,
-       standardised_index
+    standardised_index
 
 # --- latent modifiers / manipulators / combinations / broadcasting ---
 export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
-       CombineLatentModels, ConcatLatentModels, BroadcastLatentModel,
-       RepeatEach, RepeatBlock, broadcast_rule, broadcast_n, broadcast_dayofweek,
-       broadcast_weekly, equal_dimensions, arma, arima, Hierarchy
+    CombineLatentModels, ConcatLatentModels, BroadcastLatentModel,
+    RepeatEach, RepeatBlock, broadcast_rule, broadcast_n, broadcast_dayofweek,
+    broadcast_weekly, equal_dimensions, arma, arima, Hierarchy,
+    Stratify, Replicate
 
 # --- infection models ---
 export DirectInfections, ExpGrowthRate, Renewal,
-       RenewalStep, SusceptibleDepletion, ImportedCases,
-       R_to_r, r_to_R, expected_Rt
-export CombineInfections, GroupedInfections
+    RenewalStep, SusceptibleDepletion, ImportedCases,
+    R_to_r, r_to_R, expected_Rt
+export CombineInfections
+
+# --- coupling between strata ---
+export renewal_pressure, pairwise_gen_int, AbstractMixingModel, MixingStep,
+    Gravity, gravity
 
 # --- ODE compartmental models ---
 export SIRParams, SEIRParams, ODEProcess, CatalystODEParams
 
 # --- observation models ---
 export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDelay,
-       UncertainDelay, observation_error, generate_observation_error_priors,
-       define_y_t
+    UncertainDelay, observation_error, generate_observation_error_priors,
+    define_y_t
 
 # --- observation modifiers / manipulators ---
 export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
-       ReportingCDF, ReportTriangle, ReportingTriangle, ReportingPMF,
-       PrefixObservationModel, RecordExpectedObs, TransformObservationModel
+    ReportingCDF, ReportTriangle, ReportingTriangle, ReportingPMF,
+    PrefixObservationModel, RecordExpectedObs, TransformObservationModel
 
 # --- observation composition ---
 export Split, StrataMap
@@ -119,21 +124,32 @@ export IDModel
 
 # --- inference orchestration ---
 export IDProblem, NUTSampler, DirectSample,
-       apply_method, IDObservables, generated_observables,
-       spread_draws, get_param_array, forecast
+    apply_method, IDObservables, generated_observables,
+    spread_draws, get_param_array, forecast
+
+# --- extension points ---
+# Names a component author implements against but rarely calls: the shape
+# contract, the two seams that widen a model across strata, and the renewal
+# step/modifier interfaces. Public but not exported, so they are documented and
+# supported without crowding the namespace of a `using` call.
+public ModelShape, across_shape, infection_strata,
+    AbstractAccumulationStep, AbstractConstantRenewalStep,
+    ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
+    apply_modifier, renewal_foi, renewal_init_state, renewal_init_window,
+    MissingObservations
 
 # --- core architecture ---
 include("base/base.jl")
 include("base/roles.jl")
+include("base/shapes.jl")
 include("base/interfaces.jl")
 include("base/priors.jl")
 include("base/prettyprinting.jl")
 
 # --- accumulation steps ---
 # The backend-agnostic `accumulate_scan` machinery and the concrete step structs
-# it scans over, regrouped from `base/`, `utils/`, and the individual model
-# files into one location (see issue #48, Phase 1). Included early so every step
-# type is defined before the model components that construct them.
+# it scans over. Included early so every step type is defined before the model
+# components that construct them.
 include("steps/AbstractAccumulationStep.jl")
 include("steps/accumulate_scan.jl")
 include("steps/RWStep.jl")
@@ -144,6 +160,8 @@ include("steps/LDStep.jl")
 include("steps/TimeVaryingLDStep.jl")
 include("steps/RenewalSteps.jl")
 include("steps/RenewalStep.jl")
+include("steps/MixingStep.jl")
+include("steps/Gravity.jl")
 include("steps/ImportedCases.jl")
 
 # --- utilities and distributions ---
@@ -159,7 +177,6 @@ include("latent_models/models/IID.jl")
 include("latent_models/models/HierarchicalNormal.jl")
 include("latent_models/models/RandomWalk.jl")
 include("latent_models/models/AR.jl")
-include("latent_models/models/TimeVaryingAR.jl")
 include("latent_models/models/MA.jl")
 include("latent_models/models/HilbertSpaceGP.jl")
 include("latent_models/models/ExactGP.jl")
@@ -172,6 +189,8 @@ include("latent_models/modifiers/RecordExpectedLatent.jl")
 include("latent_models/manipulators/CombineLatentModels.jl")
 include("latent_models/manipulators/ConcatLatentModels.jl")
 include("latent_models/manipulators/Hierarchy.jl")
+include("latent_models/manipulators/Stratify.jl")
+include("latent_models/manipulators/Replicate.jl")
 include("latent_models/manipulators/broadcast/LatentModel.jl")
 include("latent_models/manipulators/broadcast/rules.jl")
 include("latent_models/manipulators/broadcast/helpers.jl")
@@ -185,7 +204,6 @@ include("infection_models/Renewal.jl")
 # `utils.jl` defines the `R_to_r(::Renewal)` method, so it follows `Renewal`.
 include("infection_models/utils.jl")
 include("infection_models/CombineInfections.jl")
-include("infection_models/GroupedInfections.jl")
 
 # --- ODE compartmental models ---
 include("ode/SIRParams.jl")

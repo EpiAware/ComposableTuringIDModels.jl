@@ -42,21 +42,18 @@ runs:
       id: increment
       shell: bash
       run: |
-        # Get current version
         CURRENT_VERSION=$(grep '^version = ' Project.toml | sed 's/version = "\(.*\)"/\1/')
         echo "Current version: $CURRENT_VERSION"
 
-        # Strip any pre-release/build suffix before parsing. A version like
-        # "0.1.0-DEV" (everything the kit scaffolds starts life pre-release,
-        # unregistered) has never been published, so the correct transition is
-        # to RELEASE what the number already says — drop the suffix — not to
-        # increment past it. Without this, `IFS='.'` leaves PATCH as "0-DEV" and
-        # `$(( PATCH + 1 ))` coerces the "-DEV" to 0 and yields 1, so the maiden
-        # published version would be 0.1.1 and 0.1.0 would be silently skipped
-        # (#255).
+        # Strip any pre-release/build suffix before parsing. Everything the
+        # kit scaffolds starts pre-release ("0.1.0-DEV") and unpublished, so
+        # the correct transition is to RELEASE what the number already says,
+        # not increment past it. Without this, `IFS='.'` leaves PATCH as
+        # "0-DEV" and `$(( PATCH + 1 ))` coerces it to 1, so the maiden
+        # published version would be 0.1.1 and 0.1.0 silently skipped (#255).
         BASE_VERSION="${CURRENT_VERSION%%[-+]*}"
 
-        # Parse version parts from the released base, so PATCH is a clean number.
+        # Parse version parts from the released base, so PATCH is clean.
         IFS='.' read -ra VERSION_PARTS <<< "$BASE_VERSION"
         MAJOR=${VERSION_PARTS[0]}
         MINOR=${VERSION_PARTS[1]}
@@ -68,7 +65,6 @@ runs:
           echo "Pre-release version '$CURRENT_VERSION' detected: releasing" \
                "$NEW_VERSION (suffix stripped, no increment)."
         else
-          # A plain released version: apply the requested increment.
           case "${{ inputs.increment-type }}" in
             "major")
               NEW_MAJOR=$((MAJOR + 1))
@@ -93,7 +89,6 @@ runs:
         echo "old-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
         echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-        # Update Project.toml
         sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Project.toml
 
     - name: Check for existing PR
@@ -103,7 +98,6 @@ runs:
       run: |
         NEW_VERSION="${{ steps.increment.outputs.new-version }}"
 
-        # Check if a PR already exists with the same version
         EXISTING_PR=$(gh pr list --state open --search "in:title \"${{ inputs.pr-title-prefix }} to $NEW_VERSION\"" --json number --jq '.[0].number // empty')
 
         if [ -n "$EXISTING_PR" ]; then
@@ -120,7 +114,6 @@ runs:
       if: inputs.create-pr == 'true' && steps.check-pr.outputs.existing-pr == 'false'
       shell: bash
       run: |
-        # Configure git
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
 
@@ -128,11 +121,9 @@ runs:
         NEW_VERSION="${{ steps.increment.outputs.new-version }}"
         INCREMENT_TYPE="${{ inputs.increment-type }}"
 
-        # Create new branch
         BRANCH_NAME="auto/version-increment-${NEW_VERSION}"
         git checkout -b "$BRANCH_NAME"
 
-        # Commit changes
         git add Project.toml
         git commit -m "${{ inputs.pr-title-prefix }} to $NEW_VERSION
 
@@ -141,7 +132,6 @@ runs:
         Previous version: $OLD_VERSION
         New version: $NEW_VERSION"
 
-        # Push branch
         git push origin "$BRANCH_NAME"
 
         # Only assign when a handle was configured. Assigning a bare org (the
@@ -152,7 +142,6 @@ runs:
           ASSIGNEE_ARGS=(--assignee "${{ inputs.assignee }}")
         fi
 
-        # Create PR using GitHub CLI
         PR_OUTPUT=$(gh pr create \
           --title "${{ inputs.pr-title-prefix }} to $NEW_VERSION" \
           --body "This PR automatically increments the version from \`$OLD_VERSION\` to \`$NEW_VERSION\` as a **$INCREMENT_TYPE** release.
@@ -176,7 +165,6 @@ runs:
           --head "$BRANCH_NAME" \
           "${ASSIGNEE_ARGS[@]}")
 
-        # Extract PR number
         PR_NUMBER=$(echo "$PR_OUTPUT" | grep -o '/pull/[0-9]*' | grep -o '[0-9]*')
         echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
         echo "Created PR #$PR_NUMBER"
@@ -194,7 +182,6 @@ runs:
       if: inputs.create-pr == 'false'
       shell: bash
       run: |
-        # Configure git
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
 
@@ -202,7 +189,6 @@ runs:
         NEW_VERSION="${{ steps.increment.outputs.new-version }}"
         INCREMENT_TYPE="${{ inputs.increment-type }}"
 
-        # Commit changes
         git add Project.toml
         git commit -m "${{ inputs.pr-title-prefix }} to $NEW_VERSION
 
@@ -211,5 +197,4 @@ runs:
         Previous version: $OLD_VERSION
         New version: $NEW_VERSION"
 
-        # Push to current branch
         git pull && git push

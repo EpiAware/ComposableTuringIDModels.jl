@@ -72,8 +72,8 @@ end
 # `_check_hyperprior_support`), so for them this is a backstop for a direct call
 # rather than something a chain can hit.
 function _check_spectral_args(σ, ℓ)
-    @assert ℓ>0 "the length scale ℓ must be greater than 0"
-    @assert σ>=0 "the marginal standard deviation σ must not be negative"
+    @assert ℓ > 0 "the length scale ℓ must be greater than 0"
+    @assert σ >= 0 "the marginal standard deviation σ must not be negative"
     return nothing
 end
 
@@ -88,8 +88,8 @@ end
 function _check_hyperprior_support(length_scale, marginal_std)
     ℓ_msg = "the length scale prior must not put mass on ℓ < 0"
     σ_msg = "the marginal standard deviation prior must not put mass on σ < 0"
-    @assert minimum(length_scale)>=0 ℓ_msg
-    @assert minimum(marginal_std)>=0 σ_msg
+    @assert minimum(length_scale) >= 0 ℓ_msg
+    @assert minimum(marginal_std) >= 0 σ_msg
     return nothing
 end
 
@@ -209,8 +209,10 @@ gp_matern = HilbertSpaceGP(kernel = Matern32Kernel())
 length(as_turing_model(gp_matern, 30)())
 ```
 "
-struct HilbertSpaceGP{L <: UnivariateDistribution, S <: UnivariateDistribution,
-    K <: Kernel} <: AbstractPriorModel
+struct HilbertSpaceGP{
+        L <: UnivariateDistribution, S <: UnivariateDistribution,
+        K <: Kernel,
+    } <: AbstractPriorModel
     "Prior for the length scale ``\\ell``; puts no mass below zero."
     length_scale::L
     "Prior for ``\\sigma``; puts no mass below zero."
@@ -222,18 +224,21 @@ struct HilbertSpaceGP{L <: UnivariateDistribution, S <: UnivariateDistribution,
     "Covariance kernel, a KernelFunctions.jl `Kernel`."
     kernel::K
 
-    function HilbertSpaceGP(length_scale::UnivariateDistribution,
+    function HilbertSpaceGP(
+            length_scale::UnivariateDistribution,
             marginal_std::UnivariateDistribution, m::Int, c::Real,
-            kernel::Kernel)
-        @assert m>0 "m (the number of basis functions) must be greater than 0"
+            kernel::Kernel
+        )
+        @assert m > 0 "m (the number of basis functions) must be greater than 0"
         # Below c = 1.2 the boundary effect leaves an error floor no number of
         # basis functions can clear (24% at c = 1.05, 6% at c = 1.2, measured as
         # relative Frobenius error against the Gram matrix), so the constructor
         # rejects it rather than accepting an unusable configuration.
-        @assert c>=1.2 "c (the boundary factor) must be at least 1.2"
+        @assert c >= 1.2 "c (the boundary factor) must be at least 1.2"
         _check_hyperprior_support(length_scale, marginal_std)
-        new{typeof(length_scale), typeof(marginal_std), typeof(kernel)}(
-            length_scale, marginal_std, m, Float64(c), kernel)
+        return new{typeof(length_scale), typeof(marginal_std), typeof(kernel)}(
+            length_scale, marginal_std, m, Float64(c), kernel
+        )
     end
 end
 
@@ -246,10 +251,12 @@ const _DEFAULT_LENGTH_SCALE_FLOOR = 0.05
 
 function HilbertSpaceGP(;
         length_scale::UnivariateDistribution = truncated(
-            Normal(0.0, 0.4), _DEFAULT_LENGTH_SCALE_FLOOR, Inf),
+            Normal(0.0, 0.4), _DEFAULT_LENGTH_SCALE_FLOOR, Inf
+        ),
         marginal_std::UnivariateDistribution = truncated(Normal(0.0, 1.0), 0, Inf),
         m::Int = 20, c::Real = 1.5,
-        kernel::Kernel = SqExponentialKernel())
+        kernel::Kernel = SqExponentialKernel()
+    )
     return HilbertSpaceGP(length_scale, marginal_std, m, c, kernel)
 end
 
@@ -280,8 +287,8 @@ standardised_index(5)
 ```
 "
 function standardised_index(n::Int)
-    @assert n>1 "n must be greater than 1 to standardise the index"
-    (collect(1:n) .- Statistics.mean(1:n)) ./ Statistics.std(1:n)
+    @assert n > 1 "n must be greater than 1 to standardise the index"
+    return (collect(1:n) .- Statistics.mean(1:n)) ./ Statistics.std(1:n)
 end
 
 @doc raw"
@@ -304,7 +311,7 @@ deviation (and hence ``S``) is positive; `n = 1` would give ``S = L = 0`` and a
 basis of `NaN`.
 "
 function hsgp_basis(n::Int, m::Int, c::Real)
-    @assert n>1 "n must be greater than 1 for a well-defined basis (S > 0)"
+    @assert n > 1 "n must be greater than 1 for a well-defined basis (S > 0)"
     x = standardised_index(n)
     S = maximum(abs, x)          # half-range of the standardised inputs
     L = c * S
@@ -318,8 +325,10 @@ end
 # body means it is computed once (in `as_turing_model` below) rather than on every
 # log-density / gradient evaluation: only `ℓ`, `σ`, `β` and the matrix–vector
 # product remain inside the differentiated path.
-@model function _hsgp_model(kernel::Kernel, Φ, sqrt_λ, m,
-        length_scale, marginal_std)
+@model function _hsgp_model(
+        kernel::Kernel, Φ, sqrt_λ, m,
+        length_scale, marginal_std
+    )
     ℓ ~ length_scale
     σ ~ marginal_std
     β ~ filldist(Normal(), m)
@@ -335,9 +344,11 @@ end
 # out of the differentiated per-evaluation path while preserving the single
 # `as_turing_model(model, n)` entry point; the `@model` is an implementation
 # detail of that one method, not a second public model per struct.
-function as_turing_model(model::HilbertSpaceGP, n)
-    @assert n>1 "n must be greater than 1"
+function as_turing_model(model::HilbertSpaceGP, n::Int)
+    @assert n > 1 "n must be greater than 1"
     Φ, sqrt_λ = hsgp_basis(n, model.m, model.c)
-    return _hsgp_model(model.kernel, Φ, sqrt_λ, model.m,
-        model.length_scale, model.marginal_std)
+    return _hsgp_model(
+        model.kernel, Φ, sqrt_λ, model.m,
+        model.length_scale, model.marginal_std
+    )
 end

@@ -48,5 +48,5 @@ accumulate_scan(ComposableTuringIDModels.RWStep(), 0.0, [1.0, 2.0, 3.0])
 ```
 "
 function get_state(acc_step::AbstractAccumulationStep, initial_state, state)
-    return vcat(initial_state, last.(state))
+    return vcat(collect(initial_state), last.(state))
 end

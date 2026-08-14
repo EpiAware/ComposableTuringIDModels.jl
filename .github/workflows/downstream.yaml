@@ -1,16 +1,15 @@
 # MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 name: Downstream
 
-# Opt-in reverse-dependency tests: checks that this PR's version of the package
-# does not break packages that depend on it. This is expensive, so it does not
-# run on every push. Trigger it by adding the `downstream` (or `reverse-deps`)
-# label to a PR, or by running it manually from the Actions tab.
+# Opt-in reverse-dependency tests: checks that this PR's version of the
+# package does not break packages that depend on it. Expensive, so it
+# doesn't run on every push. Trigger via the `downstream` (or `reverse-deps`)
+# PR label, or manually from the Actions tab.
 #
-# The downstream list below starts empty. Add entries as packages start
-# depending on this one (see the commented example), then label a PR to run
-# them. This list is package-owned: edit `downstreams` to fit the package and
-# `update` keeps what you set, while the rest of this file stays
-# managed.
+# `downstreams` below starts empty; add entries as packages start depending
+# on this one (see the commented example) and label a PR to run them. This
+# list is package-owned — `update` preserves it while the rest of the file
+# stays managed.
 
 on:
   pull_request:
@@ -28,7 +27,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event.label.name == 'downstream' ||
       github.event.label.name == 'reverse-deps'
-    uses: EpiAware/.github/.github/workflows/downstream.yml@383486033b4ae93561695411c9033f204df75d12
+    uses: EpiAware/.github/.github/workflows/downstream.yml@8c1e09003b9cf0d2eb3cbec7aa726855bb365ac5
     secrets: inherit  # pragma: allowlist secret
     with:
       # JSON list of downstreams. Each entry needs `repo` (owner/name) and may

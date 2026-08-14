@@ -67,13 +67,20 @@ function _spec(sym, spec)
 end
 
 function ComposableTuringIDModels.CatalystODEParams(
-        rn::ReactionSystem; tspan, u0_priors, p_priors)
+        rn::ReactionSystem; tspan, u0_priors, p_priors
+    )
     species = ModelingToolkit.unknowns(rn)
     rates = ModelingToolkit.parameters(rn)
-    length(u0_priors) == length(species) || throw(ArgumentError(
-        "u0_priors must give a prior for every species ($(length(species)) of them)"))
-    length(p_priors) == length(rates) || throw(ArgumentError(
-        "p_priors must give a prior for every parameter ($(length(rates)) of them)"))
+    length(u0_priors) == length(species) || throw(
+        ArgumentError(
+            "u0_priors must give a prior for every species ($(length(species)) of them)"
+        )
+    )
+    length(p_priors) == length(rates) || throw(
+        ArgumentError(
+            "p_priors must give a prior for every parameter ($(length(rates)) of them)"
+        )
+    )
 
     # Build the problem with placeholder symbolic maps. `jac = true` makes
     # ModelingToolkit emit the symbolic Jacobian the stiff/auto solver wants.
@@ -92,7 +99,9 @@ end
 # symbolic `remake` below places each value into the problem by name, so the
 # stored (Catalyst-sorted) layout is never assumed and the ForwardDiff `Dual`
 # values propagate through `remake` unchanged.
-@model function ComposableTuringIDModels.as_turing_model(params::CatalystODEParams, n)
+@model function ComposableTuringIDModels.as_turing_model(
+        params::CatalystODEParams, n::Union{Int, Nothing}
+    )
     u0 = Vector{Pair}(undef, length(params.u0_specs))
     p = Vector{Pair}(undef, length(params.p_specs))
     for (k, s) in enumerate(params.u0_specs)

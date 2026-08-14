@@ -6,13 +6,11 @@
 #
 #   julia --project=test/jet test/jet/runtests.jl
 #
-# A package whose public surface is DynamicPPL `@model` functions gets spurious
-# JET reports for every `~`/`:=` line (the tilde macro hides the assignment from
-# JET). To suppress exactly those, drop a package-owned `test/jet/jet_config.jl`
-# that defines `JET_REPORT_FILTER` (a `report -> Bool` predicate; a report is
-# kept when it returns `true`). `EpiAwarePackageTools.dynamicppl_model_filter`
-# is the ready-made filter for `@model` packages. Without the config the runner
-# fails on any report (the strict default).
+# A DynamicPPL `@model` package gets spurious JET reports for every `~`/`:=`
+# line (the tilde macro hides the assignment from JET). Suppress those via a
+# package-owned `test/jet/jet_config.jl` defining `JET_REPORT_FILTER`
+# (`EpiAwarePackageTools.dynamicppl_model_filter` is the ready-made one).
+# Without it the runner fails on any report (the strict default).
 
 using JET
 using EpiAwarePackageTools: dynamicppl_model_filter
@@ -22,8 +20,10 @@ const _CONFIG = joinpath(@__DIR__, "jet_config.jl")
 isfile(_CONFIG) && include(_CONFIG)
 
 if @isdefined(JET_REPORT_FILTER)
-    result = JET.report_package(ComposableTuringIDModels;
-        target_modules = (ComposableTuringIDModels,))
+    result = JET.report_package(
+        ComposableTuringIDModels;
+        target_modules = (ComposableTuringIDModels,)
+    )
     kept = filter(JET_REPORT_FILTER, JET.get_reports(result))
     for r in kept
         @info "JET report (not filtered)" report = sprint(show, r)

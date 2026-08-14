@@ -8,7 +8,8 @@
     gen_int = [0.2, 0.3, 0.5]
     model = IDModel(
         Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
-        NegativeBinomialError())
+        NegativeBinomialError()
+    )
     out = sprint(show, MIME"text/plain"(), model)
 
     # Root and each nested component appear by concrete name.
@@ -61,9 +62,12 @@ end
 @testitem "show renders each Split stream on its own line" begin
     using ComposableTuringIDModels, Distributions
 
-    split = Split((
-        cases = LatentDelay(NegativeBinomialError(), [0.4, 0.3, 0.2, 0.1]),
-        deaths = LatentDelay(PoissonError(), [0.1, 0.2, 0.3, 0.4])))
+    split = Split(
+        (
+            cases = LatentDelay(NegativeBinomialError(), [0.4, 0.3, 0.2, 0.1]),
+            deaths = LatentDelay(PoissonError(), [0.1, 0.2, 0.3, 0.4]),
+        )
+    )
     out = sprint(show, MIME"text/plain"(), split)
 
     # Each stream is a labelled branch on its own line, keyed by its name, and the
@@ -84,12 +88,17 @@ end
     # A Split nested inside a modifier, with a further submodel nested inside one
     # of its streams: indentation must compose through both layers.
     model = LatentDelay(
-        Split((
-            cases = PoissonError(),
-            deaths = LatentDelay(
-                Ascertainment(PoissonError(), FixedIntercept(log(0.1))),
-                [0.2, 0.3, 0.5]))),
-        [0.5, 0.3, 0.2])
+        Split(
+            (
+                cases = PoissonError(),
+                deaths = LatentDelay(
+                    Ascertainment(PoissonError(), FixedIntercept(log(0.1))),
+                    [0.2, 0.3, 0.5]
+                ),
+            )
+        ),
+        [0.5, 0.3, 0.2]
+    )
     out = sprint(show, MIME"text/plain"(), model)
 
     # The Split sits under the outer modifier, and its streams are indented one
@@ -119,7 +128,8 @@ end
 
     model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-        PoissonError())
+        PoissonError()
+    )
     # The compact form (used inside arrays / `repr`) is a single clean line with
     # no nested parametric type dump.
     @test sprint(show, model) == "IDModel"

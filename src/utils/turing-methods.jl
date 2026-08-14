@@ -24,8 +24,10 @@ m = as_turing_model(RandomWalk(), 10)
 condition_model(m, (rw_init = 0.0,), NamedTuple())
 ```
 "
-function condition_model(model::DynamicPPL.Model, fix_parameters::NamedTuple,
-        condition_parameters::NamedTuple)
+function condition_model(
+        model::DynamicPPL.Model, fix_parameters::NamedTuple,
+        condition_parameters::NamedTuple
+    )
     _model = fix(model, fix_parameters)
     _model = condition(_model, condition_parameters)
     return _model

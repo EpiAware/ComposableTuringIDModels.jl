@@ -1,4 +1,4 @@
-# [An SIR compartmental model](@id case-study-sir)
+# [An SIR compartmental model](@id tutorial-sir)
 
 The renewal equation is one way to generate infections, but it is not the only
 one. Mechanistic compartmental models describe transmission with a system of
@@ -7,7 +7,7 @@ showed how to embed such an ODE in a Bayesian model and infer its parameters,
 using a classic influenza outbreak in an English boarding school as their
 example.
 
-This case study swaps the renewal infection process for an
+This tutorial swaps the renewal infection process for an
 [`ODEProcess`](@ref) built from [`SIRParams`](@ref), keeping the same
 composable observation machinery. Infections come from solving the SIR equations
 with the [SciML](https://sciml.ai) stack
@@ -48,7 +48,7 @@ Random.seed!(1978)
 N = 763          # children in the school
 
 datapath = joinpath(pkgdir(ComposableTuringIDModels),
-    "docs", "src", "case-studies", "data", "influenza_england_1978_school.csv")
+    "docs", "src", "tutorials", "data", "influenza_england_1978_school.csv")
 influenza = CSV.read(datapath, DataFrame)
 y_obs = influenza.in_bed            # children confined to bed each day
 ts = collect(1.0:length(y_obs))     # observation times (days)
