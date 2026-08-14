@@ -41,6 +41,7 @@ ADFixtures = {path = "../test/ADFixtures"}
 ComposableTuringIDModels = {path = ".."}
 
 [compat]
+Enzyme = "0.13.199"
 EpiAwarePackageTools = "0.3, 0.4"
 ADTypes = "1"
 AbstractGPs = "0.5"
@@ -68,6 +69,7 @@ Mooncake = "0.5"
 OrdinaryDiffEq = "7"
 PairPlots = "3"
 Plots = "1"
+ReverseDiff = "1.17.0"
 Statistics = "1"
 StatsBase = "0.34, 0.35"
 Turing = "0.46"
