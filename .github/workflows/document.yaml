@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   Documenter:
-    uses: EpiAware/.github/.github/workflows/documentation.yml@d024dc6927cc3523292a159dc0d4a45193c9c65d
+    uses: EpiAware/.github/.github/workflows/documentation.yml@8c1e09003b9cf0d2eb3cbec7aa726855bb365ac5
     with:
       timeout_minutes: 240
       julia_num_threads: 'auto'
