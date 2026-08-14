@@ -129,6 +129,17 @@ That own weight is the `within` keyword, default `1.0`.
 `Gravity` draws priors on `α`, `β` and `γ`, then calls the same function
 inside the model, so the fixed and inferred paths cannot drift.
 
+`pop` is in whatever units you have.
+`gravity` works in units of the mean population and returns rows that sum to
+one, so `K` says only where each patch's force comes from.
+`R_t` carries its size.
+Without that split the two are confounded, since any overall scale on `K` is
+the same as scaling `R_t`.
+
+`within` sets how much of a patch's force is its own, relative to a typical
+pairwise term.
+It has to be non-zero for `α` to be identifiable.
+
 ## Many-to-one observation: age bands into one stream
 
 A hospitalisation stream rarely reports by age even when transmission does.

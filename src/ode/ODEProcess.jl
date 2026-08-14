@@ -69,8 +69,10 @@ as_turing_model(sir_process, nothing)()
   - `sol2infs`: link mapping the ODE solution to an infection series.
   - `solver_options`: extra options passed to `solve` (a `Dict` or `NamedTuple`).
 "
-@kwdef struct ODEProcess{P <: AbstractLatentModel, S, F <: Function,
-    D <: Union{Dict, NamedTuple}} <: AbstractInfectionModel
+@kwdef struct ODEProcess{
+        P <: AbstractLatentModel, S, F <: Function,
+        D <: Union{Dict, NamedTuple},
+    } <: AbstractInfectionModel
     "The ODE parameter model."
     params::P
     "The ODE solver."

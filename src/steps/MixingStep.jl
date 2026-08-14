@@ -50,15 +50,17 @@ end
 # has drawn it. Name the step and point at the seam rather than failing with a
 # bare `MethodError` from inside the recursion.
 function _unresolved_mixing(step)
-    return error("$(typeof(step)) has no scan interface. A drawn coupling " *
-                 "operator must be resolved before the scan through the " *
-                 "step's `as_turing_model` seam, i.e. " *
-                 "`as_turing_submodel(step, n)` (what `Renewal` does).")
+    return error(
+        "$(typeof(step)) has no scan interface. A drawn coupling " *
+            "operator must be resolved before the scan through the " *
+            "step's `as_turing_model` seam, i.e. " *
+            "`as_turing_submodel(step, n)` (what `Renewal` does)."
+    )
 end
 
 (step::MixingStep)(window, Rt) = _unresolved_mixing(step)
 
-function _renewal_init_state(step::MixingStep, I₀, r_approx, len_gen_int)
+function renewal_init_state(step::MixingStep, I₀, r_approx, len_gen_int)
     return _unresolved_mixing(step)
 end
 

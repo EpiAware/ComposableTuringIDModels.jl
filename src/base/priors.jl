@@ -82,16 +82,13 @@ end
 as_turing_submodel(d::Distribution, ::ModelShape; prefix::Bool = false) = d
 
 function as_turing_submodel(
-        v::AbstractVector{<:Distribution}, n::Int; prefix::Bool = false)
-    @assert length(v)==n "a length-$(length(v)) prior vector cannot produce a length-$n prior"
-    # `filldist` for a homogeneous vector, `product_distribution` otherwise.
-    # `product_distribution` (not DynamicPPL's `arraydist`, which routes a
-    # vector of univariates through the deprecated `Distributions.Product`
-    # constructor): the deprecation path pulls in `Base.depwarn`/`invokelatest`
-    # world-age machinery that Enzyme reverse cannot shadow
-    # (`EnzymeNoShadowError`), while `product_distribution` builds the identical
-    # `Product` without it.
-    return all(first(v) .== v) ? filldist(first(v), n) : product_distribution(v)
+        v::AbstractVector{<:Distribution}, n::Int; prefix::Bool = false
+    )
+    @assert length(v) == n "a length-$(length(v)) prior vector cannot produce a length-$n prior"
+    # `product_distribution` unconditionally: `arraydist`'s deprecated
+    # `Distributions.Product` path breaks Enzyme reverse, and choosing
+    # `filldist` at runtime returns a `Union` its type analysis rejects.
+    return product_distribution(v)
 end
 
 # A bare `Distribution` in a length-`n` PATH slot (an innovation or a latent
@@ -112,8 +109,10 @@ prior). Bounding a widened slot to `PriorLike` keeps the fail-fast role guard �
 wrong-role component (an observation or infection model) is rejected at
 construction — while accepting a bare distribution alongside a process.
 "
-const PriorLike = Union{Distribution, AbstractVector{<:Distribution},
-    AbstractPriorModel}
+const PriorLike = Union{
+    Distribution, AbstractVector{<:Distribution},
+    AbstractPriorModel,
+}
 
 @doc raw"
 Sample a raw prior `Distribution` as a **single scalar** RV.
@@ -154,8 +153,7 @@ end
 Sample a vector of prior `Distribution`s as a length-`n` prior submodel, one
 independent draw per element.
 
-The length is fixed by the vector, so `n` must match it. A homogeneous vector uses
-`filldist` and a heterogeneous one `product_distribution`. This is the explicit
+The length is fixed by the vector, so `n` must match it. This is the explicit
 way a prior slot asks for `n` independent draws with per-element priors (e.g. an
 `AR`'s per-lag damping coefficients).
 
@@ -171,13 +169,10 @@ as_turing_model([Normal(0, 1), Normal(5, 0.1)], 2)()
 ```
 "
 @model function as_turing_model(prior::AbstractVector{<:Distribution}, n::Int)
-    @assert length(prior)==n "a length-$(length(prior)) prior vector cannot produce a length-$n prior"
-    # One i.i.d. draw per element; `filldist` for a homogeneous vector,
-    # `product_distribution` otherwise (not `arraydist`, whose deprecated
-    # `Distributions.Product` path breaks Enzyme reverse — see the note in
-    # `as_turing_submodel`'s vector method).
-    product_dist = all(first(prior) .== prior) ? filldist(first(prior), n) :
-                   product_distribution(prior)
+    @assert length(prior) == n "a length-$(length(prior)) prior vector cannot produce a length-$n prior"
+    # One i.i.d. draw per element. See `as_turing_submodel`'s vector method
+    # for why this is `product_distribution` and not `arraydist`.
+    product_dist = product_distribution(prior)
     θ ~ product_dist
     return θ
 end
@@ -219,7 +214,7 @@ _prior_order(::AbstractPriorModel) = 1
 # distribution or a richer prior model broadcasts to `k` and imposes no
 # constraint.
 function _assert_prior_length(p::AbstractVector{<:Distribution}, k, what)
-    @assert length(p)==k "$what prior length $(length(p)) must equal $k"
+    @assert length(p) == k "$what prior length $(length(p)) must equal $k"
     return nothing
 end
 _assert_prior_length(_, k, what) = nothing

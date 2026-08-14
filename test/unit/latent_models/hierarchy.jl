@@ -80,7 +80,7 @@ end
     @test all(x -> x isa Real, out.Z_t)
 end
 
-@testitem "Hierarchy drives a per-group quantity in a stacked composed model" tags=[:sample] begin
+@testitem "Hierarchy drives a per-group quantity in a stacked composed model" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
     using Turing: to_submodel, returned
     Random.seed!(388)
@@ -89,10 +89,13 @@ end
     # read from the data matrix (its columns), NOT stored on any component.
     idmodel = IDModel(
         DirectInfections(;
-            Z = RandomWalk(), initialisation = Normal(log(50.0), 0.2)),
-        PoissonError())
+            Z = RandomWalk(), initialisation = Normal(log(50.0), 0.2)
+        ),
+        PoissonError()
+    )
     hierarchy = Hierarchy(;
-        mean = Normal(0.0, 0.5), across = IID(Normal(0.0, 0.5)))
+        mean = Normal(0.0, 0.5), across = IID(Normal(0.0, 0.5))
+    )
 
     @model function grouped_epidemic(idmodel, hierarchy, Y)
         n_time, n_groups = size(Y)
@@ -101,9 +104,11 @@ end
         # the group-requirement threading made explicit.
         group_levels ~ to_submodel(
             as_turing_model(PrefixLatentModel(hierarchy, "groups"), n_groups),
-            false)
+            false
+        )
         infections ~ to_submodel(
-            as_turing_model(idmodel.infection_model, n_time), false)
+            as_turing_model(idmodel.infection_model, n_time), false
+        )
         I_t = infections.I_t
         ys = Vector{Any}(undef, n_groups)
         for g in 1:n_groups
@@ -125,8 +130,10 @@ end
     @test size(Ydata) == (n_time, n_groups)
 
     posterior = grouped_epidemic(idmodel, hierarchy, Float64.(Ydata))
-    chain = sample(posterior, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 80;
-        progress = false)
+    chain = sample(
+        posterior, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 80;
+        progress = false
+    )
     @test size(chain, 1) == 80
     # The per-group levels are recovered as generated quantities.
     draws = reduce(hcat, [g.group_levels for g in vec(returned(posterior, chain))])
@@ -135,7 +142,7 @@ end
     @test cor(sim.group_levels, post_mean) > 0.5
 end
 
-@testitem "a partially-pooled model samples under NUTS (ForwardDiff)" tags=[:sample] begin
+@testitem "a partially-pooled model samples under NUTS (ForwardDiff)" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     using DynamicPPL: to_submodel
     Random.seed!(386)
@@ -153,8 +160,10 @@ end
 
     G = 5
     ydata = Int.(pooled_counts(h, fill(missing, G), G)())
-    chn = sample(pooled_counts(h, ydata, G),
-        NUTS(0.8; adtype = Turing.AutoForwardDiff()), 60; progress = false)
+    chn = sample(
+        pooled_counts(h, ydata, G),
+        NUTS(0.8; adtype = Turing.AutoForwardDiff()), 60; progress = false
+    )
     @test chn !== nothing
     @test size(chn, 1) == 60
 end

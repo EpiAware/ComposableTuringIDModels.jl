@@ -41,8 +41,9 @@ rand(mdl)
   - `present`: the boolean presence mask (`aggregation .!= 0`).
 "
 struct Aggregate{
-    M <: AbstractObservationModel, A <: AbstractVector{<:Int},
-    P <: AbstractVector{<:Bool}} <: AbstractObservationModel
+        M <: AbstractObservationModel, A <: AbstractVector{<:Int},
+        P <: AbstractVector{<:Bool},
+    } <: AbstractObservationModel
     "The underlying observation model."
     model::M
     "The per-period aggregation window lengths."
@@ -50,16 +51,20 @@ struct Aggregate{
     "The boolean presence mask."
     present::P
 
-    function Aggregate(model::M,
-            aggregation::A) where {
-            M <: AbstractObservationModel, A <: AbstractVector{<:Int}}
+    function Aggregate(
+            model::M,
+            aggregation::A
+        ) where {
+            M <: AbstractObservationModel, A <: AbstractVector{<:Int},
+        }
         present = aggregation .!= 0
         return new{M, A, typeof(present)}(model, aggregation, present)
     end
 end
 
 function Aggregate(; model::M, aggregation::A) where {
-        M <: AbstractObservationModel, A <: AbstractVector{<:Int}}
+        M <: AbstractObservationModel, A <: AbstractVector{<:Int},
+    }
     return Aggregate(model, aggregation)
 end
 

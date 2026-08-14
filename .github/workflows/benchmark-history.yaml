@@ -3,11 +3,10 @@ name: Benchmark history
 
 # Persistent benchmark timeline. The PR-comparison workflow
 # (`benchmark.yaml`) runs on `pull_request` and only posts a base-vs-head
-# comment; it never records history. This workflow instead runs on pushes
-# to `main` and on tags, benchmarking the last few tagged releases plus
-# HEAD so a timeline accumulates. Triggers are disjoint from
-# `benchmark.yaml` (push/tags here vs pull_request there), so the two
-# never run on the same event.
+# comment; it never records history. This workflow runs on pushes to `main`
+# and on tags, benchmarking the last few tagged releases plus HEAD so a
+# timeline accumulates. Triggers are disjoint from `benchmark.yaml`, so the
+# two never run on the same event.
 on:
   push:
     branches: [main]
@@ -20,9 +19,8 @@ permissions:
   contents: write
 
 # Serialise history deploys so concurrent pushes/tags don't race on the
-# `benchmarks` branch. Not keyed on ref so a tag push and a main push
-# queue rather than clobber. cancel-in-progress: false keeps every
-# recorded point.
+# `benchmarks` branch. Not keyed on ref, so a tag push and a main push queue
+# rather than clobber; cancel-in-progress: false keeps every recorded point.
 concurrency:
   group: benchmark-history-deploy
   cancel-in-progress: false
@@ -44,11 +42,10 @@ jobs:
       - uses: julia-actions/cache@v3
 
       # benchmark/Project.toml declares ADFixtures as a path source at
-      # `../test/ADFixtures`. benchpkg copies `benchmark/Project.toml`
-      # into a tempdir under `/tmp/` and Pkg resolves the relative source
-      # to `/tmp/test/ADFixtures`. Stage it there so resolution succeeds.
-      # Guarded so a non-AD package (no `test/ADFixtures`, no path source
-      # to stage) is a no-op.
+      # `../test/ADFixtures`. benchpkg copies that file into a `/tmp/`
+      # tempdir, where Pkg resolves the relative source to
+      # `/tmp/test/ADFixtures`, so stage it there. Guarded to a no-op for a
+      # non-AD package (no `test/ADFixtures`).
       - name: Stage ADFixtures for AirspeedVelocity
         run: |
           if [ -d test/ADFixtures ]; then
@@ -65,21 +62,17 @@ jobs:
 
       # benchpkg installs the package into its own temp project, where Pkg
       # honours only the *active* project's `[sources]`. A dependency pinned
-      # there by git url/rev because it is not yet registered cannot resolve
-      # in that temp project, and the run fails with "has no known versions!"
-      # (#216). Register each such pin into a throwaway registry in this
-      # runner's depot: registries, unlike sources, are depot-level, so the
-      # dependency then resolves by name in every environment on the runner,
-      # benchpkg's temp projects included. A package with no unregistered
-      # pins is a no-op (nothing cloned, no registry created), and the shell
-      # guard exits before installing anything, so a package with no
-      # `[sources]` at all pays nothing and takes on no new failure surface.
+      # there by git url/rev (not yet registered) cannot resolve in that temp
+      # project and fails with "has no known versions!" (#216). Register each
+      # such pin into a throwaway registry in this runner's depot instead:
+      # registries are depot-level, so the dependency then resolves by name
+      # in every environment on the runner. A package with no unregistered
+      # pins is a no-op.
       #
-      # The scratch registry from an earlier run comes back with the cached
-      # depot and is stale by construction, so it is dropped first, before the
-      # guard: a package that has since dropped its pin (because the
-      # dependency reached a registry) must not be left with a registry that
-      # still carries the name, which fails the depot with a hash mismatch.
+      # The scratch registry from an earlier run is stale (cached depot), so
+      # drop it first, before the guard: otherwise a package that has since
+      # dropped its pin is left with a registry still carrying the name,
+      # which fails the depot with a hash mismatch.
       - name: Bootstrap registry for unregistered [sources] deps
         run: |
           rm -rf "${JULIA_DEPOT_PATH:-$HOME/.julia}/registries/EpiAwareScratch"
@@ -102,7 +95,7 @@ jobs:
 
       # Last 5 tags (newest first) plus the pushed commit. On a tag push
       # GITHUB_SHA already points at the tagged commit, so HEAD is the
-      # newest point on the timeline either way.
+      # newest point either way.
       - name: Collect revs (last 5 tags + HEAD)
         id: revs
         run: |
@@ -110,21 +103,17 @@ jobs:
           if [ -n "$TAGS" ]; then
             echo "revs=${TAGS},${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           else
-            # Pre-first-tag bootstrap: with no tags the timeline is just
-            # HEAD. Emit the bare SHA so the revs list carries no leading
+            # No tags yet: emit the bare SHA so revs carries no leading
             # comma, which benchpkg rejects (#125).
             echo "revs=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           fi
 
-      # benchpkg benchmarks each rev against benchmark/benchmarks.jl
-      # (the default script benchpkg discovers in benchmark/). --bench-on
-      # pins the benchmark *script* to HEAD so older revs are measured
-      # with the current suite definition. --tune re-tunes parameters per
-      # run to quieten run-to-run noise on shared runners.
-      # --url points benchpkg at this repo directly so it resolves an
-      # unregistered package (otherwise `benchpkg <name>` looks it up in
-      # General and errors "not found ... in registry"). Harmless for a
-      # registered package. (#125)
+      # benchpkg benchmarks each rev against benchmark/benchmarks.jl.
+      # --bench-on pins the benchmark script to HEAD so older revs are
+      # measured with the current suite definition. --tune re-tunes
+      # parameters per run to quieten noise on shared runners. --url points
+      # benchpkg at this repo directly so it resolves an unregistered
+      # package (#125); harmless once registered.
       - name: Run benchmarks
         run: |
           mkdir -p results
@@ -162,10 +151,9 @@ jobs:
             echo "files in this folder for per-benchmark timelines."
           } > public/README.md
 
-      # Deploy to a dedicated `benchmarks` branch under `history/`. This
-      # is deliberately NOT gh-pages: Documenter force-pushes gh-pages on
-      # every docs build, which would clobber anything written there. A
-      # separate branch keeps the two deploys fully independent.
+      # Deploy to a dedicated `benchmarks` branch, deliberately not
+      # gh-pages: Documenter force-pushes gh-pages on every docs build,
+      # which would clobber anything written there.
       - name: Deploy to benchmarks branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:

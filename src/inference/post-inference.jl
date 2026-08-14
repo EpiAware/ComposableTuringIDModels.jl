@@ -22,7 +22,7 @@ function spread_draws(chn::Chains)
     # either.
     for (dotted, plain) in ((".iteration", "iteration"), (".chain", "chain"))
         if dotted in names(df)
-            @rename!(df, $(plain)=$(dotted))
+            @rename!(df, $(plain) = $(dotted))
         end
     end
     df = hcat(DataFrame(draw = 1:size(df, 1)), df)

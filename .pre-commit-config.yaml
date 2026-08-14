@@ -6,19 +6,17 @@ repos:
     rev: v5.0.0
     hooks:
     -   id: check-added-large-files
-    # `templates/` (in a kit that ships scaffold templates) holds files with
-    # `{{PLACEHOLDER}}` tokens that are not valid YAML/TOML until substituted,
-    # so exclude that tree from the structural parsers. Absent in a normal
-    # package, where these excludes are a no-op.
+    # `templates/` holds files with `{{PLACEHOLDER}}` tokens that are not
+    # valid YAML/TOML until substituted, so exclude that tree from the
+    # structural parsers. Absent (no-op) in a normal package.
     -   id: check-yaml
         exclude: '^templates/'
     -   id: check-toml
         exclude: '^templates/'
-    # `--assume-in-merge` so the check runs on every commit, not only while a
-    # merge is in progress (the default only fires when `.git/MERGE_HEAD`
-    # exists). Without it the hook is a no-op outside a merge, so a stray
-    # conflict marker committed after a resolve — or with `--no-verify` — sails
-    # through; that is how a marker reached CI on #250 (#251).
+    # `--assume-in-merge` runs the check on every commit, not only during a
+    # merge (the default only fires when `.git/MERGE_HEAD` exists) — without
+    # it a stray conflict marker committed after a resolve, or with
+    # `--no-verify`, sails through, as happened on #250 (#251).
     -   id: check-merge-conflict
         args: [--assume-in-merge]
     -   id: check-json
@@ -28,11 +26,11 @@ repos:
     -   id: trailing-whitespace
 #####
 # Conflict markers the stock hook misses
-# `check-merge-conflict` only looks for `<<<<<<<`, `=======` and `>>>>>>>`. A
-# `diff3`/`zdiff3` conflict style also emits a `|||||||` base marker, which it
-# does NOT catch — that is the exact marker that reached CI on #250. Forbid it
-# explicitly. Seven pipes at the start of a line (`||||||| <ref>`) is the
-# marker's shape and does not occur in real code or markdown tables (#251).
+# `check-merge-conflict` only looks for `<<<<<<<`, `=======` and `>>>>>>>`; a
+# `diff3`/`zdiff3` style also emits a `|||||||` base marker, which it misses
+# and which reached CI on #250. Forbid it explicitly: seven pipes at the
+# start of a line is the marker's shape and doesn't occur in real code or
+# markdown tables (#251).
 - repo: local
   hooks:
   - id: forbid-diff3-base-marker
@@ -42,17 +40,17 @@ repos:
     types: [text]
 #####
 # Julia
-# Due to lack of first-class Julia support, this needs a local Julia install
-#  with JuliaFormatter.jl available. Keep `rev` in step with the pinned
-#  JuliaFormatter in the formatter test environment and `.JuliaFormatter.toml`.
-- repo: https://github.com/domluna/JuliaFormatter.jl
-  rev: v2.10.1
+# Runic builds its own hook environment from `additional_dependencies`, so
+# the pinned version here is the single source `runic-check.yml` greps the
+# repo for. Keep it in step with the isolated formatter test environment.
+- repo: https://github.com/fredrikekre/runic-pre-commit
+  rev: v2.2.0
   hooks:
-  - id: julia-formatter
-    # A package that ships scaffold templates (e.g. EpiAwarePackageTools) keeps
-    # them under `templates/`; some carry `{{PLACEHOLDER}}` tokens that are not
-    # parseable Julia until substituted, so exclude that tree from formatting.
-    # The directory is absent in a normal package, where this is a no-op.
+  - id: runic
+    additional_dependencies: ['Runic@1.7.0']
+    # Runic is AST-based and errors rather than skips on the `{{PLACEHOLDER}}`
+    # tokens in templates/, which are not valid Julia until substituted.
+    # No-op in a normal package.
     exclude: '^templates/'
 #####
 # Secrets

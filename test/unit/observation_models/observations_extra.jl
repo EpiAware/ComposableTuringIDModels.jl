@@ -31,16 +31,21 @@ end
     # `Normal` draw and make the inner `PoissonError` throw a DomainError — the
     # constant-scaling invariant we are pinning holds either way).
     exp_series = as_turing_model(
-        Ascertainment(PoissonError(), Normal(0.0, 0.1);
-            transform = (Y_t, x) -> Y_t .* exp.(x)),
-        missing, fill(20.0, 6))().expected
+        Ascertainment(
+            PoissonError(), Normal(0.0, 0.1);
+            transform = (Y_t, x) -> Y_t .* exp.(x)
+        ),
+        missing, fill(20.0, 6)
+    )().expected
     ratio = exp_series ./ 20.0
     @test all(≈(first(ratio)), ratio)
     # The constant factor is one shared draw: the underlying expected series is a
     # single global exp(θ) scaling. Recover the scaling with FixedIntercept.
     Y = fill(20.0, 6)
-    asc_fixed = Ascertainment(PoissonError(), FixedIntercept(0.0);
-        transform = (Y_t, x) -> Y_t .* x)
+    asc_fixed = Ascertainment(
+        PoissonError(), FixedIntercept(0.0);
+        transform = (Y_t, x) -> Y_t .* x
+    )
     @test asc_fixed.latent_model isa AbstractPriorModel
     # A latent model still gives a time-varying effect (existing behaviour).
     asc_tv = Ascertainment(PoissonError(), RandomWalk())
@@ -75,8 +80,10 @@ end
     # reference days are fully reported).
     @test as_turing_model(c, 5)() == [0.2, 0.6, 1.0, 1.0, 1.0]
     # When the curve is at least as long as n, only its head is used.
-    @test as_turing_model(ReportingCDF(collect(range(0.05, 1.0; length = 20))),
-        5)() == collect(range(0.05, 1.0; length = 20))[1:5]
+    @test as_turing_model(
+        ReportingCDF(collect(range(0.05, 1.0; length = 20))),
+        5
+    )() == collect(range(0.05, 1.0; length = 20))[1:5]
 
     # A curve out of [0, 1] is rejected at construction.
     @test_throws Exception ReportingCDF([0.2, 0.6, 1.5])
@@ -93,7 +100,7 @@ end
     F = as_turing_model(cd, 10)()
     @test issorted(F)
     @test isapprox(F[end], 1.0)
-    @test all(0 .<= F .<= 1 + 1e-8)
+    @test all(0 .<= F .<= 1 + 1.0e-8)
 end
 
 @testitem "RightTruncate construction and interface" begin
@@ -105,11 +112,15 @@ end
     @test implements_observation_interface(o)
     # The convenience constructors wrap the correction in a ReportingCDF submodel.
     @test o.cdf_model isa ReportingCDF
-    @test RightTruncate(PoissonError(),
-        truncated(Normal(5.0, 2.0), 0.0, Inf)).cdf_model isa ReportingCDF
+    @test RightTruncate(
+        PoissonError(),
+        truncated(Normal(5.0, 2.0), 0.0, Inf)
+    ).cdf_model isa ReportingCDF
     # A correction submodel can be supplied directly.
-    @test RightTruncate(PoissonError(),
-        ReportingCDF([0.2, 0.6, 1.0])).cdf_model isa ReportingCDF
+    @test RightTruncate(
+        PoissonError(),
+        ReportingCDF([0.2, 0.6, 1.0])
+    ).cdf_model isa ReportingCDF
 end
 
 @testitem "RightTruncate scales expected eventual totals by the delay CDF" begin
@@ -197,8 +208,11 @@ end
     n = 25
     model = IDModel(
         Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
-        RightTruncate(NegativeBinomialError(),
-            truncated(Normal(4.0, 1.5), 0.0, Inf)))
+        RightTruncate(
+            NegativeBinomialError(),
+            truncated(Normal(4.0, 1.5), 0.0, Inf)
+        )
+    )
 
     sim = as_turing_model(model, missing, n)()
     y = sim.generated_y_t
@@ -208,8 +222,14 @@ end
     @test as_turing_model(model, y, n)().generated_y_t == y
 
     # It also composes as a single-stream Split.
-    stk = Split((reported = RightTruncate(PoissonError(),
-        truncated(Normal(4.0, 1.5), 0.0, Inf)),))
+    stk = Split(
+        (
+            reported = RightTruncate(
+                PoissonError(),
+                truncated(Normal(4.0, 1.5), 0.0, Inf)
+            ),
+        )
+    )
     out = as_turing_model(stk, (reported = missing,), fill(100.0, n))().y_t
     @test length(out) == 1
     @test length(out.reported) == n
@@ -250,13 +270,19 @@ end
     # The mask is exactly `t + d ≤ now` (delays d = 0,1,2 on the columns).
     expected = BitMatrix([t + d <= 4 for t in 1:4, d in 0:2])
     @test tri.observed == expected
-    @test tri.observed == BitMatrix([true true true; true true true;
-                     true true false; true false false])
+    @test tri.observed == BitMatrix(
+        [
+            true true true; true true true;
+            true true false; true false false
+        ]
+    )
     @test tri.Dmax == 2
 
     # A triangle whose Dmax does not match the model's delay PMF is rejected.
-    @test_throws Exception define_y_t(obs,
-        ReportingTriangle(zeros(Int, 4, 5), trues(4, 5), 4), fill(20.0, 4))
+    @test_throws Exception define_y_t(
+        obs,
+        ReportingTriangle(zeros(Int, 4, 5), trues(4, 5), 4), fill(20.0, 4)
+    )
     # A count matrix with the wrong number of delay columns is rejected.
     @test_throws Exception define_y_t(obs, zeros(Int, 4, 5), fill(20.0, 4))
 end
@@ -280,8 +306,10 @@ end
 
     # The three ReportTriangle constructors all wrap a delay submodel.
     @test ReportTriangle(PoissonError(), [0.5, 0.3, 0.2]).delay_model isa ReportingPMF
-    @test ReportTriangle(PoissonError(),
-        truncated(Normal(2.0, 1.0), 0.0, Inf)).delay_model isa ReportingPMF
+    @test ReportTriangle(
+        PoissonError(),
+        truncated(Normal(2.0, 1.0), 0.0, Inf)
+    ).delay_model isa ReportingPMF
     obs = ReportTriangle(PoissonError(), ReportingPMF([0.6, 0.25, 0.15]))
     @test obs.delay_model isa ReportingPMF
 
@@ -346,8 +374,10 @@ end
     # Each cell mean is `Y_t · p[d+1]`: average a stack of simulated triangles
     # (a plain sum / count, to avoid a Statistics dep in the clean test env).
     Random.seed!(73)
-    draws = [Float64.(as_turing_model(obs, missing, fill(100.0, 5))().y_t.counts)
-             for _ in 1:4000]
+    draws = [
+        Float64.(as_turing_model(obs, missing, fill(100.0, 5))().y_t.counts)
+            for _ in 1:4000
+    ]
     cell_means = sum(draws) ./ length(draws)
     for d in 0:2
         @test isapprox(cell_means[1, d + 1], 100.0 * pmf[d + 1]; rtol = 0.05)
@@ -357,7 +387,7 @@ end
 @testitem "ReportTriangle observed row-sums reconcile with RightTruncate marginal" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(74)
-    # #50's consistency check: the observed row-sums of the triangle are the
+    # Consistency check: the observed row-sums of the triangle are the
     # marginal that the right-truncation (CDF-scaling) nowcast conditions on. With
     # `now = n`, reference day `t` has age `a = n - t` and observed delays
     # `d = 0 … a`, so its expected observed row-sum is
@@ -384,10 +414,10 @@ end
     completeness = as_turing_model(ReportingCDF(cumsum(pmf)), n)()
     right_truncate_scaled = μ .* reverse(completeness)
 
-    @test triangle_rowsums≈right_truncate_scaled rtol=1e-10
+    @test triangle_rowsums ≈ right_truncate_scaled rtol = 1.0e-10
     # The oldest day is fully reported; the most recent only its delay-0 fraction.
-    @test triangle_rowsums[1]≈μ[1] rtol=1e-10
-    @test triangle_rowsums[n]≈μ[n] * pmf[1] rtol=1e-10
+    @test triangle_rowsums[1] ≈ μ[1] rtol = 1.0e-10
+    @test triangle_rowsums[n] ≈ μ[n] * pmf[1] rtol = 1.0e-10
 end
 
 @testitem "ReportTriangle composes with the renewal infection process" begin
@@ -397,8 +427,10 @@ end
     renewal = Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal())
 
     # Released-CD discretised-delay constructor (the LatentDelay path).
-    obs = ReportTriangle(NegativeBinomialError(),
-        truncated(Normal(2.0, 1.0), 0.0, Inf))
+    obs = ReportTriangle(
+        NegativeBinomialError(),
+        truncated(Normal(2.0, 1.0), 0.0, Inf)
+    )
     model = IDModel(renewal, obs)
 
     sim = as_turing_model(model, missing, 15)()
@@ -410,9 +442,12 @@ end
     @test cond.generated_y_t isa ReportingTriangle
 
     # A triangle stream composes alongside a plain-vector stream under Split.
-    stk = Split((
-        tri = ReportTriangle(PoissonError(), [0.6, 0.25, 0.15]),
-        cases = PoissonError()))
+    stk = Split(
+        (
+            tri = ReportTriangle(PoissonError(), [0.6, 0.25, 0.15]),
+            cases = PoissonError(),
+        )
+    )
     out = as_turing_model(stk, (tri = missing, cases = missing), fill(20.0, 8))().y_t
     @test keys(out) == (:tri, :cases)
     @test out.tri isa ReportingTriangle
@@ -421,25 +456,31 @@ end
 
 @testitem "UncertainDelay builds an inferred-delay LatentDelay" begin
     using ComposableTuringIDModels, Distributions
-    u = UncertainDelay(LogNormal,
-        [Normal(1.5, 0.4), truncated(Normal(0.4, 0.2), 0, Inf)]; D = 20.0)
+    u = UncertainDelay(
+        LogNormal,
+        [Normal(1.5, 0.4), truncated(Normal(0.4, 0.2), 0, Inf)]; D = 20.0
+    )
     @test u isa ComposableTuringIDModels.AbstractPriorModel
     obs = LatentDelay(NegativeBinomialError(), u)
     @test obs isa AbstractObservationModel
     # A fixed horizon `D` is required so the PMF length is constant across draws.
-    @test_throws AssertionError UncertainDelay(LogNormal,
-        [Normal(1.5, 0.4), truncated(Normal(0.4, 0.2), 0, Inf)]; D = nothing)
+    @test_throws AssertionError UncertainDelay(
+        LogNormal,
+        [Normal(1.5, 0.4), truncated(Normal(0.4, 0.2), 0, Inf)]; D = nothing
+    )
     # The fixed-PMF constructors are unaffected (no regression).
     @test LatentDelay(PoissonError(), [0.3, 0.4, 0.3]) isa AbstractObservationModel
     @test LatentDelay(PoissonError(), truncated(Normal(5, 2), 0, Inf)) isa
-          AbstractObservationModel
+        AbstractObservationModel
 end
 
 @testitem "UncertainDelay samples a valid delay PMF per draw" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(101)
-    u = UncertainDelay(LogNormal,
-        [Normal(1.5, 0.4), truncated(Normal(0.4, 0.2), 0, Inf)]; D = 15.0)
+    u = UncertainDelay(
+        LogNormal,
+        [Normal(1.5, 0.4), truncated(Normal(0.4, 0.2), 0, Inf)]; D = 15.0
+    )
     # Each prior draw builds a normalised, non-negative PMF of constant length.
     lens = Int[]
     for _ in 1:20
@@ -457,7 +498,7 @@ end
     @test all(>=(0), filter(!ismissing, sim))
 end
 
-@testitem "LatentDelay recovers an uncertain delay's parameters" tags=[:sample] begin
+@testitem "LatentDelay recovers an uncertain delay's parameters" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
     Random.seed!(20240716)
     # Simulate reports from a KNOWN LogNormal reporting delay convolving a smooth
@@ -465,15 +506,21 @@ end
     n = 60
     t = 1:n
     Y_t = 800.0 .* exp.(-((t .- 32) ./ 10.0) .^ 2) .+ 5.0
-    μ0, σ0 = 1.5, 0.40
+    μ0, σ0 = 1.5, 0.4
     truth = LatentDelay(PoissonError(), LogNormal(μ0, σ0); D = 20.0)
     y = as_turing_model(truth, missing, Y_t)().y_t
 
-    fit = LatentDelay(PoissonError(),
-        UncertainDelay(LogNormal,
-            [Normal(1.1, 0.4), truncated(Normal(0.6, 0.3), 0, Inf)]; D = 20.0))
-    chain = sample(as_turing_model(fit, y, Y_t),
-        NUTS(0.8; adtype = Turing.AutoForwardDiff()), 1000; progress = false)
+    fit = LatentDelay(
+        PoissonError(),
+        UncertainDelay(
+            LogNormal,
+            [Normal(1.1, 0.4), truncated(Normal(0.6, 0.3), 0, Inf)]; D = 20.0
+        )
+    )
+    chain = sample(
+        as_turing_model(fit, y, Y_t),
+        NUTS(0.8; adtype = Turing.AutoForwardDiff()), 1000; progress = false
+    )
 
     # The delay parameters are namespaced under the `delay` prior slot.
     dvec = vec(chain[@varname(delay.θ)])
@@ -508,23 +555,31 @@ end
     # A per-time sequence differs from applying any single fixed PMF: use the
     # first PMF fixed and confirm the series is not identical.
     exp_fixed = as_turing_model(
-        LatentDelay(PoissonError(), first(pmfs)), missing, Y)().expected
+        LatentDelay(PoissonError(), first(pmfs)), missing, Y
+    )().expected
     @test !isapprox(exp_tv, exp_fixed)
 
     # Reduction invariant: a per-time sequence of IDENTICAL PMFs reproduces the
     # single-fixed-PMF expected series exactly (TimeVaryingLDStep ≡ LDStep).
     same = [copy(first(pmfs)) for _ in 1:n]
     exp_same = as_turing_model(
-        LatentDelay(PoissonError(), same), missing, Y)().expected
+        LatentDelay(PoissonError(), same), missing, Y
+    )().expected
     @test exp_same ≈ exp_fixed
 
     # Validation: PMFs must be valid and all the same length.
-    @test_throws Exception LatentDelay(PoissonError(),
-        [[0.5, 0.5], [0.3, 0.3, 0.4]])          # unequal lengths
-    @test_throws Exception LatentDelay(PoissonError(),
-        [[0.5, 0.4], [0.6, 0.5]])               # do not sum to 1
-    @test_throws Exception LatentDelay(PoissonError(),
-        [[-0.1, 1.1], [0.5, 0.5]])              # negative entry
+    @test_throws Exception LatentDelay(
+        PoissonError(),
+        [[0.5, 0.5], [0.3, 0.3, 0.4]]
+    )          # unequal lengths
+    @test_throws Exception LatentDelay(
+        PoissonError(),
+        [[0.5, 0.4], [0.6, 0.5]]
+    )               # do not sum to 1
+    @test_throws Exception LatentDelay(
+        PoissonError(),
+        [[-0.1, 1.1], [0.5, 0.5]]
+    )              # negative entry
 end
 
 @testitem "UncertainDelay with a process parameter is time-varying" begin
@@ -533,8 +588,10 @@ end
     Random.seed!(81)
     # A LogNormal delay whose meanlog is a RandomWalk (time-varying location) and
     # whose sdlog carries a constant prior.
-    utv = UncertainDelay(LogNormal,
-        [RandomWalk(), truncated(Normal(0.4, 0.2), 0, Inf)]; D = 8.0)
+    utv = UncertainDelay(
+        LogNormal,
+        [RandomWalk(), truncated(Normal(0.4, 0.2), 0, Inf)]; D = 8.0
+    )
     @test utv isa AbstractPriorModel
     @test _delay_timevarying(utv) == true
 
@@ -561,8 +618,15 @@ end
     sim = as_turing_model(obs, missing, fill(100.0, n))().y_t
     @test length(sim) == n
     # The sampled per-time delay parameters are namespaced under `delay`.
-    names = string.(collect(keys(rand(
-        as_turing_model(obs, missing, fill(100.0, n))))))
+    names = string.(
+        collect(
+            keys(
+                rand(
+                    as_turing_model(obs, missing, fill(100.0, n))
+                )
+            )
+        )
+    )
     @test any(startswith("delay.param1."), names)
     @test any(startswith("delay.param2."), names)
 end
@@ -577,11 +641,18 @@ end
     # model. The gradient must flow through the per-time discretisation
     # (`_discretised_pmf`) and the time-indexed convolution (`TimeVaryingLDStep`).
     model = IDModel(
-        Renewal(; generation_time = [0.2, 0.3, 0.5], rt = RandomWalk(),
-            initialisation = Normal()),
-        LatentDelay(NegativeBinomialError(),
-            UncertainDelay(LogNormal,
-                [RandomWalk(), truncated(Normal(0.4, 0.2), 0, Inf)]; D = 6.0)))
+        Renewal(;
+            generation_time = [0.2, 0.3, 0.5], rt = RandomWalk(),
+            initialisation = Normal()
+        ),
+        LatentDelay(
+            NegativeBinomialError(),
+            UncertainDelay(
+                LogNormal,
+                [RandomWalk(), truncated(Normal(0.4, 0.2), 0, Inf)]; D = 6.0
+            )
+        )
+    )
     n = 12
     y = as_turing_model(model, missing, n)().generated_y_t
     m = as_turing_model(model, y, n)
@@ -595,7 +666,7 @@ end
     @test length(grad) == length(θ)
 end
 
-@testitem "forecast extends a time-varying (process-param) delay" tags=[:sample] begin
+@testitem "forecast extends a time-varying (process-param) delay" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(83)
     # A time-varying delay adds a latent (RandomWalk) stream for its meanlog. That
@@ -603,9 +674,14 @@ end
     # exactly as for any other latent — the process-param delay forecasts.
     model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal(1.0, 0.5)),
-        LatentDelay(PoissonError(),
-            UncertainDelay(LogNormal,
-                [RandomWalk(), truncated(Normal(0.4, 0.2), 0, Inf)]; D = 5.0)))
+        LatentDelay(
+            PoissonError(),
+            UncertainDelay(
+                LogNormal,
+                [RandomWalk(), truncated(Normal(0.4, 0.2), 0, Inf)]; D = 5.0
+            )
+        )
+    )
     T = 15
     y = fill(5, T)
     chain = sample(as_turing_model(model, y, T), Prior(), 40; progress = false)

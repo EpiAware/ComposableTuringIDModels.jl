@@ -10,11 +10,15 @@
     # `Stratify`-driven model with no strata gain never changes existing
     # behaviour.
     gen_int = [0.2, 0.3, 0.5]
-    single = Renewal(; generation_time = gen_int, rt = RandomWalk(),
-        initialisation = Normal())
-    strat = Renewal(; generation_time = gen_int,
+    single = Renewal(;
+        generation_time = gen_int, rt = RandomWalk(),
+        initialisation = Normal()
+    )
+    strat = Renewal(;
+        generation_time = gen_int,
         rt = Stratify(RandomWalk(), FixedIntercept(0.0)),
-        initialisation = Normal())
+        initialisation = Normal()
+    )
     n = 20
 
     Random.seed!(42)
@@ -33,9 +37,11 @@ end
     n_strata, n_time = 3, 30
     # A vector-valued (IID) initialisation gives each stratum its own seed;
     # a bare Distribution would instead broadcast one shared seed.
-    model = Renewal(; generation_time = gen_int,
+    model = Renewal(;
+        generation_time = gen_int,
         rt = Stratify(RandomWalk(), Hierarchy()),
-        initialisation = IID(Normal(log(20.0), 1.0)))
+        initialisation = IID(Normal(log(20.0), 1.0))
+    )
     out = as_turing_model(model, (n_strata, n_time))()
 
     @test size(out.I_t) == (n_strata, n_time)
@@ -55,7 +61,9 @@ end
     # per-stratum generation interval alone.
     window0 = [1.0 2.0 3.0; 1.0 2.0 3.0]
     Rt = [fill(1.5, 2) for _ in 1:10]
-    I_t = accumulate_scan(core, window0, Rt)
+    I_t = accumulate_scan(
+        core, (; val = window0[:, end], window = window0), Rt
+    )
     @test size(I_t) == (2, 10)
     @test I_t[1, :] != I_t[2, :]
 end
@@ -63,11 +71,15 @@ end
 @testitem "a Hierarchy-parameterised UncertainDelay pools across strata" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(708)
-    gen = UncertainDelay(LogNormal,
-        [Hierarchy(), truncated(Normal(0.3, 0.05), 0, Inf)]; D = 10.0)
-    model = Renewal(; generation_time = gen,
+    gen = UncertainDelay(
+        LogNormal,
+        [Hierarchy(), truncated(Normal(0.3, 0.05), 0, Inf)]; D = 10.0
+    )
+    model = Renewal(;
+        generation_time = gen,
         rt = Stratify(RandomWalk(), FixedIntercept(0.0)),
-        initialisation = IID(Normal(log(20.0), 0.3)))
+        initialisation = IID(Normal(log(20.0), 0.3))
+    )
     n_strata, n_time = 3, 15
     out = as_turing_model(model, (n_strata, n_time))()
     @test size(out.I_t) == (n_strata, n_time)
@@ -78,11 +90,15 @@ end
 @testitem "a constant-parameter UncertainDelay is shared by every stratum" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(709)
-    gen = UncertainDelay(LogNormal,
-        [Normal(1.5, 0.2), truncated(Normal(0.3, 0.05), 0, Inf)]; D = 10.0)
-    model = Renewal(; generation_time = gen,
+    gen = UncertainDelay(
+        LogNormal,
+        [Normal(1.5, 0.2), truncated(Normal(0.3, 0.05), 0, Inf)]; D = 10.0
+    )
+    model = Renewal(;
+        generation_time = gen,
         rt = Stratify(RandomWalk(), FixedIntercept(0.0)),
-        initialisation = IID(Normal(log(20.0), 0.3)))
+        initialisation = IID(Normal(log(20.0), 0.3))
+    )
     n_strata, n_time = 3, 15
     out = as_turing_model(model, (n_strata, n_time))()
     @test size(out.I_t) == (n_strata, n_time)
@@ -91,40 +107,44 @@ end
 
 @testitem "SusceptibleDepletion, scalar pop_size: one pool, all strata" begin
     using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
-                                    SusceptibleDepletion, accumulate_scan,
-                                    _renewal_init_state
+        SusceptibleDepletion, accumulate_scan,
+        renewal_init_state
     rev_gen = reverse([0.2, 0.3, 0.5])
     core = ConstantRenewalStep(rev_gen)
     step = RenewalStep(core, (SusceptibleDepletion(1000.0),))
     n_strata = 2
     I0, r = fill(5.0, n_strata), fill(0.1, n_strata)
-    init = _renewal_init_state(step, I0, r, length(rev_gen))
+    init = renewal_init_state(step, I0, r, length(rev_gen))
     # The scalar pool is spread to a separate, equal-sized copy per stratum.
-    @test init[2] == fill(1000.0, n_strata)
+    @test only(init.substates) == fill(1000.0, n_strata)
 
     Rt = [fill(1.6, n_strata) for _ in 1:10]
     I_t = accumulate_scan(step, init, Rt)
-    plain = accumulate_scan(core, init[1], Rt)
+    plain = accumulate_scan(
+        core, (; val = init.window[:, end], window = init.window), Rt
+    )
     @test size(I_t) == (n_strata, 10)
-    @test all(I_t .<= plain .+ 1e-8)
+    @test all(I_t .<= plain .+ 1.0e-8)
 end
 
 @testitem "SusceptibleDepletion, per-stratum pop_size: separate pools" begin
     using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
-                                    SusceptibleDepletion, accumulate_scan,
-                                    _renewal_init_state
+        SusceptibleDepletion, accumulate_scan,
+        renewal_init_state
     rev_gen = reverse([0.2, 0.3, 0.5])
     core = ConstantRenewalStep(rev_gen)
     pop = [200.0, 20_000.0]
     step = RenewalStep(core, (SusceptibleDepletion(pop),))
     I0, r = fill(5.0, 2), fill(0.2, 2)
-    init = _renewal_init_state(step, I0, r, length(rev_gen))
-    @test init[2] == pop
+    init = renewal_init_state(step, I0, r, length(rev_gen))
+    @test only(init.substates) == pop
 
     Rt = [fill(1.6, 2) for _ in 1:20]
     I_t = accumulate_scan(step, init, Rt)
-    plain = accumulate_scan(core, init[1], Rt)
-    @test all(I_t .<= plain .+ 1e-8)
+    plain = accumulate_scan(
+        core, (; val = init.window[:, end], window = init.window), Rt
+    )
+    @test all(I_t .<= plain .+ 1.0e-8)
     # The small pool depletes harder: it ends further below the unconstrained
     # path than the (barely touched) large pool.
     rel_small = I_t[1, end] / plain[1, end]
@@ -132,8 +152,9 @@ end
     @test rel_small < rel_large
 
     mismatched = RenewalStep(core, (SusceptibleDepletion([1.0, 2.0, 3.0]),))
-    @test_throws AssertionError _renewal_init_state(
-        mismatched, I0, r, length(rev_gen))
+    @test_throws AssertionError renewal_init_state(
+        mismatched, I0, r, length(rev_gen)
+    )
 end
 
 @testitem "_seed rejects a mismatched per-stratum initialisation" begin
@@ -159,17 +180,23 @@ end
     pop = [200.0, 200.0]
     rate = Stratify(FixedIntercept(log(0.5)), FixedIntercept(0.0))
 
-    deplete_then_import = Renewal(gen_int, SusceptibleDepletion(pop),
-        ImportedCases(rate); rt = rt, initialisation = seeds)
-    import_then_deplete = Renewal(gen_int, ImportedCases(rate),
-        SusceptibleDepletion(pop); rt = rt, initialisation = seeds)
+    deplete_then_import = Renewal(
+        gen_int, SusceptibleDepletion(pop),
+        ImportedCases(rate); rt = rt, initialisation = seeds
+    )
+    import_then_deplete = Renewal(
+        gen_int, ImportedCases(rate),
+        SusceptibleDepletion(pop); rt = rt, initialisation = seeds
+    )
 
     Random.seed!(99)
     I_deplete_first = as_turing_model(
-        deplete_then_import, (n_strata, n_time))().I_t
+        deplete_then_import, (n_strata, n_time)
+    )().I_t
     Random.seed!(99)
     I_import_first = as_turing_model(
-        import_then_deplete, (n_strata, n_time))().I_t
+        import_then_deplete, (n_strata, n_time)
+    )().I_t
 
     @test size(I_deplete_first) == (n_strata, n_time)
     @test all(isfinite, I_deplete_first)
@@ -187,8 +214,10 @@ end
 
     plain = Renewal(gen_int; rt = rt, initialisation = seeds)
     rate = Stratify(FixedIntercept(log(0.5)), Hierarchy(; mean = Dirac(0.0)))
-    imported = Renewal(gen_int, ImportedCases(rate); rt = rt,
-        initialisation = seeds)
+    imported = Renewal(
+        gen_int, ImportedCases(rate); rt = rt,
+        initialisation = seeds
+    )
 
     I_plain = as_turing_model(plain, (n_strata, n_time))().I_t
     I_imported = as_turing_model(imported, (n_strata, n_time))().I_t
@@ -196,6 +225,6 @@ end
     @test size(I_imported) == (n_strata, n_time)
     # The importation rate is strictly positive (its `exp` transformation),
     # so it lifts every stratum's incidence at every step.
-    @test all(I_imported .>= I_plain .- 1e-8)
+    @test all(I_imported .>= I_plain .- 1.0e-8)
     @test all(I_imported[:, end] .> I_plain[:, end])
 end

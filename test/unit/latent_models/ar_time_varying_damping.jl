@@ -37,9 +37,12 @@ end
     # A length-2 vector damping prior still gives an order-2 (constant) AR (init
     # length must match the order).
     @test AR(;
-        damp = [truncated(Normal(0.5, 0.1), 0, 1),
-            truncated(Normal(0.2, 0.1), 0, 1)],
-        init = [Normal(), Normal()]).p == 2
+        damp = [
+            truncated(Normal(0.5, 0.1), 0, 1),
+            truncated(Normal(0.2, 0.1), 0, 1),
+        ],
+        init = [Normal(), Normal()]
+    ).p == 2
 end
 
 @testitem "AR constant damp stays a scalar RV (no length-n allocation)" begin
@@ -67,9 +70,12 @@ end
     # It returns a numeric path, so it drops into a bare-vector latent slot such as
     # a Renewal's rt inside a composed IDModel.
     idmodel = IDModel(
-        Renewal(; generation_time = [0.2, 0.3, 0.5],
-            rt = AR(; damp = RandomWalk()), initialisation = Normal()),
-        PoissonError())
+        Renewal(;
+            generation_time = [0.2, 0.3, 0.5],
+            rt = AR(; damp = RandomWalk()), initialisation = Normal()
+        ),
+        PoissonError()
+    )
     y = as_turing_model(idmodel, missing, 12)().generated_y_t
     @test length(y) == 12
 end
@@ -88,7 +94,7 @@ end
     @test all(isfinite, grad)
 end
 
-@testitem "AR(damp = RandomWalk()) recovers a time-varying damping path" tags=[:sample] begin
+@testitem "AR(damp = RandomWalk()) recovers a time-varying damping path" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
     using Turing: to_submodel
     Random.seed!(80)
@@ -108,8 +114,10 @@ end
         end
     end
     model = observe_path(z, n)
-    chain = sample(model, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 300;
-        progress = false)
+    chain = sample(
+        model, NUTS(0.8; adtype = Turing.AutoForwardDiff()), 300;
+        progress = false
+    )
     # ρ is tracked (via `:=`) so it is recovered from the chain: `chain[:ρ]` is a
     # per-draw vector of the coefficient path.
     ρ_draws = reduce(hcat, vec(chain[:ρ]))   # (n-1) × draws

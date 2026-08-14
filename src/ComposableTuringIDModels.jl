@@ -28,7 +28,7 @@ module ComposableTuringIDModels
 # surface to the package's own exports.
 
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
-                  returned
+    returned
 using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
@@ -41,7 +41,7 @@ using Random: AbstractRNG, randexp, default_rng
 # by `HilbertSpaceGP`; the package adds only the 1-D spectral densities those
 # kernels need for the Hilbert-space approximation (see HilbertSpaceGP.jl).
 using KernelFunctions: Kernel, SqExponentialKernel, Matern32Kernel,
-                       Matern52Kernel, with_lengthscale, kernelmatrix
+    Matern52Kernel, with_lengthscale, kernelmatrix
 
 # Inference-layer dependencies.
 using ADTypes: ADTypes, AutoForwardDiff
@@ -54,67 +54,67 @@ using Tables: rowtable
 # Distributions names used (and, for many, extended) by the package, imported
 # explicitly (not reexported).
 using Distributions: Distributions, Distribution, Sampleable,
-                     UnivariateDistribution,
-                     ContinuousUnivariateDistribution, ContinuousDistribution,
-                     Normal, Poisson, NegativeBinomial, Binomial, Gamma, truncated,
-                     cdf, ccdf, logcdf, logccdf, invlogcdf, pdf, logpdf, quantile,
-                     params, mean, var, std, mode, skewness, kurtosis,
-                     product_distribution
+    UnivariateDistribution,
+    ContinuousUnivariateDistribution, ContinuousDistribution,
+    Normal, Poisson, NegativeBinomial, Binomial, Gamma, truncated,
+    cdf, ccdf, logcdf, logccdf, invlogcdf, pdf, logpdf, quantile,
+    params, mean, var, std, mode, skewness, kurtosis,
+    product_distribution
 using Statistics: Statistics
 
 # --- core architecture ---
 export AbstractComposableModel, as_turing_model
 export AbstractPriorModel, AbstractLatentModel, AbstractInfectionModel,
-       AbstractObservationModel, AbstractObservationErrorModel
+    AbstractObservationModel, AbstractObservationErrorModel
 export implements_prior_interface,
-       implements_infection_interface, implements_observation_interface
+    implements_infection_interface, implements_observation_interface
 export as_turing_submodel
 
 # --- utilities and distributions ---
 # (double-interval censoring is provided by CensoredDistributions.jl, used
 # internally by `Renewal` / `LatentDelay`; it is not re-exported here.)
 export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial,
-       NegativeBinomialMeanClust, condition_model
+    NegativeBinomialMeanClust, condition_model
 
 # --- latent models ---
 export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept,
-       FixedIntercept,
-       Null, DiffLatentModel, HilbertSpaceGP, ExactGP
+    FixedIntercept,
+    Null, DiffLatentModel, HilbertSpaceGP, ExactGP
 # Covariance kernels for `HilbertSpaceGP` / `ExactGP` are re-exported from
 # KernelFunctions.jl (the ecosystem standard); `spectral_density` adds the
 # Hilbert-space weights those kernels need.
 export SqExponentialKernel, Matern32Kernel, Matern52Kernel, spectral_density,
-       standardised_index
+    standardised_index
 
 # --- latent modifiers / manipulators / combinations / broadcasting ---
 export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
-       CombineLatentModels, ConcatLatentModels, BroadcastLatentModel,
-       RepeatEach, RepeatBlock, broadcast_rule, broadcast_n, broadcast_dayofweek,
-       broadcast_weekly, equal_dimensions, arma, arima, Hierarchy,
-       Stratify, Replicate
+    CombineLatentModels, ConcatLatentModels, BroadcastLatentModel,
+    RepeatEach, RepeatBlock, broadcast_rule, broadcast_n, broadcast_dayofweek,
+    broadcast_weekly, equal_dimensions, arma, arima, Hierarchy,
+    Stratify, Replicate
 
 # --- infection models ---
 export DirectInfections, ExpGrowthRate, Renewal,
-       RenewalStep, SusceptibleDepletion, ImportedCases,
-       R_to_r, r_to_R, expected_Rt
+    RenewalStep, SusceptibleDepletion, ImportedCases,
+    R_to_r, r_to_R, expected_Rt
 export CombineInfections
 
 # --- coupling between strata ---
 export renewal_pressure, pairwise_gen_int, AbstractMixingModel, MixingStep,
-       Gravity, gravity
+    Gravity, gravity
 
 # --- ODE compartmental models ---
 export SIRParams, SEIRParams, ODEProcess, CatalystODEParams
 
 # --- observation models ---
 export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDelay,
-       UncertainDelay, observation_error, generate_observation_error_priors,
-       define_y_t
+    UncertainDelay, observation_error, generate_observation_error_priors,
+    define_y_t
 
 # --- observation modifiers / manipulators ---
 export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
-       ReportingCDF, ReportTriangle, ReportingTriangle, ReportingPMF,
-       PrefixObservationModel, RecordExpectedObs, TransformObservationModel
+    ReportingCDF, ReportTriangle, ReportingTriangle, ReportingPMF,
+    PrefixObservationModel, RecordExpectedObs, TransformObservationModel
 
 # --- observation composition ---
 export Split, StrataMap
@@ -124,8 +124,8 @@ export IDModel
 
 # --- inference orchestration ---
 export IDProblem, NUTSampler, DirectSample,
-       apply_method, IDObservables, generated_observables,
-       spread_draws, get_param_array, forecast
+    apply_method, IDObservables, generated_observables,
+    spread_draws, get_param_array, forecast
 
 # --- extension points ---
 # Names a component author implements against but rarely calls: the shape
@@ -133,9 +133,10 @@ export IDProblem, NUTSampler, DirectSample,
 # step/modifier interfaces. Public but not exported, so they are documented and
 # supported without crowding the namespace of a `using` call.
 public ModelShape, across_shape, infection_strata,
-       AbstractAccumulationStep, AbstractConstantRenewalStep,
-       ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
-       apply_modifier, renewal_foi
+    AbstractAccumulationStep, AbstractConstantRenewalStep,
+    ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
+    apply_modifier, renewal_foi, renewal_init_state, renewal_init_window,
+    MissingObservations
 
 # --- core architecture ---
 include("base/base.jl")

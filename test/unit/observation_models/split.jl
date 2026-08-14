@@ -39,15 +39,21 @@ end
     # Share the case delay, then split: cases apply their error to the delayed
     # expectation and deaths sit DOWNSTREAM, delayed again and scaled ×0.1.
     cascade = LatentDelay(
-        Split((
-            cases = PoissonError(),
-            deaths = LatentDelay(
-                Ascertainment(PoissonError(), FixedIntercept(log(0.1))),
-                [0.2, 0.3, 0.5]))),
-        [0.5, 0.3, 0.2])
+        Split(
+            (
+                cases = PoissonError(),
+                deaths = LatentDelay(
+                    Ascertainment(PoissonError(), FixedIntercept(log(0.1))),
+                    [0.2, 0.3, 0.5]
+                ),
+            )
+        ),
+        [0.5, 0.3, 0.2]
+    )
 
     out = as_turing_model(
-        cascade, (cases = missing, deaths = missing), fill(100.0, 12))()
+        cascade, (cases = missing, deaths = missing), fill(100.0, 12)
+    )()
 
     # cases see the shared delayed expectation (12 → 10, mean 100).
     @test length(out.expected.cases) == 10
@@ -63,10 +69,16 @@ end
     # High (on infections): deaths fork off the raw input alongside a delayed cases
     # stream — parallel. Low (under the case delay): deaths see the shortened
     # expectation — cascade. Only the placement differs.
-    high = Split((cases = LatentDelay(PoissonError(), [0.5, 0.3, 0.2]),
-        deaths = PoissonError()))
-    low = LatentDelay(Split((cases = PoissonError(), deaths = PoissonError())),
-        [0.5, 0.3, 0.2])
+    high = Split(
+        (
+            cases = LatentDelay(PoissonError(), [0.5, 0.3, 0.2]),
+            deaths = PoissonError(),
+        )
+    )
+    low = LatentDelay(
+        Split((cases = PoissonError(), deaths = PoissonError())),
+        [0.5, 0.3, 0.2]
+    )
 
     Yin = fill(20.0, 12)
     ohigh = as_turing_model(high, (cases = missing, deaths = missing), Yin)()
@@ -83,10 +95,14 @@ end
     Random.seed!(84)
     # b and c both branch off a's delayed expectation by nesting a Split under a's
     # delay: a general DAG built purely by placement, no source wiring.
-    split = Split((
-        a = LatentDelay(
-        Split((leaf = PoissonError(), b = PoissonError(), c = PoissonError())),
-        [0.5, 0.3, 0.2]),))
+    split = Split(
+        (
+            a = LatentDelay(
+                Split((leaf = PoissonError(), b = PoissonError(), c = PoissonError())),
+                [0.5, 0.3, 0.2]
+            ),
+        )
+    )
     out = as_turing_model(split, (a = missing,), fill(30.0, 8))()
     # a's streams share a's delayed expectation (8 → 6, mean 30).
     @test length(out.expected.a.b) == 6
@@ -113,9 +129,11 @@ end
     @test any(startswith("old."), names)
 
     # A three-stream template also works — the count is purely data-driven.
-    out3 = as_turing_model(template,
+    out3 = as_turing_model(
+        template,
         (a = missing, b = missing, c = missing),
-        [1.0 1; 2.0 2; 3.0 3])()
+        [1.0 1; 2.0 2; 3.0 3]
+    )()
     @test keys(out3.y_t) == (:a, :b, :c)
 end
 
@@ -136,8 +154,10 @@ end
     # aggregate of both.
     W = [1.0 0.0; 0.0 1.0; 1.0 1.0]
     mm = StrataMap(M, W)
-    o2 = as_turing_model(template,
-        (a = missing, b = missing, total = missing), mm)()
+    o2 = as_turing_model(
+        template,
+        (a = missing, b = missing, total = missing), mm
+    )()
     @test o2.expected.total == fill(40.0, 6)   # many-to-one aggregate
 
     # A map whose columns disagree with the strata rows is rejected.
@@ -178,7 +198,8 @@ end
     W = [1.0 0.0; 0.0 1.0; 1.0 1.0]   # north, south, and their sum
     model = IDModel(inf, Split(PoissonError(), W))
     out = as_turing_model(
-        model, (north = missing, south = missing, total = missing), 10)()
+        model, (north = missing, south = missing, total = missing), 10
+    )()
     @test keys(out.generated_y_t) == (:north, :south, :total)
     e = out.expected_y_t
     @test e.north ≈ out.I_t[1, :]
@@ -195,9 +216,11 @@ end
     weighted = Split(PoissonError(), W)
     model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-        weighted)
+        weighted
+    )
     out = as_turing_model(
-        model, (young = missing, old = missing, total = missing), 12)()
+        model, (young = missing, old = missing, total = missing), 12
+    )()
     @test keys(out.generated_y_t) == (:young, :old, :total)
     e = out.expected_y_t
     # young/old are weighted fractions of the one infection stratum; total sums.
@@ -211,28 +234,38 @@ end
     Random.seed!(87)
     split = Split((cases = PoissonError(), deaths = PoissonError()))
     sim = as_turing_model(
-        split, (cases = missing, deaths = missing), fill(15.0, 7))().y_t
-    cond = as_turing_model(split,
-        (cases = sim.cases, deaths = sim.deaths), fill(15.0, 7))().y_t
+        split, (cases = missing, deaths = missing), fill(15.0, 7)
+    )().y_t
+    cond = as_turing_model(
+        split,
+        (cases = sim.cases, deaths = sim.deaths), fill(15.0, 7)
+    )().y_t
     @test cond.cases == sim.cases
     @test cond.deaths == sim.deaths
 end
 
-@testitem "Split composes with a renewal model and samples under NUTS" tags=[:sample] begin
+@testitem "Split composes with a renewal model and samples under NUTS" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Random, Turing
     Random.seed!(88)
     gen_int = [0.2, 0.3, 0.5]
     n = 25
 
     # Parallel cases + deaths off one shared renewal infection trajectory.
-    obs = Split((
-        cases = LatentDelay(NegativeBinomialError(),
-            truncated(Normal(3.0, 1.0), 0.0, Inf)),
-        deaths = LatentDelay(
-            Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.05))),
-            truncated(Normal(7.0, 2.0), 0.0, Inf))))
+    obs = Split(
+        (
+            cases = LatentDelay(
+                NegativeBinomialError(),
+                truncated(Normal(3.0, 1.0), 0.0, Inf)
+            ),
+            deaths = LatentDelay(
+                Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.05))),
+                truncated(Normal(7.0, 2.0), 0.0, Inf)
+            ),
+        )
+    )
     model = IDModel(
-        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()), obs)
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()), obs
+    )
 
     sim = as_turing_model(model, missing, n)()
     @test keys(sim.generated_y_t) == (:cases, :deaths)
@@ -249,7 +282,7 @@ end
     @test size(chain, 1) == 5
 end
 
-@testitem "Split cascade composes with a renewal model and samples under NUTS" tags=[:sample] begin
+@testitem "Split cascade composes with a renewal model and samples under NUTS" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Random, Turing
     Random.seed!(90)
     gen_int = [0.2, 0.3, 0.5]
@@ -257,14 +290,20 @@ end
 
     # Cascade: deaths downstream of the delayed expected cases (placement, no flag).
     cascade = LatentDelay(
-        Split((
-            cases = NegativeBinomialError(),
-            deaths = LatentDelay(
-                Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.02))),
-                truncated(Normal(5.0, 1.5), 0.0, Inf)))),
-        truncated(Normal(3.0, 1.0), 0.0, Inf))
+        Split(
+            (
+                cases = NegativeBinomialError(),
+                deaths = LatentDelay(
+                    Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.02))),
+                    truncated(Normal(5.0, 1.5), 0.0, Inf)
+                ),
+            )
+        ),
+        truncated(Normal(3.0, 1.0), 0.0, Inf)
+    )
     model = IDModel(
-        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()), cascade)
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()), cascade
+    )
 
     sim = as_turing_model(model, (cases = missing, deaths = missing), n)()
     @test keys(sim.generated_y_t) == (:cases, :deaths)
@@ -274,22 +313,28 @@ end
     @test size(chain, 1) == 5
 end
 
-@testitem "Split strata composes with a renewal model and samples under NUTS" tags=[:sample] begin
+@testitem "Split strata composes with a renewal model and samples under NUTS" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Random, Turing
     Random.seed!(91)
     gen_int = [0.2, 0.3, 0.5]
     n = 25
 
     # Strata: one full stream per band off the shared renewal infections.
-    strata = Split((
-        young = LatentDelay(
-            Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.7))),
-            truncated(Normal(2.0, 1.0), 0.0, Inf)),
-        old = LatentDelay(
-            Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.4))),
-            truncated(Normal(3.0, 1.0), 0.0, Inf))))
+    strata = Split(
+        (
+            young = LatentDelay(
+                Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.7))),
+                truncated(Normal(2.0, 1.0), 0.0, Inf)
+            ),
+            old = LatentDelay(
+                Ascertainment(NegativeBinomialError(), FixedIntercept(log(0.4))),
+                truncated(Normal(3.0, 1.0), 0.0, Inf)
+            ),
+        )
+    )
     model = IDModel(
-        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()), strata)
+        Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()), strata
+    )
 
     sim = as_turing_model(model, (young = missing, old = missing), n)()
     @test keys(sim.generated_y_t) == (:young, :old)

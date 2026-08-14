@@ -48,8 +48,9 @@ rand(as_turing_model(obs_const, missing, fill(10.0, 5)))
   - `latent_prefix`: the prefix applied to the ascertainment prior's variables.
 "
 struct Ascertainment{
-    M <: AbstractObservationModel, L <: AbstractPriorModel, F <: Function,
-    P <: String} <: AbstractObservationModel
+        M <: AbstractObservationModel, L <: AbstractPriorModel, F <: Function,
+        P <: String,
+    } <: AbstractObservationModel
     "The underlying observation model."
     model::M
     "The prior model generating the ascertainment effect."
@@ -59,9 +60,13 @@ struct Ascertainment{
     "The prefix applied to the ascertainment prior's variables."
     latent_prefix::P
 
-    function Ascertainment(model::M, latent_model, transform::F,
-            latent_prefix::P) where {M <: AbstractObservationModel,
-            F <: Function, P <: String}
+    function Ascertainment(
+            model::M, latent_model, transform::F,
+            latent_prefix::P
+        ) where {
+            M <: AbstractObservationModel,
+            F <: Function, P <: String,
+        }
         @assert hasmethod(transform, Tuple{Vector, Vector}) "transform must have a method for (Vector, Vector)"
         # A latent model is used as-is (a time-varying effect); a bare
         # `Distribution` is wrapped in an `Intercept` (a single constant factor
@@ -70,24 +75,29 @@ struct Ascertainment{
         # empty prefix opts out, leaving the prior unprefixed.
         coerced = _ascertainment_prior(latent_model)
         prior = latent_prefix == "" ? coerced :
-                PrefixLatentModel(coerced, latent_prefix)
+            PrefixLatentModel(coerced, latent_prefix)
         return new{M, typeof(prior), F, P}(
-            model, prior, transform, latent_prefix)
+            model, prior, transform, latent_prefix
+        )
     end
 end
 
 _ascertainment_prior(latent_model::AbstractPriorModel) = latent_model
 _ascertainment_prior(dist::Distribution) = Intercept(dist)
 
-function Ascertainment(model::AbstractObservationModel, latent_model;
+function Ascertainment(
+        model::AbstractObservationModel, latent_model;
         transform = (Y_t, x) -> xexpy.(Y_t, x),
-        latent_prefix::String = "Ascertainment")
+        latent_prefix::String = "Ascertainment"
+    )
     return Ascertainment(model, latent_model, transform, latent_prefix)
 end
 
-function Ascertainment(; model::AbstractObservationModel, latent_model,
+function Ascertainment(;
+        model::AbstractObservationModel, latent_model,
         transform = (Y_t, x) -> xexpy.(Y_t, x),
-        latent_prefix::String = "Ascertainment")
+        latent_prefix::String = "Ascertainment"
+    )
     return Ascertainment(model, latent_model, transform, latent_prefix)
 end
 

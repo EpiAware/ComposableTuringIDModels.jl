@@ -27,9 +27,11 @@ y = rand(as_turing_model(problem, (; y_t = missing)))
 nothing
 ```
 "
-function apply_method(idproblem::IDProblem, method::AbstractIDMethod, data;
+function apply_method(
+        idproblem::IDProblem, method::AbstractIDMethod, data;
         fix_parameters::NamedTuple = NamedTuple(),
-        condition_parameters::NamedTuple = NamedTuple(), kwargs...)
+        condition_parameters::NamedTuple = NamedTuple(), kwargs...
+    )
     model = as_turing_model(idproblem, data)
     cond_model = condition_model(model, fix_parameters, condition_parameters)
     return apply_method(cond_model, method, data; kwargs...)
@@ -38,8 +40,10 @@ end
 # Apply a method to a model and wrap the solution as observables: run the
 # method (`_apply_method`) and return an [`IDObservables`](@ref) via
 # [`generated_observables`](@ref).
-function apply_method(model::DynamicPPL.Model, method::AbstractIDMethod, data;
-        kwargs...)
+function apply_method(
+        model::DynamicPPL.Model, method::AbstractIDMethod, data;
+        kwargs...
+    )
     solution = _run_method(model, method; kwargs...)
     return generated_observables(model, data, solution)
 end
@@ -50,5 +54,5 @@ end
 
 # Run a method to its raw solution.
 function _run_method(model::DynamicPPL.Model, method::AbstractIDMethod; kwargs...)
-    _apply_method(model, method, nothing; kwargs...)
+    return _apply_method(model, method, nothing; kwargs...)
 end

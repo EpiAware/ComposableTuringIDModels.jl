@@ -49,7 +49,7 @@ struct ReportingCDF{T <: AbstractVector{<:Real}} <: AbstractLatentModel
 
     function ReportingCDF(cdf::T) where {T <: AbstractVector{<:Real}}
         @assert all(>=(0), cdf) "The reporting completeness must be non-negative"
-        @assert all(<=(1 + 1e-8), cdf) "The reporting completeness must not exceed 1"
+        @assert all(<=(1 + 1.0e-8), cdf) "The reporting completeness must not exceed 1"
         # No monotonicity check: a reporting-delay CDF is non-decreasing, but the
         # correction is deliberately a free completeness curve so a user can supply
         # a non-monotonic correction (e.g. over-/under-reporting that recovers).
@@ -58,7 +58,8 @@ struct ReportingCDF{T <: AbstractVector{<:Real}} <: AbstractLatentModel
 end
 
 function ReportingCDF(distribution::C; D = nothing, Δd = 1.0) where {
-        C <: ContinuousDistribution}
+        C <: ContinuousDistribution,
+    }
     # Build the reporting-delay CDF from the released-CD double-interval-censored
     # PMF (the same path `LatentDelay` uses), then accumulate it.
     pmf = _discretised_pmf(distribution; Δd = Δd, D = D)
@@ -138,21 +139,25 @@ rand(mdl)
     completeness curve (by age).
 "
 struct RightTruncate{M <: AbstractObservationModel, C <: AbstractLatentModel} <:
-       AbstractObservationModel
+    AbstractObservationModel
     "The inner observation-error model."
     model::M
     "The reporting-completeness correction submodel."
     cdf_model::C
 end
 
-function RightTruncate(model::M, distribution::C; D = nothing,
-        Δd = 1.0) where {
-        M <: AbstractObservationModel, C <: ContinuousDistribution}
+function RightTruncate(
+        model::M, distribution::C; D = nothing,
+        Δd = 1.0
+    ) where {
+        M <: AbstractObservationModel, C <: ContinuousDistribution,
+    }
     return RightTruncate(model, ReportingCDF(distribution; D = D, Δd = Δd))
 end
 
 function RightTruncate(model::M, cdf::V) where {
-        M <: AbstractObservationModel, V <: AbstractVector{<:Real}}
+        M <: AbstractObservationModel, V <: AbstractVector{<:Real},
+    }
     return RightTruncate(model, ReportingCDF(cdf))
 end
 
@@ -161,7 +166,7 @@ end
 
     # Draw the reporting completeness `F` (by age) from the correction submodel.
     completeness ~ as_turing_submodel(obs_model.cdf_model, n)
-    @assert length(completeness)==n "The reporting-completeness curve must have length $n (the expected-observation series length); got $(length(completeness))"
+    @assert length(completeness) == n "The reporting-completeness curve must have length $n (the expected-observation series length); got $(length(completeness))"
 
     # `completeness[a + 1]` is the completeness of a reference day of age `a`. The
     # most recent reference day (`t = n`, age `0`) is least complete and the

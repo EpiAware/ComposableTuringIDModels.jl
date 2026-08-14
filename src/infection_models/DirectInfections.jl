@@ -54,7 +54,7 @@ size(as_turing_model(strat, (3, 10))().I_t)
 ```
 "
 struct DirectInfections{L <: PriorLike, F <: Function, S <: PriorLike} <:
-       AbstractInfectionModel
+    AbstractInfectionModel
     "Latent process model generating ``Z_t``."
     Z::L
     "Link mapping the unconstrained sum to non-negative infections."
@@ -63,15 +63,18 @@ struct DirectInfections{L <: PriorLike, F <: Function, S <: PriorLike} <:
     initialisation::S
 end
 
-function DirectInfections(; Z = RandomWalk(),
-        transformation::Function = exp, initialisation = Normal())
+function DirectInfections(;
+        Z = RandomWalk(),
+        transformation::Function = exp, initialisation = Normal()
+    )
     return DirectInfections(_path_prior(Z), transformation, initialisation)
 end
 
 @model function as_turing_model(model::DirectInfections, n::ModelShape)
     Z_t ~ as_turing_submodel(model.Z, n)
     init_incidence ~ as_turing_submodel(
-        model.initialisation, _n_strata(n); prefix = true)
+        model.initialisation, _n_strata(n); prefix = true
+    )
     I_t = model.transformation.(_seed(init_incidence, n) .+ Z_t)
     return (; I_t, Z_t)
 end

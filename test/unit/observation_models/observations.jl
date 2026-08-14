@@ -53,8 +53,10 @@ end
     # series evaluates to that data (the Gaussian likelihood is centred on Y_t).
     μ = 50.0
     obs = μ .+ 0.5 .* randn(200)
-    m = as_turing_model(NormalError(; std = truncated(Normal(0, 1), 0, Inf)),
-        obs, fill(μ, 200))
+    m = as_turing_model(
+        NormalError(; std = truncated(Normal(0, 1), 0, Inf)),
+        obs, fill(μ, 200)
+    )
     @test m().y_t == obs
 end
 
@@ -69,8 +71,10 @@ end
     # number of trials is supplied via the NamedTuple data `y_t`.
     @test be isa AbstractObservationErrorModel
     @test be isa AbstractObservationModel
-    @test implements_observation_interface(be; y_t = (y = missing, N = 20),
-        Y_t = fill(0.3, 10))
+    @test implements_observation_interface(
+        be; y_t = (y = missing, N = 20),
+        Y_t = fill(0.3, 10)
+    )
 
     # Scalar N (in the data) is broadcast across the series; successes lie in 0..N.
     p = fill(0.3, 12)
@@ -92,8 +96,10 @@ end
     @test_throws Exception as_turing_model(be, (y = missing,), fill(0.3, 10))()
 
     # A trials vector whose length does not match the series is rejected.
-    @test_throws Exception as_turing_model(be, (y = missing, N = [5, 5, 5]),
-        fill(0.2, 10))()
+    @test_throws Exception as_turing_model(
+        be, (y = missing, N = [5, 5, 5]),
+        fill(0.2, 10)
+    )()
 
     # The success probability is clamped away from 0/1 (no degenerate likelihood).
     edge = as_turing_model(be, (y = missing, N = 8), [0.0, 1.0, 0.5, 0.5])().y_t
@@ -113,6 +119,18 @@ end
     @test all(ismissing, define_y_t(PoissonError(), (y = missing,), Y_t))
     # BinomialError shares the default unpacking for its `y` field.
     @test define_y_t(BinomialError(), (y = [3, 4], N = 10), fill(0.5, 2)) == [3, 4]
+
+    # A `MissingObservations` carrier (what `concrete_observations` returns for
+    # a partially-missing vector) is rebuilt into the ragged vector, at the top
+    # level and unpacked from a `y` field alike.
+    using ComposableTuringIDModels: MissingObservations
+    carrier = MissingObservations([1, 0, 3, 4, 5], Bool[1, 0, 1, 1, 1])
+    rebuilt = define_y_t(PoissonError(), carrier, Y_t)
+    @test isequal(rebuilt, [1, missing, 3, 4, 5])
+    @test isequal(
+        define_y_t(PoissonError(), (y = carrier,), Y_t),
+        [1, missing, 3, 4, 5]
+    )
 end
 
 @testitem "LatentDelay shortens expectations and wraps an error model" begin

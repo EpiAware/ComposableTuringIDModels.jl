@@ -26,25 +26,30 @@ rand(as_turing_model(combined, 10))
   - `prefixes`: the vector of prefixes, one per model.
 "
 struct CombineLatentModels{M <: AbstractVector, P <: AbstractVector{<:String}} <:
-       AbstractLatentModel
+    AbstractLatentModel
     "A vector of latent models."
     models::M
     "A vector of prefixes for the latent models."
     prefixes::P
 
-    function CombineLatentModels(models::AbstractVector,
-            prefixes::P) where {P <: AbstractVector{<:String}}
-        @assert length(models)>1 "At least two models are required"
-        @assert length(models)==length(prefixes) "The number of models and prefixes must be equal"
+    function CombineLatentModels(
+            models::AbstractVector,
+            prefixes::P
+        ) where {P <: AbstractVector{<:String}}
+        @assert length(models) > 1 "At least two models are required"
+        @assert length(models) == length(prefixes) "The number of models and prefixes must be equal"
         # Each member is a length-`n` PATH slot, so a bare `Distribution` is
         # wrapped in an `Intercept` (a constant path) before it is namespaced;
         # then non-empty prefixes get a `PrefixLatentModel` so variables stay
         # distinct. A process / `IID` / vector member passes through unchanged.
-        prefix_models = [prefixes[i] == "" ? _path_prior(models[i]) :
-                         PrefixLatentModel(_path_prior(models[i]), prefixes[i])
-                         for i in eachindex(models)]
+        prefix_models = [
+            prefixes[i] == "" ? _path_prior(models[i]) :
+                PrefixLatentModel(_path_prior(models[i]), prefixes[i])
+                for i in eachindex(models)
+        ]
         return new{AbstractVector, AbstractVector{<:String}}(
-            prefix_models, prefixes)
+            prefix_models, prefixes
+        )
     end
 end
 
@@ -60,8 +65,11 @@ end
 # the `AbstractPriorModel`/`Dims{2}` guard.
 @model function _combine_latents(latent_models::CombineLatentModels, n)
     final_latent ~ to_submodel(
-        _accumulate_latents(latent_models.models, 1, fill(0.0, n), n,
-            length(latent_models.models)), false)
+        _accumulate_latents(
+            latent_models.models, 1, fill(0.0, n), n,
+            length(latent_models.models)
+        ), false
+    )
     return final_latent
 end
 function as_turing_model(latent_models::CombineLatentModels, n::Int)
@@ -77,8 +85,11 @@ end
     else
         latent ~ as_turing_submodel(models[index], n)
         updated_latent ~ to_submodel(
-            _accumulate_latents(models, index + 1, acc_latent .+ latent, n,
-                n_models), false)
+            _accumulate_latents(
+                models, index + 1, acc_latent .+ latent, n,
+                n_models
+            ), false
+        )
         return updated_latent
     end
 end

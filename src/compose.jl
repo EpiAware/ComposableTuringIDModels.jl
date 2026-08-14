@@ -43,14 +43,61 @@ rand(mdl)
 ```
 "
 struct IDModel{I <: AbstractInfectionModel, O <: AbstractObservationModel} <:
-       AbstractComposableModel
+    AbstractComposableModel
     "Infection process model generating ``I_t`` (and its internal latent ``Z_t``)."
     infection_model::I
     "Observation model mapping ``I_t`` to ``y_t``."
     observation_model::O
 end
 
-@model function as_turing_model(model::IDModel, y_t, n)
+@doc raw"
+Narrow a data argument to a concrete element type before conditioning a model
+on it, when nothing in it is actually `missing`.
+
+Data simulated from a model's prior keeps a `Union{Missing, T}` element type
+even once every entry is concrete. Conditioning on that makes DynamicPPL
+`deepcopy` the argument on every evaluation, which Enzyme cannot differentiate
+in reverse mode. Narrowing avoids both the copy and the failure.
+
+A genuinely partially-missing vector (some entries observed, some `missing`)
+is split into a [`MissingObservations`](@ref) carrier instead: a concrete
+value vector plus a presence mask, neither of which admits `Missing` in its
+type. A fully missing vector, a partially- or fully-missing matrix (the
+strata data a data-driven [`Split`](@ref) reads shape from), and a scalar
+`missing`, are returned unchanged, and so is an array whose element type is
+already concrete. A `NamedTuple` of streams is narrowed field-wise, so each
+per-stream submodel receives a concrete vector (or a `MissingObservations`
+carrier).
+
+[`as_turing_model(::IDModel, y_t, n)`](@ref as_turing_model) applies this to
+its `y_t` automatically. It is exposed for data built elsewhere by simulating
+from a prior.
+
+# Arguments
+
+  - `y`: the data argument to narrow — an `AbstractArray`, a `NamedTuple` of
+    them, or a scalar (e.g. `missing`, returned unchanged).
+"
+function concrete_observations(y::AbstractArray)
+    eltype(y) >: Missing || return y
+    return any(ismissing, y) ? y : identity.(y)
+end
+function concrete_observations(y::AbstractVector)
+    eltype(y) >: Missing || return y
+    any(ismissing, y) || return identity.(y)
+    all(ismissing, y) && return y
+    T = nonmissingtype(eltype(y))
+    present = .!ismissing.(y)
+    value = identity.(coalesce.(y, zero(T)))
+    return MissingObservations(value, present)
+end
+concrete_observations(y::NamedTuple) = map(concrete_observations, y)
+concrete_observations(y) = y
+
+# Narrowing must happen before `y_t` is stored on the `Model`: DynamicPPL's
+# `hasmissing`/`deepcopy` check runs on the stored argument, so doing it inside
+# this body would be too late. Hence the private `@model` plus the wrapper.
+@model function _as_turing_model_idmodel(model::IDModel, y_t, n)
     infections ~ as_turing_submodel(model.infection_model, n)
     I_t = infections.I_t
     Z_t = infections.Z_t
@@ -59,6 +106,10 @@ end
     generated_y_t = obs.y_t
     expected_y_t = obs.expected
     return (; generated_y_t, expected_y_t, I_t, Z_t)
+end
+
+function as_turing_model(model::IDModel, y_t, n)
+    return _as_turing_model_idmodel(model, concrete_observations(y_t), n)
 end
 
 @doc raw"
@@ -95,7 +146,7 @@ function as_turing_model(model::IDModel, Y::AbstractMatrix)
 end
 
 function _shape(model::IDModel, Y::AbstractMatrix)
-    (infection_strata(model.observation_model, size(Y, 1)), size(Y, 2))
+    return (infection_strata(model.observation_model, size(Y, 1)), size(Y, 2))
 end
 
 @doc raw"
@@ -122,5 +173,5 @@ ComposableTuringIDModels.infection_strata(
 "
 infection_strata(obs, n_obs_strata::Int) = n_obs_strata
 function infection_strata(s::Split, n_obs_strata::Int)
-    s.map === nothing ? n_obs_strata : size(s.map, 2)
+    return s.map === nothing ? n_obs_strata : size(s.map, 2)
 end

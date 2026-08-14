@@ -20,15 +20,15 @@ in_this_package(ti) = startswith(normpath(ti.filename), TEST_ROOT)
 
 if "skip_quality" in ARGS
     @run_package_tests filter = ti -> in_this_package(ti) &&
-                                      !(:quality in ti.tags) &&
-                                      !(:ad in ti.tags)
+        !(:quality in ti.tags) &&
+        !(:ad in ti.tags)
 elseif "quality_only" in ARGS
     @run_package_tests filter = ti -> in_this_package(ti) &&
-                                      :quality in ti.tags
+        :quality in ti.tags
 elseif "readme_only" in ARGS
     @run_package_tests filter = ti -> in_this_package(ti) &&
-                                      :readme in ti.tags
+        :readme in ti.tags
 else
     @run_package_tests filter = ti -> in_this_package(ti) &&
-                                      !(:ad in ti.tags)
+        !(:ad in ti.tags)
 end

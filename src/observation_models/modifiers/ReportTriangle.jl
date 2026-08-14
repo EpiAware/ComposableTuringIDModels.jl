@@ -105,7 +105,8 @@ struct ReportingPMF{T <: AbstractVector{<:Real}} <: AbstractLatentModel
 end
 
 function ReportingPMF(distribution::C; D = nothing, Δd = 1.0) where {
-        C <: ContinuousDistribution}
+        C <: ContinuousDistribution,
+    }
     return ReportingPMF(_discretised_pmf(distribution; Δd = Δd, D = D))
 end
 
@@ -185,23 +186,31 @@ sim = as_turing_model(obs, missing, fill(50.0, 15))()
 sim.observed
 ```
 "
-@kwdef struct ReportTriangle{E <: AbstractObservationErrorModel,
-    D <: AbstractLatentModel} <: AbstractObservationModel
+@kwdef struct ReportTriangle{
+        E <: AbstractObservationErrorModel,
+        D <: AbstractLatentModel,
+    } <: AbstractObservationModel
     "The per-cell count-error model."
     error_model::E
     "The delay submodel producing the reporting-delay PMF (delays `0 … Dmax`)."
     delay_model::D
 end
 
-function ReportTriangle(error_model::E,
-        pmf::T) where {
-        E <: AbstractObservationErrorModel, T <: AbstractVector{<:Real}}
+function ReportTriangle(
+        error_model::E,
+        pmf::T
+    ) where {
+        E <: AbstractObservationErrorModel, T <: AbstractVector{<:Real},
+    }
     return ReportTriangle(error_model, ReportingPMF(pmf))
 end
 
-function ReportTriangle(error_model::E, distribution::C; D = nothing,
-        Δd = 1.0) where {
-        E <: AbstractObservationErrorModel, C <: ContinuousDistribution}
+function ReportTriangle(
+        error_model::E, distribution::C; D = nothing,
+        Δd = 1.0
+    ) where {
+        E <: AbstractObservationErrorModel, C <: ContinuousDistribution,
+    }
     return ReportTriangle(error_model, ReportingPMF(distribution; D = D, Δd = Δd))
 end
 
@@ -252,7 +261,7 @@ define_y_t(obs, N, fill(20.0, 3)).observed
 "
 function define_y_t(obs_model::ReportTriangle, y_t::ReportingTriangle, Y_t)
     Dmax = _triangle_Dmax(obs_model)
-    @assert y_t.Dmax==Dmax "The triangle's Dmax ($(y_t.Dmax)) must match the model's delay PMF (Dmax = $Dmax)"
+    @assert y_t.Dmax == Dmax "The triangle's Dmax ($(y_t.Dmax)) must match the model's delay PMF (Dmax = $Dmax)"
     return y_t
 end
 
@@ -266,18 +275,23 @@ function define_y_t(obs_model::ReportTriangle, y_t::Missing, Y_t)
     return ReportingTriangle(counts, observed, Dmax)
 end
 
-function define_y_t(obs_model::ReportTriangle, y_t::AbstractMatrix, Y_t; now::Int = size(
-        y_t, 1))
+function define_y_t(
+        obs_model::ReportTriangle, y_t::AbstractMatrix, Y_t; now::Int = size(
+            y_t, 1
+        )
+    )
     n = size(y_t, 1)
     Dmax = _triangle_Dmax(obs_model)
-    @assert size(y_t, 2)==Dmax + 1 "The count matrix has $(size(y_t, 2)) delay columns; the model expects Dmax + 1 = $(Dmax + 1)"
+    @assert size(y_t, 2) == Dmax + 1 "The count matrix has $(size(y_t, 2)) delay columns; the model expects Dmax + 1 = $(Dmax + 1)"
     observed = _triangle_mask(n, Dmax, now)
     return ReportingTriangle(y_t, observed, Dmax)
 end
 
-function define_y_t(obs_model::ReportTriangle, reports, Y_t; now::Int,
+function define_y_t(
+        obs_model::ReportTriangle, reports, Y_t; now::Int,
         reference::Symbol = :reference, delay::Symbol = :delay,
-        count::Symbol = :count)
+        count::Symbol = :count
+    )
     # Long-form `(reference, delay, count)` rows → the dense `N[t, d+1]` matrix.
     n = length(Y_t)
     Dmax = _triangle_Dmax(obs_model)
@@ -303,7 +317,8 @@ end
     # Per-cell error priors (e.g. the NegBin cluster factor) are shared across all
     # observed cells, sampled once from the inner error family.
     priors ~ to_submodel(
-        generate_observation_error_priors(obs_model.error_model, missing, Y_t), false)
+        generate_observation_error_priors(obs_model.error_model, missing, Y_t), false
+    )
 
     # Build (or pass through) the reporting triangle, then read the mask before
     # rebinding `y_t` to the bare count matrix. The tilde below scores `y_t[…]`
@@ -313,14 +328,14 @@ end
     tri = define_y_t(obs_model, y_t, Y_t)
     observed = tri.observed
     Dmax = tri.Dmax
-    @assert size(observed, 1)==n "The triangle has $(size(observed, 1)) reference days; Y_t has $n"
+    @assert size(observed, 1) == n "The triangle has $(size(observed, 1)) reference days; Y_t has $n"
     y_t = tri.counts
 
     for t in 1:n, d in 0:Dmax
 
         observed[t, d + 1] || continue
         # Expected cell mean: eventual total × reporting-delay PMF at this delay.
-        μ = Y_t[t] * pmf[d + 1] + 1e-6
+        μ = Y_t[t] * pmf[d + 1] + 1.0e-6
         y_t[t, d + 1] ~ observation_error(obs_model.error_model, μ, priors...)
     end
     # `expected` is the eventual-total series `Y_t` (uniform contract).

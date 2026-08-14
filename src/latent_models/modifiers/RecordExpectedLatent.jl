@@ -33,7 +33,7 @@ struct RecordExpectedLatent{M <: PriorLike} <: AbstractLatentModel
         # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
         # an `Intercept` (a constant inner path), never left as a scalar.
         wrapped = _path_prior(model)
-        new{typeof(wrapped)}(wrapped)
+        return new{typeof(wrapped)}(wrapped)
     end
 end
 

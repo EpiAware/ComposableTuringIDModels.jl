@@ -2,23 +2,21 @@
 name: AD
 
 # Drives the per-backend AD gradient matrix (the shipped `test/ad/` harness).
-# The per-flag coverage upload and job mechanics live in the reusable; this is
-# the thin caller. Without it the AD harness the kit ships never runs in CI.
+# Per-flag coverage upload and job mechanics live in the reusable; this is
+# the thin caller.
 #
-# `backends` is passed explicitly (built from `_AD_BACKENDS`, the kit's single
-# source of truth for the AD infra) rather than left to the reusable's own
-# default, so the actual CI matrix can never drift from the badges/codecov
-# flags this same package generates.
+# `backends` is passed explicitly (built from `_AD_BACKENDS`, the kit's
+# single source of truth) rather than left to the reusable's own default,
+# so the CI matrix can never drift from the badges/codecov flags this
+# package generates.
 
 on:
   push:
     branches: [main]
-    # Don't fire the 6-backend AD sweep (the heaviest, slowest matrix) for
-    # changes that cannot alter a gradient result. Only clearly AD-irrelevant
-    # paths are ignored: prose docs and markdown. Anything touching src/,
-    # ext/, test/, Project.toml, benchmark/ or the workflow itself still
-    # triggers the full matrix. paths-ignore only skips when EVERY changed
-    # file matches, so a mixed docs+src PR still runs.
+    # Skip the heavy 7-backend sweep only for changes that cannot alter a
+    # gradient result (prose docs, markdown); everything else — src/, ext/,
+    # test/, Project.toml, benchmark/, the workflow itself — still triggers
+    # it. Only skips when EVERY changed file matches.
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
@@ -38,5 +36,5 @@ jobs:
   ad:
     uses: EpiAware/.github/.github/workflows/ad.yml@d024dc6927cc3523292a159dc0d4a45193c9c65d
     with:
-      backends: '[{"name":"ForwardDiff","tag":"forwarddiff","flag":"ad-forwarddiff"},{"name":"ReverseDiff (tape)","tag":"reversediff","flag":"ad-reversediff"},{"name":"Enzyme forward","tag":"enzyme_forward","flag":"ad-enzyme-forward"},{"name":"Enzyme reverse","tag":"enzyme_reverse","flag":"ad-enzyme-reverse"},{"name":"Mooncake reverse","tag":"mooncake_reverse","flag":"ad-mooncake-reverse"},{"name":"Mooncake forward","tag":"mooncake_forward","flag":"ad-mooncake-forward"}]'
+      backends: '[{"name":"ForwardDiff","tag":"forwarddiff","flag":"ad-forwarddiff"},{"name":"ReverseDiff (tape)","tag":"reversediff","flag":"ad-reversediff"},{"name":"ReverseDiff (compiled)","tag":"reversediff_compiled","flag":"ad-reversediff-compiled"},{"name":"Enzyme forward","tag":"enzyme_forward","flag":"ad-enzyme-forward"},{"name":"Enzyme reverse","tag":"enzyme_reverse","flag":"ad-enzyme-reverse"},{"name":"Mooncake reverse","tag":"mooncake_reverse","flag":"ad-mooncake-reverse"},{"name":"Mooncake forward","tag":"mooncake_forward","flag":"ad-mooncake-forward"}]'
     secrets: inherit  # pragma: allowlist secret

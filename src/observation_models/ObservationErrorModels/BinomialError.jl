@@ -56,27 +56,39 @@ define_y_t(::BinomialError, y_t, Y_t) = define_y_t(PoissonError(), y_t, Y_t)
 # Resolve the number of trials carried in the data to a per-time-point vector.
 _binomial_trials(N::Integer, n) = fill(N, n)
 function _binomial_trials(N::AbstractVector{<:Integer}, n)
-    @assert length(N)==n "The number-of-trials vector `N` (length $(length(N))) must match the expected-observation series length ($n)"
+    @assert length(N) == n "The number-of-trials vector `N` (length $(length(N))) must match the expected-observation series length ($n)"
     return N
 end
 
 @model function as_turing_model(obs_model::BinomialError, y_t, Y_t)
     @assert y_t isa NamedTuple&&haskey(y_t, :N) "BinomialError needs `y_t` to be a NamedTuple carrying the number of trials, e.g. `(y = successes, N = trials)` (use `y = missing` to simulate)"
 
-    # Read the number of trials from the data, then rebind `y_t` to the observed
-    # successes (the same name, so DynamicPPL conditions on it when concrete).
+    # Read the number of trials from the data.
     N_t = _binomial_trials(y_t.N, length(Y_t))
-    y_t = define_y_t(obs_model, y_t, Y_t)
-
-    diff_t = length(y_t) - length(Y_t)
-    @assert diff_t>=0 "The observation vector must be at least as long as the expected observation vector"
 
     # `Y_t` is the success probability; clamp away from 0/1 to avoid a degenerate
     # likelihood, mirroring the count families' `Y_t .+ 1e-6` nudge.
-    p_t = clamp.(Y_t, 1e-6, 1 - 1e-6)
+    p_t = clamp.(Y_t, 1.0e-6, 1 - 1.0e-6)
+    dist = _TrialDist(obs_model, p_t, N_t)
 
-    for i in eachindex(Y_t)
-        y_t[i + diff_t] ~ observation_error(obs_model, p_t[i], N_t[i])
+    y = y_t.y
+    if y isa MissingObservations
+        diff_t = length(y.value) - length(Y_t)
+        @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
+        y_t, __varinfo__ = _score_missing_observations!!(
+            __model__.context, __varinfo__, y, diff_t, Y_t, dist
+        )
+    else
+        # Rebind `y_t` to the observed successes (the same name, so DynamicPPL
+        # conditions on it when concrete).
+        y_t = define_y_t(obs_model, y_t, Y_t)
+
+        diff_t = length(y_t) - length(Y_t)
+        @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
+
+        for i in eachindex(Y_t)
+            y_t[i + diff_t] ~ dist(i)
+        end
     end
     return (; y_t, expected = Y_t)
 end

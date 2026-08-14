@@ -1,6 +1,6 @@
 # Tests for `CombineInfections`: several (possibly different) infection
 # processes stacked into one `n_strata x n_time` `I_t` matrix, the "different
-# many" many-to-many infection-side mapping (issue #180).
+# many" many-to-many infection-side mapping.
 
 @testitem "CombineInfections constructs and is an AbstractInfectionModel" begin
     using ComposableTuringIDModels, Distributions

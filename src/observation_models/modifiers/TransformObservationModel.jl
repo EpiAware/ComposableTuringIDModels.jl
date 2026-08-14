@@ -29,7 +29,7 @@ rand(mdl)
   - `transform`: the transformation applied to the expected observations.
 "
 @kwdef struct TransformObservationModel{M <: AbstractObservationModel, F <: Function} <:
-              AbstractObservationModel
+    AbstractObservationModel
     "The inner observation model."
     model::M
     "The transformation applied to the expected observations."
@@ -37,8 +37,10 @@ rand(mdl)
 end
 
 function TransformObservationModel(
-        model::M; transform = x -> log1pexp.(x)) where {
-        M <: AbstractObservationModel}
+        model::M; transform = x -> log1pexp.(x)
+    ) where {
+        M <: AbstractObservationModel,
+    }
     return TransformObservationModel(model, transform)
 end
 

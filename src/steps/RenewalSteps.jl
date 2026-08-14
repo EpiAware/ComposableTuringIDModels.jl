@@ -62,19 +62,25 @@ function renewal_pressure end
 
 renewal_pressure(::UniformScaling, g, window::AbstractVector) = dot(window, g)
 
-renewal_pressure(::UniformScaling, g, window::AbstractMatrix) = window * g
+# Row-wise reductions rather than `window * g` and `K * v`: Enzyme forward has
+# no runtime-activity `gemv`. The vector case above is a `dot`, which it does
+# support.
+function renewal_pressure(::UniformScaling, g, window::AbstractMatrix)
+    return vec(sum(window .* reshape(g, 1, :); dims = 2))
+end
 
 # A `strata × lags` generation interval: each stratum convolves its own row of
 # the window with its own interval.
 function renewal_pressure(
-        ::UniformScaling, g::AbstractMatrix, window::AbstractMatrix)
+        ::UniformScaling, g::AbstractMatrix, window::AbstractMatrix
+    )
     return vec(sum(window .* g; dims = 2))
 end
 
 # A mixing matrix redistributes the convolved histories, whichever generation
 # interval produced them.
 function renewal_pressure(K::AbstractMatrix, g, window::AbstractMatrix)
-    return K * renewal_pressure(I, g, window)
+    return vec(sum(K .* reshape(renewal_pressure(I, g, window), 1, :); dims = 2))
 end
 
 # A per-pair generation interval, `K[g, h, i]` being the weight stratum `h`
@@ -82,10 +88,17 @@ end
 # is column `end - i + 1`; the reversed generation interval `g` is unused,
 # because the array carries the intervals itself.
 function renewal_pressure(
-        K::AbstractArray{<:Any, 3}, g, window::AbstractMatrix)
+        K::AbstractArray{<:Any, 3}, g, window::AbstractMatrix
+    )
     last_lag = size(window, 2)
-    return sum(view(K, :, :, i) * view(window, :, last_lag - i + 1)
-    for i in axes(K, 3))
+    return sum(
+        vec(
+                sum(
+                    view(K, :, :, i) .*
+                    reshape(view(window, :, last_lag - i + 1), 1, :); dims = 2
+                )
+            ) for i in axes(K, 3)
+    )
 end
 
 @doc raw"
@@ -166,7 +179,7 @@ _series(v::AbstractVector{<:AbstractVector}) = reduce(hcat, v)
 # Drop the oldest entry and commit the new incidence.
 _advance(window::AbstractVector, new) = vcat(window[2:end], new)
 function _advance(window::AbstractMatrix, new)
-    return hcat(view(window, :, 2:size(window, 2)), new)
+    return hcat(collect(view(window, :, 2:size(window, 2))), new)
 end
 
 # The number of lags a generation interval covers.
@@ -177,25 +190,79 @@ _n_lags(g::AbstractMatrix) = size(g, 2)
 _reverse_lags(g::AbstractVector) = reverse(g)
 _reverse_lags(g::AbstractMatrix) = reverse(g; dims = 2)
 
-function (recurrent_step::ConstantRenewalStep)(window, Rt)
-    new_incidence = renewal_foi(recurrent_step, window, Rt)
-    return _advance(window, new_incidence)
+function (recurrent_step::ConstantRenewalStep)(state, Rt)
+    new_incidence = renewal_foi(recurrent_step, state.window, Rt)
+    new_window = _advance(state.window, new_incidence)
+    return (; val = new_incidence, window = new_window)
 end
 
 # One series: a window decaying at the implied rate. Several strata: one row
 # each, at that stratum's own seed and implied rate. `r` broadcasts, so it is a
 # scalar for a shared generation interval and a vector for per-stratum ones.
-function _renewal_init_state(::ConstantRenewalStep, I₀::Real, r, len_gen_int)
+@doc raw"
+The incidence window a renewal scan starts from: `len_gen_int` values decaying
+at the rate `r` implied by ``R_0``, seeded at `I₀`. A vector for one series, a
+`strata × lags` matrix for a stratified renewal, since `I₀` and `r` broadcast.
+
+A new renewal step implements this if it seeds its window differently, and
+[`renewal_init_state`](@ref) to wrap it in the state the scan carries.
+
+# Arguments
+
+  - `step`: the renewal step being seeded.
+  - `I₀`: the initial incidence, one value or one per stratum.
+  - `r`: the growth rate implied by ``R_0``.
+  - `len_gen_int`: the number of lags the generation interval covers.
+
+# Examples
+```@example renewal_init_window
+using ComposableTuringIDModels
+step = ComposableTuringIDModels.ConstantRenewalStep(reverse([0.2, 0.3, 0.5]))
+ComposableTuringIDModels.renewal_init_window(step, 10.0, 0.1, 3)
+```
+"
+function renewal_init_window(::ConstantRenewalStep, I₀::Real, r, len_gen_int)
     return I₀ * [exp(-r * t) for t in (len_gen_int - 1):-1:0]
 end
 
-function _renewal_init_state(
-        ::ConstantRenewalStep, I₀::AbstractVector, r, len_gen_int)
+function renewal_init_window(
+        ::ConstantRenewalStep, I₀::AbstractVector, r, len_gen_int
+    )
     return I₀ .* exp.(.-r .* permutedims((len_gen_int - 1):-1:0))
 end
 
+@doc raw"
+The state a renewal scan carries: the newest incidence `val` alongside the
+`window` it came from, and `substates` when the step has modifiers.
+
+Pairing the value with the window lets [`get_state`](@ref) read a field rather
+than index the accumulated array, which keeps the scan differentiable under
+every AD backend.
+
+A new renewal step implements this, usually by wrapping
+[`renewal_init_window`](@ref).
+
+# Arguments
+
+  - `step`: the renewal step being seeded.
+  - `I₀`: the initial incidence, one value or one per stratum.
+  - `r`: the growth rate implied by ``R_0``.
+  - `len_gen_int`: the number of lags the generation interval covers.
+
+# Examples
+```@example renewal_init_state
+using ComposableTuringIDModels
+step = ComposableTuringIDModels.ConstantRenewalStep(reverse([0.2, 0.3, 0.5]))
+ComposableTuringIDModels.renewal_init_state(step, 10.0, 0.1, 3)
+```
+"
+function renewal_init_state(step::ConstantRenewalStep, I₀, r, len_gen_int)
+    window = renewal_init_window(step, I₀, r, len_gen_int)
+    return (; val = _newest(window), window = window)
+end
+
 function get_state(::ConstantRenewalStep, initial_state, state)
-    return _series(_newest.(state))
+    return _series(state .|> x -> x.val)
 end
 
 # `ConstantRenewalStep` is the force-of-infection primitive. The renewal step

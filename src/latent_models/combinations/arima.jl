@@ -19,9 +19,11 @@ model = arima()
 rand(as_turing_model(model, 10))
 ```
 "
-function arima(; ar_init = [Normal()], diff_init = [Normal()],
+function arima(;
+        ar_init = [Normal()], diff_init = [Normal()],
         damp = [truncated(Normal(0.0, 0.05), 0, 1)],
-        θ = [truncated(Normal(0.0, 0.05), -1, 1)], ϵ_t = HierarchicalNormal())
+        θ = [truncated(Normal(0.0, 0.05), -1, 1)], ϵ_t = HierarchicalNormal()
+    )
     arma_model = arma(; init = ar_init, damp = damp, θ = θ, ϵ_t = ϵ_t)
     return DiffLatentModel(; model = arma_model, init = diff_init)
 end

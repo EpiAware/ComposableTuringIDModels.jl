@@ -64,12 +64,14 @@ abstract type AbstractRenewalModifier end
 # never resolved. Name the modifier and point at the seam instead of failing
 # with a bare `MethodError` from inside the recursion.
 function _unresolved_modifier(mod)
-    return error("$(typeof(mod)) has no scan interface. A modifier " *
-                 "carrying priors must be resolved before the scan through " *
-                 "the step's `as_turing_model` seam, i.e. " *
-                 "`as_turing_submodel(step, n)` (what `Renewal` does); a " *
-                 "deterministic modifier must implement " *
-                 "`modifier_init_state` and `apply_modifier`.")
+    return error(
+        "$(typeof(mod)) has no scan interface. A modifier " *
+            "carrying priors must be resolved before the scan through " *
+            "the step's `as_turing_model` seam, i.e. " *
+            "`as_turing_submodel(step, n)` (what `Renewal` does); a " *
+            "deterministic modifier must implement " *
+            "`modifier_init_state` and `apply_modifier`."
+    )
 end
 
 function modifier_init_state(mod::AbstractRenewalModifier, window)
@@ -131,10 +133,10 @@ end
 _match_strata(pop_size, ::AbstractVector) = pop_size
 _match_strata(pop_size::Real, window::AbstractMatrix) = fill(pop_size, size(window, 1))
 function _match_strata(pop_size::AbstractVector, window::AbstractMatrix)
-    @assert length(pop_size)==size(window, 1) "`pop_size` has " *
-                                              "$(length(pop_size)) entries " *
-                                              "but the renewal has " *
-                                              "$(size(window, 1)) strata"
+    @assert length(pop_size) == size(window, 1) "`pop_size` has " *
+        "$(length(pop_size)) entries " *
+        "but the renewal has " *
+        "$(size(window, 1)) strata"
     return pop_size
 end
 
@@ -143,7 +145,7 @@ end
 # The floor keeps the recursion going there. Every operation is broadcast, so
 # one line serves a scalar and a per-stratum pool.
 function apply_modifier(mod::SusceptibleDepletion, incidence, S)
-    new_incidence = max.(S ./ mod.pop_size, 1e-6) .* incidence
+    new_incidence = max.(S ./ mod.pop_size, 1.0e-6) .* incidence
     return new_incidence, S .- new_incidence
 end
 
@@ -154,7 +156,7 @@ generation interval by default) with a tuple of `modifiers`
 window.
 
 With no modifiers it is a plain renewal recurrence. With modifiers its state is
-`[window, substate₁, …, substateₙ]` — the incidence window followed by one
+`(; val, window, substates)` — the newest incidence, the shared window, and one
 substate per modifier; each step computes the core force of infection, threads it
 through the modifiers (each transforming the incidence and updating its own
 substate), then advances the shared window once with the final incidence.
@@ -164,7 +166,7 @@ population `N` and susceptible depletion; a [`Renewal`](@ref) built with a
 `SusceptibleDepletion(N)` modifier uses exactly this step.
 "
 struct RenewalStep{R <: AbstractConstantRenewalStep, M <: Tuple} <:
-       AbstractConstantRenewalStep
+    AbstractConstantRenewalStep
     core::R
     modifiers::M
 end
@@ -180,8 +182,8 @@ const _PlainRenewalStep = RenewalStep{<:AbstractConstantRenewalStep, Tuple{}}
 
 (step::_PlainRenewalStep)(state, Rt) = step.core(state, Rt)
 
-function _renewal_init_state(step::_PlainRenewalStep, I₀, r_approx, len_gen_int)
-    return _renewal_init_state(step.core, I₀, r_approx, len_gen_int)
+function renewal_init_state(step::_PlainRenewalStep, I₀, r_approx, len_gen_int)
+    return renewal_init_state(step.core, I₀, r_approx, len_gen_int)
 end
 
 function get_state(step::_PlainRenewalStep, initial_state, state)
@@ -195,27 +197,28 @@ _thread_modifiers(::Tuple{}, incidence, ::Tuple{}) = (incidence, ())
 function _thread_modifiers(mods::Tuple, incidence, substates::Tuple)
     inc, s = apply_modifier(first(mods), incidence, first(substates))
     rest_inc, rest_states = _thread_modifiers(
-        Base.tail(mods), inc, Base.tail(substates))
+        Base.tail(mods), inc, Base.tail(substates)
+    )
     return rest_inc, (s, rest_states...)
 end
 
 function (step::RenewalStep)(state, Rt)
-    window = state[1]
-    substates = ntuple(i -> state[i + 1], length(step.modifiers))
-    foi = renewal_foi(step.core, window, Rt)
-    new_incidence, new_substates = _thread_modifiers(step.modifiers, foi, substates)
-    new_window = _advance(window, new_incidence)
-    return [new_window, new_substates...]
+    foi = renewal_foi(step.core, state.window, Rt)
+    new_incidence, new_substates = _thread_modifiers(
+        step.modifiers, foi, state.substates
+    )
+    new_window = _advance(state.window, new_incidence)
+    return (; val = new_incidence, window = new_window, substates = new_substates)
 end
 
-function _renewal_init_state(step::RenewalStep, I₀, r_approx, len_gen_int)
-    window = _renewal_init_state(step.core, I₀, r_approx, len_gen_int)
+function renewal_init_state(step::RenewalStep, I₀, r_approx, len_gen_int)
+    window = renewal_init_window(step.core, I₀, r_approx, len_gen_int)
     substates = map(mod -> modifier_init_state(mod, window), step.modifiers)
-    return [window, substates...]
+    return (; val = _newest(window), window = window, substates = substates)
 end
 
 function get_state(::RenewalStep, initial_state, state)
-    return _series([_newest(s[1]) for s in state])
+    return _series(state .|> x -> x.val)
 end
 
 # --- the pre-scan seam ------------------------------------------------------
@@ -270,8 +273,10 @@ end
 @model function _resolve_modifiers(mods::Tuple, n, index)
     modifier ~ to_submodel(
         prefix(as_turing_model(first(mods), n), Symbol(:modifier_, index)),
-        false)
+        false
+    )
     rest ~ to_submodel(
-        _resolve_modifiers(Base.tail(mods), n, index + 1), false)
+        _resolve_modifiers(Base.tail(mods), n, index + 1), false
+    )
     return (modifier, rest...)
 end

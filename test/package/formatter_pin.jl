@@ -2,7 +2,7 @@
 #
 # The formatting check runs from the shared test environment (the managed
 # `quality.jl` calls `test_formatting(QA_CONFIG.mod)` with no `env`), so the
-# style it asserts is whatever JuliaFormatter that environment resolves. The
+# style it asserts is whatever Runic that environment resolves. The
 # package-owned `test/Project.toml` therefore pins it exactly.
 #
 # The version everything else uses is single-sourced from the kit and reaches
@@ -15,23 +15,26 @@
 # `test/formatter` environment (as `test_linting` already does for JET), which
 # makes both pins the same file.
 
-@testitem "Quality: formatter pin" tags=[:quality] begin
+@testitem "Quality: formatter pin" tags = [:quality] begin
     using Pkg: TOML
 
     root = joinpath(@__DIR__, "..", "..")
     shared = TOML.parsefile(joinpath(root, "test", "Project.toml"))
-    managed = TOML.parsefile(joinpath(
-        root, "test", "formatter", "Project.toml"))
+    managed = TOML.parsefile(
+        joinpath(
+            root, "test", "formatter", "Project.toml"
+        )
+    )
 
-    shared_pin = get(get(shared, "compat", Dict()), "JuliaFormatter", nothing)
-    managed_pin = get(get(managed, "compat", Dict()), "JuliaFormatter", nothing)
+    shared_pin = get(get(shared, "compat", Dict()), "Runic", nothing)
+    managed_pin = get(get(managed, "compat", Dict()), "Runic", nothing)
 
     @test shared_pin !== nothing
     @test managed_pin !== nothing
     if shared_pin != managed_pin
-        @warn "JuliaFormatter pins have drifted. Set the `[compat]` entry " *
-              "in test/Project.toml to match test/formatter/Project.toml, " *
-              "then reformat the tree with `task format`." shared_pin managed_pin
+        @warn "Runic pins have drifted. Set the `[compat]` entry " *
+            "in test/Project.toml to match test/formatter/Project.toml, " *
+            "then reformat the tree with `task format`." shared_pin managed_pin
     end
     @test shared_pin == managed_pin
 end

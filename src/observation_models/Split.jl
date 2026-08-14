@@ -44,7 +44,7 @@ struct StrataMap{M <: AbstractMatrix, W <: AbstractMatrix}
     map::W
 
     function StrataMap(strata::M, map::W) where {M <: AbstractMatrix, W <: AbstractMatrix}
-        @assert size(map, 2)==size(strata, 1) "The strata map has $(size(map, 2)) columns but the expected series has $(size(strata, 1)) infection strata (rows)"
+        @assert size(map, 2) == size(strata, 1) "The strata map has $(size(map, 2)) columns but the expected series has $(size(strata, 1)) infection strata (rows)"
         return new{M, W}(strata, map)
     end
 end
@@ -62,14 +62,14 @@ end
 
 # A multi-stratum matrix: stream `k` is row `k` (one-to-one).
 function _split_expected(Y_t::AbstractMatrix, names)
-    @assert size(Y_t, 1)==length(names) "The expected series has $(size(Y_t, 1)) strata (rows) but there are $(length(names)) streams; supply a `StrataMap` for a non-identity mapping"
+    @assert size(Y_t, 1) == length(names) "The expected series has $(size(Y_t, 1)) strata (rows) but there are $(length(names)) streams; supply a `StrataMap` for a non-identity mapping"
     return [Y_t[k, :] for k in 1:length(names)]
 end
 
 # A StrataMap: project infection strata onto streams via the weight matrix.
 function _split_expected(Y_t::StrataMap, names)
     W, M = Y_t.map, Y_t.strata
-    @assert size(W, 1)==length(names) "The strata map has $(size(W, 1)) observation strata (rows) but there are $(length(names)) streams"
+    @assert size(W, 1) == length(names) "The strata map has $(size(W, 1)) observation strata (rows) but there are $(length(names)) streams"
     return [vec(sum(W[k, j] .* M[j, :] for j in 1:size(M, 1))) for k in 1:length(names)]
 end
 
@@ -194,7 +194,7 @@ end
 # number of named streams, one row per stream.
 function Split(streams::NamedTuple, map::AbstractMatrix)
     @assert !isempty(streams) "A Split needs at least one stream"
-    @assert size(map, 1)==length(streams) "The strata map has $(size(map, 1)) rows but there are $(length(streams)) streams"
+    @assert size(map, 1) == length(streams) "The strata map has $(size(map, 1)) rows but there are $(length(streams)) streams"
     return Split(streams, collect(string.(keys(streams))), map)
 end
 
@@ -204,7 +204,7 @@ Split(template::AbstractObservationModel) = Split(template, nothing, nothing)
 # Strata with a weight map: project the incoming infection strata (matrix or a
 # single-stratum vector) onto the streams through `map` inside a composed model.
 function Split(template::AbstractObservationModel, map::AbstractMatrix)
-    Split(template, nothing, map)
+    return Split(template, nothing, map)
 end
 
 # Pretty-printing: a Split's children are its named streams, one per line, so the
@@ -216,8 +216,10 @@ end
 function _component_children(m::Split)
     m.streams isa NamedTuple ||
         return Tuple{String, AbstractComposableModel}[("template", m.streams)]
-    return Tuple{String, AbstractComposableModel}[(string(nm), m.streams[nm])
-                                                  for nm in keys(m.streams)]
+    return Tuple{String, AbstractComposableModel}[
+        (string(nm), m.streams[nm])
+            for nm in keys(m.streams)
+    ]
 end
 
 # Ordered stream names: fixed for explicit streams; else the `y_t` keys for a
@@ -227,8 +229,10 @@ function _split_names(m::Split, y_t)
     m.names === nothing || return m.names
     y_t isa NamedTuple && return collect(string.(keys(y_t)))
     y_t isa AbstractMatrix && return "group" .* string.(1:size(y_t, 1))
-    error("A strata Split needs a NamedTuple or AbstractMatrix `y_t` to name " *
-          "its streams")
+    error(
+        "A strata Split needs a NamedTuple or AbstractMatrix `y_t` to name " *
+            "its streams"
+    )
 end
 
 # Per-Split expected input: with a stored weight `map` the incoming series is the
@@ -241,8 +245,11 @@ function _split_expected(m::Split, Y_t, names)
 end
 
 # Per-stream models: the named entries, or the template replicated per stream.
+# The named branch is a `Tuple`, not a `Vector`: differently-typed streams
+# infer a packed `Union` eltype Enzyme's type analysis rejects. The template
+# branch is a single concrete type already.
 function _split_models(m::Split, names)
-    m.streams isa NamedTuple && return [m.streams[Symbol(nm)] for nm in names]
+    m.streams isa NamedTuple && return Tuple(m.streams[Symbol(nm)] for nm in names)
     return [m.streams for _ in names]
 end
 
@@ -255,7 +262,7 @@ function _split_y_t(names, y_t::NamedTuple)
     return [y_t[Symbol(nm)] for nm in names]
 end
 function _split_y_t(names, y_t::AbstractMatrix)
-    @assert size(y_t, 1)==length(names) "The data matrix has $(size(y_t, 1)) rows but there are $(length(names)) streams"
+    @assert size(y_t, 1) == length(names) "The data matrix has $(size(y_t, 1)) rows but there are $(length(names)) streams"
     return [y_t[i, :] for i in eachindex(names)]
 end
 _split_y_t(names, y_t) = [y_t for _ in names]
@@ -271,13 +278,18 @@ _split_y_t(names, y_t) = [y_t for _ in names]
     for i in eachindex(names)
         nm = names[i]
         res ~ to_submodel(
-            prefix(as_turing_model(models[i], yt[i], expected_in[i]),
-                Symbol(nm)), false)
+            prefix(
+                as_turing_model(models[i], yt[i], expected_in[i]),
+                Symbol(nm)
+            ), false
+        )
         ys[i] = res.y_t
         exps[i] = res.expected
     end
 
     keysyms = Tuple(Symbol.(names))
-    return (; y_t = NamedTuple{keysyms}(Tuple(ys)),
-        expected = NamedTuple{keysyms}(Tuple(exps)))
+    return (;
+        y_t = NamedTuple{keysyms}(Tuple(ys)),
+        expected = NamedTuple{keysyms}(Tuple(exps)),
+    )
 end

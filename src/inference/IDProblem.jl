@@ -62,12 +62,13 @@ end
 # data-driven `Split` with neither) is a single series.
 _obs_data_shape(obs, y_t, time_steps) = time_steps
 _obs_data_shape(obs, y_t::Missing, time_steps) = _obs_data_shape_missing(
-    obs, time_steps)
+    obs, time_steps
+)
 function _obs_data_shape(obs, y_t::AbstractMatrix, time_steps)
-    (infection_strata(obs, size(y_t, 1)), time_steps)
+    return (infection_strata(obs, size(y_t, 1)), time_steps)
 end
 function _obs_data_shape(obs, y_t::NamedTuple, time_steps)
-    (infection_strata(obs, length(y_t)), time_steps)
+    return (infection_strata(obs, length(y_t)), time_steps)
 end
 
 _obs_data_shape_missing(obs, time_steps) = time_steps

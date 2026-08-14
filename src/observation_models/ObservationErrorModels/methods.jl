@@ -32,25 +32,103 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
 "
 @model function as_turing_model(obs_model::AbstractObservationErrorModel, y_t, Y_t)
     priors ~ to_submodel(
-        generate_observation_error_priors(obs_model, y_t, Y_t), false)
+        generate_observation_error_priors(obs_model, y_t, Y_t), false
+    )
 
-    # Extract the count series scored by this model (plain vector, `missing`, or
-    # a NamedTuple carrying extra data). Rebinding `y_t` keeps DynamicPPL treating
-    # the entries as conditioned observations.
-    y_t = define_y_t(obs_model, y_t, Y_t)
+    pad_Y_t = Y_t .+ 1.0e-6
+    # A concrete callable rather than a closure: a closure defined in a model
+    # body captures boxed locals, costing a dynamic dispatch per scored entry.
+    dist = _ErrorDist(obs_model, pad_Y_t, priors)
+    y = y_t isa NamedTuple ? y_t.y : y_t
+    if y isa MissingObservations
+        diff_t = length(y.value) - length(Y_t)
+        @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
+        y_t, __varinfo__ = _score_missing_observations!!(
+            __model__.context, __varinfo__, y, diff_t, Y_t, dist
+        )
+    else
+        # Extract the count series scored by this model (plain vector, or
+        # `missing`, replaced by a length-`Y_t` vector of `missing`).
+        # Rebinding `y_t` keeps DynamicPPL treating the entries as conditioned
+        # observations.
+        y_t = define_y_t(obs_model, y_t, Y_t)
 
-    diff_t = length(y_t) - length(Y_t)
-    @assert diff_t>=0 "The observation vector must be at least as long as the expected observation vector"
+        diff_t = length(y_t) - length(Y_t)
+        @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
 
-    pad_Y_t = Y_t .+ 1e-6
-    for i in eachindex(Y_t)
-        # Read each sampled prior at step `i` via `_at`, so a scalar prior stays
-        # constant while a length-`n` prior (drawn from a process slot) makes the
-        # error parameter time-varying — one loop serves both.
-        y_t[i + diff_t] ~ observation_error(
-            obs_model, pad_Y_t[i], map(p -> _at(p, i), values(priors))...)
+        # Every entry is scored, including a `missing` one. Sampling the blanks
+        # is what `forecast` relies on: it pads the series with `missing` over
+        # the horizon and reads the drawn values back out of the chain.
+        # Skipping them would drop the horizon from the output.
+        for i in eachindex(Y_t)
+            y_t[i + diff_t] ~ dist(i)
+        end
     end
     return (; y_t, expected = Y_t)
+end
+
+# Score every entry of a `MissingObservations` carrier against a per-time-point
+# distribution, without ever building a `Union{Missing,T}` value.
+#
+# `y_t[i] ~ dist` decides sample-vs-observe by checking `y_t[i] === missing` at
+# run time, which needs a value that can actually hold `missing` at that lens.
+# Building one freshly inside a model body — the only safe way to do it, since
+# reusing the model's stored argument across evaluations would let one draw's
+# sample leak into the next — is exactly the array Enzyme's reverse-mode type
+# analysis cannot compile. Driving `DynamicPPL.tilde_observe!!` and
+# `DynamicPPL.tilde_assume!!` directly off the carrier's own concrete `present`
+# mask needs no such value: every array touched on the AD-active path stays
+# plainly typed. `value` is copied so a fresh draw is taken on every evaluation
+# rather than mutating the model's stored argument in place.
+#
+# Returns the scored series (a plain `Vector`, the observed entries as given
+# and the rest overwritten with their fresh draws) and the updated `VarInfo`.
+function (d::_ErrorDist)(i)
+    return observation_error(
+        d.obs_model, d.pad_Y_t[i], map(p -> _at(p, i), values(d.priors))...
+    )
+end
+
+(d::_TrialDist)(i) = observation_error(d.obs_model, d.p_t[i], d.N_t[i])
+
+function _score_missing_observations!!(
+        context, varinfo, y::MissingObservations, diff_t, Y_t, dist
+    )
+    n = length(y.value)
+    # A sampled draw's type follows the AD backend (e.g. a `ForwardDiff.Dual`,
+    # not a `Float64`), which is not known until `tilde_assume!!` returns, so
+    # `scored` is untyped until every entry is in. Narrowing it with the final
+    # `identity.()` (the same idiom `concrete_observations` uses) keeps this
+    # step off the model's stored arguments — it runs after every tilde call has
+    # already accumulated its log-probability, so it is not part of what Enzyme
+    # differentiates.
+    scored = Vector{Any}(undef, n)
+    # `template` is the top-level `y_t` array itself (what the `y_t[idx] ~ ...`
+    # sugar would splice in): it tells `VarInfo` storage the real type/length to
+    # allocate for `y_t`'s entries, instead of growing an untyped array on the
+    # fly the way `NoTemplate()` would.
+    for i in eachindex(Y_t)
+        idx = i + diff_t
+        vn = DynamicPPL.VarName{:y_t}(DynamicPPL.Index((idx,), NamedTuple()))
+        if y.present[idx]
+            val = y.value[idx]
+            _, varinfo = DynamicPPL.tilde_observe!!(
+                context, dist(i), val, vn, y.value, varinfo
+            )
+        else
+            val, varinfo = DynamicPPL.tilde_assume!!(
+                context, dist(i), vn, y.value, varinfo
+            )
+        end
+        scored[idx] = val
+    end
+    # Entries outside `diff_t+1:n` (only reached when `Y_t` is shorter than
+    # `y_t`, e.g. a delay convolution) are never scored; keep them as given.
+    for idx in 1:n
+        isassigned(scored, idx) && continue
+        scored[idx] = y.present[idx] ? y.value[idx] : missing
+    end
+    return identity.(scored), varinfo
 end
 
 @doc raw"
@@ -59,17 +137,20 @@ Unpack the observed count series an observation-error model scores from the data
 
 The default method covers every count family (Poisson, negative binomial) and the
 Gaussian family: it accepts a plain observation vector, a `missing` (replaced by a
-length-`Y_t` vector of `missing` for predictive simulation), or a `NamedTuple`
-carrying the counts in a `y` field alongside any extra per-time-point data (a
-model that needs more than the counts — e.g. [`BinomialError`](@ref), which also
-needs the number of trials — reads those extra fields itself). This keeps the
-simple case ergonomic (a plain vector just works) while letting a model opt into a
-richer `NamedTuple` data contract.
+length-`Y_t` vector of `missing` for predictive simulation), a
+[`MissingObservations`](@ref) carrier (rebuilt into a ragged
+`Vector{Union{Missing,T}}`), or a `NamedTuple` carrying the counts in a `y`
+field alongside any extra per-time-point data (a model that needs more than
+the counts — e.g. [`BinomialError`](@ref), which also needs the number of
+trials — reads those extra fields itself). This keeps the simple case
+ergonomic (a plain vector just works) while letting a model opt into a richer
+`NamedTuple` data contract.
 
 # Arguments
 
   - `obs_model`: the observation-error model.
-  - `y_t`: the observed data — a vector, `missing`, or a `NamedTuple`.
+  - `y_t`: the observed data — a vector, `missing`, a `MissingObservations`
+    carrier, or a `NamedTuple`.
   - `Y_t`: the expected-observation series (used to size a `missing` series).
 
 # Examples
@@ -85,8 +166,16 @@ function define_y_t(::AbstractObservationErrorModel, y_t, Y_t)
     # counts directly. Either way, a `missing` count series becomes a length-`Y_t`
     # vector of `missing` for predictive simulation.
     y = y_t isa NamedTuple ? y_t.y : y_t
+    y = _restore_missing(y)
     return ismissing(y) ? Vector{Missing}(missing, length(Y_t)) : y
 end
+
+# Rebuild the ragged `Vector{Union{Missing,T}}` a `MissingObservations` carrier
+# stands in for, for standalone `define_y_t` calls that fall through to the
+# `~`-sugar loop above (the hot loop itself never takes this path — see
+# `_score_missing_observations!!`).
+_restore_missing(y) = y
+_restore_missing(y::MissingObservations) = map((v, p) -> p ? v : missing, y.value, y.present)
 
 @doc raw"
 Generate the priors required by an observation-error model. Returns a named
@@ -106,7 +195,8 @@ rand(m)
 ```
 "
 @model function generate_observation_error_priors(
-        obs_model::AbstractObservationErrorModel, y_t, Y_t)
+        obs_model::AbstractObservationErrorModel, y_t, Y_t
+    )
     return NamedTuple()
 end
 

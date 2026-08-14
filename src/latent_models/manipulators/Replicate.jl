@@ -59,12 +59,20 @@ end
 
 @model function as_turing_model(m::Replicate, n::Dims{2})
     n_strata, n_time = n
-    paths = Vector{Any}(undef, n_strata)
-    for g in 1:n_strata
-        drawn ~ to_submodel(
+    # Draw stratum 1 up front to fix the element type: a boxed `Vector{Any}`
+    # defeats Enzyme's type analysis.
+    drawn_1 ~ to_submodel(
+        prefix(as_turing_model(m.model, n_time), Symbol(:stratum, 1)),
+        false
+    )
+    paths = Vector{typeof(drawn_1)}(undef, n_strata)
+    paths[1] = drawn_1
+    for g in 2:n_strata
+        drawn_g ~ to_submodel(
             prefix(as_turing_model(m.model, n_time), Symbol(:stratum, g)),
-            false)
-        paths[g] = drawn
+            false
+        )
+        paths[g] = drawn_g
     end
     return permutedims(reduce(hcat, paths))
 end

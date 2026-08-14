@@ -56,7 +56,7 @@ size(as_turing_model(strat, (3, 10))().I_t)
 ```
 "
 struct ExpGrowthRate{L <: PriorLike, F <: Function, S <: PriorLike} <:
-       AbstractInfectionModel
+    AbstractInfectionModel
     "Latent process model generating the growth-rate path."
     rt::L
     "Link mapping the unconstrained cumulative sum to non-negative infections."
@@ -65,8 +65,10 @@ struct ExpGrowthRate{L <: PriorLike, F <: Function, S <: PriorLike} <:
     initialisation::S
 end
 
-function ExpGrowthRate(; rt = RandomWalk(),
-        transformation::Function = _oneexpy, initialisation = Normal())
+function ExpGrowthRate(;
+        rt = RandomWalk(),
+        transformation::Function = _oneexpy, initialisation = Normal()
+    )
     return ExpGrowthRate(_path_prior(rt), transformation, initialisation)
 end
 
@@ -78,7 +80,8 @@ _cumsum(Z_t::AbstractMatrix) = cumsum(Z_t; dims = 2)
 @model function as_turing_model(model::ExpGrowthRate, n::ModelShape)
     Z_t ~ as_turing_submodel(model.rt, n)
     init_incidence ~ as_turing_submodel(
-        model.initialisation, _n_strata(n); prefix = true)
+        model.initialisation, _n_strata(n); prefix = true
+    )
     I_t = model.transformation.(_seed(init_incidence, n) .+ _cumsum(Z_t))
     return (; I_t, Z_t)
 end

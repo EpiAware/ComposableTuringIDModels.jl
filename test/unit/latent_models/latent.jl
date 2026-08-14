@@ -2,8 +2,10 @@
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(1)
     n = 12
-    for m in (IID(Normal()), HierarchicalNormal(), RandomWalk(), AR(), MA(),
-        Intercept(Normal()), FixedIntercept(2.0), HilbertSpaceGP())
+    for m in (
+            IID(Normal()), HierarchicalNormal(), RandomWalk(), AR(), MA(),
+            Intercept(Normal()), FixedIntercept(2.0), HilbertSpaceGP(),
+        )
         path = as_turing_model(m, n)()
         @test length(path) == n
     end
@@ -15,15 +17,21 @@ end
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(2)
     ar2 = AR(;
-        damp = [truncated(Normal(0, 0.05), 0, 1),
-            truncated(Normal(0, 0.05), 0, 1)],
-        init = [Normal(), Normal()])
+        damp = [
+            truncated(Normal(0, 0.05), 0, 1),
+            truncated(Normal(0, 0.05), 0, 1),
+        ],
+        init = [Normal(), Normal()]
+    )
     @test ar2.p == 2
     @test length(as_turing_model(ar2, 10)()) == 10
 
     ma2 = MA(;
-        θ = [truncated(Normal(0, 0.05), -1, 1),
-        truncated(Normal(0, 0.05), -1, 1)])
+        θ = [
+            truncated(Normal(0, 0.05), -1, 1),
+            truncated(Normal(0, 0.05), -1, 1),
+        ]
+    )
     @test ma2.q == 2
     @test length(as_turing_model(ma2, 10)()) == 10
 end

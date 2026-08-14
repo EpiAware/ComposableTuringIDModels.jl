@@ -4,24 +4,30 @@
 Build a gravity coupling operator from populations and distances.
 
 ```math
-K_{gh} = \frac{N_g^{\alpha} N_h^{\beta}}{d_{gh}^{\gamma}}, \qquad g \neq h,
-\qquad K_{gg} = \text{within}.
+K_{gh} \propto \frac{n_g^{\alpha} n_h^{\beta}}{d_{gh}^{\gamma}},
+\qquad g \neq h, \qquad K_{gg} \propto \text{within},
+\qquad \textstyle\sum_h K_{gh} = 1.
 ```
 
-Off-diagonal entry ``K_{gh}`` is the pressure stratum `h` puts on stratum `g`,
-relative to stratum `g`'s own. The diagonal is `within`, so the default of `1.0`
-makes the diagonal the uncoupled model and the off-diagonals the extra imported
-pressure on top of it.
+Off-diagonal entry ``K_{gh}`` is the share of stratum `g`'s force of infection
+that comes from stratum `h`; the diagonal is the share from itself. `within`
+sets the self-weight relative to a typical pairwise term, so the default of
+`1.0` makes a stratum's own history count about as much as a neighbour's.
 
-The result is deliberately **not** normalised. Row-normalising it would cancel
-``\alpha`` entirely, since a common row factor divides out.
-Normalisation is therefore left to the caller. For a row-stochastic operator
-use `K ./ sum(K; dims = 2)`. For the usual local-plus-travel form use
-`(1 - ε) * I(n) + ε * K ./ sum(K; dims = 2)`.
+Populations are taken in units of their mean and each row is normalised to sum
+to one. Both are required rather than optional: [`renewal_pressure`](@ref)
+computes ``R_g \sum_h K_{gh} \Lambda_h``, so any overall scale on `K` is
+indistinguishable from scaling ``R_t``. Normalising leaves `K` carrying only
+where a stratum's force comes from and ``R_t`` carrying its size. `pop` can
+therefore be raw counts.
+
+``\alpha`` is identifiable through the split between the diagonal and the
+off-diagonals, so it needs `within` to be non-zero. At `within = 0` a common
+row factor divides out and ``\alpha`` cancels.
 
 # Arguments
 
-  - `pop`: the population of each stratum.
+  - `pop`: the population of each stratum, in any units.
   - `dist`: the `strata × strata` distance matrix. Only its off-diagonal
     entries are read.
 
@@ -30,21 +36,26 @@ use `K ./ sum(K; dims = 2)`. For the usual local-plus-travel form use
   - `α`: the exponent on the destination population (default `1.0`).
   - `β`: the exponent on the origin population (default `1.0`).
   - `γ`: the exponent on distance (default `2.0`).
-  - `within`: the diagonal, own-stratum weight (default `1.0`).
+  - `within`: the own-stratum weight, relative to a typical pairwise term
+    (default `1.0`).
 
 # Examples
 ```@example gravity
 using ComposableTuringIDModels
-pop = [1e6, 2e5]
+pop = [1.0e6, 2.0e5]
 dist = [0.0 50.0; 50.0 0.0]
 gravity(pop, dist; α = 0.0, β = 1.0, γ = 2.0)
 ```
 "
 function gravity(pop, dist; α = 1.0, β = 1.0, γ = 2.0, within = 1.0)
     n = length(pop)
-    @assert size(dist)==(n, n) "`dist` must be $n x $n for $n strata"
-    return [g == h ? within : pop[g]^α * pop[h]^β / dist[g, h]^γ
-            for g in 1:n, h in 1:n]
+    @assert size(dist) == (n, n) "`dist` must be $n x $n for $n strata"
+    p = pop ./ (sum(pop) / n)
+    K = [
+        g == h ? within : p[g]^α * p[h]^β / dist[g, h]^γ
+            for g in 1:n, h in 1:n
+    ]
+    return K ./ sum(K; dims = 2)
 end
 
 @doc raw"
@@ -71,12 +82,12 @@ so they cannot drift.
   - `α`: prior for the exponent on the destination population.
   - `β`: prior for the exponent on the origin population.
   - `γ`: prior for the exponent on distance.
-  - `within`: the diagonal, own-stratum weight.
+  - `within`: the own-stratum weight, relative to a typical pairwise term.
 
 # Examples
 ```@example Gravity
 using ComposableTuringIDModels, Distributions
-pop = [1e6, 2e5]
+pop = [1.0e6, 2.0e5]
 dist = [0.0 50.0; 50.0 0.0]
 g = Gravity(pop, dist; α = Normal(0, 0.5), β = Normal(0, 0.5),
     γ = truncated(Normal(2, 0.5), 0, Inf))
@@ -84,7 +95,7 @@ size(as_turing_model(g, (2, 20))())
 ```
 "
 struct Gravity{P, D, A <: PriorLike, B <: PriorLike, C <: PriorLike, W} <:
-       AbstractMixingModel
+    AbstractMixingModel
     "The population of each stratum."
     pop::P
     "The `strata × strata` distance matrix."
@@ -95,12 +106,14 @@ struct Gravity{P, D, A <: PriorLike, B <: PriorLike, C <: PriorLike, W} <:
     β::B
     "Prior for the exponent on distance."
     γ::C
-    "The diagonal, own-stratum weight."
+    "The own-stratum weight, relative to a typical pairwise term."
     within::W
 end
 
-function Gravity(pop, dist; α = Normal(0, 0.5), β = Normal(0, 0.5),
-        γ = truncated(Normal(2, 0.5), 0, Inf), within = 1.0)
+function Gravity(
+        pop, dist; α = Normal(0, 0.5), β = Normal(0, 0.5),
+        γ = truncated(Normal(2, 0.5), 0, Inf), within = 1.0
+    )
     return Gravity(pop, dist, α, β, γ, within)
 end
 
@@ -108,8 +121,10 @@ end
     α ~ as_turing_submodel(m.α, 1; prefix = true)
     β ~ as_turing_submodel(m.β, 1; prefix = true)
     γ ~ as_turing_submodel(m.γ, 1; prefix = true)
-    return gravity(m.pop, m.dist; α = only(α), β = only(β), γ = only(γ),
-        within = m.within)
+    return gravity(
+        m.pop, m.dist; α = only(α), β = only(β), γ = only(γ),
+        within = m.within
+    )
 end
 
 @doc raw"
@@ -138,7 +153,7 @@ size(pairwise_gen_int(K, [0.2, 0.3, 0.5]))
 ```
 "
 function pairwise_gen_int(K::AbstractMatrix, G::AbstractArray{<:Any, 3})
-    @assert size(G)[1:2]==size(K) "`G` must be $(size(K)) x lags to match `K`"
+    @assert size(G)[1:2] == size(K) "`G` must be $(size(K)) x lags to match `K`"
     for idx in CartesianIndices(K)
         _assert_pmf(view(G, idx[1], idx[2], :))
     end
@@ -148,11 +163,12 @@ end
 function pairwise_gen_int(K::AbstractMatrix, g::AbstractVector)
     _assert_pmf(g)
     return pairwise_gen_int(
-        K, repeat(reshape(g, 1, 1, :), size(K, 1), size(K, 2)))
+        K, repeat(reshape(g, 1, 1, :), size(K, 1), size(K, 2))
+    )
 end
 
 function _assert_pmf(g)
     @assert all(>=(0), g) "A generation interval must be non-negative"
-    @assert sum(g)≈1 "A generation interval must sum to 1"
+    @assert sum(g) ≈ 1 "A generation interval must sum to 1"
     return nothing
 end

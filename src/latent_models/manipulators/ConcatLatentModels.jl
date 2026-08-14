@@ -27,8 +27,9 @@ rand(as_turing_model(combined, 10))
   - `prefixes`: the vector of prefixes, one per model.
 "
 struct ConcatLatentModels{
-    M <: AbstractVector, N <: Int, F <: Function,
-    P <: AbstractVector{<:String}} <: AbstractLatentModel
+        M <: AbstractVector, N <: Int, F <: Function,
+        P <: AbstractVector{<:String},
+    } <: AbstractLatentModel
     "A vector of latent models."
     models::M
     "The number of models in the collection."
@@ -38,31 +39,41 @@ struct ConcatLatentModels{
     "A vector of prefixes for the latent models."
     prefixes::P
 
-    function ConcatLatentModels(models::AbstractVector, no_models::I,
-            dimension_adaptor::F, prefixes::P) where {
-            I <: Int, F <: Function, P <: AbstractVector{<:String}}
-        @assert length(models)>1 "At least two models are required"
-        @assert length(models)==no_models "no_models must be equal to the number of models"
+    function ConcatLatentModels(
+            models::AbstractVector, no_models::I,
+            dimension_adaptor::F, prefixes::P
+        ) where {
+            I <: Int, F <: Function, P <: AbstractVector{<:String},
+        }
+        @assert length(models) > 1 "At least two models are required"
+        @assert length(models) == no_models "no_models must be equal to the number of models"
         check_dim = dimension_adaptor(no_models, no_models)
-        @assert typeof(check_dim)<:AbstractVector{Int} "Output of dimension_adaptor must be a vector of integers"
-        @assert length(check_dim)==no_models "The vector of dimensions must have the same length as the number of models"
-        @assert length(prefixes)==no_models "The number of models and prefixes must be equal"
+        @assert typeof(check_dim) <: AbstractVector{Int} "Output of dimension_adaptor must be a vector of integers"
+        @assert length(check_dim) == no_models "The vector of dimensions must have the same length as the number of models"
+        @assert length(prefixes) == no_models "The number of models and prefixes must be equal"
         # Each member is a length-`n` (segment) PATH slot, so a bare
         # `Distribution` is wrapped in an `Intercept` (a constant segment) before
         # it is namespaced; then non-empty prefixes get a `PrefixLatentModel` so
         # variables stay distinct. A process / `IID` / vector member passes
         # through unchanged.
-        prefix_models = [prefixes[i] == "" ? _path_prior(models[i]) :
-                         PrefixLatentModel(_path_prior(models[i]), prefixes[i])
-                         for i in eachindex(models)]
-        return new{AbstractVector, Int, Function,
-            AbstractVector{<:String}}(
-            prefix_models, no_models, dimension_adaptor, prefixes)
+        prefix_models = [
+            prefixes[i] == "" ? _path_prior(models[i]) :
+                PrefixLatentModel(_path_prior(models[i]), prefixes[i])
+                for i in eachindex(models)
+        ]
+        return new{
+            AbstractVector, Int, Function,
+            AbstractVector{<:String},
+        }(
+            prefix_models, no_models, dimension_adaptor, prefixes
+        )
     end
 end
 
-function ConcatLatentModels(models::AbstractVector, dimension_adaptor::Function;
-        prefixes = nothing)
+function ConcatLatentModels(
+        models::AbstractVector, dimension_adaptor::Function;
+        prefixes = nothing
+    )
     no_models = length(models)
     if isnothing(prefixes)
         prefixes = "Concat." .* string.(1:no_models)
@@ -70,13 +81,17 @@ function ConcatLatentModels(models::AbstractVector, dimension_adaptor::Function;
     return ConcatLatentModels(models, no_models, dimension_adaptor, prefixes)
 end
 
-function ConcatLatentModels(models::AbstractVector;
-        dimension_adaptor::Function = equal_dimensions, prefixes = nothing)
+function ConcatLatentModels(
+        models::AbstractVector;
+        dimension_adaptor::Function = equal_dimensions, prefixes = nothing
+    )
     return ConcatLatentModels(models, dimension_adaptor; prefixes = prefixes)
 end
 
-function ConcatLatentModels(; models::AbstractVector,
-        dimension_adaptor::Function = equal_dimensions, prefixes = nothing)
+function ConcatLatentModels(;
+        models::AbstractVector,
+        dimension_adaptor::Function = equal_dimensions, prefixes = nothing
+    )
     return ConcatLatentModels(models, dimension_adaptor; prefixes = prefixes)
 end
 
@@ -106,25 +121,30 @@ function equal_dimensions(n::Int, m::Int)::Vector{Int}
 end
 
 @model function as_turing_model(latent_models::ConcatLatentModels, n::Int)
-    @assert latent_models.no_models<n "The number of latent variables must be greater than the number of models"
+    @assert latent_models.no_models < n "The number of latent variables must be greater than the number of models"
     dims = latent_models.dimension_adaptor(n, latent_models.no_models)
     @assert all(x -> x > 0, dims) "Non-positive dimensions are not allowed"
-    @assert sum(dims)==n "Sum of dimensions must equal the latent dimension"
+    @assert sum(dims) == n "Sum of dimensions must equal the latent dimension"
     final_latent ~ to_submodel(
-        _concat_latents(latent_models.models, 1, nothing, dims,
-            latent_models.no_models), false)
+        _concat_latents(
+            latent_models.models, 1, nothing, dims,
+            latent_models.no_models
+        ), false
+    )
     return final_latent
 end
 
 @model function _concat_latents(
-        models, index::Int, acc_latent, dims::AbstractVector{<:Int}, n_models::Int)
+        models, index::Int, acc_latent, dims::AbstractVector{<:Int}, n_models::Int
+    )
     if index > n_models
         return acc_latent
     else
         latent ~ as_turing_submodel(models[index], dims[index])
         acc_latent = isnothing(acc_latent) ? latent : vcat(acc_latent, latent)
         updated_latent ~ to_submodel(
-            _concat_latents(models, index + 1, acc_latent, dims, n_models), false)
+            _concat_latents(models, index + 1, acc_latent, dims, n_models), false
+        )
         return updated_latent
     end
 end

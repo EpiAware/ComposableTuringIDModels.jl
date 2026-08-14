@@ -17,7 +17,8 @@ end
     @test ok isa Split
     @test ok.map == [1.0 0.0; 0.0 1.0]
     @test_throws AssertionError Split(
-        (a = PoissonError(), b = PoissonError()), [1.0 0.0 0.0])
+        (a = PoissonError(), b = PoissonError()), [1.0 0.0 0.0]
+    )
 end
 
 @testitem "IDModel one-to-one: strata resolved from the data alone" begin
@@ -26,9 +27,12 @@ end
     model = IDModel(
         DirectInfections(;
             Z = Stratify(
-                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))),
-            initialisation = Normal(log(50), 0.2)),
-        Split(PoissonError()))
+                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))
+            ),
+            initialisation = Normal(log(50), 0.2)
+        ),
+        Split(PoissonError())
+    )
     Ymiss = Matrix{Union{Missing, Float64}}(missing, 3, 12)
     sim = as_turing_model(model, Ymiss)()
     @test size(sim.I_t) == (3, 12)
@@ -44,9 +48,12 @@ end
     model = IDModel(
         DirectInfections(;
             Z = Stratify(
-                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))),
-            initialisation = Normal(log(30), 0.2)),
-        Split(NegativeBinomialError(), [1.0 1.0 1.0]))
+                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))
+            ),
+            initialisation = Normal(log(30), 0.2)
+        ),
+        Split(NegativeBinomialError(), [1.0 1.0 1.0])
+    )
     Ymiss = Matrix{Union{Missing, Float64}}(missing, 1, 14)   # 1 obs stream
     sim = as_turing_model(model, Ymiss)()
     @test size(sim.I_t) == (3, 14)   # the map's column count builds 3 strata
@@ -61,10 +68,17 @@ end
     model = IDModel(
         DirectInfections(;
             Z = Stratify(
-                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))),
-            initialisation = Normal(log(40), 0.2)),
-        Split((a = PoissonError(), b = PoissonError(),
-                total = PoissonError()), W))
+                RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))
+            ),
+            initialisation = Normal(log(40), 0.2)
+        ),
+        Split(
+            (
+                a = PoissonError(), b = PoissonError(),
+                total = PoissonError(),
+            ), W
+        )
+    )
     Ymiss = Matrix{Union{Missing, Float64}}(missing, 3, 10)
     sim = as_turing_model(model, Ymiss)()
     @test size(sim.I_t) == (2, 10)   # size(W, 2) infection strata
@@ -80,9 +94,12 @@ end
     Random.seed!(804)
     W = reshape([0.7, 0.3], 2, 1)   # young, old fractions of one stratum
     model = IDModel(
-        DirectInfections(; Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
-            initialisation = Normal(log(50), 0.2)),
-        Split((young = PoissonError(), old = PoissonError()), W))
+        DirectInfections(;
+            Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
+            initialisation = Normal(log(50), 0.2)
+        ),
+        Split((young = PoissonError(), old = PoissonError()), W)
+    )
     Ymiss = Matrix{Union{Missing, Float64}}(missing, 2, 12)
     sim = as_turing_model(model, Ymiss)()
     @test size(sim.I_t) == (1, 12)   # size(W, 2) == 1 infection stratum

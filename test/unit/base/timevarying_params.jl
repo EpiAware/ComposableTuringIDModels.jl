@@ -11,26 +11,38 @@
     # NegativeBinomialError.cluster_factor
     for n in (8, 40)
         @test nkeys(
-            as_turing_model(NegativeBinomialError(), missing,
-                fill(10.0, n)), "cluster_factor") == 1        # scalar, flat in n
+            as_turing_model(
+                NegativeBinomialError(), missing,
+                fill(10.0, n)
+            ), "cluster_factor"
+        ) == 1        # scalar, flat in n
     end
     @test nkeys(
         as_turing_model(
-            NegativeBinomialError(; cluster_factor =
-            RandomWalk()), missing, fill(10.0, 20)),
-        "cluster_factor") > 1
+            NegativeBinomialError(;
+                cluster_factor =
+                    RandomWalk()
+            ), missing, fill(10.0, 20)
+        ),
+        "cluster_factor"
+    ) > 1
 
     # NormalError.std
     @test nkeys(as_turing_model(NormalError(), missing, fill(10.0, 30)), "σ") == 1
     @test nkeys(
-        as_turing_model(NormalError(; std = RandomWalk()), missing,
-            fill(10.0, 20)), "σ") > 1
+        as_turing_model(
+            NormalError(; std = RandomWalk()), missing,
+            fill(10.0, 20)
+        ), "σ"
+    ) > 1
 
     # HierarchicalNormal.std
     @test nkeys(as_turing_model(HierarchicalNormal(), 30), "std") == 1
     @test nkeys(
         as_turing_model(
-            HierarchicalNormal(; std = RandomWalk()), 20), "std") > 1
+            HierarchicalNormal(; std = RandomWalk()), 20
+        ), "std"
+    ) > 1
 
     # MA.θ (order-1 coefficient)
     @test nkeys(as_turing_model(MA(), 30), "θ") == 1
@@ -64,18 +76,25 @@ end
         # limit), a measure-zero singularity the sampler never visits.
         θ = 0.3 .* randn(MersenneTwister(1), LDP.dimension(ldf))
         grad = DI.gradient(
-            x -> LDP.logdensity(ldf, x), DI.AutoForwardDiff(), θ)
+            x -> LDP.logdensity(ldf, x), DI.AutoForwardDiff(), θ
+        )
         all(isfinite, grad) && length(grad) == length(θ)
     end
     # time-varying negative-binomial overdispersion
     @test grad_finite(
-        IDModel(DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-            NegativeBinomialError(; cluster_factor = RandomWalk())), 10)
+        IDModel(
+            DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+            NegativeBinomialError(; cluster_factor = RandomWalk())
+        ), 10
+    )
     # time-varying Gaussian observation noise (kept positive by a log transform)
     tv_sd = TransformLatentModel(RandomWalk(), x -> exp.(x))
     @test grad_finite(
-        IDModel(DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-            NormalError(; std = tv_sd)), 10)
+        IDModel(
+            DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+            NormalError(; std = tv_sd)
+        ), 10
+    )
 end
 
 @testitem "time-varying latent params differentiate (ForwardDiff)" begin
@@ -87,8 +106,10 @@ end
     grad_finite(m) = begin
         vi = link(VarInfo(m), m)
         ldf = LogDensityFunction(m, getlogjoint, vi)
-        grad = DI.gradient(x -> LDP.logdensity(ldf, x),
-            DI.AutoForwardDiff(), zeros(LDP.dimension(ldf)))
+        grad = DI.gradient(
+            x -> LDP.logdensity(ldf, x),
+            DI.AutoForwardDiff(), zeros(LDP.dimension(ldf))
+        )
         all(isfinite, grad)
     end
     # time-varying innovation scale (stochastic volatility)

@@ -134,7 +134,7 @@ size(as_turing_model(strat, (3, 20))().I_t)
 ```
 "
 struct Renewal{G, F <: Function, L <: PriorLike, S <: PriorLike, A, K} <:
-       AbstractInfectionModel
+    AbstractInfectionModel
     "Discrete generation interval, or a pmf-producing prior model when inferred."
     gen_int::G
     "Transformation between unconstrained and constrained domains."
@@ -149,29 +149,38 @@ struct Renewal{G, F <: Function, L <: PriorLike, S <: PriorLike, A, K} <:
     mixing::K
 end
 
-function Renewal(; generation_time, rt = RandomWalk(),
+function Renewal(;
+        generation_time, rt = RandomWalk(),
         initialisation = Normal(), transformation::Function = exp,
-        mixing = I, D_gen = nothing, Δd = 1.0)
+        mixing = I, D_gen = nothing, Δd = 1.0
+    )
     gen_int, recurrent_step = _renewal_fields(
-        generation_time, mixing; D_gen = D_gen, Δd = Δd)
-    return Renewal(gen_int, transformation, _path_prior(rt), initialisation,
-        recurrent_step, mixing)
+        generation_time, mixing; D_gen = D_gen, Δd = Δd
+    )
+    return Renewal(
+        gen_int, transformation, _path_prior(rt), initialisation,
+        recurrent_step, mixing
+    )
 end
 
 # Positional modifier constructor: a discrete generation interval (a non-negative
 # pmf that sums to 1) with positional [`AbstractRenewalModifier`](@ref)s composed
 # onto the renewal step — e.g.
 # `Renewal([0.2, 0.3, 0.5], SusceptibleDepletion(1000.0); rt = RandomWalk())`.
-function Renewal(gen_int::AbstractVector,
+function Renewal(
+        gen_int::AbstractVector,
         modifiers::AbstractRenewalModifier...;
         rt = RandomWalk(), mixing = I,
-        initialisation = Normal(), transformation::Function = exp)
+        initialisation = Normal(), transformation::Function = exp
+    )
     @assert all(gen_int .>= 0) "Generation interval must be non-negative"
-    @assert sum(gen_int)≈1 "Generation interval must sum to 1"
+    @assert sum(gen_int) ≈ 1 "Generation interval must sum to 1"
     core = _renewal_step(gen_int, mixing)
     recurrent_step = RenewalStep(core, modifiers)
-    return Renewal(gen_int, transformation, _path_prior(rt), initialisation,
-        recurrent_step, mixing)
+    return Renewal(
+        gen_int, transformation, _path_prior(rt), initialisation,
+        recurrent_step, mixing
+    )
 end
 
 # Fixed generation interval (a pmf vector or a continuous distribution): bake the
@@ -185,25 +194,29 @@ end
 # Inferred generation interval: hold the pmf-producing prior model and build the
 # renewal step per draw inside the `@model`, so no interval or step is baked.
 # `mixing` is still folded in there (it lives on the struct, not the step).
-function _renewal_fields(generation_time::AbstractPriorModel, mixing;
-        D_gen = nothing, Δd = 1.0)
+function _renewal_fields(
+        generation_time::AbstractPriorModel, mixing;
+        D_gen = nothing, Δd = 1.0
+    )
     return generation_time, nothing
 end
 
 # `generation_time` as a discrete PMF: use it directly (must be a valid pmf).
 function _renewal_gen_int(gen_int::AbstractVector; D_gen = nothing, Δd = 1.0)
     @assert all(gen_int .>= 0) "Generation interval must be non-negative"
-    @assert sum(gen_int)≈1 "Generation interval must sum to 1"
+    @assert sum(gen_int) ≈ 1 "Generation interval must sum to 1"
     return collect(gen_int)
 end
 
 # `generation_time` as a continuous distribution: discretise via double-interval
 # censoring, drop the delay-0 bin (a generation interval has no mass at lag 0) and
 # renormalise.
-function _renewal_gen_int(gen_distribution::ContinuousDistribution;
-        D_gen = nothing, Δd = 1.0)
+function _renewal_gen_int(
+        gen_distribution::ContinuousDistribution;
+        D_gen = nothing, Δd = 1.0
+    )
     return _discretised_pmf(gen_distribution; Δd = Δd, D = D_gen) |>
-           p -> p[2:end] ./ sum(p[2:end])
+        p -> p[2:end] ./ sum(p[2:end])
 end
 
 # The generation-interval shape a `gen_int` prior slot is drawn at: no shape
@@ -234,13 +247,14 @@ _stack_pmfs(ps) = permutedims(reduce(hcat, ps))
 # it to a per-stratum seed, `R_t` and/or generation interval.
 function _make_renewal_init(step::AbstractConstantRenewalStep, gen_int, I₀, Rt₀)
     r_approx = _init_rate(Rt₀, gen_int)
-    return _renewal_init_state(step, I₀, r_approx, _n_lags(gen_int))
+    return renewal_init_state(step, I₀, r_approx, _n_lags(gen_int))
 end
 
 @model function as_turing_model(infection::Renewal, n::ModelShape)
     Z_t ~ as_turing_submodel(infection.rt, n)
     init_incidence ~ as_turing_submodel(
-        infection.initialisation, _n_strata(n); prefix = true)
+        infection.initialisation, _n_strata(n); prefix = true
+    )
     I₀ = infection.transformation.(_seed(init_incidence, n))
     Rt = infection.transformation.(Z_t)
 
@@ -254,7 +268,8 @@ end
     # exactly as the constructors fold it into the baked step.
     if infection.gen_int isa AbstractPriorModel
         gen ~ as_turing_submodel(
-            infection.gen_int, _gen_int_shape(n)...; prefix = true)
+            infection.gen_int, _gen_int_shape(n)...; prefix = true
+        )
         gen_int = _drop_lag_zero(gen)
         step = _renewal_step(gen_int, infection.mixing)
     else

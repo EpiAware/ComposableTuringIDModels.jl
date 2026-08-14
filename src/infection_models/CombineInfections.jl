@@ -46,16 +46,17 @@ size(sim.I_t)   # 2 strata x 12 time points
 ```
 "
 struct CombineInfections{M <: AbstractVector, P <: AbstractVector{<:String}} <:
-       AbstractInfectionModel
+    AbstractInfectionModel
     "The vector of infection models, one per stratum."
     models::M
     "The stratum names (submodel prefix and `Z_t` keys)."
     names::P
 
     function CombineInfections(
-            models::M, names::P) where {M <: AbstractVector, P <: AbstractVector{<:String}}
+            models::M, names::P
+        ) where {M <: AbstractVector, P <: AbstractVector{<:String}}
         @assert !isempty(models) "CombineInfections needs at least one model"
-        @assert length(models)==length(names) "The number of models ($(length(models))) and names ($(length(names))) must be equal"
+        @assert length(models) == length(names) "The number of models ($(length(models))) and names ($(length(names))) must be equal"
         return new{M, P}(models, names)
     end
 end
@@ -72,7 +73,8 @@ end
     for i in 1:n_strata
         res ~ to_submodel(
             prefix(as_turing_model(model.models[i], n), Symbol(model.names[i])),
-            false)
+            false
+        )
         Is[i] = res.I_t
         Zs[i] = res.Z_t
     end
