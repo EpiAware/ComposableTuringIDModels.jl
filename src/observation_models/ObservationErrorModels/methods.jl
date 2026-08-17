@@ -39,7 +39,7 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
     # A concrete callable rather than a closure: a closure defined in a model
     # body captures boxed locals, costing a dynamic dispatch per scored entry.
     dist = _ErrorDist(obs_model, pad_Y_t, priors)
-    y = y_t isa NamedTuple ? y_t.y : y_t
+    y = _scored_series(obs_model, y_t, Y_t)
     if y isa MissingObservations
         diff_t = length(y.value) - length(Y_t)
         @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
@@ -47,11 +47,10 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
             __model__.context, __varinfo__, y, diff_t, Y_t, dist
         )
     else
-        # Extract the count series scored by this model (plain vector, or
-        # `missing`, replaced by a length-`Y_t` vector of `missing`).
-        # Rebinding `y_t` keeps DynamicPPL treating the entries as conditioned
-        # observations.
-        y_t = define_y_t(obs_model, y_t, Y_t)
+        # The count series scored by this model (plain vector, or `missing`,
+        # replaced by a length-`Y_t` vector of `missing`). Rebinding `y_t`
+        # keeps DynamicPPL treating the entries as conditioned observations.
+        y_t = y
 
         diff_t = length(y_t) - length(Y_t)
         @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
@@ -176,6 +175,52 @@ end
 # `_score_missing_observations!!`).
 _restore_missing(y) = y
 _restore_missing(y::MissingObservations) = map((v, p) -> p ? v : missing, y.value, y.present)
+
+# The series an error model scores, detached from the caller's data.
+#
+# A series reached through a `NamedTuple` field is not one of the model's
+# arguments, so DynamicPPL never handles it: it is neither copied nor promoted,
+# and the `y_t[i] ~ …` sugar writes a blank's draw straight into the caller's
+# array. From the next evaluation on that entry is no longer `missing`, so it
+# is scored as data — frozen at whatever the first draw produced, and never a
+# tracked latent. Narrowing such a series to a [`MissingObservations`](@ref)
+# carrier instead routes it through `_score_missing_observations!!`, which
+# registers every blank as a latent `y_t[i]` and only ever reads the data.
+#
+# A series passed as the model's own `y_t` argument needs none of this:
+# DynamicPPL has already copied it.
+_scored_series(obs_model, y_t, Y_t) = define_y_t(obs_model, y_t, Y_t)
+_scored_series(obs_model, y_t::MissingObservations, Y_t) = y_t
+function _scored_series(obs_model, y_t::NamedTuple, Y_t)
+    y_t.y isa MissingObservations && return y_t.y
+    return _detach_data(define_y_t(obs_model, y_t, Y_t))
+end
+
+# Detach an observation series from the caller's data, so that scoring a
+# `missing` entry cannot write back into it.
+#
+# A vector that can hold a `missing` becomes a `MissingObservations` carrier (a
+# concrete value vector plus a presence mask), the form the error-model loop
+# scores without touching the original. A higher-dimensional array (a reporting
+# triangle's count matrix) is copied instead. Anything nothing can be written
+# into — a concrete element type, an all-`Missing` element type — is returned
+# unchanged.
+_detach_data(y) = y
+function _detach_data(y::AbstractVector)
+    eltype(y) >: Missing || return y
+    T = nonmissingtype(eltype(y))
+    # An all-`Missing` element type holds no value, so a draw cannot be written
+    # back: the tilde sugar widens into a fresh array instead.
+    T === Union{} && return y
+    isconcretetype(T) && T <: Number || return copy(y)
+    return MissingObservations(
+        identity.(coalesce.(y, zero(T))), .!ismissing.(y)
+    )
+end
+function _detach_data(y::AbstractArray)
+    eltype(y) >: Missing && nonmissingtype(eltype(y)) !== Union{} || return y
+    return copy(y)
+end
 
 @doc raw"
 Generate the priors required by an observation-error model. Returns a named

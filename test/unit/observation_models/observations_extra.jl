@@ -353,6 +353,30 @@ end
     @test all(mt.observed)
 end
 
+@testitem "a ready-built ReportingTriangle is not written to" begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    using DynamicPPL: @varname
+    Random.seed!(73)
+    obs = ReportTriangle(PoissonError(), [0.6, 0.25, 0.15])   # Dmax = 2
+
+    # A triangle built outside the model is not one of the model's arguments,
+    # so DynamicPPL never copies it: a `missing` observed cell must still be
+    # sampled as a latent rather than written into the caller's matrix.
+    N = Matrix{Union{Missing, Int}}([10 5 2; 12 6 3; 14 7 4])
+    N[2, 1] = missing
+    tri = define_y_t(obs, N, fill(20.0, 3); now = 5)
+    before = copy(tri.counts)
+
+    chn = sample(
+        as_turing_model(obs, tri, fill(20.0, 3)), Prior(), 20; progress = false
+    )
+
+    @test isequal(tri.counts, before)
+    draws = vec(chn[@varname(y_t[2, 1])])
+    @test length(draws) == 20
+    @test length(unique(draws)) > 1
+end
+
 @testitem "ReportTriangle simulates, conditions, and recovers per-cell means" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(72)

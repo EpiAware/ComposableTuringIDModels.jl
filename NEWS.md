@@ -2,6 +2,14 @@ Changes are documented in Github releases.
 
 ## Unreleased
 
+  - Observation data supplied as a `NamedTuple` (`BinomialError`'s
+    `(y = successes, N = trials)`, and any error model given a `y` field) no
+    longer has its `missing` entries written back into the caller's array. A
+    blank is now sampled as a tracked latent `y_t[i]` on every evaluation, as
+    it already was for a plain observation vector, so it appears in the chain
+    and can be forecast. The same applies to a `ReportTriangle` handed a
+    ready-built `ReportingTriangle`.
+
   - Infection models can now generate several strata at once. `Stratify` puts
     a stratum axis on a shared process (a partially pooled panel of
     reproduction numbers, say), and `Renewal`'s `mixing` slot couples the

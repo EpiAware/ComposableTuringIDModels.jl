@@ -329,7 +329,11 @@ end
     observed = tri.observed
     Dmax = tri.Dmax
     @assert size(observed, 1) == n "The triangle has $(size(observed, 1)) reference days; Y_t has $n"
-    y_t = tri.counts
+    # A `ReportingTriangle` handed in ready-built is not a model argument, so
+    # its count matrix is the caller's own: scoring a `missing` cell would
+    # write the draw into it (and read it back as data next evaluation).
+    # Detach it first; a matrix argument has already been copied by DynamicPPL.
+    y_t = y_t isa ReportingTriangle ? _detach_data(tri.counts) : tri.counts
 
     for t in 1:n, d in 0:Dmax
 
