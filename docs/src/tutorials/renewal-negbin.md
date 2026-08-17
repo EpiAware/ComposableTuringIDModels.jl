@@ -176,8 +176,12 @@ chain = sample(
 nothing # hide
 ```
 
-Sampling returns a chain whose parameters are namespaced by the component slot
-that samples them, so a prior's inner variables never collide across the model.
+Sampling returns a chain whose nested component slots are namespaced by the
+slot that holds them, while a component's own scalar parameters keep their
+plain name.
+Two components that give a scalar parameter the same name therefore collide,
+and one of them must be wrapped in `PrefixLatentModel` or
+`PrefixObservationModel`.
 `sample` returns a
 [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which
 `summarystats` summarises directly — no conversion step — giving point estimates
