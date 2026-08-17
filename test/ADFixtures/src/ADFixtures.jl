@@ -74,8 +74,8 @@ function _models()
     )
     # The exact GP the Hilbert-space model approximates. Its gradient runs
     # through `kernelmatrix` and a `cholesky(Symmetric(...))` of a matrix built
-    # from the sampled `ℓ`/`σ` — the most AD-sensitive path of the two GPs, and
-    # the one the Gaussian-process case study drives under Mooncake.
+    # from the sampled `gp_ℓ`/`gp_σ` — the most AD-sensitive path of the two
+    # GPs, and the one the Gaussian-process case study drives under Mooncake.
     exactgp = as_turing_model(ExactGP(), n)
     # Moving-average: exercises `accumulate_scan(MAStep(θ), ...)` and its
     # `dot(θ, state)` innovation buffer (the MA counterpart of `AR`).
