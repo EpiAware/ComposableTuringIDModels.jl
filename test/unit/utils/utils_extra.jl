@@ -44,3 +44,38 @@ end
     A = get_param_array(chn)
     @test size(A) == (3, 2)
 end
+
+@testitem "_safe_int_floor rejects non-finite input with a clear DomainError" begin
+    using ComposableTuringIDModels: _safe_int_floor
+    # Regression for #140: a non-finite value used to reach `floor(BigInt, x)`
+    # and fail with an opaque `InexactError: BigInt(Inf)`. It must now fail
+    # loudly but clearly, with a `DomainError` naming the offending value,
+    # rather than the InexactError from deep inside the BigInt conversion.
+    for x in (Inf, -Inf, NaN)
+        @test_throws DomainError _safe_int_floor(x)
+        threw_inexact = try
+            _safe_int_floor(x)
+            false
+        catch e
+            e isa InexactError
+        end
+        @test !threw_inexact
+    end
+    # Finite values, including ones outside the `Int` range, are unaffected.
+    @test _safe_int_floor(3.7) == 3
+    @test _safe_int_floor(exp(48.0)) == floor(BigInt, exp(48.0))
+end
+
+@testitem "SafePoisson and SafeNegativeBinomial reject non-finite rates" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(140)
+    # Direct exposure: SafePoisson's own rate is non-finite.
+    @test_throws DomainError rand(SafePoisson(Inf))
+    @test_throws DomainError rand(SafePoisson(NaN))
+    # Indirect exposure (the issue's "check SafeNegativeBinomial too" ask): the
+    # Gamma mixing draw that feeds SafeNegativeBinomial's inner SafePoisson can
+    # itself be non-finite when `r`/`p` are degenerate, funnelling through the
+    # very same guard.
+    @test_throws DomainError rand(SafeNegativeBinomial(Inf, 0.5))
+    @test_throws DomainError rand(SafeNegativeBinomial(1.0, 0.0))
+end
