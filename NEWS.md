@@ -19,6 +19,13 @@ Changes are documented in Github releases.
     at a constructor taking its fields as stored, so `Accessors` operations are
     safe on these types.
 
+  - `observation_lead_in` reports how many leading time points an observation
+    chain drops, so a caller can write
+    `n = length(y) + observation_lead_in(model)` instead of summing
+    `length(pmf) - 1` over the chain's delays by hand.
+    `observation_coverage` reports how many of the supplied observations a
+    given `n` actually scores.
+
   - Infection models can now generate several strata at once. `Stratify` puts
     a stratum axis on a shared process (a partially pooled panel of
     reproduction numbers, say), and `Renewal`'s `mixing` slot couples the
