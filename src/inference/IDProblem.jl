@@ -78,6 +78,17 @@ function _obs_data_shape_missing(s::Split, time_steps)
     return time_steps
 end
 
+# The problem's lead-in is its observation model's, and its series length comes
+# from `tspan`, so the coverage of a dataset needs no separate `n`.
+function observation_lead_in(idproblem::IDProblem)
+    return observation_lead_in(idproblem.observation_model)
+end
+
+function observation_coverage(idproblem::IDProblem, data)
+    time_steps = idproblem.tspan[end] - idproblem.tspan[1] + 1
+    return observation_coverage(idproblem, data.y_t, time_steps)
+end
+
 @model function as_turing_model(idproblem::IDProblem, data)
     y_t = data.y_t
     time_steps = idproblem.tspan[end] - idproblem.tspan[1] + 1
