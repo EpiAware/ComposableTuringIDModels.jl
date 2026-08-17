@@ -31,7 +31,8 @@ exact = ExactGP()
     exact = length(as_turing_model(exact, 60)()))
 ```
 
-Both sample a length scale ``\ell`` and a marginal standard deviation ``\sigma``.
+Both sample a length scale ``\ell`` and a marginal standard deviation ``\sigma``, named `gp_ℓ` and `gp_σ` in the model.
+The names are GP-owned because a latent process composes into its host without a prefix, so a bare `σ` would share a namespace with an observation error model's own `σ` and one would overwrite the other.
 [`HilbertSpaceGP`](@ref) then draws ``m`` standard-normal basis weights ``\beta``, and [`ExactGP`](@ref) draws ``n`` weights ``z`` that it pushes through the Cholesky factor of the full covariance.
 Both are non-centred parameterisations, which NUTS handles well.
 
