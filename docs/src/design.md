@@ -198,6 +198,43 @@ The standard Turing tools — `rand` for prior draws, `fix` to pin parameters,
 `condition` (or `|`) to condition on values, and `sample` for inference — all
 apply unchanged.
 
+## [How much of the data an observation chain scores](@id lead-in)
+
+The `n` passed to `as_turing_model` is the length of the **infection** series,
+not the number of observations, and the two are not always the same.
+Every [`LatentDelay`](@ref) in an observation chain convolves the expected
+series with a delay PMF and returns a series shorter by `length(pmf) - 1`: the
+head of a convolution is only partially observed, so it is dropped rather than
+fitted.
+The observation-error model then right-aligns the data against what is left.
+
+So a chain with delays scores the **last** `n - lead_in` observations and
+silently ignores any earlier ones, where `lead_in` is the sum of
+`length(pmf) - 1` over the chain's delays.
+[`observation_lead_in`](@ref) reads that number off an assembled model, and
+[`observation_coverage`](@ref) reports what a given `n` scores:
+
+```@example design
+delayed = LatentDelay(
+    LatentDelay(PoissonError(), fill(1 / 15, 15)), fill(1 / 30, 30))
+y = fill(10, 60)
+
+observation_lead_in(delayed), observation_coverage(delayed, y, length(y))
+```
+
+Add the lead-in to the series length to score every observation:
+
+```@example design
+n = length(y) + observation_lead_in(delayed)
+observation_coverage(delayed, y, n)
+```
+
+The same idiom sets an [`IDProblem`](@ref)'s time span,
+`tspan = (1, length(y) + observation_lead_in(observation_model))`.
+Length-preserving modifiers ([`Ascertainment`](@ref), [`RightTruncate`](@ref),
+[`ReportTriangle`](@ref), a [`Split`](@ref)'s streams) add nothing of their own,
+so the lead-in comes from the delays alone.
+
 ## Infection↔observation mappings
 
 An infection model does not have to generate a single curve. Two components
