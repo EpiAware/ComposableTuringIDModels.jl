@@ -15,6 +15,27 @@
     @test all(>=(0), obs.delay)
 end
 
+@testitem "_discretised_pmf takes D from a truncated distribution's support" begin
+    using ComposableTuringIDModels, Distributions
+    # Issue #265: when `D` is not supplied, a finite `maximum(dist)` (e.g. a
+    # caller-truncated distribution) should set the horizon directly rather
+    # than being re-derived from a quantile, which silently shortens the PMF.
+    gen = Gamma(1.5625, 1.92) + 1.0 # mean 3, sd 2.4, shifted
+    truncated_gen = truncated(gen, nothing, 15.0)
+
+    explicit = ComposableTuringIDModels._discretised_pmf(gen; Δd = 1.0, D = 15.0)
+    from_support = ComposableTuringIDModels._discretised_pmf(truncated_gen; Δd = 1.0)
+    explicit_upper = ComposableTuringIDModels._discretised_pmf(
+        truncated_gen; Δd = 1.0, upper = 1.0
+    )
+
+    @test length(explicit) == 15
+    @test length(from_support) == 15
+    @test length(explicit_upper) == 15
+    @test isapprox(explicit, from_support; atol = 1.0e-12)
+    @test isapprox(explicit, explicit_upper; atol = 1.0e-12)
+end
+
 @testitem "expected_Rt inverts the renewal relationship" begin
     using ComposableTuringIDModels
     gen_int = [0.2, 0.3, 0.5]
