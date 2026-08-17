@@ -339,6 +339,40 @@ end
     end
 end
 
+@testitem "a GP scale composes with an error model's own scale" begin
+    using ComposableTuringIDModels, Distributions, Random, Turing
+    using DynamicPPL: DebugUtils, VarInfo
+    Random.seed!(268)
+    # A GP `R_t` with a Gaussian observation error is a standard pairing, and
+    # both components own a scale parameter. They share one flattened
+    # namespace, so a GP that named its marginal standard deviation `σ` had it
+    # silently overwritten by the error model's `σ`: `check_model` failed and
+    # `sample` refused to run. The GP-owned names keep the two apart.
+    for gp in (HilbertSpaceGP(; m = 5), ExactGP())
+        model = IDModel(
+            Renewal(;
+                generation_time = [0.3, 0.4, 0.3], rt = gp,
+                initialisation = Normal()
+            ),
+            NormalError()
+        )
+        mdl = as_turing_model(model, fill(10.0, 20), 20)
+        @test DebugUtils.check_model(mdl; error_on_failure = false)
+        names = Symbol.(string.(keys(VarInfo(mdl))))
+        @test :gp_σ ∈ names
+        @test :σ ∈ names
+        # Both scales must come back from a chain under a name a user can
+        # predict, and be separately addressable: pinning one leaves the other
+        # sampled.
+        chain = sample(mdl, Prior(), 10; progress = false)
+        @test all(>(0), vec(chain[:gp_σ]))
+        @test all(>(0), vec(chain[:σ]))
+        pinned = Symbol.(string.(keys(VarInfo(fix(mdl, (gp_σ = 0.2,))))))
+        @test :gp_σ ∉ pinned
+        @test :σ ∈ pinned
+    end
+end
+
 @testitem "HilbertSpaceGP captures its basis as a model argument" begin
     using ComposableTuringIDModels, Distributions, Random
     using ComposableTuringIDModels: hsgp_basis

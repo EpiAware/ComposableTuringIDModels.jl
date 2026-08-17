@@ -202,3 +202,32 @@ end
     )
     @test size(chain, 1) == 30
 end
+
+@testitem "every latent × error-model pairing keeps its names apart" begin
+    using ComposableTuringIDModels, Distributions
+    using DynamicPPL: DebugUtils
+    # A name clash between two components is invisible until they are
+    # composed: each is fine alone, and the composed model only warns that one
+    # assignment overwrote another. Sweeping the latent processes against the
+    # error families is the cheap net for that whole class, and it is what
+    # caught a Gaussian-process `σ` being overwritten by `NormalError`'s.
+    # `BinomialError` is left out: it needs a trials series in the data rather
+    # than the plain vector used here, and it draws no parameters of its own.
+    latents = (
+        RandomWalk(), AR(), MA(), IID(Normal()), Intercept(Normal()),
+        HierarchicalNormal(), HilbertSpaceGP(; m = 5), ExactGP(),
+    )
+    errors = (PoissonError(), NegativeBinomialError(), NormalError())
+    n = 20
+    for latent in latents, error_model in errors
+        model = IDModel(
+            Renewal(;
+                generation_time = [0.3, 0.4, 0.3], rt = latent,
+                initialisation = Normal()
+            ),
+            error_model
+        )
+        mdl = as_turing_model(model, fill(10.0, n), n)
+        @test DebugUtils.check_model(mdl; error_on_failure = false)
+    end
+end
