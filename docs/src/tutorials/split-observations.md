@@ -127,6 +127,86 @@ using MCMCChains
 summarystats(chain)
 ```
 
+Summary statistics confirm the parameters converged, but they do not show
+whether the fit actually tracks the two simulated series.
+Posterior-predictive draws from the same fitted chain, plotted against the
+simulated counts, close that loop.
+The helpers below turn a `time × draws` matrix into 50% and 95% credible
+bands and draw a median line with ribbons.
+`predictive_bands` walks a named stream's per-index sampled `y_t`, filling
+any index a stream's delay leaves unscored with `missing`.
+
+```@setup split
+using CairoMakie, Statistics
+
+const CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
+
+# time × 5 credible bands from a time × draws matrix
+function credible_bands(mat; qs = CI_QS)
+    reduce(hcat, (map(eachrow(mat)) do row
+        vals = collect(skipmissing(row))
+        isempty(vals) ? missing : quantile(vals, q)
+    end for q in qs))
+end
+
+# median line with 50% and 95% ribbons
+function ci_ribbon!(ax, ts, bands; color, label)
+    keep = findall(!ismissing, view(bands, :, 3))
+    x, b = ts[keep], Float64.(bands[keep, :])
+    band!(ax, x, b[:, 1], b[:, 5]; color = (color, 0.15))
+    band!(ax, x, b[:, 2], b[:, 4]; color = (color, 0.3))
+    lines!(ax, x, b[:, 3]; color = color, linewidth = 2, label = label)
+end
+
+# posterior-predictive bands for one stream's sampled y_t, indexed through a
+# varname-building closure (e.g. `i -> @varname(cases.y_t[i])`)
+function predictive_bands(pred, n, vn)
+    ndraws = length(vec(pred[vn(n)]))
+    rows = map(1:n) do i
+        try
+            permutedims(vec(pred[vn(i)]))
+        catch
+            fill(missing, 1, ndraws)
+        end
+    end
+    credible_bands(reduce(vcat, rows))
+end
+```
+
+`Split` prefixes each stream's `y_t`, so `predictive_bands` reads
+`cases.y_t[i]` and `deaths.y_t[i]` off the `predict` chain, the prefixed
+equivalent of the bare `y_t[i]` the [renewal tutorial](@ref tutorial-renewal)
+reads from a single-stream model:
+
+```@example split
+missmodel = as_turing_model(model, (cases = missing, deaths = missing), n)
+pred = predict(missmodel, chain)
+cases_bands = predictive_bands(pred, n, i -> @varname(cases.y_t[i]))
+deaths_bands = predictive_bands(pred, n, i -> @varname(deaths.y_t[i]))
+
+fig = Figure(; size = (760, 620))
+ax1 = Axis(fig[1, 1]; ylabel = "Cases")
+ci_ribbon!(ax1, 1:n, cases_bands; color = :teal,
+    label = "posterior predictive")
+scatter!(ax1, 1:n, y.cases; color = :black, markersize = 6,
+    label = "simulated")
+axislegend(ax1; position = :lt)
+ax2 = Axis(fig[2, 1]; xlabel = "Day", ylabel = "Deaths")
+ci_ribbon!(ax2, 1:n, deaths_bands; color = :firebrick,
+    label = "posterior predictive")
+scatter!(ax2, 1:n, y.deaths; color = :black, markersize = 6,
+    label = "simulated")
+axislegend(ax2; position = :lt)
+fig
+```
+
+The 95% band covers the simulated series on almost every day for both
+streams — 98% of days for cases, 97% for deaths — and both medians track
+the outbreak's rise and fall rather than sitting flat at the mean.
+The sparser death series (82 simulated deaths against 6576 cases over the
+same 70 days) still recovers: its band is visibly wider, but it moves with
+the same underlying trajectory rather than needing its own signal to do so.
+
 ## Cascade: deaths downstream of reported cases
 
 In the parallel model, cases and deaths both branch off infections, so a
@@ -213,6 +293,75 @@ map(s -> sum(skipmissing(s)), age.generated_y_t)         # simulated total per b
 
 The aggregate `total` stream sees the summed expected infections of both bands —
 its expected series is exactly `young .+ old`.
+
+Simulating checks that the forward map runs.
+It does not check that a many-to-one `W` is actually **recoverable** from
+data, which is the question
+[issue #247](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/247)
+asks.
+Fitting `weighted_model` to its own simulated streams answers it: the fit
+conditions on `young`, `old`, and the aggregate `total` together, exactly as
+[`Split`](@ref) conditions on any other named streams.
+
+```@example split
+weighted_data = (young = age.generated_y_t.young, old = age.generated_y_t.old,
+    total = age.generated_y_t.total)
+weighted_posterior = as_turing_model(weighted_model, weighted_data, n)
+weighted_chain = sample(
+    weighted_posterior, NUTS(0.95; adtype = AutoMooncake(; config = nothing)),
+    MCMCThreads(), 250, 2; progress = false)
+nothing # hide
+```
+
+`young`, `old`, and `total` are not three independent counts: `total` is
+exactly `young + old`, so all three read the same one-stratum ``R_t`` path
+through fixed, unequal weights rather than each pinning it independently.
+That collinearity makes the ``\epsilon_t`` innovations mix more slowly than
+the two-stream parallel fit above — worth knowing before trusting any one
+tutorial's diagnostics at face value:
+
+```@example split
+summarystats(weighted_chain)
+```
+
+Posterior-predictive bands per stream, plotted against the simulated counts,
+show whether the shared infection process and the `W` weights together
+recover each stratum — including `total`, which is nowhere in the infection
+process itself, only assembled from it by `W`:
+
+```@example split
+weighted_pred = predict(as_turing_model(
+        weighted_model, (young = missing, old = missing, total = missing), n),
+    weighted_chain)
+young_bands = predictive_bands(weighted_pred, n, i -> @varname(young.y_t[i]))
+old_bands = predictive_bands(weighted_pred, n, i -> @varname(old.y_t[i]))
+total_bands = predictive_bands(weighted_pred, n, i -> @varname(total.y_t[i]))
+
+fig2 = Figure(; size = (760, 780))
+ax_young = Axis(fig2[1, 1]; ylabel = "Young")
+ax_old = Axis(fig2[2, 1]; ylabel = "Old")
+ax_total = Axis(fig2[3, 1]; ylabel = "Total (young + old)", xlabel = "Day")
+for (ax, bands, obs, color) in (
+        (ax_young, young_bands, age.generated_y_t.young, :teal),
+        (ax_old, old_bands, age.generated_y_t.old, :firebrick),
+        (ax_total, total_bands, age.generated_y_t.total, :purple))
+    ci_ribbon!(ax, 1:n, bands; color = color, label = "posterior predictive")
+    scatter!(ax, 1:n, obs; color = :black, markersize = 6, label = "simulated")
+end
+axislegend(ax_young; position = :lt)
+fig2
+```
+
+Despite the slower mixing, the 95% band covers the simulated counts on
+almost every day — 96% for `young`, 95% for `old`, and 95% for `total` —
+so the many-to-one map is recovered, not merely simulated.
+A single shared ``R_t`` path, read through three collinear weighted views of
+it, is enough to pin that path: `young` and `old` need no independent signal
+of their own, and `total` — a stream the infection process never draws
+directly — still lands on its simulated series because `W` ties it to the
+same shared path.
+`Split(template, W)` many-to-one aggregation is not just forward-simulated
+here, it is fit and recovered.
 
 Here the single renewal process supplied one infection stratum, broadcast
 through `W`. When the strata are genuinely **separate infection processes** —
