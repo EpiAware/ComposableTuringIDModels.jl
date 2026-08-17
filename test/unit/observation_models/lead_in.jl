@@ -40,9 +40,18 @@ end
     # A strata-template Split reports its template's lead-in.
     @test observation_lead_in(Split(delayed, [1.0 1.0])) == 4
 
-    # Streams that drop different amounts have no single lead-in.
-    mismatched = Split((cases = delayed, deaths = PoissonError()))
-    @test_throws ArgumentError observation_lead_in(mismatched)
+    # Streams that drop different amounts report one lead-in each, and a
+    # surrounding delay adds to every stream.
+    mismatched = Split(
+        (
+            cases = delayed, deaths = LatentDelay(PoissonError(), fill(1 / 9, 9)),
+        )
+    )
+    @test observation_lead_in(mismatched) == (cases = 4, deaths = 8)
+    @test observation_lead_in(LatentDelay(mismatched, fill(1 / 3, 3))) ==
+        (cases = 6, deaths = 10)
+    @test observation_lead_in(Ascertainment(mismatched, FixedIntercept(0.0))) ==
+        (cases = 4, deaths = 8)
 
     # A stacked chain sums each delay it passes through.
     stacked = LatentDelay(
@@ -141,6 +150,55 @@ end
     @test observation_coverage(problem, (; y_t = y)).n_unscored == 43
 end
 
+@testitem "observation_coverage reports a Split stream by stream" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(1067)
+
+    # Two streams with different delays, as a cases/deaths model has.
+    streams = Split(
+        (
+            cases = LatentDelay(PoissonError(), fill(1 / 5, 5)),
+            deaths = LatentDelay(PoissonError(), fill(1 / 20, 20)),
+        )
+    )
+    lead_in = observation_lead_in(streams)
+    @test lead_in == (cases = 4, deaths = 19)
+
+    # Each stream scores the last `n - lead_in[stream]` of its own series, so
+    # the two are fully scored at different data lengths.
+    n = 40
+    y = (cases = fill(10, n - 4), deaths = fill(1, n - 19))
+    cover = observation_coverage(streams, y, n)
+    @test cover.cases.n_unscored == 0
+    @test cover.deaths.n_unscored == 0
+    # Equal-length streams leave the longer-delayed one short.
+    equal_length = observation_coverage(
+        streams, (cases = fill(10, n), deaths = fill(1, n)), n
+    )
+    @test equal_length.cases.n_unscored == 4
+    @test equal_length.deaths.n_unscored == 19
+
+    # The reported lead-ins match the expected series each stream is scored
+    # against.
+    sim = as_turing_model(streams, (cases = missing, deaths = missing), fill(100.0, n))()
+    @test length(sim.expected.cases) == n - 4
+    @test length(sim.expected.deaths) == n - 19
+
+    # A shared lead-in still reports each stream's data separately.
+    shared = Split(
+        (
+            cases = LatentDelay(PoissonError(), fill(1 / 5, 5)),
+            deaths = LatentDelay(PoissonError(), fill(1 / 5, 5)),
+        )
+    )
+    @test observation_lead_in(shared) == 4
+    shared_cover = observation_coverage(
+        shared, (cases = fill(10, n), deaths = fill(1, n - 4)), n
+    )
+    @test shared_cover.cases.n_unscored == 4
+    @test shared_cover.deaths.n_unscored == 0
+end
+
 @testitem "a multi-delay chain scores only observations above the lead-in" begin
     using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: VarInfo, logjoint
@@ -149,9 +207,13 @@ end
     d1 = fill(1 / 15, 15)
     d2 = fill(1 / 30, 30)
     obs = LatentDelay(LatentDelay(PoissonError(), d1), d2)
+    # A tight random walk keeps the prior draw's expected series near 100, so
+    # the log-joint stays well scaled and a perturbation of a scored entry is
+    # not lost to floating-point rounding.
     infection = Renewal(;
-        generation_time = [0.2, 0.3, 0.3, 0.2], rt = RandomWalk(),
-        initialisation = Normal(log(1.0), 0.1)
+        generation_time = [0.2, 0.3, 0.3, 0.2],
+        rt = RandomWalk(; init = Normal(0.0, 0.05), ϵ_t = Normal(0.0, 0.01)),
+        initialisation = Normal(log(100.0), 0.1)
     )
     model = IDModel(infection, obs)
     lead_in = observation_lead_in(model)
@@ -178,6 +240,7 @@ end
     scored = copy(y)
     scored[lead_in + 1] = 10^6
     @test lj(scored) != base
+    @test observation_coverage(model, y, n).n_unscored == lead_in
 
     # With the lead-in added back, every observation is scored.
     m = length(y) + lead_in
