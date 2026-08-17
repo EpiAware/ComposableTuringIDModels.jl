@@ -12,6 +12,8 @@ One model over an axis is couplable.
 Several independent models are not.
 
 Every pattern below shares the same time axis and generation interval.
+The first sections build and inspect each pattern; the last two simulate a
+known truth, fit it under NUTS, and check what actually comes back out.
 
 ```@example patches
 using ComposableTuringIDModels, Distributions, Random
@@ -163,3 +165,184 @@ The `1 × n_time` data matrix carries no strata count.
 observation model's weight matrix.
 The same three-patch process built earlier assembles itself from the data's
 shape alone.
+
+## Does the coupling actually recover? Simulate and fit
+
+Every pattern above only ever ran forward: build a model, simulate or check a
+shape, move on.
+None of it was fitted, so none of it answers whether a coupled, partially
+pooled patch process is actually **identifiable** from data.
+This section closes that gap for the fixed-`K` pattern above: simulate from a
+known truth, fit under NUTS, and check whether the three patches' `R_t`
+paths come back out.
+
+The model reuses the shared, partially pooled `R_t` process and the `K` from
+above, with two changes purely so the fit finishes in reasonable time for a
+docs build: a tighter `RandomWalk` innovation (so `R_t` drifts slowly rather
+than wandering) and a narrower prior on the initial level (so simulated case
+counts stay in the hundreds rather than the millions).
+
+```@example patches
+using Turing, Statistics
+Random.seed!(20260817)
+
+n_time = 24
+K_fit = [1.0 0.15 0.05
+         0.15 1.0 0.1
+         0.05 0.1 1.0]
+rt_fit = Stratify(
+    RandomWalk(init = Normal(log(1.15), 0.05),
+        ϵ_t = HierarchicalNormal(std = HalfNormal(0.03))),
+    Hierarchy(; mean = Normal(0.0, 0.1), across = IID(Normal(0.0, 0.2))))
+coupled = Renewal(gen_int; rt = rt_fit,
+    initialisation = Normal(log(50.0), 0.2), mixing = K_fit)
+coupled_model = IDModel(
+    coupled, Split(NegativeBinomialError(cluster_factor = HalfNormal(0.1))))
+
+Ymiss = Matrix{Union{Missing, Float64}}(missing, n_strata, n_time)
+sim = as_turing_model(coupled_model, Ymiss)()
+Rt_true = exp.(sim.Z_t)
+(Rt_range = extrema(Rt_true),
+    y_range = extrema(reduce(vcat, collect(values(sim.generated_y_t)))))
+```
+
+`R_t` stays between roughly 1.1 and 1.36 across the three patches: sustained
+but modest growth, giving case counts that reach a few thousand by day 24
+rather than the runaway millions a wider prior produces.
+Conditioning on the simulated counts and sampling recovers the posterior:
+
+```@example patches
+Ydata = Float64.(reduce(vcat,
+    [permutedims(sim.generated_y_t[Symbol(:group, g)]) for g in 1:n_strata]))
+posterior = as_turing_model(coupled_model, Ydata)
+chain = sample(
+    posterior, NUTS(0.85; adtype = Turing.AutoForwardDiff()), 300;
+    progress = false)
+nothing # hide
+```
+
+`Z_t` is a generated quantity per patch, exactly as in the [Renewal
+tutorial](@ref tutorial-renewal), so the fitted `R_t` path is recovered per
+draw with [`Turing.returned`](https://turinglang.org/) and stacked into
+credible bands:
+
+```@example patches
+using Turing: returned
+draws = vec(returned(posterior, chain))
+Rt_stack = cat((exp.(d.Z_t) for d in draws)...; dims = 3)
+Rt_med = dropdims(median(Rt_stack; dims = 3); dims = 3)
+Rt_lo = dropdims(mapslices(x -> quantile(x, 0.1), Rt_stack; dims = 3); dims = 3)
+Rt_hi = dropdims(mapslices(x -> quantile(x, 0.9), Rt_stack; dims = 3); dims = 3)
+(rmse = round(sqrt(mean((Rt_true .- Rt_med) .^ 2)); digits = 4),
+    coverage80 = round(
+        mean((Rt_true .>= Rt_lo) .& (Rt_true .<= Rt_hi)); digits = 3),
+    true_range = extrema(Rt_true), posterior_median_range = extrema(Rt_med))
+```
+
+```@example patches
+using CairoMakie
+fig = Figure(; size = (760, 640))
+for g in 1:n_strata
+    ax = Axis(fig[g, 1]; ylabel = "Patch $g  Rₜ",
+        xlabel = g == n_strata ? "Day" : "")
+    band!(ax, 1:n_time, Rt_lo[g, :], Rt_hi[g, :]; color = (:purple, 0.25))
+    lines!(ax, 1:n_time, Rt_med[g, :]; color = :purple, linewidth = 2,
+        label = "posterior median")
+    lines!(ax, 1:n_time, Rt_true[g, :]; color = :black, linestyle = :dash,
+        linewidth = 2, label = "simulated truth")
+    hlines!(ax, [1.0]; color = :grey, linestyle = :dot)
+    g == 1 && axislegend(ax; position = :lt)
+end
+fig
+```
+
+The posterior median tracks each patch's true `R_t` path closely, and the
+80% credible interval covers the truth in 76% of the 72 patch-day cells,
+close to the nominal rate.
+A coupled, partially pooled renewal process — `Stratify`, `Hierarchy`, and an
+off-diagonal `mixing` matrix composed together — is identifiable from data at
+this signal-to-noise level: the machinery in the sections above is not just
+constructible, it fits.
+
+## Does the gravity model recover its own coupling?
+
+The `K` above was fixed and known.
+[`Gravity`](@ref) instead *infers* `K`'s shape from three exponents, `α`,
+`β`, and `γ`, so the natural next question is whether those exponents
+themselves come back out of a fit — a stronger claim than merely running
+without error.
+
+The same `pop` and `dist` from the gravity example above are reused, with
+narrower priors on the exponents so the truth is a value the small panel
+below has a realistic chance of pinning down, and the same tight `R_t`
+process as the coupled fit above.
+
+```@example patches
+movement_fit = Gravity(pop, dist; α = HalfNormal(0.5), β = HalfNormal(0.5),
+    γ = HalfNormal(1.0))
+grav_rt = Stratify(
+    RandomWalk(init = Normal(log(1.08), 0.03),
+        ϵ_t = HierarchicalNormal(std = HalfNormal(0.02))),
+    Hierarchy(; mean = Normal(0.0, 0.05), across = IID(Normal(0.0, 0.15))))
+gravity_fit_model = Renewal(gen_int; rt = grav_rt,
+    initialisation = Normal(log(50.0), 0.2), mixing = movement_fit)
+grav_model = IDModel(
+    gravity_fit_model,
+    Split(NegativeBinomialError(cluster_factor = HalfNormal(0.1))))
+nothing # hide
+```
+
+Unlike the fixed-`K` fit, the truth here is itself a set of *sampled*
+parameters, so a single draw from the prior — rather than the bare
+`as_turing_model(...)()` call used above — is what fixes a reproducible
+truth alongside its exponent values:
+
+```@example patches
+Random.seed!(20260817)
+n_time_g = 20
+Ymiss_g = Matrix{Union{Missing, Float64}}(missing, n_strata, n_time_g)
+grav_prior = as_turing_model(grav_model, Ymiss_g)
+truth_chain = sample(grav_prior, Prior(), 1; progress = false)
+truth = only(vec(returned(grav_prior, truth_chain)))
+Ydata_g = Float64.(reduce(vcat,
+    [permutedims(truth.generated_y_t[Symbol(:group, g)]) for g in 1:n_strata]))
+(y_range = extrema(reduce(vcat, collect(values(truth.generated_y_t)))),
+    Rt_range = extrema(exp.(truth.Z_t)))
+```
+
+Fitting proceeds exactly as before, and the exponents' variables are
+namespaced under `core.mixing`, as [`MixingStep`](@ref) documents:
+
+```@example patches
+grav_posterior = as_turing_model(grav_model, Ydata_g)
+grav_chain = sample(
+    grav_posterior, NUTS(0.85; adtype = Turing.AutoForwardDiff()), 300;
+    progress = false)
+
+recovery = map((:α, :β, :γ)) do sym
+    label = "Parameter(core.mixing.$(sym))"
+    vn = only(filter(v -> string(v) == label, collect(keys(grav_chain))))
+    post = vec(grav_chain[vn])
+    true_val = only(vec(truth_chain[vn]))
+    (parameter = sym, true_value = round(true_val; digits = 3),
+        posterior_mean = round(mean(post); digits = 3),
+        q10 = round(quantile(post, 0.1); digits = 3),
+        q90 = round(quantile(post, 0.9); digits = 3))
+end
+recovery
+```
+
+`γ`, the distance exponent, recovers well: the truth sits inside its 80%
+interval and close to the posterior mean.
+`β` is roughly captured too, if with a wide interval.
+`α` is not: the posterior mean overshoots the truth and the 80% interval
+misses it entirely.
+With only three patches there are only three off-diagonal entries of `K` to
+learn from, and `α` (destination population) and `β` (origin population)
+trade off against each other, and against `γ`, over that little data — the
+gravity form is *constructible* and *runs* cleanly (no overflow, no
+divergences beyond the odd one in 300 draws), but three strata is not enough
+data to identify all three exponents separately.
+A real application would need more strata, an informative prior on one
+exponent, or holding one fixed (`β = 1`, the standard gravity form) to
+identify the rest cleanly.
