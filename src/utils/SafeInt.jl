@@ -18,6 +18,15 @@ const SafeDiscreteUnivariateDistribution = Distributions.Distribution{
 }
 
 function _safe_int_floor(x::Real)
+    isfinite(x) || throw(
+        DomainError(
+            x,
+            "_safe_int_floor: cannot floor a non-finite value to an integer. " *
+                "This usually means an upstream rate or mean was Inf or NaN " *
+                "(e.g. an explosive prior draw feeding a SafePoisson or " *
+                "SafeNegativeBinomial rate)."
+        )
+    )
     Tf = typeof(x)
     if (Tf(typemin(Int)) - one(Tf)) < x < (Tf(typemax(Int)) + one(Tf))
         return floor(Int, x)
