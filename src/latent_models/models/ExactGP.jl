@@ -66,6 +66,15 @@ per-evaluation work.
   - `jitter`: relative diagonal nugget ``\tau`` for a stable Cholesky factor
     (default `1e-6`); the amount added is ``\tau\sigma^2``.
 
+## Sampled variables
+
+``\ell`` and ``\sigma`` are sampled as `gp_ℓ` and `gp_σ`, and the weights as
+`z`. The GP-owned names matter once the process is composed: a latent process
+enters its host prefix-off, so a bare `σ` would share a namespace with an
+observation error model's own `σ` and one would overwrite the other. The names
+stay flat, so a chain is read as `chain[:gp_σ]` and pinned with
+`fix(model, (gp_ℓ = 0.5, gp_σ = 0.5))`.
+
 # Examples
 ```@example ExactGP
 using ComposableTuringIDModels, Distributions
@@ -120,19 +129,22 @@ end
 # log-density / gradient evaluation, exactly as `HilbertSpaceGP` does with its
 # basis. What is left inside the differentiated path is the part that genuinely
 # depends on the sampled parameters: the covariance and its Cholesky factor.
+#
+# The hyperparameters are named `gp_ℓ` and `gp_σ` rather than `ℓ` and `σ`; see
+# the note in HilbertSpaceGP.jl for why (issue #268).
 @model function _exact_gp_model(
         kernel::Kernel, x, jitter,
         length_scale, marginal_std
     )
-    ℓ ~ length_scale
-    σ ~ marginal_std
+    gp_ℓ ~ length_scale
+    gp_σ ~ marginal_std
     z ~ filldist(Normal(), length(x))
     # Scale the Gram matrix, not the kernel: `σ^2 * kernel` builds a
     # KernelFunctions `ScaledKernel`, which asserts σ² > 0 at construction.
     # NUTS can sample σ = 0.0 exactly (the prior floor, or an underflowed
     # extreme excursion), so scaling the matrix keeps that a valid, if
     # degenerate, draw instead of throwing mid-chain.
-    K = σ^2 .* kernelmatrix(with_lengthscale(kernel, ℓ), x)
+    K = gp_σ^2 .* kernelmatrix(with_lengthscale(kernel, gp_ℓ), x)
     # The nugget tracks the diagonal of K, which is σ². A fixed absolute nugget
     # is swamped once σ is large and the factorisation then fails on a matrix
     # that is only numerically indefinite, which ends the chain; a nugget with a
@@ -141,7 +153,7 @@ end
     # absolute floor here is `jitter * eps()`, far below σ² for any σ the
     # sampler can represent, and is only there to keep the factorisation
     # defined at σ = 0 exactly, where K itself vanishes.
-    L = cholesky(Symmetric(K + (jitter * (σ^2 + eps())) * I)).L
+    L = cholesky(Symmetric(K + (jitter * (gp_σ^2 + eps())) * I)).L
     # Densify `L`: the triangular BLAS path (`trmv`) has no Enzyme forward
     # rule, a plain `gemv` does. Same maths to within a rounding order, and an
     # O(n^2) copy against the O(n^3) factorisation already paid.

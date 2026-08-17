@@ -15,8 +15,8 @@
     @test all(isfinite, path)
     draw = rand(as_turing_model(gp, n))
     pairs_dict = Dict(string(k) => v for (k, v) in pairs(draw))
-    @test haskey(pairs_dict, "ℓ")
-    @test haskey(pairs_dict, "σ")
+    @test haskey(pairs_dict, "gp_ℓ")
+    @test haskey(pairs_dict, "gp_σ")
     @test haskey(pairs_dict, "β")
     @test length(pairs_dict["β"]) == 8
 end
@@ -109,7 +109,7 @@ end
             begin
                     e = zeros(n)
                     e[j] = 1.0
-                    fix(mdl, (ℓ = ℓ, σ = σ, z = e))()
+                    fix(mdl, (gp_ℓ = ℓ, gp_σ = σ, z = e))()
                 end for j in 1:n
         )
         inflation = maximum(diag(L * L')) / σ^2 - 1
@@ -117,7 +117,7 @@ end
     end
     # σ = 0 is degenerate but must still factorise rather than throw, leaving
     # only the absolute floor (√(jitter·eps) ≈ 1.5e-11) in the path.
-    @test all(<(1.0e-8) ∘ abs, fix(mdl, (ℓ = ℓ, σ = 0.0))())
+    @test all(<(1.0e-8) ∘ abs, fix(mdl, (gp_ℓ = ℓ, gp_σ = 0.0))())
 end
 
 @testitem "GP latents reject a hyperprior that strays off its support" begin
@@ -223,7 +223,7 @@ end
             begin
                     e = zeros(k)
                     e[j] = 1.0
-                    fix(mdl, (ℓ = ℓ, σ = σ, weight => e))()
+                    fix(mdl, (gp_ℓ = ℓ, gp_σ = σ, weight => e))()
                 end for j in 1:k
         )
         return A * A'
@@ -311,7 +311,7 @@ end
     using ComposableTuringIDModels, Distributions
     using DynamicPPL: VarInfo
     # `Renewal` threads its `rt` slot through the prefix-off submodel seam, so a
-    # GP latent contributes flat `ℓ`, `σ` and weight names to the composed
+    # GP latent contributes flat `gp_ℓ`, `gp_σ` and weight names to the composed
     # model. The composed-fit test items below `fix` on those flat names, and
     # the case study reads them out of the chain.
     for (gp, weight) in ((HilbertSpaceGP(; m = 5), :β), (ExactGP(), :z))
@@ -333,8 +333,8 @@ end
                 )
             )
         )
-        @test :ℓ ∈ names
-        @test :σ ∈ names
+        @test :gp_ℓ ∈ names
+        @test :gp_σ ∈ names
         @test weight ∈ names
     end
 end
@@ -401,7 +401,7 @@ end
     chn = sample(as_turing_model(gp, n), NUTS(), 40; progress = false)
     @test size(chn, 1) == 40
     @test all(isfinite, Array(chn))
-    ℓ = vec(chn[:ℓ])
+    ℓ = vec(chn[:gp_ℓ])
     @test all(>(0), ℓ)
     path = as_turing_model(gp, n)()
     @test length(path) == n
@@ -426,7 +426,7 @@ end
         NegativeBinomialError(cluster_factor = HalfNormal(0.1))
     )
     prior = as_turing_model(model, fill(missing, n), n)
-    sim = fix(prior, (ℓ = 0.5, σ = 0.5))()
+    sim = fix(prior, (gp_ℓ = 0.5, gp_σ = 0.5))()
     y_obs = sim.generated_y_t
     posterior = as_turing_model(model, y_obs, n)
     chain = sample(
@@ -464,8 +464,8 @@ end
     @test all(isfinite, path)
     draw = rand(as_turing_model(gp, n))
     pairs_dict = Dict(string(k) => v for (k, v) in pairs(draw))
-    @test haskey(pairs_dict, "ℓ")
-    @test haskey(pairs_dict, "σ")
+    @test haskey(pairs_dict, "gp_ℓ")
+    @test haskey(pairs_dict, "gp_σ")
     @test haskey(pairs_dict, "z")
     @test length(pairs_dict["z"]) == n
 end
@@ -493,7 +493,7 @@ end
             begin
                     e = zeros(n)
                     e[j] = 1.0
-                    fix(mdl, (ℓ = ℓ, σ = σ, z = e))()
+                    fix(mdl, (gp_ℓ = ℓ, gp_σ = σ, z = e))()
                 end for j in 1:n
         )
         # `ExactGP` adds a relative nugget to the diagonal, so it reproduces the
@@ -533,7 +533,7 @@ end
     chn = sample(as_turing_model(gp, n), NUTS(), 40; progress = false)
     @test size(chn, 1) == 40
     @test all(isfinite, Array(chn))
-    @test all(>(0), vec(chn[:ℓ]))
+    @test all(>(0), vec(chn[:gp_ℓ]))
     path = as_turing_model(gp, n)()
     @test length(path) == n
     @test all(isfinite, path)
@@ -550,7 +550,7 @@ end
     n = 40
     for σ in (0.0, 1.0e-8, 1.0, 1.0e3, 1.0e5), ℓ in (0.05, 0.5, 5.0)
 
-        path = fix(as_turing_model(ExactGP(), n), (ℓ = ℓ, σ = σ))()
+        path = fix(as_turing_model(ExactGP(), n), (gp_ℓ = ℓ, gp_σ = σ))()
         @test length(path) == n
         @test all(isfinite, path)
     end
@@ -601,7 +601,7 @@ end
         NegativeBinomialError(cluster_factor = HalfNormal(0.1))
     )
     prior = as_turing_model(model, fill(missing, n), n)
-    sim = fix(prior, (ℓ = 0.5, σ = 0.5))()
+    sim = fix(prior, (gp_ℓ = 0.5, gp_σ = 0.5))()
     y_obs = sim.generated_y_t
     posterior = as_turing_model(model, y_obs, n)
     chain = sample(

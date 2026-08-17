@@ -195,6 +195,15 @@ rejects it.
   - `kernel`: the covariance kernel, a KernelFunctions.jl `Kernel` (default
     `SqExponentialKernel()`).
 
+## Sampled variables
+
+``\ell`` and ``\sigma`` are sampled as `gp_ℓ` and `gp_σ`, and the `m` weights
+as `β`. The GP-owned names matter once the process is composed: a latent
+process enters its host prefix-off, so a bare `σ` would share a namespace with
+an observation error model's own `σ` and one would overwrite the other. The
+names stay flat, so a chain is read as `chain[:gp_σ]` and pinned with
+`fix(model, (gp_ℓ = 0.5, gp_σ = 0.5))`.
+
 # Examples
 ```@example HilbertSpaceGP
 using ComposableTuringIDModels, Distributions
@@ -323,16 +332,22 @@ end
 
 # Inner Turing model over a PREBUILT basis. Keeping the basis out of the `@model`
 # body means it is computed once (in `as_turing_model` below) rather than on every
-# log-density / gradient evaluation: only `ℓ`, `σ`, `β` and the matrix–vector
-# product remain inside the differentiated path.
+# log-density / gradient evaluation: only `gp_ℓ`, `gp_σ`, `β` and the
+# matrix–vector product remain inside the differentiated path.
+#
+# The hyperparameters are named `gp_ℓ` and `gp_σ`, not `ℓ` and `σ`. A latent
+# process composes into its host prefix-off (the package standard), so a bare
+# `σ` here lands in the same flattened namespace as an observation error
+# model's own `σ` and one silently overwrites the other (issue #268). The names
+# stay flat — `chain[:gp_σ]` — but are owned by the GP.
 @model function _hsgp_model(
         kernel::Kernel, Φ, sqrt_λ, m,
         length_scale, marginal_std
     )
-    ℓ ~ length_scale
-    σ ~ marginal_std
+    gp_ℓ ~ length_scale
+    gp_σ ~ marginal_std
     β ~ filldist(Normal(), m)
-    spectral_weights = sqrt.(spectral_density(kernel, sqrt_λ, σ, ℓ))
+    spectral_weights = sqrt.(spectral_density(kernel, sqrt_λ, gp_σ, gp_ℓ))
     gp = Φ * (spectral_weights .* β)
     return gp
 end
