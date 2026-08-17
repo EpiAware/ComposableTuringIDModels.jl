@@ -14,3 +14,12 @@ Changes are documented in Github releases.
     **Breaking**: `GroupedInfections` and the grouped `IDModel` constructors
     are removed; a `Stratify`-based infection model observed through `Split`
     replaces them.
+
+  - Fixed: discretising a continuous delay distribution without an explicit
+    `D` now takes the horizon from the distribution's own support when it is
+    finite (e.g. a distribution the caller has already `truncated`), instead
+    of silently re-deriving a shorter horizon from a quantile. `LatentDelay`,
+    `UncertainDelay`, `ReportingCDF`, `ReportingPMF` and `Renewal`'s
+    generation-interval slot all pick this up automatically; a caller can now
+    express "use this distribution's own bound" by truncating the
+    distribution, without a separate `D` keyword.

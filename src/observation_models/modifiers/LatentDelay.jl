@@ -25,7 +25,11 @@ delay composes exactly like a prior anywhere else in the model.
   - `LatentDelay(model, pmf)` — from a fixed delay PMF (non-negative, sums to 1).
   - `LatentDelay(model, distribution; D, Δd)` — discretise a fixed continuous
     delay distribution once via double-interval censoring
-    (CensoredDistributions.jl).
+    (CensoredDistributions.jl). `D` is the truncation horizon; if omitted and
+    `distribution` has finite support (e.g. it was built with `truncated`),
+    the support's upper bound is used as `D` directly, so a caller who has
+    already truncated the distribution does not need to repeat the horizon
+    as a separate keyword — `truncated(dist, lower, upper)` is enough.
   - `LatentDelay(model, pmfs::AbstractVector{<:AbstractVector})` — a deterministic
     time-varying delay from a per-time sequence of PMFs (one per time point, all
     the same length, each non-negative and summing to 1).
@@ -51,6 +55,16 @@ using ComposableTuringIDModels, Distributions
 obs = LatentDelay(NegativeBinomialError(), truncated(Normal(5.0, 2.0), 0.0, Inf))
 mdl = as_turing_model(obs, missing, fill(10, 30))
 mdl()
+```
+
+A fixed delay with an explicit horizon expressed on the distribution itself
+(truncating above at 15, rather than passing `D = 15.0` separately):
+
+```@example LatentDelay
+bounded = LatentDelay(
+    NegativeBinomialError(), truncated(Normal(5.0, 2.0), 0.0, 15.0)
+)
+length(bounded.delay)
 ```
 
 A deterministic time-varying delay — a PMF per time point (here sharpening over

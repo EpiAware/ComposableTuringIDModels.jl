@@ -474,6 +474,23 @@ end
         AbstractObservationModel
 end
 
+@testitem "LatentDelay takes D from a truncated distribution's own support" begin
+    using ComposableTuringIDModels, Distributions
+    # Issue #265: a caller who has already truncated the delay distribution
+    # (finite support) should not need to repeat the horizon as a separate
+    # `D` keyword — the truncation bound is used directly.
+    dist = truncated(Normal(5.0, 2.0), 0.0, 15.0)
+    bounded = LatentDelay(NegativeBinomialError(), dist)
+    explicitD = LatentDelay(NegativeBinomialError(), dist; D = 15.0)
+    @test length(bounded.delay) == length(explicitD.delay) == 15
+    @test isapprox(bounded.delay, explicitD.delay; atol = 1.0e-12)
+
+    # An unbounded (or only lower-truncated) distribution is unaffected: it
+    # still falls back to the quantile-derived horizon, shorter than 15 here.
+    unbounded = truncated(Normal(5.0, 2.0), 0.0, Inf)
+    @test length(LatentDelay(NegativeBinomialError(), unbounded).delay) == 10
+end
+
 @testitem "UncertainDelay samples a valid delay PMF per draw" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(101)
