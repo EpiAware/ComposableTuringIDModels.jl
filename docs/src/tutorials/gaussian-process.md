@@ -31,8 +31,7 @@ exact = ExactGP()
     exact = length(as_turing_model(exact, 60)()))
 ```
 
-Both sample a length scale ``\ell`` and a marginal standard deviation ``\sigma``, named `gp_ℓ` and `gp_σ` in the model.
-The names are GP-owned because a latent process composes into its host without a prefix, so a bare `σ` would share a namespace with an observation error model's own `σ` and one would overwrite the other.
+Both sample a length scale ``\ell`` and a marginal standard deviation ``\sigma``.
 [`HilbertSpaceGP`](@ref) then draws ``m`` standard-normal basis weights ``\beta``, and [`ExactGP`](@ref) draws ``n`` weights ``z`` that it pushes through the Cholesky factor of the full covariance.
 Both are non-centred parameterisations, which NUTS handles well.
 
@@ -61,9 +60,9 @@ relerr(K) = norm(K - K_ref) / norm(K_ref)
 K_ref = gp_cov(GP(σ0^2 * with_lengthscale(SqExponentialKernel(), ℓ0))(
     standardised_index(n0)))
 K_exact = gram([fix(as_turing_model(ExactGP(), n0),
-                   (gp_ℓ = ℓ0, gp_σ = σ0, z = unit(n0, j)))() for j in 1:n0])
+                   (ℓ = ℓ0, σ = σ0, z = unit(n0, j)))() for j in 1:n0])
 K_hsgp = gram([fix(as_turing_model(HilbertSpaceGP(m = 20), n0),
-                  (gp_ℓ = ℓ0, gp_σ = σ0, β = unit(20, j)))() for j in 1:20])
+                  (ℓ = ℓ0, σ = σ0, β = unit(20, j)))() for j in 1:20])
 
 err = (exact = relerr(K_exact), hsgp = relerr(K_hsgp))
 @assert err.exact < 1e-5 && err.hsgp < 1e-3   # drift fails the build
@@ -81,7 +80,7 @@ function hsgp_relerr(ℓ, m)
     K_true = gp_cov(GP(σ0^2 * with_lengthscale(SqExponentialKernel(), ℓ))(
         standardised_index(n0)))
     K = gram([fix(as_turing_model(HilbertSpaceGP(m = m), n0),
-                 (gp_ℓ = ℓ, gp_σ = σ0, β = unit(m, j)))() for j in 1:m])
+                 (ℓ = ℓ, σ = σ0, β = unit(m, j)))() for j in 1:m])
     return norm(K - K_true) / norm(K_true)
 end
 
@@ -113,7 +112,7 @@ id_model(latent) = IDModel(Renewal(; generation_time = si, rt = latent,
 
 Random.seed!(10)
 sim = fix(as_turing_model(id_model(ExactGP()), fill(missing, n), n),
-    (gp_ℓ = 0.55, gp_σ = 0.55))()
+    (ℓ = 0.55, σ = 0.55))()
 y_obs = sim.generated_y_t
 Z_true = sim.Z_t
 (total_cases = sum(y_obs), peak = maximum(y_obs),

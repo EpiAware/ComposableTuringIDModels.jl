@@ -2,17 +2,14 @@ Changes are documented in Github releases.
 
 ## Unreleased
 
-  - `HilbertSpaceGP` and `ExactGP` now sample their hyperparameters as `gp_ℓ`
-    and `gp_σ` rather than `ℓ` and `σ`. A latent process composes into its host
-    prefix-off, so the old bare `σ` shared a namespace with an observation
-    error model's own `σ` and one silently overwrote the other: a
-    Gaussian-process `R_t` with a `NormalError` failed `check_model` and
-    `sample` refused to run (issue #268).
-
-    **Breaking**: code that reads a GP hyperparameter from a chain, or pins one
-    with `fix`, must use the new names (`chain[:gp_σ]`,
-    `fix(model, (gp_ℓ = 0.5, gp_σ = 0.5))`). The weights (`β` for the
-    Hilbert-space basis, `z` for the exact GP) are unchanged.
+  - Documented what a component's parameter names namespace to, and how to keep
+    two components apart when they want the same name. A component names its
+    parameters for what they are, so a Gaussian process and `NormalError` both
+    draw a bare `σ`, and composing them puts two parameters on one variable:
+    `check_model` fails and `sample` refuses to run. The fix is a prefix where
+    the conflict is, through `PrefixLatentModel` or `PrefixObservationModel`,
+    and both now have a documented home in the composable-design page along
+    with the Gaussian-process docstrings (issue #268). No parameter is renamed.
 
   - Infection models can now generate several strata at once. `Stratify` puts
     a stratum axis on a shared process (a partially pooled panel of

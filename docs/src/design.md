@@ -30,12 +30,79 @@ z ~ as_turing_submodel(inner_model, n)
 ```
 
 `as_turing_submodel` disables automatic variable prefixing by default, so
-parameter names stay flat (pass `prefix = true` to namespace a slot). Because every component speaks the same `as_turing_model` protocol,
+parameter names stay flat (pass `prefix = true` to namespace a slot).
+Because every component speaks the same `as_turing_model` protocol,
 components nest freely: an [`AR`](@ref) process can carry a
 [`HierarchicalNormal`](@ref) error model, a [`DiffLatentModel`](@ref) can wrap
 that `AR` to produce an ARIMA-style process, and that whole latent process can be
 folded into a [`DirectInfections`](@ref) model observed with a
 [`NegativeBinomialError`](@ref).
+
+## Parameter names, and prefixing where they clash
+
+A component names its own parameters for what they are, not for which
+component owns them: a damping coefficient is `damp`, an initial value is
+`init`, a marginal standard deviation is `σ`.
+Names stay short because a component knows nothing about what it will be
+composed with, and a self-describing name would be wrong as soon as the same
+component appeared twice.
+
+The cost is that two components can want the same name.
+A Gaussian process draws a marginal standard deviation `σ`, and so does
+[`NormalError`](@ref).
+Composed bare, both reach the top level of the same model and land on one
+variable:
+
+```@example prefixing
+using ComposableTuringIDModels, Distributions
+using DynamicPPL: DebugUtils, VarInfo
+
+renewal(rt) = Renewal(;
+    generation_time = [0.3, 0.4, 0.3], rt = rt, initialisation = Normal())
+bare = as_turing_model(
+    IDModel(renewal(HilbertSpaceGP()), NormalError()), fill(10.0, 20), 20)
+keys(VarInfo(bare))
+```
+
+There are four names for five parameters, and the model says so:
+
+```@example prefixing
+DebugUtils.check_model(bare; error_on_failure = false)
+```
+
+That is a hard stop, not a silent error.
+`sample` runs `check_model` first and refuses to run a model that fails it.
+
+The fix is a prefix applied where the conflict is, rather than a longer name
+everywhere.
+[`PrefixLatentModel`](@ref) wraps a latent process so its variables are
+namespaced, and [`PrefixObservationModel`](@ref) does the same for an
+observation model:
+
+```@example prefixing
+prefixed = as_turing_model(
+    IDModel(
+        renewal(PrefixLatentModel(; model = HilbertSpaceGP(), prefix = "gp")),
+        NormalError()
+    ), fill(10.0, 20), 20)
+keys(VarInfo(prefixed))
+```
+
+```@example prefixing
+DebugUtils.check_model(prefixed; error_on_failure = false)
+```
+
+The Gaussian process's hyperparameters are now `gp.ℓ` and `gp.σ`, and the
+error model keeps its own `σ`.
+A chain reads each by its own path, `chain[@varname(gp.σ)]`, and a value is
+pinned the same way with `fix(prefixed, (gp = (σ = 0.2,),))`.
+
+Components that compose several children of the same kind prefix them
+already, so nothing needs adding there.
+[`CombineLatentModels`](@ref) names its components `Combine.1`, `Combine.2`
+and so on, [`ConcatLatentModels`](@ref) uses `Concat.1`, `Concat.2`, and
+[`Split`](@ref) prefixes each observation stream by its name.
+A Gaussian process reached through one of those never collides.
 
 ## The latent is folded into the infection model
 
