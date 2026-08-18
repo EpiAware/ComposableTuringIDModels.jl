@@ -171,13 +171,6 @@ function predictive_bands(pred, n, vn)
     end
     credible_bands(reduce(vcat, rows))
 end
-
-# fraction of scored days on which the 95% band contains the simulated count
-function band_coverage(bands, obs)
-    scored = [i for i in eachindex(obs)
-              if !ismissing(bands[i, 1]) && !ismissing(obs[i])]
-    mean(bands[i, 1] <= obs[i] <= bands[i, 5] for i in scored)
-end
 ```
 
 `Split` prefixes each stream's `y_t`, so `predictive_bands` reads
@@ -190,8 +183,6 @@ missmodel = as_turing_model(model, (cases = missing, deaths = missing), n)
 pred = predict(missmodel, chain)
 cases_bands = predictive_bands(pred, n, i -> @varname(cases.y_t[i]))
 deaths_bands = predictive_bands(pred, n, i -> @varname(deaths.y_t[i]))
-cases_cov = band_coverage(cases_bands, y.cases)
-deaths_cov = band_coverage(deaths_bands, y.deaths)
 
 fig = Figure(; size = (760, 620))
 ax1 = Axis(fig[1, 1]; ylabel = "Cases")
@@ -207,13 +198,6 @@ scatter!(ax2, 1:n, y.deaths; color = :black, markersize = 6,
     label = "simulated")
 axislegend(ax2; position = :lt)
 fig
-```
-
-How often the 95% band contains the simulated count is computed, not read off
-the figure:
-
-```@example split
-(cases = round(cases_cov; digits = 2), deaths = round(deaths_cov; digits = 2))
 ```
 
 The band covers the simulated series on almost every day for both streams,
@@ -350,9 +334,6 @@ weighted_pred = predict(as_turing_model(
 young_bands = predictive_bands(weighted_pred, n, i -> @varname(young.y_t[i]))
 old_bands = predictive_bands(weighted_pred, n, i -> @varname(old.y_t[i]))
 total_bands = predictive_bands(weighted_pred, n, i -> @varname(total.y_t[i]))
-young_cov = band_coverage(young_bands, age.generated_y_t.young)
-old_cov = band_coverage(old_bands, age.generated_y_t.old)
-total_cov = band_coverage(total_bands, age.generated_y_t.total)
 
 fig2 = Figure(; size = (760, 780))
 ax_young = Axis(fig2[1, 1]; ylabel = "Young")
@@ -367,13 +348,6 @@ for (ax, bands, obs, color) in (
 end
 axislegend(ax_young; position = :lt)
 fig2
-```
-
-The same coverage check applies per stream:
-
-```@example split
-(young = round(young_cov; digits = 2), old = round(old_cov; digits = 2),
-    total = round(total_cov; digits = 2))
 ```
 
 Despite the slower mixing, the 95% band covers the simulated counts on almost
