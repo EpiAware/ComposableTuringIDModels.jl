@@ -18,7 +18,7 @@
     @test all(>=(0), gen.I_t)
 end
 
-@testitem "concrete_observations narrows only when nothing is missing" begin
+@testitem "concrete_observations narrows or detaches missing data" begin
     using ComposableTuringIDModels: concrete_observations, MissingObservations
 
     # Fully concrete data (no `missing` left) is narrowed to a concrete eltype.
@@ -37,10 +37,20 @@ end
     @test split.present == [true, false, true]
     @test split.value[[1, 3]] == [1, 3]
 
-    # A fully missing vector survives unchanged: there is nothing concrete to
-    # split out.
+    # A fully missing vector is split too: `present` is all `false`, and the
+    # value vector is a placeholder. Nothing a draw could be written into
+    # survives, so the caller's array cannot be mutated by scoring it.
     y_allgap = Vector{Union{Missing, Int}}(missing, 3)
-    @test concrete_observations(y_allgap) === y_allgap
+    allgap = concrete_observations(y_allgap)
+    @test allgap isa MissingObservations
+    @test !any(allgap.present)
+    @test !(eltype(allgap.value) >: Missing)
+
+    # A `Vector{Missing}` carries no value type to build a carrier from, and
+    # nothing can be written into it either (the tilde sugar widens it into a
+    # fresh array), so it survives unchanged.
+    y_bare = Vector{Missing}(missing, 3)
+    @test concrete_observations(y_bare) === y_bare
 
     # A `NamedTuple` of data streams (e.g. `BinomialError`'s `(y, N)`, or a
     # `Split` observation's per-stream series) is narrowed field-wise.

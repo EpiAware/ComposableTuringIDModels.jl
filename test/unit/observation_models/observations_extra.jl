@@ -353,6 +353,27 @@ end
     @test all(mt.observed)
 end
 
+@testitem "ReportTriangle narrows its counts at construction" begin
+    using ComposableTuringIDModels, Distributions
+    obs = ReportTriangle(PoissonError(), [0.6, 0.25, 0.15])   # Dmax = 2
+
+    # The count matrix the model scores is one of the model's own arguments,
+    # so it is built once when the model is constructed and DynamicPPL owns
+    # any copying it needs. Nothing about the data is unpacked, narrowed or
+    # copied inside the model body, where it would run on every evaluation
+    # (and where a run-time type computation crashes Mooncake's compiler).
+    N = Matrix{Union{Missing, Int}}([10 5 2; 12 6 3; 14 7 4])
+    tri = define_y_t(obs, N, fill(20.0, 3); now = 5)
+    mdl = as_turing_model(obs, tri, fill(20.0, 3))
+
+    @test mdl.args.y_t isa AbstractMatrix
+    @test mdl.args.y_t !== tri.counts
+    # Nothing is missing here, so the argument is narrowed to a concrete
+    # eltype and never sees DynamicPPL's `hasmissing` deepcopy.
+    @test eltype(mdl.args.y_t) === Int
+    @test mdl.args.y_t == tri.counts
+end
+
 @testitem "a ready-built ReportingTriangle is not written to" begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     using DynamicPPL: @varname
