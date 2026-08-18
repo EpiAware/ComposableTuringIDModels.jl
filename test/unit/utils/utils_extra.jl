@@ -36,6 +36,36 @@ end
     @test isapprox(explicit, explicit_upper; atol = 1.0e-12)
 end
 
+@testitem "_discretised_pmf rounds a misaligned support bound up to Δd" begin
+    using ComposableTuringIDModels, Distributions
+    # A bounded distribution's `maximum` need not land on a Δd grid point
+    # (e.g. truncating at 15.5 with Δd = 1.0). The PMF horizon must still be
+    # a multiple of Δd, or the bins `0, Δd, …, D-Δd` misalign with the
+    # right-truncation applied inside `double_interval_censored` and the
+    # final bin covers a partial, non-Δd-wide interval.
+    gen = Gamma(1.5625, 1.92) + 1.0
+    truncated_gen = truncated(gen, nothing, 15.5)
+
+    pmf = ComposableTuringIDModels._discretised_pmf(truncated_gen; Δd = 1.0)
+
+    # Horizon rounds 15.5 up to 16.0, giving 16 unit-width bins, so no mass
+    # between the true bound (15.5) and the rounded horizon (16.0) is lost:
+    # the distribution has no density past its own maximum.
+    @test length(pmf) == 16
+    @test isapprox(sum(pmf), 1.0)
+    @test all(>=(0), pmf)
+
+    # A non-unit Δd that also does not divide the bound exactly.
+    truncated_small = truncated(gen, nothing, 15.5)
+    pmf_small = ComposableTuringIDModels._discretised_pmf(
+        truncated_small; Δd = 0.3
+    )
+    # ceil(15.5 / 0.3) = 52, so the horizon is 15.6 and there are 52 bins.
+    @test length(pmf_small) == 52
+    @test isapprox(sum(pmf_small), 1.0)
+    @test all(>=(0), pmf_small)
+end
+
 @testitem "expected_Rt inverts the renewal relationship" begin
     using ComposableTuringIDModels
     gen_int = [0.2, 0.3, 0.5]
