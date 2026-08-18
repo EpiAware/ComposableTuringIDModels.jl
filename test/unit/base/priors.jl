@@ -223,6 +223,40 @@ end
     @test length(as_turing_model(CombineLatentModels([Normal(), AR()]), 10)()) == 10
 end
 
+@testitem "component-author widening helpers are public, not exported" begin
+    using ComposableTuringIDModels, Distributions
+    # `public` (documented API, not brought into scope by `using`): a custom
+    # component's constructor/recursion reaches these under the module name.
+    for name in (:at, :path_prior, :prior_order, :assert_prior_length)
+        @test Base.ispublic(ComposableTuringIDModels, name)
+        @test !Base.isexported(ComposableTuringIDModels, name)
+    end
+    # Not brought into scope by a plain `using`.
+    @test !isdefined(@__MODULE__, :at)
+    @test !isdefined(@__MODULE__, :path_prior)
+    # Behaviour, reached via the qualified public name.
+    @test ComposableTuringIDModels.at(0.5, 3) == 0.5
+    @test ComposableTuringIDModels.at([0.1, 0.2, 0.3], 2) == 0.2
+    @test ComposableTuringIDModels.path_prior(Normal()) isa
+        ComposableTuringIDModels.Intercept
+    @test ComposableTuringIDModels.path_prior(RandomWalk()) isa RandomWalk
+    @test ComposableTuringIDModels.prior_order(Normal()) == 1
+    @test ComposableTuringIDModels.prior_order([Normal(), Normal()]) == 2
+    @test ComposableTuringIDModels.assert_prior_length(
+        [Normal(), Normal()], 2, :damp
+    ) === nothing
+    @test_throws AssertionError ComposableTuringIDModels.assert_prior_length(
+        [Normal(), Normal()], 3, :damp
+    )
+    # The previously-private underscore names are the same functions, kept
+    # working for anything already calling them.
+    @test ComposableTuringIDModels._at === ComposableTuringIDModels.at
+    @test ComposableTuringIDModels._path_prior === ComposableTuringIDModels.path_prior
+    @test ComposableTuringIDModels._prior_order === ComposableTuringIDModels.prior_order
+    @test ComposableTuringIDModels._assert_prior_length ===
+        ComposableTuringIDModels.assert_prior_length
+end
+
 @testitem "priors compose as submodels (distribution and latent)" begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(103)
