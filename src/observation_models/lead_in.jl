@@ -69,17 +69,24 @@ observation_lead_in(streams)
 "
 function observation_lead_in end
 
-# Default: a component drops nothing of its own, so its lead-in is that of the
-# observation model it wraps, passed straight through. Written as a field walk
-# rather than a method per modifier so a new length-preserving modifier is
-# handled without one. A modifier wraps a single observation model; several in
-# parallel is what a `Split` is, and it has its own method below.
-function observation_lead_in(model::AbstractObservationModel)
+# The observation model a component wraps, or `nothing` for one that consumes
+# the expected series itself. Found by a field walk rather than a method per
+# modifier, so a new length-preserving modifier needs no accessor of its own.
+# A modifier wraps a single observation model; several in parallel is what a
+# `Split` is, and every walk below gives it its own method.
+function _wrapped_model(model::AbstractObservationModel)
     for f in fieldnames(typeof(model))
         v = getfield(model, f)
-        v isa AbstractObservationModel && return observation_lead_in(v)
+        v isa AbstractObservationModel && return v
     end
-    return 0
+    return nothing
+end
+
+# Default: a component drops nothing of its own, so its lead-in is that of the
+# observation model it wraps, passed straight through.
+function observation_lead_in(model::AbstractObservationModel)
+    inner = _wrapped_model(model)
+    return inner === nothing ? 0 : observation_lead_in(inner)
 end
 
 # Add a component's own lead-in to the one it wraps. The wrapped side is a plain
@@ -137,18 +144,13 @@ end
 _observation_chain(model::AbstractObservationModel) = model
 
 # The per-stream observation models a chain fans out to, or `nothing` when it
-# scores a single series. Walks the same structural path as
+# scores a single series. Follows the same structural path as
 # `observation_lead_in`, so a coverage report is keyed by the same streams and
 # each stream's data is counted by the model that actually scores it.
 _stream_models(model) = nothing
 function _stream_models(model::AbstractObservationModel)
-    for f in fieldnames(typeof(model))
-        v = getfield(model, f)
-        v isa AbstractObservationModel || continue
-        inner = _stream_models(v)
-        inner === nothing || return inner
-    end
-    return nothing
+    inner = _wrapped_model(model)
+    return inner === nothing ? nothing : _stream_models(inner)
 end
 
 # A strata template is one model replicated across streams the data names, so
@@ -269,12 +271,9 @@ _stream(x, ::Symbol) = x
 # the chain untouched — a modifier reshapes the expected series, not the
 # observations — so the walk descends to the component that consumes it.
 function _n_observations(model::AbstractObservationModel, y_t, n_expected)
-    for f in fieldnames(typeof(model))
-        v = getfield(model, f)
-        v isa AbstractObservationModel &&
-            return _n_observations(v, y_t, n_expected)
-    end
-    return _n_series_observations(y_t, n_expected)
+    inner = _wrapped_model(model)
+    inner === nothing && return _n_series_observations(y_t, n_expected)
+    return _n_observations(inner, y_t, n_expected)
 end
 
 _n_series_observations(y_t::AbstractVector, n_expected) = length(y_t)
