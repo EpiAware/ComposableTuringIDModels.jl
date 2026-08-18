@@ -14,3 +14,11 @@ Changes are documented in Github releases.
     **Breaking**: `GroupedInfections` and the grouped `IDModel` constructors
     are removed; a `Stratify`-based infection model observed through `Split`
     replaces them.
+
+  - `SafePoisson` and `SafeNegativeBinomial` now raise a clear `DomainError`
+    naming the offending value when a non-finite (`Inf`/`NaN`) rate or shape
+    parameter reaches an integer conversion, instead of an opaque
+    `InexactError`. The guard covers every entry point that floors a
+    parameter to an integer: `rand` (via `_safe_int_floor`, including the
+    Gamma-mixing draw inside `SafeNegativeBinomial.rand`), `quantile` on both
+    types, and `SafeNegativeBinomial`'s `mode`.
