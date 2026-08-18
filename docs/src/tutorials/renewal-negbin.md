@@ -176,12 +176,13 @@ chain = sample(
 nothing # hide
 ```
 
-Sampling returns a chain whose nested component slots are namespaced by the
-slot that holds them, while a component's own scalar parameters keep their
-plain name.
-Two components that give a scalar parameter the same name therefore collide,
-and one of them must be wrapped in `PrefixLatentModel` or
-`PrefixObservationModel`.
+Sampling returns a chain whose parameter names are flat: composition does not
+namespace by default, so a component's own parameter keeps its plain name
+however deeply it is nested — `damp_AR` and `std` below belong to the AR
+process folded into the renewal model.
+A few components deliberately prefix their children, and two components that
+would otherwise use the same name are separated by wrapping one in
+`PrefixLatentModel` or `PrefixObservationModel`.
 `sample` returns a
 [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which
 `summarystats` summarises directly — no conversion step — giving point estimates
