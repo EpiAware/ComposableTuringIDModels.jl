@@ -267,7 +267,9 @@ end
         (n_observations = 30, lead_in = 4, n_scored = 26, n_unscored = 4)
 
     # A `MissingObservations` carrier reports the series it stands in for.
-    carrier = MissingObservations(fill(10.0, n), fill(true, n))
+    carrier = ComposableTuringIDModels.MissingObservations(
+        fill(10.0, n), fill(true, n)
+    )
     @test observation_coverage(plain, carrier, n).n_observations == 30
 
     # A stratified model's data is `strata x time`: the time axis counts.
@@ -385,7 +387,8 @@ end
     # An `IDProblem` records the fitted length in its `tspan`, so it needs no
     # keyword.
     problem = IDProblem(
-        infection = model.infection, observation_model = obs, tspan = (1, n)
+        infection = model.infection_model, observation_model = obs,
+        tspan = (1, n)
     )
     @test observation_coverage(problem, (; y_t = y)).n_unscored == 0
     pchain = sample(

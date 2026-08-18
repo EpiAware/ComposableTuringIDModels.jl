@@ -84,6 +84,8 @@ function observation_lead_in(idproblem::IDProblem)
     return observation_lead_in(idproblem.observation_model)
 end
 
+_observation_chain(idproblem::IDProblem) = idproblem.observation_model
+
 function observation_coverage(idproblem::IDProblem, data)
     time_steps = idproblem.tspan[end] - idproblem.tspan[1] + 1
     return observation_coverage(idproblem, data.y_t, time_steps)

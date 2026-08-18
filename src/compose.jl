@@ -51,8 +51,10 @@ struct IDModel{I <: AbstractInfectionModel, O <: AbstractObservationModel} <:
 end
 
 # A composed model's lead-in is its observation model's: the infection process
-# runs the full `n` steps and the chain drops the head of the convolution.
+# runs the full `n` steps and the chain drops the head of the convolution. The
+# same for the chain a coverage report is read off.
 observation_lead_in(model::IDModel) = observation_lead_in(model.observation_model)
+_observation_chain(model::IDModel) = model.observation_model
 
 @doc raw"
 Narrow a data argument to a concrete element type before conditioning a model

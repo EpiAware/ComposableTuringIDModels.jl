@@ -70,31 +70,23 @@ observation_lead_in(streams)
 function observation_lead_in end
 
 # Default: a component drops nothing of its own, so its lead-in is that of the
-# observation models it wraps. Written as a field walk rather than a method per
-# modifier so a new length-preserving modifier is handled without one.
+# observation model it wraps, passed straight through. Written as a field walk
+# rather than a method per modifier so a new length-preserving modifier is
+# handled without one. A modifier wraps a single observation model; several in
+# parallel is what a `Split` is, and it has its own method below.
 function observation_lead_in(model::AbstractObservationModel)
-    total = 0
     for f in fieldnames(typeof(model))
         v = getfield(model, f)
-        if v isa AbstractObservationModel
-            total = _add_lead_in(total, observation_lead_in(v))
-        elseif v isa Union{AbstractVector, Tuple, NamedTuple}
-            for el in v
-                el isa AbstractObservationModel &&
-                    (total = _add_lead_in(total, observation_lead_in(el)))
-            end
-        end
+        v isa AbstractObservationModel && return observation_lead_in(v)
     end
-    return total
+    return 0
 end
 
-# Accumulate lead-ins down a chain. Both sides are plain counts until a `Split`
-# with unequal streams reports one per stream; from there the surrounding chain's
-# lead-in is added to every stream. Two per-stream lead-ins never meet, because a
-# modifier wraps one observation model and a `Split` handles its own streams.
+# Add a component's own lead-in to the one it wraps. The wrapped side is a plain
+# count until a `Split` with unequal streams reports one per stream; from there
+# the surrounding chain's lead-in is added to every stream.
 _add_lead_in(a::Int, b::Int) = a + b
 _add_lead_in(a::Int, b::NamedTuple) = map(x -> _add_lead_in(a, x), b)
-_add_lead_in(a::NamedTuple, b::Int) = map(x -> _add_lead_in(x, b), a)
 
 # A delay drops the head of its convolution, on top of whatever it wraps.
 function observation_lead_in(model::LatentDelay)
@@ -139,6 +131,32 @@ function observation_lead_in(model::Split)
     return allequal(values(lead_ins)) ? first(values(lead_ins)) : lead_ins
 end
 
+# The observation chain a diagnostic runs over. A bare observation model is its
+# own chain; the composed wrappers hand theirs over (their methods sit with the
+# types, in `compose.jl` and `IDProblem.jl`).
+_observation_chain(model::AbstractObservationModel) = model
+
+# The per-stream observation models a chain fans out to, or `nothing` when it
+# scores a single series. Walks the same structural path as
+# `observation_lead_in`, so a coverage report is keyed by the same streams and
+# each stream's data is counted by the model that actually scores it.
+_stream_models(model) = nothing
+function _stream_models(model::AbstractObservationModel)
+    for f in fieldnames(typeof(model))
+        v = getfield(model, f)
+        v isa AbstractObservationModel || continue
+        inner = _stream_models(v)
+        inner === nothing || return inner
+    end
+    return nothing
+end
+
+# A strata template is one model replicated across streams the data names, so
+# there are no per-stream models to key a report by.
+function _stream_models(model::Split)
+    return model.streams isa NamedTuple ? model.streams : nothing
+end
+
 @doc raw"
 How many of the supplied observations an observation chain actually scores, for
 a given series length `n`.
@@ -156,11 +174,40 @@ silently dropped. Call this before sampling to check `n_unscored` is what you
 meant it to be; `n = length(y) + observation_lead_in(model)` makes it zero.
 
 A [`Split`](@ref)'s streams are reported one by one — a `NamedTuple` of the
-above, keyed by stream — whenever the streams differ in lead-in or the data
-arrives as a `NamedTuple` of per-stream series.
+above, keyed by stream. Each stream is counted by the model that scores it, so a
+stream taking `NamedTuple` data is not mistaken for a further split.
 
 An [`IDProblem`](@ref) reads its series length from `tspan`, so it takes the
 data on its own: `observation_coverage(problem, data)`.
+
+## What counts as an observation
+
+The count is read from the data through the contract of the model that scores
+it, on the time axis:
+
+  - a plain vector, or a [`MissingObservations`](@ref) carrier, is the series
+    itself; a `strata × time` matrix is counted along its columns;
+  - a model taking extra per-time data reads its observations from the `y` field
+    of the supplied `NamedTuple`, so [`BinomialError`](@ref)'s
+    `(y = successes, N = trials)` has `length(y)` observations, not two;
+  - a [`ReportTriangle`](@ref) is counted down the reference days of its
+    reference-day × delay matrix, not across its delay columns;
+  - a `missing` is simulated at whatever length the chain produces, so it is
+    scored in full.
+
+## Reporting triangles do not right-align
+
+Only the per-time-point error families right-align, so only there does a
+non-zero `n_unscored` mean observations quietly dropped from the head.
+[`ReportTriangle`](@ref) instead asserts that its triangle has exactly
+`n - lead_in` reference days, so a non-zero `n_unscored` there is a call that
+will *fail*, and the report says so before it does.
+
+## Forecasting
+
+[`forecast`](@ref) rebuilds the model at a longer series, and needs the same `n`
+the fit used: pass `forecast(model, y, chain, horizon; n = n)` when `n` is not
+`length(y)`. An [`IDProblem`](@ref) records it in `tspan` and needs no keyword.
 
 ## Arguments
 
@@ -179,13 +226,32 @@ observation_coverage(obs, y, length(y) + observation_lead_in(obs))
 ```
 "
 function observation_coverage(model, y_t, n::ModelShape)
-    return _coverage(observation_lead_in(model), y_t, _n_time(n))
+    chain = _observation_chain(model)
+    return _coverage(chain, observation_lead_in(chain), y_t, _n_time(n))
+end
+
+# A chain that fans out to named streams reports one coverage per stream, each
+# read through that stream's own model and data. `lead_in` is shared when the
+# streams drop the same amount and keyed by stream when they do not, so it is
+# split by the same `_stream` lookup as the data.
+function _coverage(model, lead_in, y_t, n_time::Int)
+    streams = _stream_models(model)
+    streams === nothing &&
+        return _series_coverage(model, lead_in, y_t, n_time)
+    return NamedTuple{keys(streams)}(
+        map(
+            k -> _series_coverage(
+                streams[k], _stream(lead_in, k), _stream(y_t, k), n_time
+            ),
+            keys(streams)
+        )
+    )
 end
 
 # One chain, one series: the last `n - lead_in` observations are scored.
-function _coverage(lead_in::Int, y_t, n_time::Int)
+function _series_coverage(model, lead_in::Int, y_t, n_time::Int)
     n_expected = max(n_time - lead_in, 0)
-    n_observations = _n_observations(y_t, n_expected)
+    n_observations = _n_observations(model, y_t, n_expected)
     n_scored = min(n_observations, n_expected)
     return (;
         n_observations, lead_in, n_scored,
@@ -193,34 +259,46 @@ function _coverage(lead_in::Int, y_t, n_time::Int)
     )
 end
 
-# Per-stream data under a shared lead-in: one report per stream, since the
-# streams need not be the same length.
-function _coverage(lead_in::Int, y_t::NamedTuple, n_time::Int)
-    return map(y -> _coverage(lead_in, y, n_time), y_t)
+# Pick a stream's share of a per-stream value; a value shared across streams (a
+# common lead-in, or one series reaching every stream) passes through unchanged.
+_stream(x::NamedTuple, k::Symbol) = x[k]
+_stream(x, ::Symbol) = x
+
+# The number of observations a data argument carries on the time axis, read
+# through the contract of the model that scores it. The data reaches the end of
+# the chain untouched — a modifier reshapes the expected series, not the
+# observations — so the walk descends to the component that consumes it.
+function _n_observations(model::AbstractObservationModel, y_t, n_expected)
+    for f in fieldnames(typeof(model))
+        v = getfield(model, f)
+        v isa AbstractObservationModel &&
+            return _n_observations(v, y_t, n_expected)
+    end
+    return _n_series_observations(y_t, n_expected)
 end
 
-# Per-stream lead-ins: one report per stream, each against that stream's data
-# (a shared `missing` or vector reaches every stream unchanged).
-_coverage(lead_in::NamedTuple, y_t, n_time::Int) = _stream_coverage(
-    lead_in, y_t, n_time
-)
-_coverage(lead_in::NamedTuple, y_t::NamedTuple, n_time::Int) = _stream_coverage(
-    lead_in, y_t, n_time
-)
-
-function _stream_coverage(lead_in::NamedTuple, y_t, n_time::Int)
-    return NamedTuple{keys(lead_in)}(
-        map(k -> _coverage(lead_in[k], _stream(y_t, k), n_time), keys(lead_in))
-    )
+_n_series_observations(y_t::AbstractVector, n_expected) = length(y_t)
+_n_series_observations(y_t::AbstractMatrix, n_expected) = size(y_t, 2)
+_n_series_observations(y_t::MissingObservations, n_expected) = length(y_t.value)
+_n_series_observations(::Missing, n_expected) = n_expected
+# A model needing more than the counts takes them in the `y` field of a
+# `NamedTuple` (see `define_y_t`); the other fields are known per-time-point
+# covariates — `BinomialError`'s number of trials — not observations.
+function _n_series_observations(y_t::NamedTuple, n_expected)
+    return _n_series_observations(y_t.y, n_expected)
 end
 
-_stream(y_t::NamedTuple, k::Symbol) = y_t[k]
-_stream(y_t, ::Symbol) = y_t
+# A `ReportTriangle` scores the cells of a reference-day × delay matrix, so its
+# observations run down the ROWS: the delay columns are one reference day's
+# report split by delay, not further time points.
+function _n_observations(::ReportTriangle, y_t, n_expected)
+    return _n_triangle_observations(y_t, n_expected)
+end
 
-# The number of observations a data argument carries, on the time axis. A
-# `missing` is simulated at whatever length the chain produces, so it is scored
-# in full.
-_n_observations(y_t::AbstractVector, n_expected) = length(y_t)
-_n_observations(y_t::AbstractMatrix, n_expected) = size(y_t, 2)
-_n_observations(y_t::MissingObservations, n_expected) = length(y_t.value)
-_n_observations(::Missing, n_expected) = n_expected
+_n_triangle_observations(y_t::ReportingTriangle, n_expected) = size(
+    y_t.counts, 1
+)
+_n_triangle_observations(y_t::AbstractMatrix, n_expected) = size(y_t, 1)
+# `missing` (simulating) and a long-form `(reference, delay, count)` table are
+# both sized from the expected series, so they cover it exactly.
+_n_triangle_observations(y_t, n_expected) = n_expected
