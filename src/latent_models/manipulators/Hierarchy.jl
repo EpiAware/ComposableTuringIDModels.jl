@@ -82,7 +82,7 @@ end
     # One shared level μ (a single global draw), plus n_groups deviations from the
     # cross-group prior: the latent parameterises the pooling (iid ⇒ exchangeable,
     # RandomWalk ⇒ correlated neighbours). The result is a numeric per-group path.
-    hierarchy_mean ~ as_turing_submodel(h.mean, 1; prefix = true)
+    mean ~ as_turing_submodel(h.mean, 1; prefix = true)
     group_effects ~ as_turing_submodel(h.across, n_groups; prefix = true)
-    return only(hierarchy_mean) .+ group_effects
+    return only(mean) .+ group_effects
 end

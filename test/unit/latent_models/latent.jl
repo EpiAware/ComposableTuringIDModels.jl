@@ -54,9 +54,9 @@ end
     names = string.(collect(keys(draw)))
     # The init prior slot is prefixed at the call site (prefix-on
     # `as_turing_submodel`), so a RandomWalk exposes its init under a namespace
-    # path (e.g. `rw_init.θ`); the inner HierarchicalNormal's `std` is a flat
+    # path (e.g. `init.θ`); the inner HierarchicalNormal's `std` is a flat
     # native-tilde scalar draw.
-    @test any(startswith("rw_init"), names)
+    @test any(startswith("init"), names)
     @test any(contains("std"), names)
 end
 

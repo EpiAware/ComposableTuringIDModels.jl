@@ -189,7 +189,7 @@ shows which parameters the six weeks of Italian data moved.
 using CairoMakie, PairPlots
 
 prior_chain = sample(posterior, Prior(), 1000; progress = false)
-pp_keys = [@varname(damp_AR), @varname(θ),
+pp_keys = [@varname(damp), @varname(θ),
     @varname(std), @varname(cluster_factor)]
 pairplot(
     PairPlots.Series(chain[pp_keys]; label = "posterior"),
@@ -199,7 +199,7 @@ pairplot(
 The innovation scale ``\sigma`` (`std`)
 and the negative-binomial overdispersion (`cluster_factor`) tighten under the
 data, while the autoregressive damping
-(`damp_AR`) and moving-average
+(`damp`) and moving-average
 (`θ`) coefficients of the ARIMA process stay
 close to their weakly informative priors.
 
