@@ -15,8 +15,8 @@
     @test all(isfinite, path)
     draw = rand(as_turing_model(gp, n))
     pairs_dict = Dict(string(k) => v for (k, v) in pairs(draw))
-    @test haskey(pairs_dict, "gp_ℓ")
-    @test haskey(pairs_dict, "gp_σ")
+    @test haskey(pairs_dict, "ℓ")
+    @test haskey(pairs_dict, "σ")
     @test haskey(pairs_dict, "β")
     @test length(pairs_dict["β"]) == 8
 end
@@ -109,7 +109,7 @@ end
             begin
                     e = zeros(n)
                     e[j] = 1.0
-                    fix(mdl, (gp_ℓ = ℓ, gp_σ = σ, z = e))()
+                    fix(mdl, (ℓ = ℓ, σ = σ, z = e))()
                 end for j in 1:n
         )
         inflation = maximum(diag(L * L')) / σ^2 - 1
@@ -117,7 +117,7 @@ end
     end
     # σ = 0 is degenerate but must still factorise rather than throw, leaving
     # only the absolute floor (√(jitter·eps) ≈ 1.5e-11) in the path.
-    @test all(<(1.0e-8) ∘ abs, fix(mdl, (gp_ℓ = ℓ, gp_σ = 0.0))())
+    @test all(<(1.0e-8) ∘ abs, fix(mdl, (ℓ = ℓ, σ = 0.0))())
 end
 
 @testitem "GP latents reject a hyperprior that strays off its support" begin
@@ -223,7 +223,7 @@ end
             begin
                     e = zeros(k)
                     e[j] = 1.0
-                    fix(mdl, (gp_ℓ = ℓ, gp_σ = σ, weight => e))()
+                    fix(mdl, (ℓ = ℓ, σ = σ, weight => e))()
                 end for j in 1:k
         )
         return A * A'
@@ -311,7 +311,7 @@ end
     using ComposableTuringIDModels, Distributions
     using DynamicPPL: VarInfo
     # `Renewal` threads its `rt` slot through the prefix-off submodel seam, so a
-    # GP latent contributes flat `gp_ℓ`, `gp_σ` and weight names to the composed
+    # GP latent contributes flat `ℓ`, `σ` and weight names to the composed
     # model. The composed-fit test items below `fix` on those flat names, and
     # the case study reads them out of the chain.
     for (gp, weight) in ((HilbertSpaceGP(; m = 5), :β), (ExactGP(), :z))
@@ -333,42 +333,52 @@ end
                 )
             )
         )
-        @test :gp_ℓ ∈ names
-        @test :gp_σ ∈ names
+        @test :ℓ ∈ names
+        @test :σ ∈ names
         @test weight ∈ names
     end
 end
 
-@testitem "a GP scale composes with an error model's own scale" begin
+@testitem "a GP beside an error model's own scale needs a prefix" begin
     using ComposableTuringIDModels, Distributions, Random, Turing
-    using DynamicPPL: DebugUtils, VarInfo
+    using DynamicPPL: DebugUtils, VarInfo, @varname
     Random.seed!(268)
     # A GP `R_t` with a Gaussian observation error is a standard pairing, and
-    # both components own a scale parameter. They share one flattened
-    # namespace, so a GP that named its marginal standard deviation `σ` had it
-    # silently overwritten by the error model's `σ`: `check_model` failed and
-    # `sample` refused to run. The GP-owned names keep the two apart.
+    # both components name their marginal standard deviation `σ`. A latent
+    # process composes into its host prefix-off, so bare they land on one
+    # variable: `check_model` fails and `sample` refuses to run.
+    #
+    # The names stay generic and the user prefixes where the conflict is. This
+    # pins both halves of that contract, because the failure is only useful if
+    # the documented fix really works (issue #268).
     for gp in (HilbertSpaceGP(; m = 5), ExactGP())
-        model = IDModel(
-            Renewal(;
-                generation_time = [0.3, 0.4, 0.3], rt = gp,
-                initialisation = Normal()
-            ),
-            NormalError()
+        composed(rt) = as_turing_model(
+            IDModel(
+                Renewal(;
+                    generation_time = [0.3, 0.4, 0.3], rt = rt,
+                    initialisation = Normal()
+                ),
+                NormalError()
+            ), fill(10.0, 20), 20
         )
-        mdl = as_turing_model(model, fill(10.0, 20), 20)
+        bare = composed(gp)
+        mdl = composed(PrefixLatentModel(; model = gp, prefix = "gp"))
+        @test !DebugUtils.check_model(bare; error_on_failure = false)
         @test DebugUtils.check_model(mdl; error_on_failure = false)
+        # The collision is one name short: the two `σ`s share a variable.
         names = Symbol.(string.(keys(VarInfo(mdl))))
-        @test :gp_σ ∈ names
+        @test length(keys(VarInfo(bare))) == length(names) - 1
+        @test Symbol("gp.σ") ∈ names
         @test :σ ∈ names
-        # Both scales must come back from a chain under a name a user can
-        # predict, and be separately addressable: pinning one leaves the other
-        # sampled.
+        # Both scales must come back from a chain, and be separately
+        # addressable: pinning one leaves the other sampled.
         chain = sample(mdl, Prior(), 10; progress = false)
-        @test all(>(0), vec(chain[:gp_σ]))
+        @test all(>(0), vec(chain[@varname(gp.σ)]))
         @test all(>(0), vec(chain[:σ]))
-        pinned = Symbol.(string.(keys(VarInfo(fix(mdl, (gp_σ = 0.2,))))))
-        @test :gp_σ ∉ pinned
+        pinned = Symbol.(
+            string.(keys(VarInfo(fix(mdl, (gp = (σ = 0.2,),)))))
+        )
+        @test Symbol("gp.σ") ∉ pinned
         @test :σ ∈ pinned
     end
 end
@@ -401,7 +411,7 @@ end
     chn = sample(as_turing_model(gp, n), NUTS(), 40; progress = false)
     @test size(chn, 1) == 40
     @test all(isfinite, Array(chn))
-    ℓ = vec(chn[:gp_ℓ])
+    ℓ = vec(chn[:ℓ])
     @test all(>(0), ℓ)
     path = as_turing_model(gp, n)()
     @test length(path) == n
@@ -426,7 +436,7 @@ end
         NegativeBinomialError(cluster_factor = HalfNormal(0.1))
     )
     prior = as_turing_model(model, fill(missing, n), n)
-    sim = fix(prior, (gp_ℓ = 0.5, gp_σ = 0.5))()
+    sim = fix(prior, (ℓ = 0.5, σ = 0.5))()
     y_obs = sim.generated_y_t
     posterior = as_turing_model(model, y_obs, n)
     chain = sample(
@@ -464,8 +474,8 @@ end
     @test all(isfinite, path)
     draw = rand(as_turing_model(gp, n))
     pairs_dict = Dict(string(k) => v for (k, v) in pairs(draw))
-    @test haskey(pairs_dict, "gp_ℓ")
-    @test haskey(pairs_dict, "gp_σ")
+    @test haskey(pairs_dict, "ℓ")
+    @test haskey(pairs_dict, "σ")
     @test haskey(pairs_dict, "z")
     @test length(pairs_dict["z"]) == n
 end
@@ -493,7 +503,7 @@ end
             begin
                     e = zeros(n)
                     e[j] = 1.0
-                    fix(mdl, (gp_ℓ = ℓ, gp_σ = σ, z = e))()
+                    fix(mdl, (ℓ = ℓ, σ = σ, z = e))()
                 end for j in 1:n
         )
         # `ExactGP` adds a relative nugget to the diagonal, so it reproduces the
@@ -533,7 +543,7 @@ end
     chn = sample(as_turing_model(gp, n), NUTS(), 40; progress = false)
     @test size(chn, 1) == 40
     @test all(isfinite, Array(chn))
-    @test all(>(0), vec(chn[:gp_ℓ]))
+    @test all(>(0), vec(chn[:ℓ]))
     path = as_turing_model(gp, n)()
     @test length(path) == n
     @test all(isfinite, path)
@@ -550,7 +560,7 @@ end
     n = 40
     for σ in (0.0, 1.0e-8, 1.0, 1.0e3, 1.0e5), ℓ in (0.05, 0.5, 5.0)
 
-        path = fix(as_turing_model(ExactGP(), n), (gp_ℓ = ℓ, gp_σ = σ))()
+        path = fix(as_turing_model(ExactGP(), n), (ℓ = ℓ, σ = σ))()
         @test length(path) == n
         @test all(isfinite, path)
     end
@@ -601,7 +611,7 @@ end
         NegativeBinomialError(cluster_factor = HalfNormal(0.1))
     )
     prior = as_turing_model(model, fill(missing, n), n)
-    sim = fix(prior, (gp_ℓ = 0.5, gp_σ = 0.5))()
+    sim = fix(prior, (ℓ = 0.5, σ = 0.5))()
     y_obs = sim.generated_y_t
     posterior = as_turing_model(model, y_obs, n)
     chain = sample(

@@ -209,8 +209,17 @@ end
     # A name clash between two components is invisible until they are
     # composed: each is fine alone, and the composed model only warns that one
     # assignment overwrote another. Sweeping the latent processes against the
-    # error families is the cheap net for that whole class, and it is what
-    # caught a Gaussian-process `σ` being overwritten by `NormalError`'s.
+    # error families is the cheap net for that whole class.
+    #
+    # Components name their parameters for what they are, not for who owns
+    # them, and a latent process composes into its host prefix-off. So two
+    # components CAN reach for the same name, and the fix is a prefix applied
+    # where the conflict happens rather than a longer name everywhere. Both
+    # Gaussian processes sample a marginal standard deviation `σ`, and so does
+    # `NormalError`: those two pairings are the conflict, and the sweep pins
+    # both halves of the contract — where it collides, and that a
+    # `PrefixLatentModel` fixes it.
+    #
     # `BinomialError` is left out: it needs a trials series in the data rather
     # than the plain vector used here, and it draws no parameters of its own.
     latents = (
@@ -219,15 +228,25 @@ end
     )
     errors = (PoissonError(), NegativeBinomialError(), NormalError())
     n = 20
-    for latent in latents, error_model in errors
-        model = IDModel(
-            Renewal(;
-                generation_time = [0.3, 0.4, 0.3], rt = latent,
-                initialisation = Normal()
-            ),
-            error_model
+    function checks(latent, error_model)
+        renewal = Renewal(;
+            generation_time = [0.3, 0.4, 0.3], rt = latent,
+            initialisation = Normal()
         )
-        mdl = as_turing_model(model, fill(10.0, n), n)
-        @test DebugUtils.check_model(mdl; error_on_failure = false)
+        mdl = as_turing_model(
+            IDModel(renewal, error_model), fill(10.0, n), n
+        )
+        return DebugUtils.check_model(mdl; error_on_failure = false)
+    end
+    for latent in latents, error_model in errors
+        # A Gaussian process and `NormalError` both draw a bare `σ`; nothing
+        # else in the sweep shares a name.
+        collides = latent isa Union{HilbertSpaceGP, ExactGP} &&
+            error_model isa NormalError
+        @test checks(latent, error_model) == !collides
+        # Prefixing the latent is the documented fix, and it has to work for
+        # every pairing, not just the colliding ones.
+        prefixed = PrefixLatentModel(; model = latent, prefix = "latent")
+        @test checks(prefixed, error_model)
     end
 end
