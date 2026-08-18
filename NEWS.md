@@ -24,7 +24,16 @@ Changes are documented in Github releases.
     `n = length(y) + observation_lead_in(model)` instead of summing
     `length(pmf) - 1` over the chain's delays by hand.
     `observation_coverage` reports how many of the supplied observations a
-    given `n` actually scores.
+    given `n` actually scores, counting them through the contract of the model
+    that scores them: the `y` field of a `BinomialError`'s `(y, N)` data, and
+    the reference days of a `ReportTriangle`'s reporting triangle.
+
+  - `forecast` takes the series length the fit used as `n`, so a model fitted
+    with `n = length(y) + observation_lead_in(model)` forecasts from the same
+    length rather than being rebuilt at `length(y) + horizon`. An `IDProblem`
+    reads it from its `tspan`, which is a behaviour change for a problem whose
+    span was longer than its data. A chain fitted over a longer series than the
+    horizon model covers is now an error rather than a silent misalignment.
 
   - Infection models can now generate several strata at once. `Stratify` puts
     a stratum axis on a shared process (a partially pooled panel of
