@@ -2,6 +2,29 @@ Changes are documented in Github releases.
 
 ## Unreleased
 
+  - Parameter names no longer carry the name of the component that draws them.
+    A component names a quantity for what it is, and where two components then
+    want the same name the composition that puts them together prefixes them.
+
+    **Breaking**: anything reading these from a chain, or pinning one with
+    `fix`, needs the new name. `fix` and `condition` ignore a name the model
+    does not have, so a stale call keeps running and pins nothing.
+
+    | component | old | new |
+    | --- | --- | --- |
+    | `AR` | `ar_init` | `init` |
+    | `AR` | `damp_AR` | `damp` |
+    | `RandomWalk` | `rw_init` | `init` |
+    | `Hierarchy` | `hierarchy_mean` | `mean` |
+    | `ARStep` (field) | `damp_AR` | `damp` |
+
+    Unchanged, with reasons: `DiffLatentModel`'s `latent_init` would land on
+    the inner process's own `init` (`DiffLatentModel(model = AR())` fails
+    `check_model` under that rename); `arima`'s `ar_init` / `diff_init`
+    keyword arguments name two different init slots in one constructor;
+    `init_incidence`, `cluster_factor`, `import_rates` and `std` name the
+    quantity rather than the component.
+
   - Documented what a component's parameter names namespace to, and how to keep
     two components apart when they want the same name. A component names its
     parameters for what they are, so a Gaussian process and `NormalError` both

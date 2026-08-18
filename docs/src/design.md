@@ -41,8 +41,8 @@ folded into a [`DirectInfections`](@ref) model observed with a
 ## Parameter names, and prefixing where they clash
 
 A component names its own parameters for what they are, not for which
-component owns them: a marginal standard deviation is `σ`, a length scale is
-`ℓ`, an innovation series is `ϵ_t`.
+component owns them: an initial value is `init`, a damping coefficient is
+`damp`, a marginal standard deviation is `σ`.
 Names stay short because a component knows nothing about what it will be
 composed with, and a self-describing name would be wrong as soon as the same
 component appeared twice.
