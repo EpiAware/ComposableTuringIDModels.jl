@@ -74,7 +74,7 @@ end
 # distributions returns the product distribution (a native, per-element draw). A
 # process (or any other model) returns a namespaced submodel via the generic
 # method above — the length-`n`, e.g. time-varying / hierarchical, path. A
-# component consumes whichever it gets with [`_at`](@ref), so supplying a process
+# component consumes whichever it gets with [`at`](@ref), so supplying a process
 # makes the parameter vary with no rewiring while a `Distribution` keeps its clean
 # constant name. `n` is ignored for the scalar case, whatever shape it is asked
 # for.
@@ -141,7 +141,7 @@ the slot holds a bare distribution or a process. A bare distribution draws ONE
 scalar value (a constant, no length-`n` allocation) whatever shape it is asked
 for — `n` is ignored, whether it is a length or an `(n_strata, n_time)` shape.
 A component then reads a possibly-time-varying parameter per step with
-[`_at`](@ref), so the scalar stays constant while a process-valued slot
+[`at`](@ref), so the scalar stays constant while a process-valued slot
 varies — this is the single seam behind [`AR`](@ref)'s optionally-time-varying
 damping and the other per-step parameters.
 
@@ -203,7 +203,7 @@ end
 # and the time-varying (or hierarchical) case with no per-component special-casing
 # and no efficiency loss when the parameter is constant. This is general: any
 # per-step parameter is widened to optionally-time-varying just by drawing its slot
-# through [`as_turing_submodel`](@ref) and consuming it with [`_at`](@ref) — see
+# through [`as_turing_submodel`](@ref) and consuming it with [`at`](@ref) — see
 # [`AR`](@ref)'s damping for the worked example.
 
 @doc raw"

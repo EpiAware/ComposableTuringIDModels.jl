@@ -130,7 +130,7 @@ uses. Each draw builds the right-truncated, double-interval-censored delay PMF
     slot through the [`as_turing_submodel`](@ref) seam); and
   - if any parameter is a process, `as_turing_model(u::UncertainDelay, n)` builds
     one PMF **per time point** — each parameter is read at time `t` via
-    [`_at`](@ref) (a constant stays constant, a process path is indexed), so the
+    [`at`](@ref) (a constant stays constant, a process path is indexed), so the
     delay, and its discretised PMF, varies with time. A time-varying delay needs a
     series length, so the no-`n` method raises an error.
 
@@ -246,7 +246,7 @@ delay pmfs.
 Each parameter is drawn through the [`as_turing_submodel`](@ref) seam: a
 `Distribution` parameter draws a scalar (constant across time), while a process
 parameter (an [`AbstractPriorModel`](@ref)) draws a length-`n` path. The pmf at
-time `t` is built from each parameter read at `t` via [`_at`](@ref), so the delay
+time `t` is built from each parameter read at `t` via [`at`](@ref), so the delay
 distribution — and its discretised pmf — varies with time. The fixed horizon `D`
 keeps every pmf the same length.
 "

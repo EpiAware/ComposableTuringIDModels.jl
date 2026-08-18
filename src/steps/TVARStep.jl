@@ -3,7 +3,7 @@
 @doc raw"
 Order-1 AR step for use with [`accumulate_scan`](@ref).
 
-The damping coefficient is read per step via [`_at`](@ref), so the *same* step
+The damping coefficient is read per step via [`at`](@ref), so the *same* step
 serves both a constant coefficient (a scalar `ρ`, drawn from a `Distribution`
 prior) and a time-varying coefficient path (a vector `ρ`, drawn from a process
 prior):
