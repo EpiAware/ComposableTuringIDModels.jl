@@ -269,6 +269,13 @@ from `damp`), a second per-lag/per-element slot given as a vector (e.g.
 broadcasts to `k` and imposes no constraint, so it always passes. `what` is a
 short description of the slot used in the assertion message.
 
+# Arguments
+
+  - `p`: the prior for the slot being checked. A vector of `Distribution`s is
+    length-checked; anything else broadcasts and always passes.
+  - `k`: the required number of elements, fixed earlier by another slot.
+  - `what`: a short description of the slot, used in the assertion message.
+
 # Examples
 ```@example assert_prior_length
 using ComposableTuringIDModels, Distributions
