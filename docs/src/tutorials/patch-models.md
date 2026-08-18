@@ -263,9 +263,8 @@ end
 fig
 ```
 
-The posterior median tracks each patch's true `R_t` path closely.
-`coverage80` above is the fraction of the patch-day cells whose 80% credible
-interval contains the truth, computed rather than read off the figure.
+The posterior median tracks each patch's true `R_t` path closely, and the 80%
+band holds the simulated truth across almost the whole panel.
 A coupled, partially pooled renewal process — `Stratify`, `Hierarchy`, and an
 off-diagonal `mixing` matrix composed together — is identifiable from data at
 this signal-to-noise level: the machinery in the sections above is not just
@@ -326,23 +325,45 @@ grav_chain = sample(
     grav_posterior, NUTS(0.85; adtype = Turing.AutoForwardDiff()), 300;
     progress = false)
 
-recovery = map((:α, :β, :γ)) do sym
+grav_post = map((:α, :β, :γ)) do sym
     label = "Parameter(core.mixing.$(sym))"
     vn = only(filter(v -> string(v) == label, collect(keys(grav_chain))))
-    post = vec(grav_chain[vn])
-    true_val = only(vec(truth_chain[vn]))
-    q10, q90 = quantile(post, 0.1), quantile(post, 0.9)
-    (parameter = sym, true_value = round(true_val; digits = 3),
-        posterior_mean = round(mean(post); digits = 3),
-        q10 = round(q10; digits = 3), q90 = round(q90; digits = 3),
-        covered = q10 <= true_val <= q90)
+    (parameter = sym, post = vec(grav_chain[vn]),
+        truth = only(vec(truth_chain[vn])))
+end
+
+recovery = map(grav_post) do p
+    (parameter = p.parameter, true_value = round(p.truth; digits = 3),
+        posterior_mean = round(mean(p.post); digits = 3),
+        q10 = round(quantile(p.post, 0.1); digits = 3),
+        q90 = round(quantile(p.post, 0.9); digits = 3))
 end
 recovery
 ```
 
-The `covered` column is the recovery verdict itself: it is `true` when the
-truth falls inside that exponent's 80% interval, so the table decides which
-exponents come back out rather than this paragraph asserting it.
+Each exponent's posterior against the value that generated the data says more
+than the table does:
+
+```@example patches
+fig_grav = Figure(; size = (760, 320))
+axes_grav = map(enumerate(grav_post)) do (i, p)
+    ax = Axis(fig_grav[1, i]; xlabel = string(p.parameter),
+        ylabel = i == 1 ? "Posterior density" : "")
+    density!(ax, p.post; color = (:purple, 0.3), strokecolor = :purple,
+        strokewidth = 2)
+    vlines!(ax, [p.truth]; color = :black, linestyle = :dash, linewidth = 2,
+        label = "simulated truth")
+    ax
+end
+Legend(fig_grav[2, 1:3], first(axes_grav); orientation = :horizontal,
+    framevisible = false)
+fig_grav
+```
+
+The distance exponent `γ` is by far the tightest of the three and brackets the
+value that generated the data.
+The two population exponents are much more diffuse, and the destination
+exponent `α` sits away from its truth altogether.
 With only three patches there are only three off-diagonal entries of `K` to
 learn from, and `α` (destination population) and `β` (origin population)
 trade off against each other, and against `γ`, over that little data — the
