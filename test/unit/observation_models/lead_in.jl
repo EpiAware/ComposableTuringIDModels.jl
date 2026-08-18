@@ -254,3 +254,143 @@ end
     end
     @test observation_coverage(model, y, m).n_unscored == 0
 end
+
+@testitem "observation_coverage counts each data shape's observations" begin
+    using ComposableTuringIDModels, Distributions
+
+    pmf = fill(1 / 5, 5)                       # lead-in 4
+    n = 30
+
+    # A plain vector: the series itself carries the observations.
+    plain = LatentDelay(PoissonError(), pmf)
+    @test observation_coverage(plain, fill(10, n), n) ==
+        (n_observations = 30, lead_in = 4, n_scored = 26, n_unscored = 4)
+
+    # A `MissingObservations` carrier reports the series it stands in for.
+    carrier = MissingObservations(fill(10.0, n), fill(true, n))
+    @test observation_coverage(plain, carrier, n).n_observations == 30
+
+    # A stratified model's data is `strata x time`: the time axis counts.
+    @test observation_coverage(plain, fill(10, 2, n), (2, n)).n_observations == 30
+
+    # `BinomialError` takes `(; y, N)`. The trials are known covariates, not
+    # observations, so only the `y` field is counted.
+    binom = LatentDelay(BinomialError(), pmf)
+    scalar_N = observation_coverage(binom, (y = fill(3, n), N = 20), n)
+    @test scalar_N ==
+        (n_observations = 30, lead_in = 4, n_scored = 26, n_unscored = 4)
+    vector_N = observation_coverage(binom, (y = fill(3, n), N = fill(20, n)), n)
+    @test vector_N == scalar_N
+    # Adding the lead-in back scores every trial-weighted observation.
+    @test observation_coverage(
+        binom, (y = fill(3, n), N = 20), n + observation_lead_in(binom)
+    ).n_unscored == 0
+    # Simulating scores whatever the chain produces.
+    @test observation_coverage(binom, (y = missing, N = 20), n).n_unscored == 0
+end
+
+@testitem "observation_coverage counts a ReportTriangle's reference days" begin
+    using ComposableTuringIDModels, Distributions
+
+    n = 30
+    tri = ReportTriangle(PoissonError(), fill(1 / 3, 3))    # Dmax = 2
+
+    # The reference days run down the rows; the delay columns are not
+    # observations of their own.
+    counts = fill(2, n, 3)
+    @test observation_coverage(tri, counts, n) ==
+        (n_observations = 30, lead_in = 0, n_scored = 30, n_unscored = 0)
+
+    # An already-built `ReportingTriangle` reports the same.
+    built = define_y_t(tri, counts, fill(20.0, n))
+    @test observation_coverage(tri, built, n).n_observations == 30
+
+    # Simulating sizes the triangle from the expected series.
+    @test observation_coverage(tri, missing, n) ==
+        (n_observations = 30, lead_in = 0, n_scored = 30, n_unscored = 0)
+
+    # Under a delay the triangle needs `n - lead_in` reference days, and a
+    # full-length one is over-supplied.
+    delayed = LatentDelay(tri, fill(1 / 5, 5))
+    @test observation_lead_in(delayed) == 4
+    @test observation_coverage(delayed, counts, n).n_unscored == 4
+    @test observation_coverage(delayed, fill(2, n - 4, 3), n).n_unscored == 0
+end
+
+@testitem "observation_coverage keys a Split by stream, not by data field" begin
+    using ComposableTuringIDModels, Distributions
+
+    n = 40
+    streams = Split(
+        (
+            cases = LatentDelay(PoissonError(), fill(1 / 5, 5)),
+            deaths = LatentDelay(PoissonError(), fill(1 / 20, 20)),
+        )
+    )
+
+    # One series shared by both streams still reports per stream.
+    shared = observation_coverage(streams, fill(10, n), n)
+    @test shared.cases.n_unscored == 4
+    @test shared.deaths.n_unscored == 19
+
+    # A stream taking `(; y, N)` data is counted by its own contract, not
+    # unpacked as if `N` were another stream.
+    mixed = Split((cases = PoissonError(), positivity = BinomialError()))
+    cover = observation_coverage(
+        mixed,
+        (cases = fill(10, n), positivity = (y = fill(3, n), N = 50)),
+        n
+    )
+    @test cover.cases == (
+        n_observations = 40, lead_in = 0, n_scored = 40, n_unscored = 0,
+    )
+    @test cover.positivity == cover.cases
+end
+
+@testitem "forecast follows the fitted series length" tags = [:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(1068)
+
+    # A delay chain fitted with the documented idiom runs its infection series
+    # over `length(y) + lead_in` steps, so the forecast must be rebuilt from
+    # that length rather than from `length(y)`.
+    obs = LatentDelay(PoissonError(), fill(1 / 6, 6))
+    model = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal(1.0, 0.5)),
+        obs
+    )
+    y = fill(5, 20)
+    n = length(y) + observation_lead_in(model)
+    @test observation_coverage(model, y, n).n_unscored == 0
+
+    chain = sample(
+        as_turing_model(model, y, n), Prior(), 20; progress = false
+    )
+    h = 3
+
+    # Rebuilding at `length(y) + h` asks for a shorter latent stream than the
+    # chain holds; say so rather than failing on a dimension mismatch.
+    err = try
+        forecast(model, y, chain, h)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ErrorException
+    @test occursin("observation_lead_in", err.msg)
+
+    fc = forecast(model, y, chain, h; n = n)
+    @test size(fc, 1) == 20
+
+    # An `IDProblem` records the fitted length in its `tspan`, so it needs no
+    # keyword.
+    problem = IDProblem(
+        infection = model.infection, observation_model = obs, tspan = (1, n)
+    )
+    @test observation_coverage(problem, (; y_t = y)).n_unscored == 0
+    pchain = sample(
+        as_turing_model(problem, (; y_t = y)), Prior(), 20; progress = false
+    )
+    pfc = forecast(problem, y, pchain, h)
+    @test size(pfc, 1) == 20
+end
