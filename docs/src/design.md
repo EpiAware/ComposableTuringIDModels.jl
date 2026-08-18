@@ -235,6 +235,31 @@ Length-preserving modifiers ([`Ascertainment`](@ref), [`RightTruncate`](@ref),
 [`ReportTriangle`](@ref), a [`Split`](@ref)'s streams) add nothing of their own,
 so the lead-in comes from the delays alone.
 
+What counts as an observation follows the model that scores it, not the shape of
+the data.
+A [`BinomialError`](@ref) takes `(y = successes, N = trials)` and is counted by
+its `y` field, a [`ReportTriangle`](@ref) by the reference days of its triangle,
+and a [`Split`](@ref) one stream at a time.
+Only the per-time-point error families right-align, so only there does a
+non-zero `n_unscored` mean observations quietly dropped; a `ReportTriangle`
+asserts its reference days instead, and the report warns before the assertion
+fires.
+
+The extended series length then has to travel with the model.
+[`forecast`](@ref) rebuilds the model over the horizon, and defaults to the
+length of `y`, so a chain fitted with the lead-in added back needs the same `n`:
+
+```julia
+n = length(y) + observation_lead_in(model)
+chain = sample(as_turing_model(model, y, n), NUTS(), 1000)
+fc = forecast(model, y, chain, 14; n = n)
+```
+
+An [`IDProblem`](@ref) already records that length in its `tspan`, so
+`forecast(problem, y, chain, 14)` needs no keyword.
+Forecasting from the shorter default asks for a shorter latent stream than the
+chain holds, which `forecast` refuses.
+
 ## Infection↔observation mappings
 
 An infection model does not have to generate a single curve. Two components
