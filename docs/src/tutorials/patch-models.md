@@ -230,12 +230,19 @@ credible bands:
 using Turing: returned
 draws = vec(returned(posterior, chain))
 Rt_stack = cat((exp.(d.Z_t) for d in draws)...; dims = 3)
-Rt_med = dropdims(median(Rt_stack; dims = 3); dims = 3)
-Rt_lo = dropdims(mapslices(x -> quantile(x, 0.1), Rt_stack; dims = 3); dims = 3)
-Rt_hi = dropdims(mapslices(x -> quantile(x, 0.9), Rt_stack; dims = 3); dims = 3)
-(rmse = round(sqrt(mean((Rt_true .- Rt_med) .^ 2)); digits = 4),
-    coverage80 = round(
-        mean((Rt_true .>= Rt_lo) .& (Rt_true .<= Rt_hi)); digits = 3),
+
+# time × 3 credible bands (10%, 50%, 90%) from a time × draws matrix
+credible_bands(mat; qs = [0.1, 0.5, 0.9]) = reduce(hcat,
+    (map(row -> quantile(row, q), eachrow(mat)) for q in qs))
+
+# one band set per patch, stacked back into strata × time
+patch_bands = [credible_bands(Rt_stack[g, :, :]) for g in 1:n_strata]
+band_matrix(k) = permutedims(reduce(hcat, (b[:, k] for b in patch_bands)))
+Rt_lo, Rt_med, Rt_hi = band_matrix(1), band_matrix(2), band_matrix(3)
+
+rmse = sqrt(mean((Rt_true .- Rt_med) .^ 2))
+coverage80 = mean((Rt_true .>= Rt_lo) .& (Rt_true .<= Rt_hi))
+(rmse = round(rmse; digits = 4), coverage80 = round(coverage80; digits = 3),
     true_range = extrema(Rt_true), posterior_median_range = extrema(Rt_med))
 ```
 
@@ -256,9 +263,9 @@ end
 fig
 ```
 
-The posterior median tracks each patch's true `R_t` path closely, and the
-80% credible interval covers the truth in 76% of the 72 patch-day cells,
-close to the nominal rate.
+The posterior median tracks each patch's true `R_t` path closely.
+`coverage80` above is the fraction of the patch-day cells whose 80% credible
+interval contains the truth, computed rather than read off the figure.
 A coupled, partially pooled renewal process — `Stratify`, `Hierarchy`, and an
 off-diagonal `mixing` matrix composed together — is identifiable from data at
 this signal-to-noise level: the machinery in the sections above is not just
@@ -324,19 +331,18 @@ recovery = map((:α, :β, :γ)) do sym
     vn = only(filter(v -> string(v) == label, collect(keys(grav_chain))))
     post = vec(grav_chain[vn])
     true_val = only(vec(truth_chain[vn]))
+    q10, q90 = quantile(post, 0.1), quantile(post, 0.9)
     (parameter = sym, true_value = round(true_val; digits = 3),
         posterior_mean = round(mean(post); digits = 3),
-        q10 = round(quantile(post, 0.1); digits = 3),
-        q90 = round(quantile(post, 0.9); digits = 3))
+        q10 = round(q10; digits = 3), q90 = round(q90; digits = 3),
+        covered = q10 <= true_val <= q90)
 end
 recovery
 ```
 
-`γ`, the distance exponent, recovers well: the truth sits inside its 80%
-interval and close to the posterior mean.
-`β` is roughly captured too, if with a wide interval.
-`α` is not: the posterior mean overshoots the truth and the 80% interval
-misses it entirely.
+The `covered` column is the recovery verdict itself: it is `true` when the
+truth falls inside that exponent's 80% interval, so the table decides which
+exponents come back out rather than this paragraph asserting it.
 With only three patches there are only three off-diagonal entries of `K` to
 learn from, and `α` (destination population) and `β` (origin population)
 trade off against each other, and against `γ`, over that little data — the
