@@ -79,3 +79,30 @@ end
     @test_throws DomainError rand(SafeNegativeBinomial(Inf, 0.5))
     @test_throws DomainError rand(SafeNegativeBinomial(1.0, 0.0))
 end
+
+@testitem "quantile and mode reject non-finite parameters, not just rand" begin
+    using ComposableTuringIDModels, Distributions
+    # `_safe_int_floor` is not the only place a non-finite rate gets floored
+    # to an `Int`: `quantile` (both types) and `SafeNegativeBinomial`'s
+    # `mode` delegate to the wrapped `Distributions.Poisson` /
+    # `NegativeBinomial`, which floor internally without going through the
+    # guard at all. Before the fix these raised a bare `InexactError`
+    # instead of the same clear `DomainError`.
+    for λ in (Inf, NaN)
+        @test_throws DomainError quantile(SafePoisson(λ), 0.5)
+    end
+    for (r, p) in ((Inf, 0.5), (NaN, 0.5), (1.0, Inf), (1.0, NaN))
+        @test_throws DomainError quantile(SafeNegativeBinomial(r, p), 0.5)
+        @test_throws DomainError mode(SafeNegativeBinomial(r, p))
+    end
+    # None of these should ever surface the underlying InexactError.
+    for f in (d -> quantile(d, 0.5),)
+        threw_inexact = try
+            f(SafePoisson(Inf))
+            false
+        catch e
+            e isa InexactError
+        end
+        @test !threw_inexact
+    end
+end
