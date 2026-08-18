@@ -59,3 +59,48 @@ end
     @test any(startswith("rw_init"), names)
     @test any(contains("std"), names)
 end
+
+@testitem "latent components name their parameters generically" begin
+    using ComposableTuringIDModels, Distributions
+    using DynamicPPL: VarInfo, DebugUtils
+    # A parameter is named for what it is, not for the component that draws
+    # it, so the same quantity reads the same way whichever process supplies
+    # it and a component that appears twice is told apart by a prefix rather
+    # than by a longer name.
+    varnames(model, n) = Symbol.(
+        string.(
+            keys(
+                VarInfo(
+                    as_turing_model(model, n)
+                )
+            )
+        )
+    )
+
+    ar = varnames(AR(), 20)
+    @test :init ∈ ar
+    @test :damp ∈ ar
+    @test :ar_init ∉ ar
+    @test :damp_AR ∉ ar
+
+    @test :init ∈ varnames(RandomWalk(), 20)
+    @test :mean ∈ varnames(Hierarchy(), 3)
+
+    # Two processes that now share `init` are told apart by the prefix their
+    # composition already applies.
+    combined = varnames(CombineLatentModels([AR(), RandomWalk()]), 20)
+    @test Symbol("Combine.1.init") ∈ combined
+    @test Symbol("Combine.2.init") ∈ combined
+
+    # `DiffLatentModel` keeps `latent_init` rather than taking `init` too: it
+    # wraps a single inner model prefix-off, so a generic name there would
+    # land on the inner process's own `init` and the shipped
+    # `DiffLatentModel(model = AR())` would stop working out of the box.
+    diffed = varnames(DiffLatentModel(model = AR()), 20)
+    @test :latent_init ∈ diffed
+    @test :init ∈ diffed
+    @test DebugUtils.check_model(
+        as_turing_model(DiffLatentModel(model = AR()), 20);
+        error_on_failure = false
+    )
+end
