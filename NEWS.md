@@ -6,9 +6,12 @@ Changes are documented in Github releases.
     `(y = successes, N = trials)`, and any error model given a `y` field) no
     longer has its `missing` entries written back into the caller's array. A
     blank is now sampled as a tracked latent `y_t[i]` on every evaluation, as
-    it already was for a plain observation vector, so it appears in the chain
-    and can be forecast. The same applies to a `ReportTriangle` handed a
-    ready-built `ReportingTriangle`.
+    it already was for a plain observation vector, so it appears in the chain.
+    The same applies to a `ReportTriangle` handed a ready-built
+    `ReportingTriangle`. `forecast` still does not work with a
+    `BinomialError`-shaped `(y = …, N = …)` series: it reads the two fields as
+    two observation streams. That is a separate data-contract defect, tracked
+    in #273.
 
   - Infection models can now generate several strata at once. `Stratify` puts
     a stratum axis on a shared process (a partially pooled panel of

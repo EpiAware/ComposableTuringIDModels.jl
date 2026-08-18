@@ -53,6 +53,15 @@ struct ReportingTriangle{A <: AbstractMatrix, M <: AbstractMatrix{Bool}}
     Dmax::Int
 end
 
+# A `ReportingTriangle` keeps its counts in a struct field, which DynamicPPL
+# cannot see into, so narrow that field with the rest of the data — before the
+# triangle is stored on the model — rather than on every evaluation.
+function concrete_observations(y::ReportingTriangle)
+    counts = concrete_observations(y.counts)
+    counts === y.counts && return y
+    return ReportingTriangle(counts, y.observed, y.Dmax)
+end
+
 # Build the `t + d ≤ now` observation mask for an `n × (Dmax + 1)` triangle.
 function _triangle_mask(n::Int, Dmax::Int, now::Int)
     return BitMatrix([t + d <= now for t in 1:n, d in 0:Dmax])
@@ -183,7 +192,7 @@ using ComposableTuringIDModels, Distributions
 obs = ReportTriangle(PoissonError(), truncated(Normal(2.0, 1.0), 0.0, Inf))
 # Simulate a triangle for 15 reference days of expected total 50.
 sim = as_turing_model(obs, missing, fill(50.0, 15))()
-sim.observed
+sim.y_t.observed
 ```
 "
 @kwdef struct ReportTriangle{
@@ -307,7 +316,31 @@ function define_y_t(
     return define_y_t(obs_model, N, Y_t; now = now)
 end
 
-@model function as_turing_model(obs_model::ReportTriangle, y_t, Y_t)
+# The reporting triangle is assembled — and its count matrix narrowed — before
+# the model is built, not inside the model body. Everything the body needs is
+# then one of its own arguments: DynamicPPL owns any copying the count matrix
+# needs (it deepcopies an argument that still holds a `missing`), so a
+# ready-built `ReportingTriangle` handed in by a caller is never written to,
+# and no unpacking, narrowing or copying runs per evaluation. Doing any of it
+# in the body also puts a run-time type computation on the AD path, which
+# crashes Mooncake's compiler ("Unreachable reached") when the count matrix's
+# element type is not known at inference time.
+function as_turing_model(obs_model::ReportTriangle, y_t, Y_t)
+    tri = define_y_t(obs_model, y_t, Y_t)
+    n = length(Y_t)
+    @assert size(tri.observed, 1) == n "The triangle has $(size(tri.observed, 1)) reference days; Y_t has $n"
+    counts = concrete_observations(tri.counts)
+    return _report_triangle_model(
+        obs_model, counts, tri.observed, tri.Dmax, Y_t
+    )
+end
+
+# The scored half of `as_turing_model(::ReportTriangle, …)`. `y_t` is the bare
+# count matrix so that the tilde below scores `y_t[t, d + 1]` — a model
+# ARGUMENT — and DynamicPPL treats concrete cells as conditioned observations
+# (not latent variables to link) and `missing` ones as predictive draws to fill
+# in (widening/rebinding `y_t`).
+@model function _report_triangle_model(obs_model, y_t, observed, Dmax, Y_t)
     n = length(Y_t)
 
     # Draw the reporting-delay PMF from the delay submodel (the default
@@ -319,21 +352,6 @@ end
     priors ~ to_submodel(
         generate_observation_error_priors(obs_model.error_model, missing, Y_t), false
     )
-
-    # Build (or pass through) the reporting triangle, then read the mask before
-    # rebinding `y_t` to the bare count matrix. The tilde below scores `y_t[…]`
-    # directly — using the model *argument* name — so DynamicPPL treats concrete
-    # cells as conditioned observations (not latent variables to link) and a
-    # `missing` matrix as predictive draws to fill in (widening/rebinding `y_t`).
-    tri = define_y_t(obs_model, y_t, Y_t)
-    observed = tri.observed
-    Dmax = tri.Dmax
-    @assert size(observed, 1) == n "The triangle has $(size(observed, 1)) reference days; Y_t has $n"
-    # A `ReportingTriangle` handed in ready-built is not a model argument, so
-    # its count matrix is the caller's own: scoring a `missing` cell would
-    # write the draw into it (and read it back as data next evaluation).
-    # Detach it first; a matrix argument has already been copied by DynamicPPL.
-    y_t = y_t isa ReportingTriangle ? _detach_data(tri.counts) : tri.counts
 
     for t in 1:n, d in 0:Dmax
 

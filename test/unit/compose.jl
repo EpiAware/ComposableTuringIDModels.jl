@@ -19,6 +19,7 @@
 end
 
 @testitem "concrete_observations narrows or detaches missing data" begin
+    using ComposableTuringIDModels
     using ComposableTuringIDModels: concrete_observations, MissingObservations
 
     # Fully concrete data (no `missing` left) is narrowed to a concrete eltype.
@@ -71,6 +72,17 @@ end
     # unchanged: only vectors are split into a `MissingObservations` carrier.
     y_mat_gap = Matrix{Union{Missing, Int}}([1 2; missing 4])
     @test concrete_observations(y_mat_gap) === y_mat_gap
+
+    # A `ReportingTriangle` keeps its counts in a struct field, which
+    # DynamicPPL cannot see into, so they are narrowed here rather than inside
+    # the model body on every evaluation.
+    tri = ReportingTriangle(
+        Matrix{Union{Missing, Int}}([1 2; 3 4]), trues(2, 2), 1
+    )
+    narrowed_tri = concrete_observations(tri)
+    @test eltype(narrowed_tri.counts) === Int
+    @test narrowed_tri.observed === tri.observed
+    @test narrowed_tri.Dmax == tri.Dmax
 end
 
 @testitem "composed model: as_turing_model narrows y_t automatically" begin
