@@ -91,16 +91,33 @@ function as_turing_submodel(
     return product_distribution(v)
 end
 
-# A bare `Distribution` in a length-`n` PATH slot (an innovation or a latent
-# process) is wrapped in an `Intercept` so it is a well-defined CONSTANT path
-# (one shared draw broadcast to length `n`), not a scalar. A process, an
-# explicit `IID`/`Intercept`, or a vector passes through unchanged. Per-step
-# PARAMETER slots (damp, θ, std, …) keep the bare `Distribution` — a scalar
-# constant — and must NOT use this. Use `IID` for `n` independent draws.
-# (`Intercept` is defined later in the module; the reference resolves by late
-# binding when the wrapped path slot is first constructed.)
-_path_prior(p::Distribution) = Intercept(p)
-_path_prior(p) = p
+@doc raw"
+Widen a raw prior into a well-defined length-`n` PATH prior.
+
+A bare `Distribution` given to a length-`n` PATH slot (an innovation, or a
+latent process such as [`Hierarchy`](@ref)'s `across`) is wrapped in an
+[`Intercept`](@ref) so it is a **constant path** (one shared draw broadcast to
+length `n`), not a scalar. A process, an explicit [`IID`](@ref)/`Intercept`,
+or a vector passes through unchanged.
+
+A component author writing a new PATH-slot constructor calls this on the raw
+argument, exactly as [`AR`](@ref), [`MA`](@ref) and [`Hierarchy`](@ref) do for
+their innovation/across slots. **Per-step PARAMETER slots** (`damp`, `θ`,
+`std`, …) keep the bare `Distribution` — a scalar constant — and must **not**
+use this; use [`IID`](@ref) for `n` independent draws instead.
+
+# Examples
+```@example path_prior
+using ComposableTuringIDModels, Distributions
+ComposableTuringIDModels.path_prior(Normal()) isa Intercept
+```
+"
+path_prior(p::Distribution) = Intercept(p)
+path_prior(p) = p
+
+# Backwards-compatible alias: `_path_prior` was the private name before this
+# seam was made public (#173, #184). Same generic function under both names.
+const _path_prior = path_prior
 
 @doc raw"
 The types accepted in a prior / process slot: a raw `Distribution`, a vector of
@@ -194,27 +211,74 @@ Read a possibly-time-varying parameter at step `t`.
 
 A scalar (a constant parameter, drawn from a `Distribution` prior through the
 single [`as_turing_submodel`](@ref) seam) is returned unchanged at every step; a
-vector (a per-step path, drawn from a process prior) is indexed at `t`. A
-component's recursion writes `_at(ρ, t) * …` so the *same* code serves a constant
-and a time-varying parameter — the scalar branch is zero-cost (no per-step
-allocation).
+vector (a per-step path, drawn from a process prior) is indexed at `t`; a
+matrix (a strata × time parameter) is indexed at column `t`. A component's
+recursion writes `at(ρ, t) * …` so the *same* code serves a constant and a
+time-varying (or strata-varying) parameter — the scalar branch is zero-cost
+(no per-step allocation).
+
+This is the read side of the widening seam a custom component uses to make any
+per-step parameter optionally time-varying: draw the slot through
+[`as_turing_submodel`](@ref), then read it per step with `at`. See [Time-varying
+damping in an AR process](@ref tutorial-tvdamp) for the worked example.
+
+# Examples
+```@example at
+using ComposableTuringIDModels
+(ComposableTuringIDModels.at(0.5, 3), ComposableTuringIDModels.at([0.1, 0.2, 0.3], 2))
+```
 "
-_at(p::Number, t) = p
-_at(p::AbstractVector, t) = p[t]
+at(p::Number, t) = p
+at(p::AbstractVector, t) = p[t]
 # A strata × time parameter read at step `t` is that step's column.
-_at(p::AbstractMatrix, t) = view(p, :, t)
+at(p::AbstractMatrix, t) = view(p, :, t)
 
-# Order (p / q / d) implied by a prior: a vector fixes it to the vector length; a
-# single distribution or a richer prior model defaults to order 1.
-_prior_order(p::AbstractVector{<:Distribution}) = length(p)
-_prior_order(::Distribution) = 1
-_prior_order(::AbstractPriorModel) = 1
+# Backwards-compatible alias: `_at` was the private name before this seam was
+# made public (#173, #184). Same generic function under both names.
+const _at = at
 
-# Assert a vector prior's length matches the required order `k`. A single
-# distribution or a richer prior model broadcasts to `k` and imposes no
-# constraint.
-function _assert_prior_length(p::AbstractVector{<:Distribution}, k, what)
+@doc raw"
+The order (`p`/`q`/`d`) implied by a prior slot.
+
+A vector of `Distribution`s fixes the order to the vector length (one
+independent per-lag/per-element prior); a single `Distribution` or a richer
+prior model (an [`AbstractPriorModel`](@ref)) defaults to order 1. This is
+how [`AR`](@ref) and [`MA`](@ref) infer their order from `damp`/`θ` without a
+separate order argument; a component author defining a similar per-lag slot
+uses it the same way.
+
+# Examples
+```@example prior_order
+using ComposableTuringIDModels, Distributions
+(ComposableTuringIDModels.prior_order(Normal()),
+    ComposableTuringIDModels.prior_order([Normal(), Normal()]))
+```
+"
+prior_order(p::AbstractVector{<:Distribution}) = length(p)
+prior_order(::Distribution) = 1
+prior_order(::AbstractPriorModel) = 1
+
+const _prior_order = prior_order
+
+@doc raw"
+Assert that a vector-of-`Distribution`s prior has exactly `k` elements.
+
+Pairs with [`prior_order`](@ref): once a slot has fixed the order `k` (e.g.
+from `damp`), a second per-lag/per-element slot given as a vector (e.g.
+`init`) must match it. A single `Distribution` or a richer prior model
+broadcasts to `k` and imposes no constraint, so it always passes. `what` is a
+short description of the slot used in the assertion message.
+
+# Examples
+```@example assert_prior_length
+using ComposableTuringIDModels, Distributions
+ComposableTuringIDModels.assert_prior_length([Normal(), Normal()], 2, :damp)
+```
+"
+function assert_prior_length(p::AbstractVector{<:Distribution}, k, what)
     @assert length(p) == k "$what prior length $(length(p)) must equal $k"
     return nothing
 end
-_assert_prior_length(_, k, what) = nothing
+assert_prior_length(_, k, what) = nothing
+
+const _assert_prior_length = assert_prior_length
