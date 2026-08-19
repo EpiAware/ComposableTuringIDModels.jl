@@ -108,9 +108,8 @@ end
 # carry it directly, and an `UncertainDelay` fixes it with its horizon `D` and
 # bin width `Δd`, which is exactly why `D` is required.
 _delay_lead_in(pmf::AbstractVector{<:Real}) = length(pmf) - 1
-function _delay_lead_in(pmfs::AbstractVector{<:AbstractVector{<:Real}})
-    return length(first(pmfs)) - 1
-end
+_delay_lead_in(pmfs::AbstractVector{<:AbstractVector{<:Real}}) =
+    _delay_lead_in(first(pmfs))
 _delay_lead_in(u::UncertainDelay) = length(0.0:(u.Δd):(u.D - u.Δd)) - 1
 
 # Anything else is a delay component whose PMF length is not knowable before it
@@ -147,17 +146,15 @@ _observation_chain(model::AbstractObservationModel) = model
 # scores a single series. Follows the same structural path as
 # `observation_lead_in`, so a coverage report is keyed by the same streams and
 # each stream's data is counted by the model that actually scores it.
-_stream_models(model) = nothing
-function _stream_models(model::AbstractObservationModel)
-    inner = _wrapped_model(model)
-    return inner === nothing ? nothing : _stream_models(inner)
-end
+_stream_models(m::AbstractObservationModel) = _stream_models(_wrapped_model(m))
+
+# The walk reached the component that consumes the expected series without
+# meeting a `Split`, so there is one stream and nothing to key a report by.
+_stream_models(::Nothing) = nothing
 
 # A strata template is one model replicated across streams the data names, so
-# there are no per-stream models to key a report by.
-function _stream_models(model::Split)
-    return model.streams isa NamedTuple ? model.streams : nothing
-end
+# there are no per-stream models to key a report by either.
+_stream_models(m::Split) = m.streams isa NamedTuple ? m.streams : nothing
 
 @doc raw"
 How many of the supplied observations an observation chain actually scores, for
@@ -270,11 +267,12 @@ _stream(x, ::Symbol) = x
 # through the contract of the model that scores it. The data reaches the end of
 # the chain untouched — a modifier reshapes the expected series, not the
 # observations — so the walk descends to the component that consumes it.
-function _n_observations(model::AbstractObservationModel, y_t, n_expected)
-    inner = _wrapped_model(model)
-    inner === nothing && return _n_series_observations(y_t, n_expected)
-    return _n_observations(inner, y_t, n_expected)
-end
+_n_observations(model::AbstractObservationModel, y_t, n_expected) =
+    _n_observations(_wrapped_model(model), y_t, n_expected)
+
+# The end of the walk: the component that consumes the data reads it itself.
+_n_observations(::Nothing, y_t, n_expected) =
+    _n_series_observations(y_t, n_expected)
 
 _n_series_observations(y_t::AbstractVector, n_expected) = length(y_t)
 _n_series_observations(y_t::AbstractMatrix, n_expected) = size(y_t, 2)
@@ -283,16 +281,14 @@ _n_series_observations(::Missing, n_expected) = n_expected
 # A model needing more than the counts takes them in the `y` field of a
 # `NamedTuple` (see `define_y_t`); the other fields are known per-time-point
 # covariates — `BinomialError`'s number of trials — not observations.
-function _n_series_observations(y_t::NamedTuple, n_expected)
-    return _n_series_observations(y_t.y, n_expected)
-end
+_n_series_observations(y_t::NamedTuple, n_expected) =
+    _n_series_observations(y_t.y, n_expected)
 
 # A `ReportTriangle` scores the cells of a reference-day × delay matrix, so its
 # observations run down the ROWS: the delay columns are one reference day's
 # report split by delay, not further time points.
-function _n_observations(::ReportTriangle, y_t, n_expected)
-    return _n_triangle_observations(y_t, n_expected)
-end
+_n_observations(::ReportTriangle, y_t, n_expected) =
+    _n_triangle_observations(y_t, n_expected)
 
 _n_triangle_observations(y_t::ReportingTriangle, n_expected) = size(
     y_t.counts, 1
