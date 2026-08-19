@@ -171,11 +171,13 @@ What counts as an observation follows the model that scores it, not the shape of
 the data.
 A [`BinomialError`](@ref) takes `(y = successes, N = trials)` and is counted by
 its `y` field, a [`ReportTriangle`](@ref) by the reference days of its triangle,
-and a [`Split`](@ref) one stream at a time.
+an [`Aggregate`](@ref) by the reporting windows it closes rather than by the
+time points it is given, and a [`Split`](@ref) one stream at a time.
 Only the per-time-point error families right-align, so only there does a
-non-zero `n_unscored` mean observations quietly dropped; a `ReportTriangle`
-asserts its reference days instead, and the report warns before the assertion
-fires.
+non-zero `n_unscored` mean observations quietly dropped.
+A `ReportTriangle` asserts its reference days and an `Aggregate` sums over the
+windows its data length implies, so under either the report warns before a call
+that would fail.
 
 The extended series length then has to travel with the model.
 [`forecast`](@ref) rebuilds the model over the horizon, and defaults to the

@@ -25,8 +25,10 @@ Changes are documented in Github releases.
     `length(pmf) - 1` over the chain's delays by hand.
     `observation_coverage` reports how many of the supplied observations a
     given `n` actually scores, counting them through the contract of the model
-    that scores them: the `y` field of a `BinomialError`'s `(y, N)` data, and
-    the reference days of a `ReportTriangle`'s reporting triangle.
+    that scores them: the `y` field of a `BinomialError`'s `(y, N)` data, the
+    reference days of a `ReportTriangle`'s reporting triangle, and the
+    reporting windows of an `Aggregate` rather than the time points it is
+    given.
 
   - `forecast` takes the series length the fit used as `n`, so a model fitted
     with `n = length(y) + observation_lead_in(model)` forecasts from the same
