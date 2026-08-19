@@ -100,8 +100,9 @@ pinned the same way with `fix(prefixed, (gp = (σ = 0.2,),))`.
 Components that compose several children of the same kind prefix them
 already, so nothing needs adding there.
 [`CombineLatentModels`](@ref) names its components `Combine.1`, `Combine.2`
-and so on, [`ConcatLatentModels`](@ref) uses `Concat.1`, `Concat.2`, and
-[`Split`](@ref) prefixes each observation stream by its name.
+and so on, [`ConcatLatentModels`](@ref) uses `Concat.1`, `Concat.2`,
+[`DiffLatentModel`](@ref) namespaces the process it differences under `diff`,
+and [`Split`](@ref) prefixes each observation stream by its name.
 A Gaussian process reached through one of those never collides.
 
 ## The latent is folded into the infection model

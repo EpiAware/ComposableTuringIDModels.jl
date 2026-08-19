@@ -17,11 +17,21 @@ Changes are documented in Github releases.
     | `RandomWalk` | `rw_init` | `init` |
     | `Hierarchy` | `hierarchy_mean` | `mean` |
     | `ARStep` (field) | `damp_AR` | `damp` |
+    | `DiffLatentModel` | `latent_init` | `init` |
+    | `DiffLatentModel` (inner process) | `damp` | `diff.damp` |
+    | `DiffLatentModel` (inner process) | `init` | `diff.init` |
+    | `DiffLatentModel` (inner process) | `θ` | `diff.θ` |
+    | `DiffLatentModel` (inner process) | `std` | `diff.std` |
 
-    Unchanged, with reasons: `DiffLatentModel`'s `latent_init` would land on
-    the inner process's own `init` (`DiffLatentModel(model = AR())` fails
-    `check_model` under that rename); `arima`'s `ar_init` / `diff_init`
-    keyword arguments name two different init slots in one constructor;
+    `DiffLatentModel` composes two latent processes, so it now namespaces the
+    one it differences rather than lengthening its own name. `init` is the
+    differencing initial conditions and `diff.*` are parameters of the
+    differenced series. `arima` inherits this, so an ARIMA chain reads
+    `init`, `diff.init`, `diff.damp` and `diff.θ`. Pin an inner parameter
+    through the nested form, `fix(mdl, (diff = (damp = 0.1,),))`.
+
+    Unchanged, with reasons: `arima`'s `ar_init` / `diff_init` keyword
+    arguments name two different init slots in one constructor;
     `init_incidence`, `cluster_factor`, `import_rates` and `std` name the
     quantity rather than the component.
 
