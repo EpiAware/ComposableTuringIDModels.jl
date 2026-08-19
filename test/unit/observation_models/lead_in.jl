@@ -394,3 +394,29 @@ end
     pfc = forecast(problem, y, pchain, h)
     @test size(pfc, 1) == 20
 end
+
+@testitem "observation_coverage counts an Aggregate's windows" begin
+    using ComposableTuringIDModels, Distributions
+
+    n = 28
+    weekly = Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7])
+
+    # Only the day closing each week reaches the error model, so a full daily
+    # series carries four observations rather than 28.
+    @test observation_coverage(weekly, fill(10, n), n) ==
+        (n_observations = 4, lead_in = 0, n_scored = 4, n_unscored = 0)
+
+    # Simulating is sized from the expected series, in windows.
+    @test observation_coverage(weekly, missing, n).n_observations == 4
+
+    # A delay before the aggregation drops time points, and the windows are
+    # counted in what is left of the series.
+    delayed = LatentDelay(weekly, fill(1 / 8, 8))
+    @test observation_lead_in(delayed) == 7
+    @test observation_coverage(delayed, fill(10, n - 7), n) ==
+        (n_observations = 3, lead_in = 7, n_scored = 3, n_unscored = 0)
+
+    # An aggregation does not right-align either: a full-length series over
+    # the same chain is a call that fails, not one that drops its head.
+    @test observation_coverage(delayed, fill(10, n), n).n_unscored == 1
+end
