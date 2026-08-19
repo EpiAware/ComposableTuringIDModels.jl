@@ -136,10 +136,15 @@ end
     @test Symbol("diff.θ") ∈ arima_names
     @test checks(as_turing_model(arima(), n))
 
-    # A prefixed name is what `fix` has to be given; the old flat name is a
-    # silent no-op.
-    pinned = fix(as_turing_model(arima(), n), (var"diff.damp" = [0.1],))
+    # A prefixed name has to be pinned through the nested form. The flat
+    # spelling and the old name are both silent no-ops.
+    mdl = as_turing_model(arima(), n)
+    pinned = fix(mdl, (diff = (damp = 0.1,),))
     @test Symbol("diff.damp") ∉ varnames(pinned)
+    @test length(pinned()) == n
+    @test Symbol("diff.damp") ∈ varnames(fix(mdl, (var"diff.damp" = 0.1,)))
+    @test :init ∉ varnames(fix(mdl, (init = [0.0],)))
+    @test varnames(fix(mdl, (latent_init = [0.0],))) == varnames(mdl)
 
     # Composed under a `Renewal` with an error model the names survive.
     for inner in (AR(), RandomWalk(), HierarchicalNormal())

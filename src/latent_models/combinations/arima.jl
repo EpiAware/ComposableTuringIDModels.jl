@@ -12,11 +12,20 @@ Build an ARIMA(p, d, q) latent process: an [`arma`](@ref) wrapped in a
   - `θ`: prior(s) for the MA coefficients.
   - `ϵ_t`: the innovation model (default [`HierarchicalNormal`](@ref)).
 
+The differencing is the outer layer, so the ARMA parameters are namespaced
+under `diff` (`diff.damp`, `diff.θ`, `diff.init`) and the bare `init` is the
+differencing initial conditions. See [`DiffLatentModel`](@ref).
+
 # Examples
 ```@example arima
 using ComposableTuringIDModels, Distributions
 model = arima()
 rand(as_turing_model(model, 10))
+```
+
+```@example arima
+using DynamicPPL: VarInfo
+keys(VarInfo(as_turing_model(model, 10)))
 ```
 "
 function arima(;
