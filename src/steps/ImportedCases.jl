@@ -158,7 +158,7 @@ end
 modifier_init_state(::ImportedRate, window) = 0
 
 function apply_modifier(mod::ImportedRate, incidence, t)
-    return incidence + _at(mod.rate, t + 1), t + 1
+    return incidence + at(mod.rate, t + 1), t + 1
 end
 
 @doc raw"

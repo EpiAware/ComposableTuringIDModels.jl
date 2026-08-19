@@ -74,8 +74,8 @@ struct AR{
 
     function AR(damp, init, p::Int, ϵ_t, transform)
         @assert p > 0 "p must be greater than 0"
-        _assert_prior_length(damp, p, "damp")
-        _assert_prior_length(init, p, "init")
+        assert_prior_length(damp, p, "damp")
+        assert_prior_length(init, p, "init")
         return new{
             typeof(damp), typeof(init), typeof(p), typeof(ϵ_t),
             typeof(transform),
@@ -99,9 +99,9 @@ function AR(;
     # slot needs `p` values, so a bare `Distribution` is sized to a length-`p`
     # vector (one i.i.d. draw per lag); an explicit vector must already be length
     # `p`, and a process supplies its own length.
-    p = _prior_order(damp)
+    p = prior_order(damp)
     init = (p > 1 && init isa Distribution) ? fill(init, p) : init
-    return AR(damp, init, p, _path_prior(ϵ_t), transform)
+    return AR(damp, init, p, path_prior(ϵ_t), transform)
 end
 
 @model function as_turing_model(model::AR, n::Int)
@@ -111,7 +111,7 @@ end
     if p == 1
         # Order 1: draw the coefficient through the single seam. A `Distribution`
         # gives a scalar (constant, no length-`n` allocation); a process gives a
-        # length-`(n-1)` path. `TVARStep` reads it per step with `_at`, so one
+        # length-`(n-1)` path. `TVARStep` reads it per step with `at`, so one
         # recursion serves both.
         damp_AR ~ as_turing_submodel(
             _order1_prior(model.damp), n - 1;

@@ -7,7 +7,7 @@ Changes are documented in Github releases.
     `at`, `path_prior`, `prior_order`, `assert_prior_length`. The previous
     private names (`_at`, `_path_prior`, `_prior_order`,
     `_assert_prior_length`) still work as aliases of the same functions, so
-    this is non-breaking. Addresses #173 and #184.
+    this is non-breaking.
 
   - Infection models can now generate several strata at once. `Stratify` puts
     a stratum axis on a shared process (a partially pooled panel of

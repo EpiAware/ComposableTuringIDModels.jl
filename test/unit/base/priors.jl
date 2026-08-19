@@ -248,8 +248,7 @@ end
     @test_throws AssertionError ComposableTuringIDModels.assert_prior_length(
         [Normal(), Normal()], 3, :damp
     )
-    # The previously-private underscore names are the same functions, kept
-    # working for anything already calling them.
+    # The underscore aliases resolve to the same functions.
     @test ComposableTuringIDModels._at === ComposableTuringIDModels.at
     @test ComposableTuringIDModels._path_prior === ComposableTuringIDModels.path_prior
     @test ComposableTuringIDModels._prior_order === ComposableTuringIDModels.prior_order

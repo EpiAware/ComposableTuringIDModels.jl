@@ -115,8 +115,7 @@ ComposableTuringIDModels.path_prior(Normal()) isa Intercept
 path_prior(p::Distribution) = Intercept(p)
 path_prior(p) = p
 
-# Backwards-compatible alias: `_path_prior` was the private name before this
-# seam was made public (#173, #184). Same generic function under both names.
+# Deprecated alias for `path_prior`; the same generic function.
 const _path_prior = path_prior
 
 @doc raw"
@@ -199,7 +198,7 @@ end
 # The single seam above draws a parameter slot as EITHER a scalar (a bare
 # `Distribution` ⇒ one RV, a constant, no length-`n` allocation) OR a length-`n`
 # path (an `AbstractPriorModel` process ⇒ the process's own draw). A component
-# reads the result per step with `_at`, so ONE recursion serves both the constant
+# reads the result per step with `at`, so ONE recursion serves both the constant
 # and the time-varying (or hierarchical) case with no per-component special-casing
 # and no efficiency loss when the parameter is constant. This is general: any
 # per-step parameter is widened to optionally-time-varying just by drawing its slot
@@ -233,8 +232,7 @@ at(p::AbstractVector, t) = p[t]
 # A strata × time parameter read at step `t` is that step's column.
 at(p::AbstractMatrix, t) = view(p, :, t)
 
-# Backwards-compatible alias: `_at` was the private name before this seam was
-# made public (#173, #184). Same generic function under both names.
+# Deprecated alias for `at`; the same generic function.
 const _at = at
 
 @doc raw"
@@ -266,8 +264,7 @@ Assert that a vector-of-`Distribution`s prior has exactly `k` elements.
 Pairs with [`prior_order`](@ref): once a slot has fixed the order `k` (e.g.
 from `damp`), a second per-lag/per-element slot given as a vector (e.g.
 `init`) must match it. A single `Distribution` or a richer prior model
-broadcasts to `k` and imposes no constraint, so it always passes. `what` is a
-short description of the slot used in the assertion message.
+broadcasts to `k` and imposes no constraint, so it always passes.
 
 # Arguments
 

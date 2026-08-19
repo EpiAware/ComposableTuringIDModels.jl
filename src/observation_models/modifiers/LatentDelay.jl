@@ -257,7 +257,7 @@ keeps every pmf the same length.
     # Draw each parameter through the seam: a `Distribution` gives a scalar
     # (constant), a process gives a length-`n` path. Each parameter's submodel is
     # drawn under its own explicit prefix (the `Split` idiom) so a single `~` LHS
-    # holds the return, collected into a plain local vector; `_at` reads each per
+    # holds the return, collected into a plain local vector; `at` reads each per
     # time point. `as_turing_model(prior, n)` is used directly (not the seam's
     # scalar short-circuit) so a constant parameter is a prefixable submodel too.
     params = Vector{Any}(undef, np)
@@ -268,7 +268,7 @@ keeps every pmf the same length.
         params[i] = drawn
     end
     # Freeze into a `Tuple`: a `Vector{Any}` keeps every element boxed, so the
-    # draws reach `_at` as `Base.RefValue`s it cannot index. A tuple fixes the
+    # draws reach `at` as `Base.RefValue`s it cannot index. A tuple fixes the
     # element types to concrete `Number`/`Vector`.
     params_t = Tuple(params)
     return map(1:n) do t
@@ -283,7 +283,7 @@ end
 # Read every drawn parameter at time `t`, one static tuple position at a time.
 _at_all(::Tuple{}, t) = ()
 function _at_all(params::Tuple, t)
-    return (_at(first(params), t), _at_all(Base.tail(params), t)...)
+    return (at(first(params), t), _at_all(Base.tail(params), t)...)
 end
 
 # Whether a `delay` field yields per-time kernels (time-varying) or a single
