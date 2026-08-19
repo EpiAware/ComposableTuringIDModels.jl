@@ -53,6 +53,19 @@ end
     y_bare = Vector{Missing}(missing, 3)
     @test concrete_observations(y_bare) === y_bare
 
+    # An element type a carrier cannot be built from — abstract, or not a
+    # `Number`, so there is no `zero` to place behind the mask — is copied
+    # instead. The copy is what the tilde sugar writes into, so the caller's
+    # array is still out of reach, which is the guarantee this branch exists
+    # for. Such data is not narrowed and its blanks are not tracked latents.
+    y_abstract = Vector{Union{Missing, Real}}([1, missing, 3.0])
+    copied = concrete_observations(y_abstract)
+    @test copied !== y_abstract
+    @test isequal(copied, y_abstract)
+    @test !(copied isa MissingObservations)
+    copied[2] = 99
+    @test ismissing(y_abstract[2])
+
     # A `NamedTuple` of data streams (e.g. `BinomialError`'s `(y, N)`, or a
     # `Split` observation's per-stream series) is narrowed field-wise.
     nt = (y = Vector{Union{Missing, Int}}([4, 5]), N = [10, 10])

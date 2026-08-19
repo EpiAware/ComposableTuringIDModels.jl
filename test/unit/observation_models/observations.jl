@@ -158,6 +158,24 @@ end
     )
     @test isequal(yw, yw_before)
     @test length(unique(vec(chw[@varname(y_t[3])]))) > 1
+
+    # Reached through a composed `IDModel` the data takes the other route into
+    # the same helper: `concrete_observations` narrows the NamedTuple
+    # field-wise when the model is built, so the series arrives already a
+    # carrier. The guarantee has to hold on that path too.
+    yc = Vector{Union{Missing, Int}}([10, 25, missing])
+    yc_before = copy(yc)
+    composed = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+        BinomialError()
+    )
+    chc = sample(
+        as_turing_model(composed, (y = yc, N = trials), 3), Prior(), 20;
+        progress = false
+    )
+    @test isequal(yc, yc_before)
+    @test length(unique(vec(chc[@varname(y_t[3])]))) > 1
+    @test !haskey(chc, @varname(y_t[1]))
 end
 
 @testitem "define_y_t unpacks counts for vector or NamedTuple data" begin
