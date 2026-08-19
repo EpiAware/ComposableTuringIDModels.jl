@@ -206,22 +206,11 @@ end
 @testitem "every latent × error-model pairing keeps its names apart" begin
     using ComposableTuringIDModels, Distributions
     using DynamicPPL: DebugUtils
-    # A name clash between two components is invisible until they are
-    # composed: each is fine alone, and the composed model only warns that one
-    # assignment overwrote another. Sweeping the latent processes against the
-    # error families is the cheap net for that whole class.
-    #
-    # Components name their parameters for what they are, not for who owns
-    # them, and a latent process composes into its host prefix-off. So two
-    # components CAN reach for the same name, and the fix is a prefix applied
-    # where the conflict happens rather than a longer name everywhere. Both
-    # Gaussian processes sample a marginal standard deviation `σ`, and so does
-    # `NormalError`: those two pairings are the conflict, and the sweep pins
-    # both halves of the contract — where it collides, and that a
-    # `PrefixLatentModel` fixes it.
-    #
-    # `BinomialError` is left out: it needs a trials series in the data rather
-    # than the plain vector used here, and it draws no parameters of its own.
+    # A clash is invisible until two components are composed, so sweep the
+    # pairings. Only the Gaussian processes collide with `NormalError`, on
+    # `σ`; the sweep pins that and that a `PrefixLatentModel` fixes it.
+    # `BinomialError` is left out: it needs a trials series rather than the
+    # plain vector used here, and draws no parameters of its own.
     latents = (
         RandomWalk(), AR(), MA(), IID(Normal()), Intercept(Normal()),
         HierarchicalNormal(), HilbertSpaceGP(; m = 5), ExactGP(),
