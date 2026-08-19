@@ -92,15 +92,68 @@ end
     @test Symbol("Combine.1.init") ∈ combined
     @test Symbol("Combine.2.init") ∈ combined
 
-    # `DiffLatentModel` keeps `latent_init` rather than taking `init` too: it
-    # wraps a single inner model prefix-off, so a generic name there would
-    # land on the inner process's own `init` and the shipped
-    # `DiffLatentModel(model = AR())` would stop working out of the box.
+    # `DiffLatentModel` composes two children, so it namespaces the inner
+    # process under `diff` and keeps the generic `init` for its own
+    # integration constants.
     diffed = varnames(DiffLatentModel(model = AR()), 20)
-    @test :latent_init ∈ diffed
     @test :init ∈ diffed
+    @test Symbol("diff.init") ∈ diffed
+    @test Symbol("diff.damp") ∈ diffed
+    @test :latent_init ∉ diffed
     @test DebugUtils.check_model(
         as_turing_model(DiffLatentModel(model = AR()), 20);
         error_on_failure = false
     )
+end
+
+@testitem "DiffLatentModel namespaces its inner process under `diff`" begin
+    using ComposableTuringIDModels, Distributions
+    using DynamicPPL: VarInfo, DebugUtils, fix
+    # The bare names belong to `DiffLatentModel` itself and the prefixed ones
+    # to the process it differences, so an inner parameter reads as a
+    # parameter of the differenced series.
+    varnames(mdl) = Symbol.(string.(keys(VarInfo(mdl))))
+    checks(mdl) = DebugUtils.check_model(mdl; error_on_failure = false)
+
+    n = 20
+    inits = [Normal(), Normal()]
+    for inner in (AR(), RandomWalk(), HierarchicalNormal())
+        mdl = as_turing_model(
+            DiffLatentModel(; model = inner, init = inits), n
+        )
+        names = varnames(mdl)
+        @test :init ∈ names
+        @test :latent_init ∉ names
+        @test any(startswith("diff."), string.(names))
+        @test checks(mdl)
+    end
+
+    # `arima` inherits the namespacing rather than adding one of its own.
+    arima_names = varnames(as_turing_model(arima(), n))
+    @test :init ∈ arima_names
+    @test Symbol("diff.init") ∈ arima_names
+    @test Symbol("diff.damp") ∈ arima_names
+    @test Symbol("diff.θ") ∈ arima_names
+    @test checks(as_turing_model(arima(), n))
+
+    # A prefixed name is what `fix` has to be given; the old flat name is a
+    # silent no-op.
+    pinned = fix(as_turing_model(arima(), n), (var"diff.damp" = [0.1],))
+    @test Symbol("diff.damp") ∉ varnames(pinned)
+
+    # Composed under a `Renewal` with an error model the names survive.
+    for inner in (AR(), RandomWalk(), HierarchicalNormal())
+        latent = DiffLatentModel(; model = inner, init = inits)
+        renewal = Renewal(;
+            generation_time = [0.3, 0.4, 0.3], rt = latent,
+            initialisation = Normal()
+        )
+        for error_model in (PoissonError(), NegativeBinomialError())
+            @test checks(
+                as_turing_model(
+                    IDModel(renewal, error_model), fill(10.0, n), n
+                )
+            )
+        end
+    end
 end
