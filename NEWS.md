@@ -9,7 +9,7 @@ Changes are documented in Github releases.
     `check_model` fails and `sample` refuses to run. The fix is a prefix where
     the conflict is, through `PrefixLatentModel` or `PrefixObservationModel`,
     and both now have a documented home in the composable-design page along
-    with the Gaussian-process docstrings (issue #268). No parameter is renamed.
+    with the Gaussian-process docstrings. No parameter is renamed.
 
   - Infection models can now generate several strata at once. `Stratify` puts
     a stratum axis on a shared process (a partially pooled panel of

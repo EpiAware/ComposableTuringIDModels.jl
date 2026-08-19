@@ -350,7 +350,7 @@ end
     #
     # The names stay generic and the user prefixes where the conflict is. This
     # pins both halves of that contract, because the failure is only useful if
-    # the documented fix really works (issue #268).
+    # the documented fix really works.
     for gp in (HilbertSpaceGP(; m = 5), ExactGP())
         composed(rt) = as_turing_model(
             IDModel(
