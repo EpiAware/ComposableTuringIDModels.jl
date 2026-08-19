@@ -17,7 +17,7 @@ end
 
 @testitem "_discretised_pmf takes D from a truncated distribution's support" begin
     using ComposableTuringIDModels, Distributions
-    # Issue #265: when `D` is not supplied, a finite `maximum(dist)` (e.g. a
+    # When `D` is not supplied, a finite `maximum(dist)` (e.g. a
     # caller-truncated distribution) should set the horizon directly rather
     # than being re-derived from a quantile, which silently shortens the PMF.
     gen = Gamma(1.5625, 1.92) + 1.0 # mean 3, sd 2.4, shifted

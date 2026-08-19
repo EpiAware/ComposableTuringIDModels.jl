@@ -6,19 +6,13 @@
 # censoring of width `Δd`. Evaluating its `pdf` on the bin left-edges
 # `0, Δd, …, D-Δd` and normalising gives the discrete PMF the models consume.
 # When `D` is `nothing`, a distribution with finite support (e.g. one the
-# caller has already `truncated`) uses that bound directly as the horizon —
-# it already says where the mass ends, so re-deriving a horizon from a
-# quantile would silently produce a shorter PMF than the caller's own
-# truncation implies. That bound is rounded *up* to the nearest multiple of
-# `Δd`: the downstream bins `0, Δd, …, D-Δd` must land exactly on `D`, and
-# every consumer (`LatentDelay`, `RightTruncate`, `ReportTriangle`,
-# `Renewal`) treats the PMF as covering `[0, D)` in whole `Δd`-wide steps.
-# Rounding down would silently discard the slice of the caller's own support
-# between the rounded point and the true bound; rounding up only widens the
-# final bin into a region where the distribution's density is already zero
-# (nothing past `maximum(dist)` has mass), so no mass is fabricated or lost.
-# An unbounded distribution falls back to the `upper`th quantile rounded to a
-# multiple of `Δd`, unchanged from before.
+# caller has already `truncated`) sets the horizon from that bound, which
+# already says where the mass ends; a quantile would give a shorter PMF than
+# the caller's own truncation implies. The bound rounds *up* to a multiple of
+# `Δd` because every consumer treats the PMF as covering `[0, D)` in whole
+# `Δd`-wide bins: rounding down would drop the support between the rounded
+# point and the true bound, while rounding up only widens the last bin into a
+# region with no mass. An unbounded distribution uses the `upper`th quantile.
 function _discretised_pmf(dist::Distribution; Δd = 1.0, D = nothing, upper = 0.99)
     @assert minimum(dist) >= 0.0 "Distribution must be non-negative."
     @assert Δd > 0.0 "Δd must be positive."

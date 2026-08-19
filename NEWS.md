@@ -19,7 +19,9 @@ Changes are documented in Github releases.
     `D` now takes the horizon from the distribution's own support when it is
     finite (e.g. a distribution the caller has already `truncated`), instead
     of silently re-deriving a shorter horizon from a quantile. `LatentDelay`,
-    `UncertainDelay`, `ReportingCDF`, `ReportingPMF` and `Renewal`'s
-    generation-interval slot all pick this up automatically; a caller can now
-    express "use this distribution's own bound" by truncating the
-    distribution, without a separate `D` keyword.
+    `ReportingCDF`, `ReportingPMF`, `RightTruncate`, `ReportTriangle` and
+    `Renewal`'s generation-interval slot all pick this up automatically; a
+    caller can now express "use this distribution's own bound" by truncating
+    the distribution, without a separate `D` keyword. `UncertainDelay` is the
+    exception: it requires a fixed `D` so its PMF length stays constant across
+    draws, so it is unaffected.

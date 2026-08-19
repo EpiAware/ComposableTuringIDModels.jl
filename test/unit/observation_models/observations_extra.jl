@@ -476,9 +476,9 @@ end
 
 @testitem "LatentDelay takes D from a truncated distribution's own support" begin
     using ComposableTuringIDModels, Distributions
-    # Issue #265: a caller who has already truncated the delay distribution
-    # (finite support) should not need to repeat the horizon as a separate
-    # `D` keyword — the truncation bound is used directly.
+    # A caller who has already truncated the delay distribution (finite
+    # support) should not need to repeat the horizon as a separate `D`
+    # keyword — the truncation bound is used directly.
     dist = truncated(Normal(5.0, 2.0), 0.0, 15.0)
     bounded = LatentDelay(NegativeBinomialError(), dist)
     explicitD = LatentDelay(NegativeBinomialError(), dist; D = 15.0)
