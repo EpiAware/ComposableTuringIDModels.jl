@@ -32,10 +32,15 @@ Changes are documented in Github releases.
 
   - `forecast` takes the series length the fit used as `n`, so a model fitted
     with `n = length(y) + observation_lead_in(model)` forecasts from the same
-    length rather than being rebuilt at `length(y) + horizon`. An `IDProblem`
-    reads it from its `tspan`, which is a behaviour change for a problem whose
-    span was longer than its data. A chain fitted over a longer series than the
-    horizon model covers is now an error rather than a silent misalignment.
+    length rather than being rebuilt at `length(y) + horizon`. A chain fitted
+    over a longer series than the horizon model covers is now an error rather
+    than a silent misalignment.
+
+    **Breaking**: `forecast(::IDProblem, ...)` now takes that length from the
+    problem's `tspan` rather than from the length of `y`. The two differ
+    exactly when the span was set to cover an observation chain's lead-in, and
+    for such a problem the forecast is now made at a different length than
+    before. Pass `n` explicitly to keep the old behaviour.
 
   - Infection models can now generate several strata at once. `Stratify` puts
     a stratum axis on a shared process (a partially pooled panel of
