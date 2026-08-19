@@ -191,16 +191,21 @@ it, on the time axis:
     `(y = successes, N = trials)` has `length(y)` observations, not two;
   - a [`ReportTriangle`](@ref) is counted down the reference days of its
     reference-day × delay matrix, not across its delay columns;
+  - under an [`Aggregate`](@ref) the whole report moves onto the reporting
+    window axis, because the time points its presence mask leaves out never
+    reach the error model: a daily series under weekly reporting carries one
+    observation per week, not one per day;
   - a `missing` is simulated at whatever length the chain produces, so it is
     scored in full.
 
-## Reporting triangles do not right-align
+## Where a non-zero `n_unscored` means a failure instead
 
 Only the per-time-point error families right-align, so only there does a
 non-zero `n_unscored` mean observations quietly dropped from the head.
 [`ReportTriangle`](@ref) instead asserts that its triangle has exactly
-`n - lead_in` reference days, so a non-zero `n_unscored` there is a call that
-will *fail*, and the report says so before it does.
+`n - lead_in` reference days, and an [`Aggregate`](@ref) sums the expected
+series over the windows its own data length implies, so a non-zero `n_unscored`
+under either is a call that will *fail*, and the report says so before it does.
 
 ## Forecasting
 
@@ -249,7 +254,7 @@ end
 
 # One chain, one series: the last `n - lead_in` observations are scored.
 function _series_coverage(model, lead_in::Int, y_t, n_time::Int)
-    n_expected = max(n_time - lead_in, 0)
+    n_expected = _n_expected_values(model, max(n_time - lead_in, 0))
     n_observations = _n_observations(model, y_t, n_expected)
     n_scored = min(n_observations, n_expected)
     return (;
@@ -262,6 +267,21 @@ end
 # common lead-in, or one series reaching every stream) passes through unchanged.
 _stream(x::NamedTuple, k::Symbol) = x[k]
 _stream(x, ::Symbol) = x
+
+# The number of expected values the error model is handed, once the chain's
+# lead-in has come off the series. That is one per time point everywhere except
+# an `Aggregate`, which sums the series into reporting windows and hands on one
+# value per window.
+_n_expected_values(model::AbstractObservationModel, n) =
+    _n_expected_values(_wrapped_model(model), n)
+_n_expected_values(::Nothing, n) = n
+_n_expected_values(model::Aggregate, n) =
+    _n_expected_values(model.model, count(_present_mask(model, n)))
+
+# The presence mask an `Aggregate` applies over `n` time points, broadcast by
+# the same rule the model itself uses so the two agree on which points report.
+_present_mask(ag::Aggregate, n) =
+    broadcast_rule(RepeatEach(), ag.present, n, length(ag.present))
 
 # The number of observations a data argument carries on the time axis, read
 # through the contract of the model that scores it. The data reaches the end of
@@ -283,6 +303,20 @@ _n_series_observations(::Missing, n_expected) = n_expected
 # covariates — `BinomialError`'s number of trials — not observations.
 _n_series_observations(y_t::NamedTuple, n_expected) =
     _n_series_observations(y_t.y, n_expected)
+
+# An `Aggregate` scores one observation per reporting window: the time points
+# its presence mask leaves out never reach the error model. The data moves onto
+# the window axis here, exactly as the model moves it, so the component that
+# consumes it counts what it actually scores.
+_n_observations(model::Aggregate, y_t, n_expected) =
+    _n_observations(model.model, _aggregate_data(model, y_t), n_expected)
+
+_aggregate_data(ag::Aggregate, y_t::AbstractVector) =
+    y_t[_present_mask(ag, length(y_t))]
+# `missing` (simulating) and any other carrier are left as they are: the
+# component that consumes the data counts them on its own terms, and the
+# expected count they are compared against is already in windows.
+_aggregate_data(::Aggregate, y_t) = y_t
 
 # A `ReportTriangle` scores the cells of a reference-day × delay matrix, so its
 # observations run down the ROWS: the delay columns are one reference day's
