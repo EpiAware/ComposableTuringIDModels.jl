@@ -105,4 +105,13 @@ end
         end
         @test !threw_inexact
     end
+    # The guard must be transparent for finite parameters: each guarded entry
+    # point still delegates to the wrapped distribution and returns its value.
+    for q in (0.1, 0.5, 0.9)
+        @test quantile(SafePoisson(4.0), q) == quantile(Poisson(4.0), q)
+        @test quantile(SafeNegativeBinomial(3.0, 0.4), q) ==
+            quantile(NegativeBinomial(3.0, 0.4), q)
+    end
+    @test mode(SafeNegativeBinomial(3.0, 0.4)) ==
+        mode(NegativeBinomial(3.0, 0.4))
 end
