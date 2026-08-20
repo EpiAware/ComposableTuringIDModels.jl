@@ -291,6 +291,30 @@ end
     @test all(x -> x isa Integer && x ≥ 0, vec(fc[@varname(y_t[T + 1])]))
 end
 
+@testitem "forecast's factorisation probe fails clearly on an explosive prior" tags = [
+    :sample,
+] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(2024)
+    # An un-damped `DiffLatentModel(RandomWalk())` on `log R_t` is
+    # prior-explosive: incidence can reach `Inf` on some prior draws, and
+    # `forecast`'s `_assert_factorised` probe samples the whole model,
+    # observation included. A non-finite rate reaching `SafePoisson` must
+    # raise a `DomainError` naming the value, not an `InexactError` from
+    # deep inside the sampler.
+    diffrt = DiffLatentModel(model = RandomWalk(), init = [Normal(0.0, 0.2)])
+    ren = Renewal(
+        generation_time = Gamma(6.5, 0.62); rt = diffrt,
+        initialisation = Normal(log(1.0), 0.1)
+    )
+    model = IDModel(ren, PoissonError())
+    y = fill(5, 20)
+    chain = sample(
+        as_turing_model(model, y, length(y)), Prior(), 12; progress = false
+    )
+    @test_throws DomainError forecast(model, y, chain, 6)
+end
+
 @testitem "generated_observables leaves non-chain solutions missing" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(76)

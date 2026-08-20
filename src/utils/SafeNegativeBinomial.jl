@@ -46,13 +46,21 @@ Distributions.var(d::SafeNegativeBinomial) = _negbin(d) |> var
 Distributions.std(d::SafeNegativeBinomial) = _negbin(d) |> std
 Distributions.skewness(d::SafeNegativeBinomial) = _negbin(d) |> skewness
 Distributions.kurtosis(d::SafeNegativeBinomial) = _negbin(d) |> kurtosis
-Distributions.mode(d::SafeNegativeBinomial) = _negbin(d) |> mode
+function Distributions.mode(d::SafeNegativeBinomial)
+    _require_finite_for_int(d.r, "mode(::SafeNegativeBinomial, ...)")
+    _require_finite_for_int(d.p, "mode(::SafeNegativeBinomial, ...)")
+    return _negbin(d) |> mode
+end
 Distributions.logpdf(d::SafeNegativeBinomial, k::Real) = logpdf(_negbin(d), k)
 Distributions.cdf(d::SafeNegativeBinomial, x::Real) = cdf(_negbin(d), x)
 Distributions.ccdf(d::SafeNegativeBinomial, x::Real) = ccdf(_negbin(d), x)
 Distributions.logcdf(d::SafeNegativeBinomial, x::Real) = logcdf(_negbin(d), x)
 Distributions.logccdf(d::SafeNegativeBinomial, x::Real) = logccdf(_negbin(d), x)
-Distributions.quantile(d::SafeNegativeBinomial, q::Real) = quantile(_negbin(d), q)
+function Distributions.quantile(d::SafeNegativeBinomial, q::Real)
+    _require_finite_for_int(d.r, "quantile(::SafeNegativeBinomial, ...)")
+    _require_finite_for_int(d.p, "quantile(::SafeNegativeBinomial, ...)")
+    return quantile(_negbin(d), q)
+end
 
 function Base.rand(rng::AbstractRNG, d::SafeNegativeBinomial)
     if isone(d.p)
