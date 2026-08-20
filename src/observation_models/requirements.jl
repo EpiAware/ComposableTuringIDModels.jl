@@ -481,12 +481,29 @@ end
 # by exactly the chain's lead-in is the pre-0.2.0 idiom, where `n` was the
 # infection series length and the caller added the lead-in by hand; say so
 # rather than fitting a longer series than the caller means.
+#
+# This walks the chain rather than building a `DataRequirements`: an
+# `IDProblem`'s model body reassembles its `IDModel` on every evaluation, so
+# the check runs per evaluation and must not allocate.
 function _check_observation_count(model, y_t, n::ModelShape)
-    req = data_requirements(model, y_t, n)
-    data_fits(req) && return nothing
-    bad = first(Iterators.filter(!_stream_fits, req.streams))
-    shortfall = bad.n_required - bad.n_supplied
-    hint = shortfall == bad.lead_in && bad.lead_in > 0 ?
+    chain = _observation_chain(model)
+    lead_in = observation_lead_in(chain)
+    streams = _stream_models(chain)
+    n_time = _n_time(n)
+    streams === nothing &&
+        return _check_stream(:y_t, chain, lead_in, y_t, n_time)
+    for k in keys(streams)
+        _check_stream(
+            k, streams[k], _stream(lead_in, k), _stream(y_t, k), n_time
+        )
+    end
+    return nothing
+end
+
+function _check_stream(name::Symbol, model, lead_in::Int, y_t, n::Int)
+    supplied = _n_supplied(_data_contract(_consumer(model)).shape, y_t)
+    (supplied === nothing || supplied == n) && return nothing
+    hint = n - supplied == lead_in && lead_in > 0 ?
         " `n` is the number of observations, not the length of the infection " *
         "series: the shortfall is exactly this chain's lead-in, so this looks " *
         "like the pre-0.2.0 `n = length(y) + observation_lead_in(model)`. " *
@@ -495,8 +512,8 @@ function _check_observation_count(model, y_t, n::ModelShape)
         "with no data."
     throw(
         ArgumentError(
-            "as_turing_model: stream `$(bad.name)` needs $(bad.n_required) " *
-                "observations but $(bad.n_supplied) were supplied." * hint
+            "as_turing_model: stream `$name` needs $n observations but " *
+                "$supplied were supplied." * hint
         )
     )
 end
