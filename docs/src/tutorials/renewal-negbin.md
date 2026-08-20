@@ -178,7 +178,7 @@ nothing # hide
 
 Sampling returns a chain whose parameter names are flat: composition does not
 namespace by default, so a component's own parameter keeps its plain name
-however deeply it is nested — `damp_AR` and `std` below belong to the AR
+however deeply it is nested — `damp` and `std` below belong to the AR
 process folded into the renewal model.
 A few components deliberately prefix their children, and two components that
 would otherwise use the same name are separated by wrapping one in
