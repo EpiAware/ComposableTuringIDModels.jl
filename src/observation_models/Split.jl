@@ -126,6 +126,16 @@ The incoming expected series may be a single vector (broadcast to every stream),
 a per-stream NamedTuple, an `inf_strata × time` matrix (one stream per row), or a
 [`StrataMap`](@ref).
 
+## Streams with different lead-ins
+
+Streams run in parallel off one expected series, so a stream whose chain
+consumes a longer lead-in (a longer delay, say) is left with fewer expected
+values than its neighbours, and no single series length gives every stream as
+many expected values as it has observations. Each stream right-aligns its data
+against its own expected series, exactly as a single stream does, so pass each
+stream the observations it has. The extra leading expected values of a
+shorter-lead-in stream are unobserved run-in, not a length to pad away.
+
 ## Constructors
 
   - `Split(streams::NamedTuple)` — explicit named streams, one-to-one with the
