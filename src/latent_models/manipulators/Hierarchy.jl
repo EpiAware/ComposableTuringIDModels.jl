@@ -68,7 +68,7 @@ struct Hierarchy{M <: PriorLike, A <: PriorLike} <: AbstractLatentModel
         # a bare `Distribution` is wrapped in an `Intercept` (a constant, shared
         # deviation broadcast across groups), never left as a scalar. `mean` is a
         # single shared level, so it stays a bare scalar prior.
-        wrapped = _path_prior(across)
+        wrapped = path_prior(across)
         return new{typeof(mean), typeof(wrapped)}(mean, wrapped)
     end
 end
