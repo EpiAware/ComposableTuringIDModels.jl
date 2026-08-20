@@ -97,8 +97,16 @@ returned `generated_y_t` is a `NamedTuple` of the two simulated series.
 n = 70
 sim = as_turing_model(model, (cases = missing, deaths = missing), n)()
 y = sim.generated_y_t
-(total_cases = sum(skipmissing(y.cases)), total_deaths = sum(skipmissing(y.deaths)))
+(total_cases = sum(y.cases), total_deaths = sum(y.deaths),
+    n_cases = length(y.cases), n_deaths = length(y.deaths))
 ```
+
+The two series come back at different lengths.
+One infection series serves both streams, so it is long enough for the deeper
+infection→death delay, and the shorter infection→report delay leaves the cases
+stream with expected values for earlier days too.
+Both are scored: pass each stream the observations it has.
+[`data_requirements`](@ref) reports the two lengths before the model is built.
 
 Fitting conditions on both streams at once.
 We draw a full chain with NUTS, matching the other tutorials, and
