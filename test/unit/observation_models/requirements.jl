@@ -461,14 +461,15 @@ end
     @test size(pfc, 1) == 20
 end
 
-@testitem "a Split of unequal lead-ins needs both alignments" begin
-    using ComposableTuringIDModels, Distributions
+@testitem "a Split of unequal lead-ins scores both streams in full" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: VarInfo, logjoint
+    Random.seed!(1070)
 
     # Each stream is supplied `n` observations and the series covers the
     # deepest lead-in, so the shallower stream produces more expected values
-    # than it has data. Scoring that needs the observation loop to right-align
-    # in both directions, which is the remaining half of the split lead-in
-    # report and is not in this change.
+    # than it has data. Right-aligning in both directions leaves that head
+    # unobserved and scores every observation of both streams.
     n = 30
     streams = Split(
         (
@@ -477,9 +478,28 @@ end
         )
     )
     model = IDModel(
-        DirectInfections(; Z = RandomWalk(), initialisation = Normal()), streams
+        Renewal(;
+            generation_time = [0.2, 0.3, 0.3, 0.2],
+            rt = RandomWalk(; init = Normal(0.0, 0.05), ϵ_t = Normal(0.0, 0.01)),
+            initialisation = Normal(log(100.0), 0.1)
+        ),
+        streams
     )
-    y = (cases = fill(10, n), deaths = fill(1, n))
+    y = (cases = fill(100, n), deaths = fill(100, n))
     @test data_fits(model, y, n)
-    @test_broken as_turing_model(model, y, n)() isa Any
+    sim = as_turing_model(model, y, n)()
+    @test length(sim.generated_y_t.cases) == n
+    @test length(sim.generated_y_t.deaths) == n
+
+    # The first observation of each stream is scored: neither is dropped from
+    # the head, whichever lead-in its own chain consumes.
+    vi = VarInfo(as_turing_model(model, y, n))
+    lj(yv) = logjoint(as_turing_model(model, yv, n), vi)
+    base = lj(y)
+    for k in (:cases, :deaths), i in (1, n)
+        perturbed = merge(y, NamedTuple{(k,)}((replace(y[k], 100 => 100),)))
+        moved = copy(perturbed[k])
+        moved[i] = 10^6
+        @test lj(merge(y, NamedTuple{(k,)}((moved,)))) != base
+    end
 end
