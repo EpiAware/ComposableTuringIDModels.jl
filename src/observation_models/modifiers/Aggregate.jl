@@ -9,6 +9,58 @@ function _return_aggregate(pred_obs, present, n)
     return agg_obs
 end
 
+# Find a `LatentDelay` nested inside `model` by following the linear `.model`
+# wrapper chain (the shape every modifier in this package uses). Returns
+# `nothing` when no `.model` field is present (a leaf, or a branching
+# composition such as `Split` that this conservative check does not look
+# inside).
+_find_latent_delay(m::LatentDelay) = m
+function _find_latent_delay(m)
+    hasproperty(m, :model) || return nothing
+    return _find_latent_delay(m.model)
+end
+
+# The length of the (reversed or forward) delay PMF a `LatentDelay.delay`
+# field yields, when that length is knowable without sampling. A fixed PMF
+# and a deterministic per-time PMF sequence carry their length directly; an
+# `UncertainDelay`'s PMF length is fixed by its `D`/`Δd` truncation horizon
+# regardless of the (uncertain) distribution parameters. Any other
+# `AbstractPriorModel` delay has no statically knowable length, so `nothing`
+# is returned and the aggregation-alignment check is skipped for it.
+_delay_pmf_length(pmf::AbstractVector{<:Real}) = length(pmf)
+_delay_pmf_length(pmfs::AbstractVector{<:AbstractVector{<:Real}}) = length(first(pmfs))
+function _delay_pmf_length(delay::UncertainDelay)
+    return length(0.0:(delay.Δd):(delay.D - delay.Δd))
+end
+_delay_pmf_length(::AbstractPriorModel) = nothing
+
+# Reject a `LatentDelay` nested inside an `Aggregate` when its PMF is longer
+# than one bin. `LatentDelay` always trims that many lead-in windows off the
+# *aggregated* window series to avoid fitting to partially observed data, so
+# the inner model returns fewer predictions than there are reported windows
+# and the scatter in `_return_aggregate` fails with an opaque
+# `DimensionMismatch`. Aligning a partially covered window is a modelling
+# decision (what does a partial window mean?) that this guard deliberately
+# does not make; it only rejects the combination up front. Move the delay
+# outside the `Aggregate` (applied to the pre-aggregation series) instead.
+function _check_aggregate_delay(model)
+    delay = _find_latent_delay(model)
+    delay === nothing && return nothing
+    d = _delay_pmf_length(delay.delay)
+    (d === nothing || d <= 1) && return nothing
+    throw(
+        ArgumentError(
+            "Aggregate cannot build: it wraps a LatentDelay with a " *
+                "$d-long delay PMF. LatentDelay drops $(d - 1) lead-in " *
+                "window(s) from the aggregated series to avoid fitting " *
+                "partially observed windows, so the inner model would " *
+                "return fewer predictions than reported windows. Move the " *
+                "LatentDelay outside the Aggregate (apply it to the " *
+                "pre-aggregation series instead)."
+        )
+    )
+end
+
 @doc raw"
 Aggregate the expected observations of an underlying model over reporting windows.
 
@@ -57,6 +109,7 @@ struct Aggregate{
         ) where {
             M <: AbstractObservationModel, A <: AbstractVector{<:Int},
         }
+        _check_aggregate_delay(model)
         present = aggregation .!= 0
         return new{M, A, typeof(present)}(model, aggregation, present)
     end

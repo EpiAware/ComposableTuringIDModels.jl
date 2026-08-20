@@ -79,17 +79,17 @@ end
     # A genuine (multi-bin) delay drops lead-in windows from the aggregated
     # series, so it is rejected up front with a message naming the
     # aggregation, the delay, and the fix.
-    local err = nothing
-    try
-        Aggregate(
-            LatentDelay(PoissonError(), fill(1 / 3, 3)),
-            [0, 0, 0, 0, 0, 0, 7]
-        )
+    build_unaligned() = Aggregate(
+        LatentDelay(PoissonError(), fill(1 / 3, 3)),
+        [0, 0, 0, 0, 0, 0, 7]
+    )
+    @test_throws ArgumentError build_unaligned()
+    msg = try
+        build_unaligned()
+        ""
     catch e
-        err = e
+        sprint(showerror, e)
     end
-    @test err isa ArgumentError
-    msg = sprint(showerror, err)
     @test occursin("Aggregate", msg)
     @test occursin("LatentDelay", msg)
     @test occursin("outside the Aggregate", msg)
