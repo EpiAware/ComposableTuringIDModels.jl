@@ -124,14 +124,14 @@ Turing + Mooncake + `SciMLSensitivity` integration gap that affects every ODE
 infection model (tracked in
 [issue #46](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/46)).
 Forward-mode autodiff is a good fit here anyway, for a system this small. We draw
-two chains in parallel with `MCMCThreads()` so a cross-chain ``\hat R`` is
+four chains in parallel with `MCMCThreads()` so a cross-chain ``\hat R`` is
 available:
 
 ```@example sir
 posterior = as_turing_model(model, y_obs, n)
 chain = sample(
     posterior, NUTS(0.95; adtype = AutoForwardDiff()),
-    MCMCThreads(), 250, 2; progress = false)
+    MCMCThreads(), 250, 4; progress = false)
 nothing # hide
 ```
 
@@ -295,7 +295,7 @@ sampler stable through the ODE solve.
 stochastic_chain = sample(
     as_turing_model(stochastic_model, y_obs, n),
     NUTS(0.95; adtype = AutoForwardDiff()),
-    MCMCThreads(), 250, 2; progress = false)
+    MCMCThreads(), 250, 4; progress = false)
 nothing # hide
 ```
 
