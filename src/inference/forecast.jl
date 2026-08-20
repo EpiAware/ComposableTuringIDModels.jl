@@ -39,15 +39,10 @@ that generically and errors rather than returning a mis-calibrated forecast.
 
 ## The series length the fit used
 
-The horizon model is rebuilt at the fitted series length plus `horizon`, and
-`n` says what that fitted length was. It defaults to the length of `y`, which is
-the usual case — but a chain with a [`LatentDelay`](@ref) is fitted at
-`n = length(y) + observation_lead_in(model)` so that every observation is
-scored (see [`observation_lead_in`](@ref)), and then the same `n` must be passed
-here. Forecasting from the shorter default asks for a shorter latent stream than
-the chain holds, which `forecast` refuses rather than silently misaligning.
-An [`IDProblem`](@ref) records its fitted length in `tspan`, so its method takes
-`n` from there and needs no keyword.
+The horizon model is rebuilt over `length(y) + horizon` observations, and
+[`as_turing_model`](@ref) covers the observation chain's lead-in on top of that,
+exactly as it did for the fit. So a chain with a [`LatentDelay`](@ref) in it
+needs nothing said about its lead-in here either.
 
 # Arguments
 
@@ -58,8 +53,6 @@ An [`IDProblem`](@ref) records its fitted length in `tspan`, so its method takes
 
 # Keyword arguments
 
-  - `n`: the series length the model was fitted at (its time axis, for a
-    stratified model). Defaults to the time length of `y`.
   - `rng`: random number generator for the future innovations and the predictive
     draws.
 
@@ -79,12 +72,11 @@ size(fc)
 "
 function forecast(
         model::IDModel, y, chain, horizon::Integer;
-        n::Union{Nothing, ModelShape} = nothing,
         rng::AbstractRNG = default_rng()
     )
     horizon ≥ 1 ||
         throw(ArgumentError("horizon must be ≥ 1, got $horizon"))
-    n_time = n === nothing ? _series_time_length(y) : _n_time(n)
+    n_time = _series_time_length(y)
     y_ext = _extend_series(y, horizon)
     shape = _obs_data_shape(model.observation_model, y, n_time + horizon)
     fc_model = as_turing_model(model, y_ext, shape)
@@ -112,19 +104,13 @@ _extend_series(y::NamedTuple, horizon) = map(v -> _extend_series(v, horizon), y)
 Forecast from a fitted [`IDProblem`](@ref); see [`forecast`](@ref) for the model
 method. The observation model and infection process are taken from the problem,
 and the horizon extends the problem's `tspan`.
-
-The problem records the series length it was built at, so `n` defaults to the
-length of `tspan` rather than to the length of `y`. The two differ exactly when
-the span was set to cover an observation chain's lead-in.
 "
 function forecast(
         problem::IDProblem, y, chain, horizon::Integer;
-        n::Union{Nothing, ModelShape} = nothing,
         rng::AbstractRNG = default_rng()
     )
     model = IDModel(problem.infection, problem.observation_model)
-    n_fit = n === nothing ? problem.tspan[end] - problem.tspan[1] + 1 : n
-    return forecast(model, y, chain, horizon; n = n_fit, rng = rng)
+    return forecast(model, y, chain, horizon; rng = rng)
 end
 
 # Extend the latent innovation streams in `chain` to the length the horizon model
@@ -185,11 +171,10 @@ end
 
 # Guard on the series length the horizon model is rebuilt at. A stream the
 # forecast model draws LESS of than the chain holds means the fit ran over a
-# longer series than `n + horizon` — the signature of a chain fitted with an
-# observation chain's lead-in added back (`n = length(y) +
-# observation_lead_in(model)`) and then forecast from `length(y)`. Splicing
-# cannot repair that, and evaluating it anyway would score the observations
-# against the wrong times, so say what to pass instead.
+# longer series than `length(y) + horizon` observations imply, so the chain and
+# the horizon model disagree about the times being scored. Splicing cannot
+# repair that, and evaluating it anyway would score the observations against the
+# wrong times.
 function _assert_fit_length(rng::AbstractRNG, fc_model, resized)
     prior = Dict(vn => val for (vn, val) in pairs(rand(rng, fc_model)))
     for (key, fit_len) in resized
@@ -198,9 +183,9 @@ function _assert_fit_length(rng::AbstractRNG, fc_model, resized)
             "forecast: the chain holds `$(key.name)` at length $fit_len but " *
                 "the model rebuilt over the horizon draws only $full_len, so " *
                 "it was fitted over a longer series than the horizon model " *
-                "covers. Pass the series length the fit used, e.g. " *
-                "`forecast(model, y, chain, horizon; n = length(y) + " *
-                "observation_lead_in(model))`."
+                "covers. Fit and forecast the same model over the same " *
+                "observations: `n` counts observations, and `y` here must be " *
+                "the series the model was fitted to."
         )
     end
     return nothing

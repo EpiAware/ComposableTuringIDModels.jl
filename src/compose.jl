@@ -10,7 +10,7 @@ The infection process owns its own latent (parameter) process internally, so
 a composed model is just two parts: infections, then observations.
 
 Sampling [`as_turing_model(model, y_t, n)`](@ref as_turing_model) runs the two
-stages as submodels:
+stages as submodels, with `n` the number of OBSERVATIONS:
 
 ```math
 I_t \;\xrightarrow{\text{infections}}\;
@@ -25,6 +25,14 @@ infection model's internal latent draw (e.g. the (log) ``R_t`` path), kept
 accessible as a generated quantity, or `nothing` for infection models with no
 exposable latent (e.g. [`ODEProcess`](@ref)). Pass `y_t = missing` to simulate
 from the prior, or a data vector to condition.
+
+An observation chain with delays in it consumes the head of the series it is
+given, so the infection process is run over `n + observation_lead_in(model)`
+time points and the observation model scores all `n` observations. That is
+derived from the chain, not asked of the caller: `n` is always the number of
+observations, and supplying a different number of them is an error rather than
+a silent reinterpretation. [`data_requirements`](@ref) reports what a model
+needs before it is built.
 
 ## Fields
 
@@ -50,9 +58,8 @@ struct IDModel{I <: AbstractInfectionModel, O <: AbstractObservationModel} <:
     observation_model::O
 end
 
-# A composed model's lead-in is its observation model's: the infection process
-# runs the full `n` steps and the chain drops the head of the convolution. The
-# same for the chain a coverage report is read off.
+# A composed model's lead-in is its observation model's, and so is the chain a
+# requirements report is read off.
 observation_lead_in(model::IDModel) = observation_lead_in(model.observation_model)
 _observation_chain(model::IDModel) = model.observation_model
 
@@ -115,7 +122,20 @@ concrete_observations(y) = y
 end
 
 function as_turing_model(model::IDModel, y_t, n)
-    return _as_turing_model_idmodel(model, concrete_observations(y_t), n)
+    _check_observation_count(model, y_t, n)
+    return _as_turing_model_idmodel(
+        model, concrete_observations(y_t), _series_shape(model, n)
+    )
+end
+
+# The shape the infection process is built at. `n` is the number of
+# observations, so the series carries the chain's lead-in on top of it: the
+# delays consume the head of the convolution, and what is left is exactly the
+# `n` expected values the error model scores. A stratified model grows along its
+# time axis only.
+_series_shape(model, n::Int) = n + _series_lead_in(model)
+function _series_shape(model, n::Dims{2})
+    return (n[1], n[2] + _series_lead_in(model))
 end
 
 @doc raw"
