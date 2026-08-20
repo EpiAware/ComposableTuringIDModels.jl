@@ -414,6 +414,7 @@ end
     # same latent draw, moving its earliest observation moves the log-joint.
     vi = VarInfo(mdl)
     moved = (cases = vcat(60, y_t.cases[2:end]), deaths = y_t.deaths)
+    @test isfinite(logjoint(mdl, vi))
     @test logjoint(as_turing_model(model, moved, n), vi) !=
         logjoint(mdl, vi)
 end
