@@ -339,6 +339,43 @@ end
     end
 end
 
+@testitem "a GP beside an error model's own scale needs a prefix" begin
+    using ComposableTuringIDModels, Distributions, Random, Turing
+    using DynamicPPL: DebugUtils, VarInfo, @varname
+    Random.seed!(268)
+    # Pins both halves: bare fails `check_model`, prefixed passes.
+    for gp in (HilbertSpaceGP(; m = 5), ExactGP())
+        composed(rt) = as_turing_model(
+            IDModel(
+                Renewal(;
+                    generation_time = [0.3, 0.4, 0.3], rt = rt,
+                    initialisation = Normal()
+                ),
+                NormalError()
+            ), fill(10.0, 20), 20
+        )
+        bare = composed(gp)
+        mdl = composed(PrefixLatentModel(; model = gp, prefix = "gp"))
+        @test !DebugUtils.check_model(bare; error_on_failure = false)
+        @test DebugUtils.check_model(mdl; error_on_failure = false)
+        # The collision is one name short: the two `σ`s share a variable.
+        names = Symbol.(string.(keys(VarInfo(mdl))))
+        @test length(keys(VarInfo(bare))) == length(names) - 1
+        @test Symbol("gp.σ") ∈ names
+        @test :σ ∈ names
+        # Both scales must come back from a chain, and be separately
+        # addressable: pinning one leaves the other sampled.
+        chain = sample(mdl, Prior(), 10; progress = false)
+        @test all(>(0), vec(chain[@varname(gp.σ)]))
+        @test all(>(0), vec(chain[:σ]))
+        pinned = Symbol.(
+            string.(keys(VarInfo(fix(mdl, (gp = (σ = 0.2,),)))))
+        )
+        @test Symbol("gp.σ") ∉ pinned
+        @test :σ ∈ pinned
+    end
+end
+
 @testitem "HilbertSpaceGP captures its basis as a model argument" begin
     using ComposableTuringIDModels, Distributions, Random
     using ComposableTuringIDModels: hsgp_basis

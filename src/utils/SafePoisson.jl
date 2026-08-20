@@ -40,7 +40,10 @@ Distributions.logpdf(d::SafePoisson, x::Real) = logpdf(_poisson(d), x)
 Distributions.pdf(d::SafePoisson, x::Integer) = pdf(_poisson(d), x)
 Distributions.cdf(d::SafePoisson, x::Integer) = cdf(_poisson(d), x)
 Distributions.ccdf(d::SafePoisson, x::Integer) = ccdf(_poisson(d), x)
-Distributions.quantile(d::SafePoisson, q::Real) = quantile(_poisson(d), q)
+function Distributions.quantile(d::SafePoisson, q::Real)
+    _require_finite_for_int(d.λ, "quantile(::SafePoisson, ...)")
+    return quantile(_poisson(d), q)
+end
 
 Base.minimum(d::SafePoisson) = 0
 Base.maximum(d::SafePoisson) = Inf
