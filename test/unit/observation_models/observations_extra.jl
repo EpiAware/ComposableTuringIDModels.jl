@@ -689,7 +689,7 @@ end
     @test size(fc, 1) == size(chain, 1)
 end
 
-@testitem "A delay nested inside an Aggregate right-aligns onto the windows" begin
+@testitem "A delay nested in an Aggregate right-aligns on windows" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(292)
     # Weekly reporting over 28 days: the present windows end on days 7, 14, 21
