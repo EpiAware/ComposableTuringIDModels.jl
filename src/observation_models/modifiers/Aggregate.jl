@@ -1,11 +1,17 @@
 # Aggregation observation modifier (sum expected observations over reporting
 # windows).
 
-# Scatter the predicted observations for the present time points back into a
-# length-`n` vector of expected observations (zeros where not present).
-function _return_aggregate(pred_obs, present, n)
+# Scatter the predictions for the present time points back into a length-`n`
+# vector (zeros where not present). A modifier nested inside the aggregation
+# (e.g. `LatentDelay`) shortens the window series, so there can be fewer
+# predictions than present windows. They are the *last* windows, matching the
+# right-alignment every other observation chain uses, so the leading windows are
+# left at zero.
+function _return_aggregate(pred_obs, idx, n)
+    k = length(pred_obs)
+    @assert k <= length(idx) "The aggregated model returned more predictions ($k) than reporting windows ($(length(idx)))"
     agg_obs = zeros(eltype(pred_obs), n)
-    agg_obs[findall(present)] = pred_obs
+    agg_obs[idx[(end - k + 1):end]] = pred_obs
     return agg_obs
 end
 
@@ -19,6 +25,13 @@ presence vectors are broadcast to the observation length with
 [`RepeatEach`](@ref), the expected observations are summed over each window, the
 inner `model` is applied to the present windows, and the predictions are scattered
 back into a full-length vector (zeros elsewhere).
+
+Because the outermost modifier is applied first, the nesting of a
+[`LatentDelay`](@ref) decides the units the delay is measured in.
+`Aggregate(LatentDelay(model, pmf), aggregation)` sums into windows and then
+convolves, so the delay is in *windows* and the leading windows it consumes go
+unpredicted, while `LatentDelay(Aggregate(model, aggregation), pmf)` delays the
+daily series before summing, so the delay is in *time points*.
 
 # Arguments
 
@@ -95,12 +108,19 @@ end
     m = length(ag.aggregation)
     aggregation = broadcast_rule(RepeatEach(), ag.aggregation, n, m)
     present = broadcast_rule(RepeatEach(), ag.present, n, m)
-    agg_Y_t = map(findall(present)) do i
-        sum(Y_t[max(1, i - aggregation[i] + 1):i])
+    # An outer modifier can hand over a `Y_t` shorter than `y_t`. Like every
+    # other chain it is right-aligned, so it covers the last `length(Y_t)` time
+    # points and the window indices shift by `offset`. A window reaching back
+    # before the start of `Y_t` is clipped, as one reaching before time 1
+    # already is.
+    offset = n - length(Y_t)
+    idx = findall(present)
+    agg_Y_t = map(idx) do i
+        sum(Y_t[max(1, i - aggregation[i] + 1 - offset):max(0, i - offset)])
     end
     inner ~ as_turing_submodel(ag.model, y_t[present], agg_Y_t)
     # Scatter counts and means back into length-`n` vectors (zeros where absent).
-    y_t = _return_aggregate(inner.y_t, present, n)
-    expected = _return_aggregate(inner.expected, present, n)
+    y_t = _return_aggregate(inner.y_t, idx, n)
+    expected = _return_aggregate(inner.expected, idx, n)
     return (; y_t, expected)
 end

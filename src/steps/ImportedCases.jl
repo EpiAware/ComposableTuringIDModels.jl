@@ -38,10 +38,10 @@ For infection arriving from another *modelled* stratum, rather than from
 outside the system altogether, use the renewal `mixing` slot instead (see
 [`renewal_pressure`](@ref)); handing this modifier a [`Stratify`](@ref) rate
 gives a `strata × time` importation rate, one exogenous stream per stratum,
-read per step with [`_at`](@ref) exactly as a shared rate is.
+read per step with [`at`](@ref) exactly as a shared rate is.
 
 `importation_rate` is a per-step parameter slot holding the **unconstrained**
-rate ``\tilde\iota_t``, read at step ``t`` with [`_at`](@ref): a bare
+rate ``\tilde\iota_t``, read at step ``t`` with [`at`](@ref): a bare
 `Distribution` is one unknown constant shared across time, a
 `Vector{<:Distribution}` or a latent process (e.g. a [`RandomWalk`](@ref)) is a
 length-`n` path. The modifier maps whatever it gets onto the positive rate
@@ -141,7 +141,7 @@ A resolved [`ImportedCases`](@ref): the drawn importation rate, ready to scan.
 This is what [`ImportedCases`](@ref) returns from its pre-scan
 `as_turing_model` seam — the prior has been sampled and transformed, so the scan
 sees a plain deterministic modifier. Its substate is the step counter, so step
-``t`` adds ``\iota_t`` read with [`_at`](@ref) (a constant rate stays a scalar).
+``t`` adds ``\iota_t`` read with [`at`](@ref) (a constant rate stays a scalar).
 
 ## Fields
 
@@ -158,7 +158,7 @@ end
 modifier_init_state(::ImportedRate, window) = 0
 
 function apply_modifier(mod::ImportedRate, incidence, t)
-    return incidence + _at(mod.rate, t + 1), t + 1
+    return incidence + at(mod.rate, t + 1), t + 1
 end
 
 @doc raw"
@@ -169,7 +169,7 @@ Draws the unconstrained rate slot through [`as_turing_submodel`](@ref) — a bar
 maps it onto the positive scale with the modifier's `transformation`, and
 returns the [`ImportedRate`](@ref) the scan uses. The map is broadcast, so a
 constant stays a scalar (no length-`n` allocation) and the scan reads either
-shape with [`_at`](@ref).
+shape with [`at`](@ref).
 
 # Arguments
 

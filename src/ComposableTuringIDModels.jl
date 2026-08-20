@@ -135,14 +135,16 @@ export IDProblem, NUTSampler, DirectSample,
 # --- extension points ---
 # Names a component author implements against but rarely calls: the shape
 # contract, the two seams that widen a model across strata, the renewal
-# step/modifier interfaces, and the observation-chain traversal seam. Public but
-# not exported, so they are documented and supported without crowding the
-# namespace of a `using` call.
+# step/modifier interfaces, the prior-slot widening helpers a new component's
+# constructor and recursion call directly, and the observation-chain traversal
+# seam. Public but not exported, so they are documented and supported without
+# crowding the namespace of a `using` call.
 public ModelShape, across_shape, infection_strata,
     AbstractAccumulationStep, AbstractConstantRenewalStep,
     ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
     apply_modifier, renewal_foi, renewal_init_state, renewal_init_window,
     MissingObservations,
+    at, path_prior, prior_order, assert_prior_length,
     wrapped_models, observation_components, rewrap
 
 # --- core architecture ---
