@@ -343,3 +343,38 @@ end
     chain = sample(as_turing_model(model, ydata, n), NUTS(), 5; progress = false)
     @test size(chain, 1) == 5
 end
+
+@testitem "Split branches of unequal lead-in right-align their own data" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: VarInfo, logjoint
+    Random.seed!(285)
+
+    # Two parallel streams off one infection series, with genuinely unequal
+    # lead-ins: a 3-day delay drops 2 days, an 8-day delay drops 7.
+    split = Split(
+        (
+            cases = LatentDelay(PoissonError(), [0.5, 0.3, 0.2]),
+            deaths = LatentDelay(PoissonError(), fill(1 / 8, 8)),
+        )
+    )
+
+    n = 20
+    Y_t = collect(range(80.0, 120.0; length = n))
+    # The longest lead-in fixes how many days are observable, and the caller
+    # passes the observations they have: equal length, no leading `missing`s.
+    n_obs = n - 7
+    y_t = (cases = fill(100, n_obs), deaths = fill(90, n_obs))
+
+    mdl = as_turing_model(split, y_t, Y_t)
+    out = mdl()
+    @test length(out.expected.cases) == n - 2
+    @test length(out.expected.deaths) == n_obs
+
+    # Each stream scores the LAST `n_obs` of its own expected series, so the
+    # case stream's two extra days are unobserved run-in rather than a
+    # misalignment of every scored day.
+    scored_cases = out.expected.cases[(end - n_obs + 1):end]
+    ref = sum(logpdf.(SafePoisson.(scored_cases .+ 1.0e-6), y_t.cases)) +
+        sum(logpdf.(SafePoisson.(out.expected.deaths .+ 1.0e-6), y_t.deaths))
+    @test logjoint(mdl, VarInfo(mdl)) ≈ ref
+end
