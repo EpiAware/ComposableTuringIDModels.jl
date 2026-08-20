@@ -118,23 +118,18 @@ model.
 
 Each convolution shortens the expected series by `length(pmf) - 1`, because the
 head of a convolution is only partially observed. Two stacked delays therefore
-leave the first few reference days without an expected count, and the
-observation model scores the data from there on. [`observation_lead_in`](@ref)
-reads that number off the assembled chain:
+need the infection process to start that many days before the first report.
+[`observation_lead_in`](@ref) reads the number off the assembled chain:
 
 ```@example delays
 observation_lead_in(observation)
 ```
 
-The series length passed to a model is the length of the *infection* series, so
-`tspan = (1, length(y))` scores only the last `length(y) - lead_in` reports and
-drops the rest. Adding the lead-in back —
-`tspan = (1, length(y) + observation_lead_in(observation))` — scores every
-observation, at the cost of estimating infections over the extra lead-in days.
-[`observation_coverage`](@ref) reports which of the two you have before you
-sample. We keep the shorter span here, so the fit below conditions on the
-reports the delays fully support (see
-[How much of the data an observation chain scores](@ref lead-in)).
+An [`IDProblem`](@ref)'s `tspan` is the span of the *observations*, so
+`tspan = (1, length(y))` fits every report we have. The infection process is run
+over the extra lead-in days to support them, which the model derives from the
+chain rather than asking of us (see [What data a model needs](@ref lead-in)).
+[`data_requirements`](@ref) says what a chain needs before it is sampled.
 
 ## The data
 
