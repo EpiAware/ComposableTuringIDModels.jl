@@ -541,10 +541,11 @@ end
 
 # --- the check `as_turing_model` runs --------------------------------------
 
-# `n` is the number of observations, so the data has to carry that many. Fewer
-# by exactly the chain's lead-in is the pre-0.2.0 idiom, where `n` was the
-# infection series length and the caller added the lead-in by hand; say so
-# rather than fitting a longer series than the caller means.
+# What `as_turing_model` refuses. More observations than a chain can score is an
+# error, because their head would never enter the likelihood. Fewer is not: the
+# data is right-aligned, so a series that starts later is scored at the end.
+# The one exception is a shortfall of exactly the chain's lead-in, which is the
+# pre-0.2.0 meaning of `n`.
 #
 # This walks the chain rather than building a `DataRequirements`: an
 # `IDProblem`'s model body reassembles its `IDModel` on every evaluation, so
@@ -587,7 +588,7 @@ end
 # An exact-length component cannot right-align at all, so a series of the wrong
 # length is a call that will fail rather than one that scores what it has.
 _check_exact_length(::Val, name, supplied, n_max) = nothing
-function _check_exact_length(alignment::Val{:exact}, name, supplied, n_max)
+function _check_exact_length(::Val{:exact}, name, supplied, n_max)
     supplied == n_max && return nothing
     throw(
         ArgumentError(
