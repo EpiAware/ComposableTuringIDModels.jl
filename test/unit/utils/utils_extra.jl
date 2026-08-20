@@ -47,19 +47,10 @@ end
 
 @testitem "_safe_int_floor rejects non-finite input with a clear DomainError" begin
     using ComposableTuringIDModels: _safe_int_floor
-    # Regression for #140: a non-finite value used to reach `floor(BigInt, x)`
-    # and fail with an opaque `InexactError: BigInt(Inf)`. It must now fail
-    # loudly but clearly, with a `DomainError` naming the offending value,
-    # rather than the InexactError from deep inside the BigInt conversion.
+    # A non-finite value must raise a `DomainError` naming the offending value,
+    # not an `InexactError` from the eventual `BigInt` conversion.
     for x in (Inf, -Inf, NaN)
         @test_throws DomainError _safe_int_floor(x)
-        threw_inexact = try
-            _safe_int_floor(x)
-            false
-        catch e
-            e isa InexactError
-        end
-        @test !threw_inexact
     end
     # Finite values, including ones outside the `Int` range, are unaffected.
     @test _safe_int_floor(3.7) == 3
@@ -69,41 +60,28 @@ end
 @testitem "SafePoisson and SafeNegativeBinomial reject non-finite rates" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(140)
-    # Direct exposure: SafePoisson's own rate is non-finite.
+    # A non-finite `SafePoisson` rate must raise a `DomainError`.
     @test_throws DomainError rand(SafePoisson(Inf))
     @test_throws DomainError rand(SafePoisson(NaN))
-    # Indirect exposure (the issue's "check SafeNegativeBinomial too" ask): the
-    # Gamma mixing draw that feeds SafeNegativeBinomial's inner SafePoisson can
-    # itself be non-finite when `r`/`p` are degenerate, funnelling through the
-    # very same guard.
+    # `SafeNegativeBinomial` samples through an inner `SafePoisson` whose rate
+    # is a Gamma mixing draw. Degenerate `r`/`p` make that draw non-finite, so
+    # it reaches the same guard.
     @test_throws DomainError rand(SafeNegativeBinomial(Inf, 0.5))
     @test_throws DomainError rand(SafeNegativeBinomial(1.0, 0.0))
 end
 
 @testitem "quantile and mode reject non-finite parameters, not just rand" begin
     using ComposableTuringIDModels, Distributions
-    # `_safe_int_floor` is not the only place a non-finite rate gets floored
-    # to an `Int`: `quantile` (both types) and `SafeNegativeBinomial`'s
-    # `mode` delegate to the wrapped `Distributions.Poisson` /
-    # `NegativeBinomial`, which floor internally without going through the
-    # guard at all. Before the fix these raised a bare `InexactError`
-    # instead of the same clear `DomainError`.
+    # `quantile` (both types) and `SafeNegativeBinomial`'s `mode` delegate to
+    # the wrapped `Distributions.Poisson` / `NegativeBinomial`, which floor
+    # internally without passing through `_safe_int_floor`. They must raise the
+    # same `DomainError` naming the offending value on a non-finite parameter.
     for λ in (Inf, NaN)
         @test_throws DomainError quantile(SafePoisson(λ), 0.5)
     end
     for (r, p) in ((Inf, 0.5), (NaN, 0.5), (1.0, Inf), (1.0, NaN))
         @test_throws DomainError quantile(SafeNegativeBinomial(r, p), 0.5)
         @test_throws DomainError mode(SafeNegativeBinomial(r, p))
-    end
-    # None of these should ever surface the underlying InexactError.
-    for f in (d -> quantile(d, 0.5),)
-        threw_inexact = try
-            f(SafePoisson(Inf))
-            false
-        catch e
-            e isa InexactError
-        end
-        @test !threw_inexact
     end
     # The guard must be transparent for finite parameters: each guarded entry
     # point still delegates to the wrapped distribution and returns its value.
