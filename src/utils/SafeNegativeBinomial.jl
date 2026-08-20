@@ -9,6 +9,12 @@ The package uses a mean/cluster-factor parameterisation when constructing this
 distribution from an expected count (see
 [`NegativeBinomialMeanClust`](@ref)).
 
+Construction does not validate `r`/`p`, since these may transiently be
+out-of-domain values on the automatic-differentiation path (e.g. built from a
+sampled cluster factor while `logpdf` is evaluated). `rand` validates instead,
+raising a `DomainError` naming the invalid parameter rather than the opaque
+`sqrt`/`Gamma` error a bad value would otherwise surface as.
+
 # Examples
 ```jldoctest SafeNegativeBinomial; output = false
 using ComposableTuringIDModels, Distributions
@@ -55,6 +61,20 @@ Distributions.logccdf(d::SafeNegativeBinomial, x::Real) = logccdf(_negbin(d), x)
 Distributions.quantile(d::SafeNegativeBinomial, q::Real) = quantile(_negbin(d), q)
 
 function Base.rand(rng::AbstractRNG, d::SafeNegativeBinomial)
+    d.r > zero(d.r) || throw(
+        DomainError(
+            d.r,
+            "SafeNegativeBinomial: r (the shape / number of successes) must " *
+                "be positive."
+        )
+    )
+    zero(d.p) < d.p <= one(d.p) || throw(
+        DomainError(
+            d.p,
+            "SafeNegativeBinomial: p (the success probability) must lie in " *
+                "(0, 1]."
+        )
+    )
     if isone(d.p)
         return 0
     else

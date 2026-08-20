@@ -14,3 +14,8 @@ Changes are documented in Github releases.
     **Breaking**: `GroupedInfections` and the grouped `IDModel` constructors
     are removed; a `Stratify`-based infection model observed through `Split`
     replaces them.
+
+  - `SafeNegativeBinomial` and `SafePoisson` now validate their parameters at
+    construction (`r > 0` and `p ∈ (0, 1]` for the former, `λ ≥ 0` for the
+    latter), raising a named `DomainError` instead of an opaque `sqrt`/`Gamma`
+    error surfacing later from `rand`.
