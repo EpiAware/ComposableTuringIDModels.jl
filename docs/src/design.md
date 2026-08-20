@@ -64,17 +64,13 @@ bare = as_turing_model(
 keys(VarInfo(bare))
 ```
 
-There are four names for five parameters, and the model says so:
+There are four names for five parameters:
 
 ```@example prefixing
 DebugUtils.check_model(bare; error_on_failure = false)
 ```
 
-That is a hard stop, not a silent error.
-`sample` runs `check_model` first and refuses to run a model that fails it.
 
-The fix is a prefix applied where the conflict is, rather than a longer name
-everywhere.
 [`PrefixLatentModel`](@ref) wraps a latent process so its variables are
 namespaced, and [`PrefixObservationModel`](@ref) does the same for an
 observation model:
