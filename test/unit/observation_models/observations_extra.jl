@@ -68,6 +68,33 @@ end
     @test count(!=(0), res.expected) == 4
 end
 
+@testitem "Aggregate rejects a nested LatentDelay it cannot align" begin
+    using ComposableTuringIDModels
+
+    # A one-bin (undelayed) PMF doesn't shorten the window series, so it
+    # builds fine.
+    fits = Aggregate(LatentDelay(PoissonError(), [1.0]), [0, 0, 0, 0, 0, 0, 7])
+    @test fits isa Aggregate
+
+    # A genuine (multi-bin) delay drops lead-in windows from the aggregated
+    # series, so it is rejected up front with a message naming the
+    # aggregation, the delay, and the fix.
+    local err = nothing
+    try
+        Aggregate(
+            LatentDelay(PoissonError(), fill(1 / 3, 3)),
+            [0, 0, 0, 0, 0, 0, 7]
+        )
+    catch e
+        err = e
+    end
+    @test err isa ArgumentError
+    msg = sprint(showerror, err)
+    @test occursin("Aggregate", msg)
+    @test occursin("LatentDelay", msg)
+    @test occursin("outside the Aggregate", msg)
+end
+
 @testitem "ReportingCDF produces a length-n completeness curve" begin
     using ComposableTuringIDModels, Distributions
 
