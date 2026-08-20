@@ -343,9 +343,7 @@ end
     using ComposableTuringIDModels, Distributions, Random, Turing
     using DynamicPPL: DebugUtils, VarInfo, @varname
     Random.seed!(268)
-    # A GP `R_t` with a Gaussian observation error is a standard pairing and
-    # both name their marginal standard deviation `σ`. Pin both halves of the
-    # contract: bare it fails `check_model`, prefixed it passes.
+    # Pins both halves: bare fails `check_model`, prefixed passes.
     for gp in (HilbertSpaceGP(; m = 5), ExactGP())
         composed(rt) = as_turing_model(
             IDModel(

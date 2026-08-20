@@ -206,15 +206,12 @@ end
 @testitem "every latent × error-model pairing keeps its names apart" begin
     using ComposableTuringIDModels, Distributions
     using DynamicPPL: DebugUtils
-    # A clash is invisible until two components are composed, so sweep the
-    # pairings. Only the Gaussian processes collide with `NormalError`, on
-    # `σ`; the sweep pins that and that a `PrefixLatentModel` fixes it.
-    # `BinomialError` is left out: it needs a trials series rather than the
-    # plain vector used here, and draws no parameters of its own.
+    # Pins that only the Gaussian processes collide, and only on `σ`.
     latents = (
         RandomWalk(), AR(), MA(), IID(Normal()), Intercept(Normal()),
         HierarchicalNormal(), HilbertSpaceGP(; m = 5), ExactGP(),
     )
+    # `BinomialError` needs a trials series, so it is out of the sweep.
     errors = (PoissonError(), NegativeBinomialError(), NormalError())
     n = 20
     function checks(latent, error_model)
@@ -228,13 +225,10 @@ end
         return DebugUtils.check_model(mdl; error_on_failure = false)
     end
     for latent in latents, error_model in errors
-        # A Gaussian process and `NormalError` both draw a bare `σ`; nothing
-        # else in the sweep shares a name.
         collides = latent isa Union{HilbertSpaceGP, ExactGP} &&
             error_model isa NormalError
         @test checks(latent, error_model) == !collides
-        # Prefixing the latent is the documented fix, and it has to work for
-        # every pairing, not just the colliding ones.
+        # Prefixing must work for every pairing, not just the colliding one.
         prefixed = PrefixLatentModel(; model = latent, prefix = "latent")
         @test checks(prefixed, error_model)
     end
