@@ -72,7 +72,7 @@ struct Stratify{S <: PriorLike, A <: PriorLike, F <: Function} <:
 end
 
 function Stratify(shared, across; combine = +)
-    return Stratify(_path_prior(shared), _path_prior(across), combine)
+    return Stratify(path_prior(shared), path_prior(across), combine)
 end
 
 @model function as_turing_model(m::Stratify, n::Dims{2})

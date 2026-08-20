@@ -67,7 +67,7 @@ function DirectInfections(;
         Z = RandomWalk(),
         transformation::Function = exp, initialisation = Normal()
     )
-    return DirectInfections(_path_prior(Z), transformation, initialisation)
+    return DirectInfections(path_prior(Z), transformation, initialisation)
 end
 
 @model function as_turing_model(model::DirectInfections, n::ModelShape)

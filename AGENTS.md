@@ -12,3 +12,9 @@ Standards and how-to live in the docs, not here.
 - [EpiAware](https://epiaware.org)
 - [ColPrac](https://github.com/SciML/ColPrac)
 <!-- epiaware-standards:end -->
+
+## Docs
+
+Documentation pages do not use `@assert`.
+A figure a page claims is computed and rendered, so a regression is visible to a reader rather than breaking the build.
+Checks that must fail belong in the test suite, because gating the docs build on sampler output makes it a version-coupled tripwire.
