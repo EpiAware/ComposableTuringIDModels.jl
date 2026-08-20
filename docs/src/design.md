@@ -226,12 +226,14 @@ observation_lead_in(delayed)
 data_requirements(delayed, y, length(y))
 ```
 
-[`data_fits`](@ref) is the same question as a yes or no, and supplying the wrong
-number of observations is an error rather than a series quietly fitted at a
+[`data_fits`](@ref) is the same question as a yes or no.
+It asks whether every observation supplied would be scored, so more data than
+the model can score is `false`, and supplying that number to
+`as_turing_model` is an error rather than a series quietly fitted at a
 different length:
 
 ```@example design
-data_fits(delayed, y, length(y)), data_fits(delayed, y[1:50], length(y))
+data_fits(delayed, y, length(y)), data_fits(delayed, vcat(y, y), length(y))
 ```
 
 An [`IDProblem`](@ref)'s `tspan` is the span of the observations for the same
@@ -243,6 +245,9 @@ Length-preserving modifiers ([`Ascertainment`](@ref), [`RightTruncate`](@ref),
 own, so the lead-in comes from the delays alone.
 A [`Split`](@ref)'s streams run in parallel, so their lead-ins do not add up and
 the series covers the deepest of them.
+A stream with a shorter lead-in is then handed more expected values than `n`,
+which the report says as `up to`: supply `n` for every stream and every one is
+scored, or supply the extra earlier values for that stream if you have them.
 
 What a stream asks for follows the model that scores it, not the shape of the
 data.

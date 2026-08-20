@@ -185,16 +185,26 @@ What a single observation stream requires of the data supplied for it.
 ## Fields
 
   - `name`: the stream's name, or `:y_t` for a model scoring a single series.
-  - `n_required`: how long the supplied series must be along its own axis —
-    time points, or reference days for a [`ReportTriangle`](@ref).
-  - `n_scored`: how many observations enter the likelihood. Equal to
-    `n_required` except under an [`Aggregate`](@ref), which scores one value
-    per reporting window and ignores the days between.
+  - `n_required`: how long the supplied series should be along its own axis —
+    time points, or reference days for a [`ReportTriangle`](@ref). This is the
+    `n` the model was asked for.
+  - `n_max`: the most this stream can score. It exceeds `n_required` only for a
+    [`Split`](@ref) stream whose chain consumes a shorter lead-in than its
+    neighbours: one series serves every stream, so it is long enough for the
+    deepest, and a shallower stream is handed extra leading expected values it
+    can score if earlier data happens to exist.
+  - `n_scored`: how many of the expected values enter the likelihood. Equal to
+    `n_max` except under an [`Aggregate`](@ref), which scores one value per
+    reporting window and ignores the days between.
   - `lead_in`: the time points this stream's chain consumes (see
     [`observation_lead_in`](@ref)). Reported for explanation; it is already
     covered by the series [`as_turing_model`](@ref) builds.
   - `shape`: the shape the data takes — `:series` (one entry per time point) or
     `:triangle` (a reference-day × delay matrix).
+  - `alignment`: `:right` when the stream right-aligns its data against its
+    expected series, so a shorter series is scored at the end and the earlier
+    expected values are unobserved; `:exact` when it does not
+    ([`Aggregate`](@ref), [`ReportTriangle`](@ref)), so the lengths must match.
   - `fields`: the fields the scoring model reads when it needs more than the
     counts, e.g. `(:y, :N)` for [`BinomialError`](@ref); empty when a plain
     series is enough.
@@ -204,24 +214,34 @@ What a single observation stream requires of the data supplied for it.
 struct StreamRequirement
     "The stream's name, or `:y_t` for a single series."
     name::Symbol
-    "The length the supplied series must have along its own axis."
+    "The length the supplied series should have along its own axis."
     n_required::Int
-    "How many observations enter the likelihood."
+    "The most this stream can score."
+    n_max::Int
+    "How many of the expected values enter the likelihood."
     n_scored::Int
     "The time points this stream's chain consumes."
     lead_in::Int
     "The shape the data takes: `:series` or `:triangle`."
     shape::Symbol
+    "Whether the stream right-aligns its data (`:right`) or not (`:exact`)."
+    alignment::Symbol
     "The fields the scoring model reads, when it needs more than the counts."
     fields::Tuple{Vararg{Symbol}}
     "How much data was supplied, or `nothing` if none was."
     n_supplied::Union{Int, Nothing}
 end
 
-# A stream is satisfied when the data supplied for it is the length the model
-# requires. Asking without data satisfies nothing and fails nothing.
-_stream_fits(r::StreamRequirement) =
-    r.n_supplied === nothing || r.n_supplied == r.n_required
+# A stream is satisfied when every observation supplied for it is scored. A
+# right-aligning stream scores the last `n_max` it is given, so anything up to
+# that is covered and more than that would drop the head. A stream that does not
+# right-align has to match exactly. Asking without data satisfies nothing and
+# fails nothing.
+function _stream_fits(r::StreamRequirement)
+    r.n_supplied === nothing && return true
+    r.alignment === :exact && return r.n_supplied == r.n_max
+    return r.n_supplied <= r.n_max
+end
 
 @doc raw"
 What data a model needs, stream by stream.
@@ -262,9 +282,21 @@ end
 @doc raw"
 Whether a dataset fits a model: a straight yes or no.
 
-`true` when every observation stream was supplied the length its own chain
-requires. Data that is not there to disagree — a `missing` stream, simulated at
-whatever length the chain produces — fits by construction.
+`true` when every observation supplied would be scored. A stream that
+right-aligns its data (any of the per-time-point error families) is satisfied by
+anything up to the number of expected values it is handed, because a shorter
+series is scored at the end and the earlier expected values are simply
+unobserved. More than that would leave the head of the data unscored, which is
+`false`. An [`Aggregate`](@ref) and a [`ReportTriangle`](@ref) do not
+right-align at all, so there the length has to match exactly.
+
+Data that is not there to disagree — a `missing` stream, simulated at whatever
+length the chain produces — fits by construction.
+
+[`as_turing_model`](@ref) applies one further check this does not: a stream
+short by *exactly* its chain's lead-in is the pre-0.2.0 meaning of `n`, where
+the caller added the lead-in to the series length by hand, and is rejected
+rather than fitted over a longer series than the caller means.
 
 Takes a model and its data, or a report already built by
 [`data_requirements`](@ref). When the answer is no, print the report to see
@@ -280,7 +312,7 @@ which stream is wrong and by how much.
 ```@example data_fits
 using ComposableTuringIDModels
 obs = LatentDelay(PoissonError(), fill(1 / 10, 10))
-data_fits(obs, fill(10, 30), 30), data_fits(obs, fill(10, 25), 30)
+data_fits(obs, fill(10, 30), 30), data_fits(obs, fill(10, 40), 30)
 ```
 "
 data_fits(r::DataRequirements) = all(_stream_fits, r.streams)
@@ -348,26 +380,44 @@ end
 function _requirements(model, y_t, n::Int)
     chain = _observation_chain(model)
     lead_in = observation_lead_in(chain)
+    deepest = _max_lead_in(lead_in)
     streams = _stream_models(chain)
     entries = if streams === nothing
-        [_stream_requirement(:y_t, chain, lead_in, y_t, n)]
+        [_stream_requirement(:y_t, chain, lead_in, deepest, y_t, n)]
     else
         [
             _stream_requirement(
-                    k, streams[k], _stream(lead_in, k), _stream(y_t, k), n
+                    k, streams[k], _stream(lead_in, k), deepest,
+                    _stream(y_t, k), n
                 ) for k in keys(streams)
         ]
     end
-    return DataRequirements(n, n + _max_lead_in(lead_in), entries)
+    return DataRequirements(n, n + deepest, entries)
 end
 
-function _stream_requirement(name::Symbol, model, lead_in::Int, y_t, n::Int)
+function _stream_requirement(
+        name::Symbol, model, lead_in::Int, deepest::Int, y_t, n::Int
+    )
     contract = _data_contract(_consumer(model))
+    # One series serves every stream, so it covers the deepest lead-in and a
+    # shallower stream is handed that much more than `n`.
+    n_max = n + deepest - lead_in
     return StreamRequirement(
-        name, n, _n_scored(model, n), lead_in, contract.shape,
-        contract.fields, _n_supplied(contract.shape, y_t)
+        name, n, n_max, _n_scored(model, n_max), lead_in, contract.shape,
+        _alignment(model), contract.fields,
+        _n_supplied(contract.shape, y_t)
     )
 end
+
+# Whether a stream right-aligns its data against its expected series. The
+# per-time-point error families do, so a shorter series is scored at the end and
+# the earlier expected values are unobserved run-in. An `Aggregate` indexes its
+# data by a presence mask over the expected series, and a `ReportTriangle`
+# asserts its reference days, so neither tolerates a length that differs.
+_alignment(model::AbstractObservationModel) = _alignment(_wrapped_model(model))
+_alignment(::Nothing) = :right
+_alignment(::Aggregate) = :exact
+_alignment(::ReportTriangle) = :exact
 
 # Pick a stream's share of a per-stream value; a value shared across streams (a
 # common lead-in, or one series reaching every stream) passes through unchanged.
@@ -471,7 +521,9 @@ Base.show(io::IO, s::StreamRequirement) = _show_stream(io, s)
 
 function _show_stream(io::IO, s::StreamRequirement)
     print(io, s.name, ": ", _supply_description(s))
-    s.n_scored == s.n_required ||
+    s.n_max == s.n_required ||
+        print(io, " (up to ", s.n_max, " if earlier data exists)")
+    s.n_scored == s.n_max ||
         print(io, ", ", s.n_scored, " of them scored")
     s.lead_in == 0 || print(io, ", after a lead-in of ", s.lead_in)
     s.n_supplied === nothing && return
@@ -502,30 +554,66 @@ function _check_observation_count(model, y_t, n::ModelShape)
     lead_in = observation_lead_in(chain)
     streams = _stream_models(chain)
     n_time = _n_time(n)
+    deepest = _max_lead_in(lead_in)
     streams === nothing &&
-        return _check_stream(:y_t, chain, lead_in, y_t, n_time)
+        return _check_stream(:y_t, chain, lead_in, deepest, y_t, n_time)
     for k in keys(streams)
         _check_stream(
-            k, streams[k], _stream(lead_in, k), _stream(y_t, k), n_time
+            k, streams[k], _stream(lead_in, k), deepest, _stream(y_t, k),
+            n_time
         )
     end
     return nothing
 end
 
-function _check_stream(name::Symbol, model, lead_in::Int, y_t, n::Int)
+function _check_stream(
+        name::Symbol, model, lead_in::Int, deepest::Int, y_t, n::Int
+    )
     supplied = _n_supplied(_data_contract(_consumer(model)).shape, y_t)
-    (supplied === nothing || supplied == n) && return nothing
-    hint = n - supplied == lead_in && lead_in > 0 ?
-        " `n` is the number of observations, not the length of the infection " *
-        "series: the shortfall is exactly this chain's lead-in, so this looks " *
-        "like the pre-0.2.0 `n = length(y) + observation_lead_in(model)`. " *
-        "Pass `length(y)`." :
-        " Pass one value per observation, and `missing` for any time point " *
-        "with no data."
+    supplied === nothing && return nothing
+    n_max = n + deepest - lead_in
+    supplied > n_max && throw(
+        ArgumentError(
+            "as_turing_model: stream `$name` is scored against $n_max " *
+                "expected values but $supplied observations were supplied, " *
+                "so the first $(supplied - n_max) would never be scored. `n` " *
+                "is the number of observations."
+        )
+    )
+    _check_exact_length(Val(_alignment(model)), name, supplied, n_max)
+    return _check_pre_020(name, supplied, lead_in, n)
+end
+
+# An exact-length component cannot right-align at all, so a series of the wrong
+# length is a call that will fail rather than one that scores what it has.
+_check_exact_length(::Val, name, supplied, n_max) = nothing
+function _check_exact_length(alignment::Val{:exact}, name, supplied, n_max)
+    supplied == n_max && return nothing
     throw(
         ArgumentError(
-            "as_turing_model: stream `$name` needs $n observations but " *
-                "$supplied were supplied." * hint
+            "as_turing_model: stream `$name` takes exactly $n_max values but " *
+                "$supplied were supplied. An aggregation or a reporting " *
+                "triangle is indexed against the expected series rather than " *
+                "right-aligned to it."
+        )
+    )
+end
+
+# A shortfall of exactly the chain's lead-in is the pre-0.2.0 idiom, where `n`
+# was the infection series length and the caller added the lead-in by hand.
+# Every observation would still be scored, but against a model run over a
+# longer series than the caller means, so name it.
+function _check_pre_020(name, supplied, lead_in, n)
+    (lead_in > 0 && n - supplied == lead_in) || return nothing
+    throw(
+        ArgumentError(
+            "as_turing_model: stream `$name` was given $supplied " *
+                "observations for a model asked to cover $n, short by " *
+                "exactly this chain's lead-in, which is the pre-0.2.0 " *
+                "meaning of `n`. `n` is now the number of observations, not " *
+                "the length of the infection series: pass `length(y)`. If the " *
+                "stream really does have that many fewer observations, pad " *
+                "its head with `missing`."
         )
     )
 end
