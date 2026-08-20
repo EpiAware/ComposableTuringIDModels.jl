@@ -378,3 +378,42 @@ end
         sum(logpdf.(SafePoisson.(out.expected.deaths .+ 1.0e-6), y_t.deaths))
     @test logjoint(mdl, VarInfo(mdl)) ≈ ref
 end
+
+@testitem "IDModel scores unpadded data on streams of unequal lead-in" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: VarInfo, logjoint
+    Random.seed!(286)
+
+    # A 4-day delay drops 3 days, an 11-day delay drops 10, so one series
+    # length cannot give both streams as many expected values as they have
+    # observations.
+    obs = Split(
+        (
+            cases = LatentDelay(PoissonError(), fill(1 / 4, 4)),
+            deaths = LatentDelay(PoissonError(), fill(1 / 11, 11)),
+        )
+    )
+    model = IDModel(
+        Renewal(;
+            generation_time = [0.2, 0.3, 0.5], rt = RandomWalk(),
+            initialisation = Normal()
+        ),
+        obs
+    )
+
+    n = 40
+    n_obs = n - 10
+    y_t = (cases = fill(20, n_obs), deaths = fill(5, n_obs))
+
+    mdl = as_turing_model(model, y_t, n)
+    out = mdl()
+    @test length(out.expected_y_t.cases) == n - 3
+    @test length(out.expected_y_t.deaths) == n_obs
+
+    # Nothing is dropped from the head of the shorter-lead-in stream: at the
+    # same latent draw, moving its earliest observation moves the log-joint.
+    vi = VarInfo(mdl)
+    moved = (cases = vcat(60, y_t.cases[2:end]), deaths = y_t.deaths)
+    @test logjoint(as_turing_model(model, moved, n), vi) !=
+        logjoint(mdl, vi)
+end
