@@ -4,6 +4,10 @@
 A Poisson distribution parameterised by its mean `λ` that avoids `InexactError`
 for very large means.
 
+Construction does not validate `λ`, since it may transiently be an
+out-of-domain value on the automatic-differentiation path. `rand` validates
+instead, raising a `DomainError` naming `λ`.
+
 # Examples
 ```jldoctest SafePoisson; output = false
 using ComposableTuringIDModels, Distributions
@@ -153,5 +157,8 @@ function _ad_rand(rng::AbstractRNG, λ)
 end
 
 function Base.rand(rng::AbstractRNG, d::SafePoisson)
+    d.λ >= zero(d.λ) || throw(
+        DomainError(d.λ, "SafePoisson: λ (the mean) must be non-negative.")
+    )
     return d.λ < 6 ? _count_rand(rng, d.λ) : _ad_rand(rng, d.λ)
 end
