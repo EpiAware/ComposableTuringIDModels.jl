@@ -195,6 +195,18 @@ rejects it.
   - `kernel`: the covariance kernel, a KernelFunctions.jl `Kernel` (default
     `SqExponentialKernel()`).
 
+## Sampled variables
+
+``\ell`` and ``\sigma`` are sampled under those names, and the `m` basis
+weights as `β`, so a chain reads as `chain[:σ]` and a value is pinned with
+`fix(model, (ℓ = 0.5, σ = 0.5))`.
+
+Those names reach the top level of a composed model unprefixed, where `σ`
+collides with the `σ` of an error model such as [`NormalError`](@ref) and
+`check_model` fails. Wrap the process in [`PrefixLatentModel`](@ref) and its
+hyperparameters become `gp.ℓ` and `gp.σ`. [Composable design](@ref) covers
+why names are generic and prefixes local.
+
 # Examples
 ```@example HilbertSpaceGP
 using ComposableTuringIDModels, Distributions
@@ -207,6 +219,21 @@ A rougher prior with a Matérn-3/2 kernel:
 ```@example HilbertSpaceGP
 gp_matern = HilbertSpaceGP(kernel = Matern32Kernel())
 length(as_turing_model(gp_matern, 30)())
+```
+
+Composed with an error model that owns a `σ` of its own, prefixed so the two
+scales stay apart:
+```@example HilbertSpaceGP
+using DynamicPPL: VarInfo
+composed = IDModel(
+    Renewal(;
+        generation_time = [0.3, 0.4, 0.3],
+        rt = PrefixLatentModel(; model = gp, prefix = \"gp\"),
+        initialisation = Normal()
+    ),
+    NormalError()
+)
+keys(VarInfo(as_turing_model(composed, fill(10.0, 20), 20)))
 ```
 "
 struct HilbertSpaceGP{
