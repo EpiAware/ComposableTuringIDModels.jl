@@ -138,13 +138,13 @@ end
     Random.seed!(12)
     obs = LatentDelay(PoissonError(), truncated(Normal(5.0, 2.0), 0.0, Inf))
     Y_t = fill(10.0, 30)
+    # LatentDelay drops the partially observed head of the convolution, so a
+    # predictive draw is the convolved series rather than the series it was
+    # handed, and every entry of it is drawn.
     sim = as_turing_model(obs, missing, Y_t)().y_t
-    @test length(sim) == length(Y_t)
-    # LatentDelay deliberately leaves the head of the series unobserved
-    # (partially observed data), so only the non-missing tail is filled.
-    observed = filter(!ismissing, sim)
-    @test !isempty(observed)
-    @test all(>=(0), observed)
+    @test length(sim) == length(Y_t) - observation_lead_in(obs)
+    @test !isempty(sim)
+    @test all(>=(0), sim)
 end
 
 @testitem "safe count distributions tolerate very large means" begin
@@ -157,6 +157,29 @@ end
     p = bigλ / σ²
     r = bigλ * p / (1 - p)
     @test rand(SafeNegativeBinomial(r, p)) >= 0
+end
+
+@testitem "an expected series longer than the data is right-aligned" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: MissingObservations
+    using DynamicPPL: VarInfo, logjoint
+
+    # The model runs longer than the data. The extra leading expected values
+    # are unobserved run-in and every observation is still scored against the
+    # day it belongs to.
+    Y_t = collect(10.0:1.0:19.0)
+    y = [12, 13, 14, 15]
+
+    mdl = as_turing_model(PoissonError(), y, Y_t)
+    ref = sum(logpdf.(SafePoisson.(Y_t[(end - 3):end] .+ 1.0e-6), y))
+    @test logjoint(mdl, VarInfo(mdl)) ≈ ref
+
+    # A `MissingObservations` carrier takes the same alignment: the observed
+    # entries come back as given and the gap is drawn.
+    carrier = MissingObservations([12, 0, 14, 15], Bool[1, 0, 1, 1])
+    out = as_turing_model(PoissonError(), carrier, Y_t)()
+    @test length(out.y_t) == 4
+    @test out.y_t[[1, 3, 4]] == [12, 14, 15]
 end
 
 @testitem "SafeNegativeBinomial rejects an invalid shape or success probability" begin

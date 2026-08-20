@@ -37,6 +37,13 @@ stream is itself jointly correlated across time (e.g. an exact-GP `MvNormal`)
 would instead need its tail drawn conditional on the history; `forecast` detects
 that generically and errors rather than returning a mis-calibrated forecast.
 
+## The series length the fit used
+
+The horizon model is rebuilt over `length(y) + horizon` observations, and
+[`as_turing_model`](@ref) covers the observation chain's lead-in on top of that,
+exactly as it did for the fit. So a chain with a [`LatentDelay`](@ref) in it
+needs nothing said about its lead-in here either.
+
 # Arguments
 
   - `model`: the fitted [`IDModel`](@ref) (or an [`IDProblem`](@ref)).
@@ -145,6 +152,7 @@ function _extend_latent_draws(rng::AbstractRNG, fc_model, chain)
         sample isa AbstractVector && (resized[key] = length(sample))
     end
     isempty(resized) && return extended
+    _assert_fit_length(rng, fc_model, resized)
     _assert_factorised(rng, fc_model, resized)
     ni, nc = size(chain)
     for j in 1:nc, i in 1:ni
@@ -159,6 +167,28 @@ function _extend_latent_draws(rng::AbstractRNG, fc_model, chain)
         end
     end
     return extended
+end
+
+# Guard on the series length the horizon model is rebuilt at. A stream the
+# forecast model draws LESS of than the chain holds means the fit ran over a
+# longer series than `length(y) + horizon` observations imply, so the chain and
+# the horizon model disagree about the times being scored. Splicing cannot
+# repair that, and evaluating it anyway would score the observations against the
+# wrong times.
+function _assert_fit_length(rng::AbstractRNG, fc_model, resized)
+    prior = Dict(vn => val for (vn, val) in pairs(rand(rng, fc_model)))
+    for (key, fit_len) in resized
+        full_len = length(prior[key.name])
+        full_len < fit_len && error(
+            "forecast: the chain holds `$(key.name)` at length $fit_len but " *
+                "the model rebuilt over the horizon draws only $full_len, so " *
+                "it was fitted over a longer series than the horizon model " *
+                "covers. Fit and forecast the same model over the same " *
+                "observations: `n` counts observations, and `y` here must be " *
+                "the series the model was fitted to."
+        )
+    end
+    return nothing
 end
 
 # Correctness guard for the independent-tail extension above. Splicing an

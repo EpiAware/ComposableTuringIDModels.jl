@@ -511,8 +511,8 @@ end
     obs = LatentDelay(PoissonError(), u)
     Y = fill(100.0, 40)
     sim = as_turing_model(obs, missing, Y)().y_t
-    @test length(sim) == length(Y)
-    @test all(>=(0), filter(!ismissing, sim))
+    @test length(sim) == length(Y) - observation_lead_in(obs)
+    @test all(>=(0), sim)
 end
 
 @testitem "LatentDelay recovers an uncertain delay's parameters" tags = [:sample] begin
@@ -633,7 +633,7 @@ end
     exp_tv = as_turing_model(obs, missing, fill(100.0, n))().expected
     @test length(exp_tv) == n - d + 1
     sim = as_turing_model(obs, missing, fill(100.0, n))().y_t
-    @test length(sim) == n
+    @test length(sim) == n - d + 1
     # The sampled per-time delay parameters are namespaced under `delay`.
     names = string.(
         collect(
