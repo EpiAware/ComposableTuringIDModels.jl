@@ -36,7 +36,7 @@ struct RandomWalk{D <: PriorLike, E <: PriorLike} <: AbstractLatentModel
 end
 
 function RandomWalk(; init = Normal(), ϵ_t = HierarchicalNormal())
-    return RandomWalk(init, _path_prior(ϵ_t))
+    return RandomWalk(init, path_prior(ϵ_t))
 end
 
 @model function as_turing_model(model::RandomWalk, n::Int)

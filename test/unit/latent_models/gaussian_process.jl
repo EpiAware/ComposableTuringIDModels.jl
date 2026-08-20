@@ -343,14 +343,7 @@ end
     using ComposableTuringIDModels, Distributions, Random, Turing
     using DynamicPPL: DebugUtils, VarInfo, @varname
     Random.seed!(268)
-    # A GP `R_t` with a Gaussian observation error is a standard pairing, and
-    # both components name their marginal standard deviation `σ`. A latent
-    # process composes into its host prefix-off, so bare they land on one
-    # variable: `check_model` fails and `sample` refuses to run.
-    #
-    # The names stay generic and the user prefixes where the conflict is. This
-    # pins both halves of that contract, because the failure is only useful if
-    # the documented fix really works.
+    # Pins both halves: bare fails `check_model`, prefixed passes.
     for gp in (HilbertSpaceGP(; m = 5), ExactGP())
         composed(rt) = as_turing_model(
             IDModel(

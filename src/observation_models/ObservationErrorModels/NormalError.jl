@@ -19,7 +19,7 @@ concentrations) where a Gaussian likelihood is appropriate.
 The field `std` sets the prior for ``\sigma`` — a `Distribution` (a constant, one
 scalar RV) or a process (a length-`n`, e.g. time-varying, standard deviation). It
 is drawn through the single [`as_turing_submodel`](@ref) seam and read per time
-point via `_at`, so a process makes the observation noise time-varying with no
+point via `at`, so a process makes the observation noise time-varying with no
 other change.
 
 # Examples

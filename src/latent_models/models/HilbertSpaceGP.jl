@@ -198,19 +198,14 @@ rejects it.
 ## Sampled variables
 
 ``\ell`` and ``\sigma`` are sampled under those names, and the `m` basis
-weights as `β`. The names say what the parameters are rather than which
-component owns them, so a chain reads as `chain[:σ]` and a value is pinned
-with `fix(model, (ℓ = 0.5, σ = 0.5))`.
+weights as `β`, so a chain reads as `chain[:σ]` and a value is pinned with
+`fix(model, (ℓ = 0.5, σ = 0.5))`.
 
-A latent process composes into its host without a prefix, so those names reach
-the top level of a composed model. An observation error model draws its own
-`σ`, so a bare Gaussian process beside [`NormalError`](@ref) puts two
-parameters on one variable: `check_model` fails and `sample` refuses to run.
-Prefix the process where that conflict happens, with
-[`PrefixLatentModel`](@ref), and the hyperparameters become `gp.ℓ` and `gp.σ`
-beside the error model's `σ`. [`CombineLatentModels`](@ref) and
-[`ConcatLatentModels`](@ref) prefix their components already, so a Gaussian
-process reached through one of those needs nothing.
+Those names reach the top level of a composed model unprefixed, where `σ`
+collides with the `σ` of an error model such as [`NormalError`](@ref) and
+`check_model` fails. Wrap the process in [`PrefixLatentModel`](@ref) and its
+hyperparameters become `gp.ℓ` and `gp.σ`. [Composable design](@ref) covers
+why names are generic and prefixes local.
 
 # Examples
 ```@example HilbertSpaceGP

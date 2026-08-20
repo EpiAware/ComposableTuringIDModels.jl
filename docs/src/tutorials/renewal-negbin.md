@@ -161,7 +161,7 @@ n = length(y_obs)
 ## Fit
 
 Conditioning on the observed counts and sampling with NUTS recovers the
-posterior. We draw two chains in parallel with `MCMCThreads()` so the posterior
+posterior. We draw four chains in parallel with `MCMCThreads()` so the posterior
 is well resolved and the cross-chain ``\hat R`` diagnostic is available; the
 slightly raised target acceptance rate keeps the sampler stable on the
 hierarchical innovation scale. We differentiate with
@@ -172,12 +172,17 @@ this package (see [Automatic differentiation backend](@ref ad-backends)).
 posterior = as_turing_model(model, y_obs, n)
 chain = sample(
     posterior, NUTS(0.95; adtype = AutoMooncake(; config = nothing)),
-    MCMCThreads(), 250, 2; progress = false)
+    MCMCThreads(), 250, 4; progress = false)
 nothing # hide
 ```
 
-Sampling returns a chain whose parameters are namespaced by the component slot
-that samples them, so a prior's inner variables never collide across the model.
+Sampling returns a chain whose parameter names are flat: composition does not
+namespace by default, so a component's own parameter keeps its plain name
+however deeply it is nested — `damp` and `std` below belong to the AR
+process folded into the renewal model.
+A few components deliberately prefix their children, and two components that
+would otherwise use the same name are separated by wrapping one in
+`PrefixLatentModel` or `PrefixObservationModel`.
 `sample` returns a
 [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which
 `summarystats` summarises directly — no conversion step — giving point estimates

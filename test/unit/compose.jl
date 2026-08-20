@@ -206,26 +206,12 @@ end
 @testitem "every latent × error-model pairing keeps its names apart" begin
     using ComposableTuringIDModels, Distributions
     using DynamicPPL: DebugUtils
-    # A name clash between two components is invisible until they are
-    # composed: each is fine alone, and the composed model only warns that one
-    # assignment overwrote another. Sweeping the latent processes against the
-    # error families is the cheap net for that whole class.
-    #
-    # Components name their parameters for what they are, not for who owns
-    # them, and a latent process composes into its host prefix-off. So two
-    # components CAN reach for the same name, and the fix is a prefix applied
-    # where the conflict happens rather than a longer name everywhere. Both
-    # Gaussian processes sample a marginal standard deviation `σ`, and so does
-    # `NormalError`: those two pairings are the conflict, and the sweep pins
-    # both halves of the contract — where it collides, and that a
-    # `PrefixLatentModel` fixes it.
-    #
-    # `BinomialError` is left out: it needs a trials series in the data rather
-    # than the plain vector used here, and it draws no parameters of its own.
+    # Pins that only the Gaussian processes collide, and only on `σ`.
     latents = (
         RandomWalk(), AR(), MA(), IID(Normal()), Intercept(Normal()),
         HierarchicalNormal(), HilbertSpaceGP(; m = 5), ExactGP(),
     )
+    # `BinomialError` needs a trials series, so it is out of the sweep.
     errors = (PoissonError(), NegativeBinomialError(), NormalError())
     n = 20
     function checks(latent, error_model)
@@ -239,13 +225,10 @@ end
         return DebugUtils.check_model(mdl; error_on_failure = false)
     end
     for latent in latents, error_model in errors
-        # A Gaussian process and `NormalError` both draw a bare `σ`; nothing
-        # else in the sweep shares a name.
         collides = latent isa Union{HilbertSpaceGP, ExactGP} &&
             error_model isa NormalError
         @test checks(latent, error_model) == !collides
-        # Prefixing the latent is the documented fix, and it has to work for
-        # every pairing, not just the colliding ones.
+        # Prefixing must work for every pairing, not just the colliding one.
         prefixed = PrefixLatentModel(; model = latent, prefix = "latent")
         @test checks(prefixed, error_model)
     end

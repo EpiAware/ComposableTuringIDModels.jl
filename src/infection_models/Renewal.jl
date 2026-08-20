@@ -158,7 +158,7 @@ function Renewal(;
         generation_time, mixing; D_gen = D_gen, Δd = Δd
     )
     return Renewal(
-        gen_int, transformation, _path_prior(rt), initialisation,
+        gen_int, transformation, path_prior(rt), initialisation,
         recurrent_step, mixing
     )
 end
@@ -178,7 +178,7 @@ function Renewal(
     core = _renewal_step(gen_int, mixing)
     recurrent_step = RenewalStep(core, modifiers)
     return Renewal(
-        gen_int, transformation, _path_prior(rt), initialisation,
+        gen_int, transformation, path_prior(rt), initialisation,
         recurrent_step, mixing
     )
 end
