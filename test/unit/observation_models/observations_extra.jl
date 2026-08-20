@@ -705,3 +705,56 @@ end
     fc = forecast(model, y, chain, 7)
     @test size(fc, 1) == size(chain, 1)
 end
+
+@testitem "A delay nested in an Aggregate right-aligns on windows" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(292)
+    # Weekly reporting over 28 days: the present windows end on days 7, 14, 21
+    # and 28. A spike on the last day of each window makes the window totals
+    # 1, 2, 3, 4, so the delayed series says which units the delay is in.
+    aggregation = [0, 0, 0, 0, 0, 0, 7]
+    Y = zeros(28)
+    Y[7], Y[14], Y[21], Y[28] = 1.0, 2.0, 3.0, 4.0
+    # A point mass at the third PMF entry is a lag of two.
+    pmf = [0.0, 0.0, 1.0]
+
+    # Delay inside: the daily series is summed into windows first, so the lag is
+    # two *windows* (14 days). The 4 window totals become 2 delayed windows,
+    # which land on the last two present days.
+    inside = as_turing_model(
+        Aggregate(LatentDelay(PoissonError(), pmf), aggregation), missing, Y
+    )()
+    @test length(inside.expected) == 28
+    @test inside.expected[[7, 14, 21, 28]] == [0.0, 0.0, 1.0, 2.0]
+    @test all(iszero, inside.expected[setdiff(1:28, [21, 28])])
+
+    # Delay outside: the daily series is delayed first, so the lag is two *days*
+    # and each window total shifts by one window's worth of spike.
+    outside = as_turing_model(
+        LatentDelay(Aggregate(PoissonError(), aggregation), pmf), missing, Y
+    )()
+    @test length(outside.expected) == 28
+    @test outside.expected[[7, 14, 21, 28]] == [0.0, 1.0, 2.0, 3.0]
+
+    # The reported issue: a nested delay must not break model construction.
+    obs = Aggregate(LatentDelay(PoissonError(), fill(1 / 3, 3)), aggregation)
+    idm = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal(1.0, 0.5)),
+        obs
+    )
+    @test length(rand(as_turing_model(idm, fill(10, 28), 28))) > 0
+
+    # A delay exactly as long as the window series leaves a single window.
+    one_left = as_turing_model(
+        Aggregate(LatentDelay(PoissonError(), fill(0.25, 4)), aggregation),
+        missing, Y
+    )()
+    @test count(!=(0), one_left.expected) == 1
+    @test one_left.expected[28] ≈ sum(1:4) / 4
+
+    # A delay longer than the window series has nothing to align to.
+    @test_throws Exception as_turing_model(
+        Aggregate(LatentDelay(PoissonError(), fill(0.2, 5)), aggregation),
+        missing, Y
+    )()
+end
