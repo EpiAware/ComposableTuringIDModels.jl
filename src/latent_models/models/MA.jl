@@ -40,7 +40,7 @@ struct MA{C <: PriorLike, Q <: Int, E <: PriorLike} <: AbstractLatentModel
 
     function MA(θ, q::Int, ϵ_t)
         @assert q > 0 "q must be greater than 0"
-        _assert_prior_length(θ, q, "θ")
+        assert_prior_length(θ, q, "θ")
         return new{typeof(θ), typeof(q), typeof(ϵ_t)}(θ, q, ϵ_t)
     end
 end
@@ -53,8 +53,8 @@ function MA(;
         θ = [truncated(Normal(0.0, 0.05), -1, 1)],
         ϵ_t = HierarchicalNormal()
     )
-    q = _prior_order(θ)
-    return MA(θ, q, _path_prior(ϵ_t))
+    q = prior_order(θ)
+    return MA(θ, q, path_prior(ϵ_t))
 end
 
 @model function as_turing_model(model::MA, n::Int)

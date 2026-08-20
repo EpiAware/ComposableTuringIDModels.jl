@@ -10,7 +10,7 @@ through one general mechanism that any component can use:
     **time-varying** parameter — a whole path, one value per step.
 
 The component reads the parameter the same way at every step
-(`ComposableTuringIDModels._at(ρ, t)`), so a single recursion serves both cases.
+(`ComposableTuringIDModels.at(ρ, t)`), so a single recursion serves both cases.
 Here we use the damping coefficient of an autoregressive process as the worked
 example, but the same widening applies to any scalar parameter.
 
