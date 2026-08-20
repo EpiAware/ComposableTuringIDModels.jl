@@ -134,14 +134,16 @@ export IDProblem, NUTSampler, DirectSample,
 
 # --- extension points ---
 # Names a component author implements against but rarely calls: the shape
-# contract, the two seams that widen a model across strata, and the renewal
-# step/modifier interfaces. Public but not exported, so they are documented and
-# supported without crowding the namespace of a `using` call.
+# contract, the two seams that widen a model across strata, the renewal
+# step/modifier interfaces, and the observation-chain traversal seam. Public but
+# not exported, so they are documented and supported without crowding the
+# namespace of a `using` call.
 public ModelShape, across_shape, infection_strata,
     AbstractAccumulationStep, AbstractConstantRenewalStep,
     ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
     apply_modifier, renewal_foi, renewal_init_state, renewal_init_window,
-    MissingObservations
+    MissingObservations,
+    wrapped_models, observation_components, rewrap
 
 # --- core architecture ---
 include("base/base.jl")
@@ -235,6 +237,11 @@ include("observation_models/Split.jl")
 
 # --- composition ---
 include("compose.jl")
+
+# Structural traversal of an assembled observation chain. Included after the
+# composition so it can dispatch on `IDModel` as well as on every observation
+# component.
+include("observation_models/traversal.jl")
 
 # --- inference orchestration ---
 include("inference/types.jl")

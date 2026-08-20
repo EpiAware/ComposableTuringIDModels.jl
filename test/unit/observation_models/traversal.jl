@@ -185,9 +185,14 @@ end
     parts = observation_components(swapped)
     @test !any(x -> x isa PoissonError, parts)
     @test count(x -> x isa NegativeBinomialError, parts) == 2
-    # Every wrapper survives the rebuild, in the same order and shape.
-    @test map(nameof ∘ typeof, parts) ==
-        map(nameof ∘ typeof, observation_components(obs))
+    # Every wrapper survives the rebuild, in the same order and shape; only
+    # the leaves the swap targeted have changed.
+    wrappers(chain) = [
+        nameof(typeof(x))
+            for x in chain if !(x isa AbstractObservationErrorModel)
+    ]
+    @test wrappers(parts) == wrappers(observation_components(obs))
+    @test length(parts) == length(observation_components(obs))
     # The original is untouched.
     @test count(x -> x isa PoissonError, observation_components(obs)) == 2
 end

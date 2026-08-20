@@ -2,6 +2,13 @@ Changes are documented in Github releases.
 
 ## Unreleased
 
+  - An observation chain can now be inspected and rewritten through a supported
+    API rather than by field path. `wrapped_models` reports what a single
+    component wraps, `observation_components` walks a whole chain outermost
+    first with a `Split`'s branches followed in stream order, and `rewrap`
+    rebuilds a component around new wrapped models. All three are public but
+    not exported.
+
   - Rebuilding an observation component no longer corrupts it. `LatentDelay`
     stores its delay PMF reversed, `Ascertainment` stores its prior already
     wrapped in a `PrefixLatentModel`, and `Aggregate` derives its presence
