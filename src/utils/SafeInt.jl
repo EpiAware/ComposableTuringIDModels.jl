@@ -34,7 +34,7 @@ function _require_finite_for_int(x::Real, caller::AbstractString = "_safe_int_fl
                 "SafeNegativeBinomial rate)."
         )
     )
-    return x
+    return nothing
 end
 
 function _safe_int_floor(x::Real)
