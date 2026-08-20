@@ -219,7 +219,11 @@ delayed = LatentDelay(
     LatentDelay(PoissonError(), fill(1 / 15, 15)), fill(1 / 30, 30))
 y = fill(10, 60)
 
-observation_lead_in(delayed), data_requirements(delayed, y, length(y))
+observation_lead_in(delayed)
+```
+
+```@example design
+data_requirements(delayed, y, length(y))
 ```
 
 [`data_fits`](@ref) is the same question as a yes or no, and supplying the wrong

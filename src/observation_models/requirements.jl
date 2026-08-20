@@ -457,6 +457,18 @@ function Base.show(io::IO, ::MIME"text/plain", s::StreamRequirement)
     return _show_stream(io, s)
 end
 
+# Compact forms, for a report nested inside something else (a tuple in a
+# docstring example, a vector of reports). The struct's own field dump says
+# nothing a reader wants.
+function Base.show(io::IO, r::DataRequirements)
+    print(io, "DataRequirements(", r.n, " observations, ")
+    print(io, length(r.streams), " stream")
+    length(r.streams) == 1 || print(io, "s")
+    return print(io, ", series ", r.series_length, ")")
+end
+
+Base.show(io::IO, s::StreamRequirement) = _show_stream(io, s)
+
 function _show_stream(io::IO, s::StreamRequirement)
     print(io, s.name, ": ", _supply_description(s))
     s.n_scored == s.n_required ||
