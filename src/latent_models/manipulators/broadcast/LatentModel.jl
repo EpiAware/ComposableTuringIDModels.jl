@@ -93,7 +93,7 @@ struct BroadcastLatentModel{
         @assert period > 0 "period must be greater than 0"
         # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
         # an `Intercept` (a constant inner path), never left as a scalar.
-        wrapped = _path_prior(model)
+        wrapped = path_prior(model)
         return new{typeof(wrapped), typeof(period), typeof(broadcast_rule)}(
             wrapped, period, broadcast_rule
         )

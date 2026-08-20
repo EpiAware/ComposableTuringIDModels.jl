@@ -6,7 +6,7 @@ A negative-binomial observation-error model with an inferred cluster factor.
 The field `cluster_factor` sets the prior for the cluster factor — a
 `Distribution` (a constant, one scalar RV) or a process (a length-`n`, e.g.
 time-varying, overdispersion). It is drawn through the single
-[`as_turing_submodel`](@ref) seam and read per time point via `_at`, so a process
+[`as_turing_submodel`](@ref) seam and read per time point via `at`, so a process
 makes the overdispersion time-varying with no other change.
 
 # Examples

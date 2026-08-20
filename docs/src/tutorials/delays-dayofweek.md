@@ -162,14 +162,14 @@ nothing # hide
 
 Fitting conditions on the observed reports, differentiating with the recommended
 [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) backend (see
-[Automatic differentiation backend](@ref ad-backends)). We draw two chains in
+[Automatic differentiation backend](@ref ad-backends)). We draw four chains in
 parallel with `MCMCThreads()`, which gives a cross-chain ``\hat R``:
 
 ```@example delays
 posterior = as_turing_model(problem, (y_t = y_obs,))
 chain = sample(
     posterior, NUTS(0.95; adtype = AutoMooncake(; config = nothing)),
-    MCMCThreads(), 250, 2; progress = false)
+    MCMCThreads(), 250, 4; progress = false)
 nothing # hide
 ```
 

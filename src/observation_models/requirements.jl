@@ -40,9 +40,11 @@ built to cover the deepest of them.
 
 A lead-in is counted on the axis the delay sits on, and an [`Aggregate`](@ref)
 moves that axis onto reporting windows. A delay nested *inside* an aggregation
-therefore consumes windows rather than time points, which is not a series
-length, and this raises rather than converting between the two. Apply the delay
-outside the aggregation instead.
+therefore consumes windows, which are taken from the series the aggregation was
+already given, so it reports `0`: the infection series does not lengthen, and
+what the delay costs is scored windows rather than time points. A delay applied
+*outside* an aggregation sits on the time axis and lengthens the series as
+usual.
 
 ## Arguments
 
@@ -134,23 +136,14 @@ function observation_lead_in(model::Split)
     return allequal(values(lead_ins)) ? first(values(lead_ins)) : lead_ins
 end
 
-# An aggregation moves the axis: what it wraps consumes reporting windows rather
-# than time points, and a window is not a time point, so a delay nested inside
-# one has no lead-in expressible as a series length. Say so rather than adding
-# windows to a count of days. (A delay outside an aggregation is on the time
-# axis and is the ordinary case.)
-function observation_lead_in(model::Aggregate)
-    inner = observation_lead_in(model.model)
-    inner == 0 && return 0
-    throw(
-        ArgumentError(
-            "A delay nested inside an `Aggregate` consumes reporting windows, " *
-                "not time points, so the series length it implies cannot be " *
-                "derived. Apply the delay outside the aggregation: " *
-                "`LatentDelay(Aggregate(model, windows), pmf)`."
-        )
-    )
-end
+# An aggregation moves the axis: what it wraps consumes reporting WINDOWS rather
+# than time points. Those windows are drawn from the series the aggregation was
+# already given, and the ones a nested delay consumes are simply left
+# unpredicted, so nothing about the infection series changes and the lead-in in
+# time points is zero. What does change is how many windows are scored, which
+# `_n_scored` reads off the same nesting. (A delay applied OUTSIDE an
+# aggregation is on the time axis and is the ordinary lengthening case.)
+observation_lead_in(::Aggregate) = 0
 
 # The lead-in the infection series has to cover. A chain consumes its own lead-in
 # from the head of the series; a `Split`'s streams consume theirs in parallel, so
@@ -414,6 +407,17 @@ end
 # the earlier expected values are unobserved run-in. An `Aggregate` indexes its
 # data by a presence mask over the expected series, and a `ReportTriangle`
 # asserts its reference days, so neither tolerates a length that differs.
+# Whether a component reads its data on the calendar it was handed rather than
+# on the convolved series. Only an `Aggregate` does: its reporting windows are
+# indexed off `length(y_t)`, and it right-aligns a shorter expected series
+# against them. A `ReportTriangle` builds its triangle from the series it
+# actually reads, so it does not.
+_needs_input_calendar(model::AbstractObservationModel) = _needs_input_calendar(
+    _wrapped_model(model)
+)
+_needs_input_calendar(::Nothing) = false
+_needs_input_calendar(::Aggregate) = true
+
 _alignment(model::AbstractObservationModel) = _alignment(_wrapped_model(model))
 _alignment(::Nothing) = :right
 _alignment(::Aggregate) = :exact
@@ -460,8 +464,12 @@ _n_scored(model::AbstractObservationModel, n::Int) = _n_scored(
     _wrapped_model(model), n
 )
 _n_scored(::Nothing, n::Int) = n
-_n_scored(model::Aggregate, n::Int) =
-    _n_scored(model.model, count(_present_mask(model, n)))
+# The windows an `Aggregate` closes, less those a nested delay leaves
+# unpredicted: inside an aggregation a delay's lead-in is counted in windows.
+function _n_scored(model::Aggregate, n::Int)
+    windows = count(_present_mask(model, n))
+    return _n_scored(model.model, max(0, windows - observation_lead_in(model.model)))
+end
 
 # The presence mask an `Aggregate` applies over `n` time points, broadcast by
 # the same rule the model itself uses so the two agree on which points report.
