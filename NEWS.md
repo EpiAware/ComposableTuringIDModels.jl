@@ -45,10 +45,12 @@ Changes are documented in Github releases.
     why a model runs longer than its data.
 
     The old call is **detected, not reinterpreted**: passing
-    `length(y) + observation_lead_in(model)` now asks for more observations
-    than were supplied, short by exactly the lead-in, and raises an
-    `ArgumentError` naming the change. Any other mismatch between `n` and the
-    data supplied is an error too.
+    `length(y) + observation_lead_in(model)` leaves the data short by exactly
+    the chain's lead-in, and that raises an `ArgumentError` naming the change.
+    Supplying more observations than a chain can score, whose head would never
+    enter the likelihood, is an error too. Supplying fewer is not: the data is
+    right-aligned, so a series that starts later is scored at the end and the
+    earlier expected values are unobserved.
 
     An `IDProblem`'s `tspan` is likewise the span of the observations, and
     `forecast` takes no `n`: it extends the observations by the horizon and
@@ -63,8 +65,8 @@ Changes are documented in Github releases.
     `BinomialError`, a reference-day × delay matrix for `ReportTriangle`, a
     full series of which an `Aggregate` scores one entry per reporting window).
     Pass the data too and each stream reports what was supplied alongside;
-    `data_fits` is the same question as a yes or no. The report is printable,
-    indexable by stream name, and iterable.
+    `data_fits` answers whether every observation supplied would be scored. The
+    report is printable, indexable by stream name, and iterable.
 
   - `observation_lead_in` reports how many leading time points an observation
     chain consumes, walking the chain through the `wrapped_models` traversal

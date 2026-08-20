@@ -233,15 +233,20 @@ end
     @test occursin("number of observations", err.msg)
     @test occursin("pre-0.2.0", err.msg)
 
-    # Any other mismatch is an error too, without the historical hint.
-    short = try
-        as_turing_model(model, fill(10, 30), 40)
+    # More observations than the model can score is an error too: their head
+    # would never enter the likelihood, which is the failure being removed.
+    over = try
+        as_turing_model(model, fill(10, 60), 40)
         nothing
     catch e
         e
     end
-    @test short isa ArgumentError
-    @test !occursin("pre-0.2.0", short.msg)
+    @test over isa ArgumentError
+    @test occursin("never be scored", over.msg)
+
+    # Fewer is not an error: the data is right-aligned, so a series that starts
+    # later is scored at the end and the earlier expected values are unobserved.
+    @test as_turing_model(model, fill(10, 30), 40) isa Any
 
     # Simulating has no data to disagree with.
     @test as_turing_model(model, missing, 40) isa Any
@@ -263,9 +268,11 @@ end
     @test stream === req[1] === only(collect(req))
     @test stream.name === :y_t
     @test stream.n_required == 60
+    @test stream.n_max == 60
     @test stream.n_scored == 60
     @test stream.lead_in == 43
     @test stream.shape === :series
+    @test stream.alignment === :right
     @test stream.fields == ()
     @test stream.n_supplied === nothing
     @test data_fits(req)
@@ -273,7 +280,9 @@ end
 
     # With data, each stream also says how much was supplied.
     @test data_requirements(model, fill(10, 60), 60)[:y_t].n_supplied == 60
-    @test !data_fits(model, fill(10, 59), 60)
+    # More than the chain can score does not fit; less does, right-aligned.
+    @test !data_fits(model, fill(10, 61), 60)
+    @test data_fits(model, fill(10, 59), 60)
     @test data_fits(model, missing, 60)
 
     # An `IDProblem` reads the observation count from its `tspan`.
@@ -283,7 +292,7 @@ end
     )
     @test data_requirements(problem).series_length == 103
     @test data_fits(data_requirements(problem, (; y_t = fill(10, 60))))
-    @test !data_fits(data_requirements(problem, (; y_t = fill(10, 45))))
+    @test !data_fits(data_requirements(problem, (; y_t = fill(10, 61))))
 end
 
 @testitem "data_requirements reads each data shape's contract" begin
@@ -328,7 +337,10 @@ end
     built = define_y_t(tri, fill(2, n, 3), fill(20.0, n))
     @test data_requirements(tri, built, n)[:y_t].n_supplied == 30
     @test data_fits(tri, missing, n)
-    # Under a delay the triangle still takes one reference day per observation.
+    # A reporting triangle does not right-align, so its reference days must
+    # match exactly: one per observation, under a delay as without one.
+    @test triangle.alignment === :exact
+    @test !data_fits(tri, fill(2, n - 1, 3), n)
     delayed = LatentDelay(tri, pmf)
     @test data_fits(delayed, fill(2, n, 3), n)
     @test !data_fits(delayed, fill(2, n - 4, 3), n)
@@ -362,8 +374,16 @@ end
     )
     @test supplied[:cases].n_supplied == n
     @test supplied[:deaths].n_supplied == n - 5
-    @test !data_fits(supplied)
+    @test data_fits(supplied)
     @test data_fits(streams, fill(10, n), n)
+
+    # One series serves both streams, so it covers the deeper lead-in and the
+    # shallower stream can score earlier data if it has any. More than that
+    # does not fit.
+    @test req[:cases].n_max == n + 19 - 4
+    @test req[:deaths].n_max == n
+    @test data_fits(streams, (cases = fill(10, n + 15), deaths = fill(1, n)), n)
+    @test !data_fits(streams, (cases = fill(10, n + 16), deaths = fill(1, n)), n)
 
     # A stream taking `(; y, N)` data is read by its own contract, not unpacked
     # as if `N` were another stream.
@@ -390,7 +410,11 @@ end
     @test req.n_scored == 4
     @test req.lead_in == 0
     @test req.n_supplied == 28
+    @test req.alignment === :exact
     @test data_fits(weekly, fill(10, n), n)
+    # An aggregation indexes its data against the expected series rather than
+    # right-aligning to it, so a shorter series is a call that fails.
+    @test !data_fits(weekly, fill(10, n - 1), n)
 
     # A delay in front of the aggregation lengthens the series, not the data.
     delayed = LatentDelay(weekly, fill(1 / 8, 8))
@@ -413,8 +437,11 @@ end
     out = sprint(show, MIME"text/plain"(), data_requirements(streams, 40))
     @test occursin("40 observations per stream", out)
     @test occursin("infection series built at length 44", out)
-    @test occursin("cases: 40 values, after a lead-in of 4", out)
-    @test occursin("deaths: 40 values in each of `y`, `N`", out)
+    @test occursin(
+        "cases: 40 values, 4 of them scored, after a lead-in of 4", out
+    ) || occursin("cases: 40 values, after a lead-in of 4", out)
+    @test occursin("deaths: 40 values", out)
+    @test occursin("up to 44 if earlier data exists", out)
 
     # Supplying data adds what was supplied, and an aggregation says how much
     # of it is scored.
