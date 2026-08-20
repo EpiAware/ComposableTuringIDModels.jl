@@ -322,9 +322,10 @@ _delay_timevarying(::AbstractPriorModel) = false
 _delay_timevarying(::UncertainDelay{P, F, T, TV}) where {P, F, T, TV} = TV
 
 @model function as_turing_model(obs_model::LatentDelay, y_t, Y_t)
-    if ismissing(y_t)
-        y_t = Vector{Missing}(missing, length(Y_t))
-    end
+    # A `missing` series is passed down as it is, so the component that scores
+    # it sizes it from the CONVOLVED series it actually reads. Sizing it here
+    # instead would simulate a series as long as the input, with the lead-in at
+    # its head coming back as `missing` rather than not coming back at all.
     spec = obs_model.delay
     n = length(Y_t)
 

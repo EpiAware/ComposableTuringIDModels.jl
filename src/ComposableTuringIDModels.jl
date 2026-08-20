@@ -125,9 +125,9 @@ export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
 export Split, StrataMap
 
 # --- observation diagnostics ---
-# How much of the head of a series a delay chain drops, and how much of the
-# data survives it.
-export observation_lead_in, observation_coverage
+# What data a model needs, and how much of the series its delays consume.
+export data_requirements, data_fits, observation_lead_in
+export DataRequirements, StreamRequirement
 
 # --- composition ---
 export IDModel
@@ -241,9 +241,6 @@ include("observation_models/modifiers/PrefixObservationModel.jl")
 include("observation_models/modifiers/RecordExpectedObs.jl")
 include("observation_models/modifiers/TransformObservationModel.jl")
 include("observation_models/Split.jl")
-# Structural accessors over an assembled observation chain; included last so
-# every observation component it dispatches on is defined.
-include("observation_models/lead_in.jl")
 
 # --- composition ---
 include("compose.jl")
@@ -252,6 +249,9 @@ include("compose.jl")
 # composition so it can dispatch on `IDModel` as well as on every observation
 # component.
 include("observation_models/traversal.jl")
+
+# What data an assembled model needs, read off the traversal seam above.
+include("observation_models/requirements.jl")
 
 # --- inference orchestration ---
 include("inference/types.jl")
