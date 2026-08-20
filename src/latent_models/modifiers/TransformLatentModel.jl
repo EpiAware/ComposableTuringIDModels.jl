@@ -36,7 +36,7 @@ struct TransformLatentModel{M <: PriorLike, F <: Function} <:
     function TransformLatentModel(model, transform::F) where {F <: Function}
         # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
         # an `Intercept` (a constant inner path), never left as a scalar.
-        wrapped = _path_prior(model)
+        wrapped = path_prior(model)
         return new{typeof(wrapped), F}(wrapped, transform)
     end
 end

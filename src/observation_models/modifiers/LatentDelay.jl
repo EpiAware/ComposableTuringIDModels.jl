@@ -144,7 +144,7 @@ uses. Each draw builds the right-truncated, double-interval-censored delay PMF
     slot through the [`as_turing_submodel`](@ref) seam); and
   - if any parameter is a process, `as_turing_model(u::UncertainDelay, n)` builds
     one PMF **per time point** — each parameter is read at time `t` via
-    [`_at`](@ref) (a constant stays constant, a process path is indexed), so the
+    [`at`](@ref) (a constant stays constant, a process path is indexed), so the
     delay, and its discretised PMF, varies with time. A time-varying delay needs a
     series length, so the no-`n` method raises an error.
 
@@ -260,7 +260,7 @@ delay pmfs.
 Each parameter is drawn through the [`as_turing_submodel`](@ref) seam: a
 `Distribution` parameter draws a scalar (constant across time), while a process
 parameter (an [`AbstractPriorModel`](@ref)) draws a length-`n` path. The pmf at
-time `t` is built from each parameter read at `t` via [`_at`](@ref), so the delay
+time `t` is built from each parameter read at `t` via [`at`](@ref), so the delay
 distribution — and its discretised pmf — varies with time. The fixed horizon `D`
 keeps every pmf the same length.
 "
@@ -271,7 +271,7 @@ keeps every pmf the same length.
     # Draw each parameter through the seam: a `Distribution` gives a scalar
     # (constant), a process gives a length-`n` path. Each parameter's submodel is
     # drawn under its own explicit prefix (the `Split` idiom) so a single `~` LHS
-    # holds the return, collected into a plain local vector; `_at` reads each per
+    # holds the return, collected into a plain local vector; `at` reads each per
     # time point. `as_turing_model(prior, n)` is used directly (not the seam's
     # scalar short-circuit) so a constant parameter is a prefixable submodel too.
     params = Vector{Any}(undef, np)
@@ -282,7 +282,7 @@ keeps every pmf the same length.
         params[i] = drawn
     end
     # Freeze into a `Tuple`: a `Vector{Any}` keeps every element boxed, so the
-    # draws reach `_at` as `Base.RefValue`s it cannot index. A tuple fixes the
+    # draws reach `at` as `Base.RefValue`s it cannot index. A tuple fixes the
     # element types to concrete `Number`/`Vector`.
     params_t = Tuple(params)
     return map(1:n) do t
@@ -297,7 +297,7 @@ end
 # Read every drawn parameter at time `t`, one static tuple position at a time.
 _at_all(::Tuple{}, t) = ()
 function _at_all(params::Tuple, t)
-    return (_at(first(params), t), _at_all(Base.tail(params), t)...)
+    return (at(first(params), t), _at_all(Base.tail(params), t)...)
 end
 
 # Whether a `delay` field yields per-time kernels (time-varying) or a single

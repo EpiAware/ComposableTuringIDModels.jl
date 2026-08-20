@@ -66,6 +66,18 @@ per-evaluation work.
   - `jitter`: relative diagonal nugget ``\tau`` for a stable Cholesky factor
     (default `1e-6`); the amount added is ``\tau\sigma^2``.
 
+## Sampled variables
+
+``\ell`` and ``\sigma`` are sampled under those names, and the `n` weights as
+`z`, so a chain reads as `chain[:σ]` and a value is pinned with
+`fix(model, (ℓ = 0.5, σ = 0.5))`.
+
+Those names reach the top level of a composed model unprefixed, where `σ`
+collides with the `σ` of an error model such as [`NormalError`](@ref) and
+`check_model` fails. Wrap the process in [`PrefixLatentModel`](@ref) and its
+hyperparameters become `gp.ℓ` and `gp.σ`. [Composable design](@ref) covers
+why names are generic and prefixes local.
+
 # Examples
 ```@example ExactGP
 using ComposableTuringIDModels, Distributions
@@ -78,6 +90,21 @@ A rougher prior with a Matérn-3/2 kernel:
 ```@example ExactGP
 gp_matern = ExactGP(kernel = Matern32Kernel())
 length(as_turing_model(gp_matern, 30)())
+```
+
+Composed with an error model that owns a `σ` of its own, prefixed so the two
+scales stay apart:
+```@example ExactGP
+using DynamicPPL: VarInfo
+composed = IDModel(
+    Renewal(;
+        generation_time = [0.3, 0.4, 0.3],
+        rt = PrefixLatentModel(; model = gp, prefix = \"gp\"),
+        initialisation = Normal()
+    ),
+    NormalError()
+)
+keys(VarInfo(as_turing_model(composed, fill(10.0, 20), 20)))
 ```
 "
 struct ExactGP{

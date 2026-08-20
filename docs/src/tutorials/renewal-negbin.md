@@ -161,7 +161,7 @@ n = length(y_obs)
 ## Fit
 
 Conditioning on the observed counts and sampling with NUTS recovers the
-posterior. We draw two chains in parallel with `MCMCThreads()` so the posterior
+posterior. We draw four chains in parallel with `MCMCThreads()` so the posterior
 is well resolved and the cross-chain ``\hat R`` diagnostic is available; the
 slightly raised target acceptance rate keeps the sampler stable on the
 hierarchical innovation scale. We differentiate with
@@ -172,7 +172,7 @@ this package (see [Automatic differentiation backend](@ref ad-backends)).
 posterior = as_turing_model(model, y_obs, n)
 chain = sample(
     posterior, NUTS(0.95; adtype = AutoMooncake(; config = nothing)),
-    MCMCThreads(), 250, 2; progress = false)
+    MCMCThreads(), 250, 4; progress = false)
 nothing # hide
 ```
 

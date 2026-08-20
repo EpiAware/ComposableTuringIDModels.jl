@@ -57,8 +57,8 @@ struct ConcatLatentModels{
         # variables stay distinct. A process / `IID` / vector member passes
         # through unchanged.
         prefix_models = [
-            prefixes[i] == "" ? _path_prior(models[i]) :
-                PrefixLatentModel(_path_prior(models[i]), prefixes[i])
+            prefixes[i] == "" ? path_prior(models[i]) :
+                PrefixLatentModel(path_prior(models[i]), prefixes[i])
                 for i in eachindex(models)
         ]
         return new{
