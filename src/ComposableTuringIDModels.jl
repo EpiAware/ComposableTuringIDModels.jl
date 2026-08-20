@@ -32,6 +32,11 @@ using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
 using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
+# Rebuilding a component from its stored fields. Several wrappers transform an
+# argument before storing it, so they point `constructorof` at a raw constructor
+# rather than at the public one, which keeps `Accessors` (and the package's own
+# `rewrap`) from applying the transform a second time.
+using ConstructionBase: ConstructionBase
 using LinearAlgebra: dot, cholesky, Symmetric, I, UniformScaling
 using LogExpFunctions: softmax, xexpy, log1pexp
 using OrdinaryDiffEq: ODEProblem, ODEFunction, solve, remake, AutoVern7, Rodas5P

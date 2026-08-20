@@ -80,6 +80,29 @@ struct Ascertainment{
             model, prior, transform, latent_prefix
         )
     end
+
+    # The raw constructor, taking the fields exactly as stored, with the prior
+    # already coerced and prefixed. Rebuilding a component goes through this
+    # rather than through the constructor above, which would prefix a second
+    # time.
+    function Ascertainment{M, L, F, P}(
+            model, latent_model, transform, latent_prefix
+        ) where {M, L, F, P}
+        return new{M, L, F, P}(model, latent_model, transform, latent_prefix)
+    end
+end
+
+# An `Ascertainment` stores its prior already wrapped in a `PrefixLatentModel`,
+# so a rebuild through the public constructor wraps it again and nothing throws.
+# Point `ConstructionBase` (and so `Accessors`) at the raw constructor.
+ConstructionBase.constructorof(::Type{<:Ascertainment}) = _rebuild_ascertainment
+
+function _rebuild_ascertainment(model, latent_model, transform, latent_prefix)
+    T = Ascertainment{
+        typeof(model), typeof(latent_model), typeof(transform),
+        typeof(latent_prefix),
+    }
+    return T(model, latent_model, transform, latent_prefix)
 end
 
 _ascertainment_prior(latent_model::AbstractPriorModel) = latent_model
