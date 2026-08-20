@@ -246,16 +246,10 @@ function ci_ribbon!(ax, ts, bands; color, label)
     lines!(ax, x, b[:, 3]; color = color, linewidth = 2, label = label)
 end
 
-# the two delay convolutions leave the first few reference days unscored,
-# so those predictive entries are filled with `missing` and skipped
+# every reference day is scored, so every predictive entry is there
 function predictive_bands(pred, n)
-    ndraws = length(vec(pred[@varname(y_t[n])]))
     rows = map(1:n) do i
-        try
-            permutedims(vec(pred[@varname(y_t[i])]))
-        catch
-            fill(missing, 1, ndraws)
-        end
+        permutedims(vec(pred[@varname(y_t[i])]))
     end
     credible_bands(reduce(vcat, rows))
 end
@@ -282,11 +276,11 @@ fig
 ```
 
 The weekly ``R_t`` is piecewise-constant by construction, stepping down through
-one as the first wave turns over. The posterior-predictive band starts partway
-into the series — the two delay convolutions leave the earliest reference days
-without a fully supported expected count — and from there tracks the observed
-Italian reports, the layered observation model having absorbed the reporting
-pattern rather than the infection signal.
+one as the first wave turns over. The ``R_t`` panel runs longer than the reports
+panel, because the infection process covers the delays' lead-in before the first
+report. The posterior-predictive band tracks the observed Italian reports, the
+layered observation model having absorbed the reporting pattern rather than the
+infection signal.
 
 ## A time-varying reporting pattern
 
