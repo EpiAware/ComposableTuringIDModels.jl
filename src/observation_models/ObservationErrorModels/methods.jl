@@ -98,7 +98,9 @@ function (d::_ErrorDist)(i)
     )
 end
 
-(d::_TrialDist)(i) = observation_error(d.obs_model, d.p_t[i], d.N_t[i])
+function (d::_TrialDist)(i)
+    return observation_error(d.obs_model, d.p_t[i], d.N_t[i + d.n_diff])
+end
 
 function _score_missing_observations!!(
         context, varinfo, y::MissingObservations, diff_t, Y_t, dist

@@ -95,7 +95,7 @@ end
     @test_throws Exception as_turing_model(be, fill(3, 10), fill(0.3, 10))()
     @test_throws Exception as_turing_model(be, (y = missing,), fill(0.3, 10))()
 
-    # A trials vector whose length does not match the series is rejected.
+    # A trials vector too short to cover every scored step is rejected.
     @test_throws Exception as_turing_model(
         be, (y = missing, N = [5, 5, 5]),
         fill(0.2, 10)
