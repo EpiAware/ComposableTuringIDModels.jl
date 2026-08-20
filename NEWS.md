@@ -73,6 +73,13 @@ Changes are documented in Github releases.
     `Aggregate` consumes reporting windows rather than time points, which is
     not a series length, so that raises rather than guessing.
 
+  - An observation model now right-aligns its data against the expected series
+    in both directions. An expected series longer than the data is read as
+    unobserved run-in and its head is left unscored, where it used to be
+    rejected. This is what a `Split` produces whenever its streams consume
+    different lead-ins, so a caller passes each stream the observations it has
+    rather than padding the shorter-lead-in stream with leading `missing`s.
+
   - Infection models can now generate several strata at once. `Stratify` puts
     a stratum axis on a shared process (a partially pooled panel of
     reproduction numbers, say), and `Renewal`'s `mixing` slot couples the

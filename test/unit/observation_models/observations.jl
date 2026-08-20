@@ -158,3 +158,26 @@ end
     r = bigλ * p / (1 - p)
     @test rand(SafeNegativeBinomial(r, p)) >= 0
 end
+
+@testitem "an expected series longer than the data is right-aligned" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: MissingObservations
+    using DynamicPPL: VarInfo, logjoint
+
+    # The model runs longer than the data. The extra leading expected values
+    # are unobserved run-in and every observation is still scored against the
+    # day it belongs to.
+    Y_t = collect(10.0:1.0:19.0)
+    y = [12, 13, 14, 15]
+
+    mdl = as_turing_model(PoissonError(), y, Y_t)
+    ref = sum(logpdf.(SafePoisson.(Y_t[(end - 3):end] .+ 1.0e-6), y))
+    @test logjoint(mdl, VarInfo(mdl)) ≈ ref
+
+    # A `MissingObservations` carrier takes the same alignment: the observed
+    # entries come back as given and the gap is drawn.
+    carrier = MissingObservations([12, 0, 14, 15], Bool[1, 0, 1, 1])
+    out = as_turing_model(PoissonError(), carrier, Y_t)()
+    @test length(out.y_t) == 4
+    @test out.y_t[[1, 3, 4]] == [12, 14, 15]
+end

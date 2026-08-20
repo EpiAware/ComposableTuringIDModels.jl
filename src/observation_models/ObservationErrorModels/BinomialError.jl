@@ -74,7 +74,6 @@ end
     y = y_t.y
     if y isa MissingObservations
         diff_t = length(y.value) - length(Y_t)
-        @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
         y_t, __varinfo__ = _score_missing_observations!!(
             __model__.context, __varinfo__, y, diff_t, Y_t, dist
         )
@@ -84,9 +83,8 @@ end
         y_t = define_y_t(obs_model, y_t, Y_t)
 
         diff_t = length(y_t) - length(Y_t)
-        @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
 
-        for i in eachindex(Y_t)
+        for i in _scored_steps(diff_t, Y_t)
             y_t[i + diff_t] ~ dist(i)
         end
     end
