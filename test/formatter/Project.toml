@@ -7,4 +7,4 @@ Runic = "62bfec6d-59d7-401d-8490-b29ee721c001"
 # matrix (lts/1/pre). Unpinned, the version floats per job, so `test (1)` and
 # `pre-commit` reformat files that `test (lts)` left alone. Keep in step with
 # the `.pre-commit-config.yaml` Runic `additional_dependencies` pin.
-Runic = "=1.7.0"
+Runic = "=1.7.0, 1.9"
