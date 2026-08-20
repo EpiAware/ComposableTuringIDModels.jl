@@ -41,10 +41,10 @@ struct DiffLatentModel{M <: PriorLike, P <: PriorLike} <: AbstractLatentModel
 
     function DiffLatentModel(model, init, d::Int)
         @assert d > 0 "d must be greater than 0"
-        _assert_prior_length(init, d, "init")
+        assert_prior_length(init, d, "init")
         # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
         # an `Intercept` (a constant inner path), never left as a scalar.
-        wrapped = _path_prior(model)
+        wrapped = path_prior(model)
         return new{typeof(wrapped), typeof(init)}(wrapped, init, d)
     end
 end
@@ -54,7 +54,7 @@ function DiffLatentModel(model, init::Distribution; d::Int)
 end
 
 function DiffLatentModel(; model, init = [Normal()])
-    d = _prior_order(init)
+    d = prior_order(init)
     return DiffLatentModel(model, init, d)
 end
 
