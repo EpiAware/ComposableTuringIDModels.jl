@@ -21,7 +21,7 @@ named tuple may be empty.
 ```@example condition_model
 using ComposableTuringIDModels, Distributions
 m = as_turing_model(RandomWalk(), 10)
-condition_model(m, (rw_init = 0.0,), NamedTuple())
+condition_model(m, (init = 0.0,), NamedTuple())
 ```
 "
 function condition_model(

@@ -327,7 +327,7 @@ the observed-so-far series it saw.
 ## Shared parameters
 
 Neither correction touches the renewal process, so both recover the *same* shared
-parameters, the autoregressive damping ``\rho`` (`damp_AR[1]`), the innovation
+parameters, the autoregressive damping ``\rho`` (`damp[1]`), the innovation
 scale ``\sigma`` (`std`), the observation overdispersion (`cluster_factor`) and
 the initial infections (`init_incidence`).
 `sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
@@ -350,7 +350,7 @@ correction still identifies the shared parameters from the thinned triangle.
 using PairPlots
 
 prior_chain = sample(tri_post, Prior(), 1000; progress = false)
-pp_keys = [@varname(damp_AR), @varname(std),
+pp_keys = [@varname(damp), @varname(std),
     @varname(cluster_factor), @varname(init_incidence)]
 pairplot(
     PairPlots.Series(tri_chain[pp_keys]; label = "posterior"),

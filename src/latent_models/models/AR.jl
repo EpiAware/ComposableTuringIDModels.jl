@@ -107,36 +107,36 @@ end
 @model function as_turing_model(model::AR, n::Int)
     p = model.p
     @assert n > p "n must be longer than the order of the autoregressive process"
-    ar_init ~ as_turing_submodel(model.init, p; prefix = true)
+    init ~ as_turing_submodel(model.init, p; prefix = true)
     if p == 1
         # Order 1: draw the coefficient through the single seam. A `Distribution`
         # gives a scalar (constant, no length-`n` allocation); a process gives a
         # length-`(n-1)` path. `TVARStep` reads it per step with `at`, so one
         # recursion serves both.
-        damp_AR ~ as_turing_submodel(
+        damp ~ as_turing_submodel(
             _order1_prior(model.damp), n - 1;
             prefix = true
         )
         # Track the (possibly time-varying) coefficient as a generated quantity so
         # it is recoverable from the chain; `transform` broadcasts over a scalar or
         # a path.
-        ρ := model.transform.(damp_AR)
+        ρ := model.transform.(damp)
         ϵ_t ~ as_turing_submodel(model.ϵ_t, n - 1)
         z = accumulate_scan(
-            TVARStep(ρ), only(ar_init),
+            TVARStep(ρ), only(init),
             collect(zip(1:(n - 1), ϵ_t))
         )
         return z
     end
-    damp_AR ~ as_turing_submodel(model.damp, p; prefix = true)
+    damp ~ as_turing_submodel(model.damp, p; prefix = true)
     ϵ_t ~ as_turing_submodel(model.ϵ_t, n - p)
     # `ARStep`'s state runs oldest→newest (`[Z_{t-p}, …, Z_{t-1}]`), so reverse
-    # the damping coefficients so `damp_AR[i]` multiplies the lag-`i` term
+    # the damping coefficients so `damp[i]` multiplies the lag-`i` term
     # `Z_{t-i}`, matching the documented recursion `Z_t = Σ ρ_i Z_{t-i}`. Without
-    # the reversal `damp_AR[1]` was applied to the *longest* lag; identical for the
+    # the reversal `damp[1]` was applied to the *longest* lag; identical for the
     # default i.i.d. priors, but wrong for heterogeneous per-lag priors.
     ar = accumulate_scan(
-        ARStep(reverse(damp_AR)), (; val = last(ar_init), window = ar_init), ϵ_t
+        ARStep(reverse(damp)), (; val = last(init), window = init), ϵ_t
     )
     return ar
 end

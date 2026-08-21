@@ -52,7 +52,7 @@ end
     # so the number of damping parameters does NOT grow with the series length.
     for nn in (10, 100)
         draw = rand(as_turing_model(AR(; damp = Normal()), nn))
-        dk = [k for k in keys(draw) if occursin("damp_AR", string(k))]
+        dk = [k for k in keys(draw) if occursin("damp", string(k))]
         @test length(dk) == 1
         @test draw[only(dk)] isa Real          # scalar, not a length-n vector
     end
@@ -60,7 +60,7 @@ end
     # DOES scale with n — the flexibility is there when asked for.
     Random.seed!(4)
     proc = rand(as_turing_model(AR(; damp = RandomWalk()), 30))
-    pk = [k for k in keys(proc) if occursin("damp_AR", string(k))]
+    pk = [k for k in keys(proc) if occursin("damp", string(k))]
     @test length(pk) > 1
 end
 
