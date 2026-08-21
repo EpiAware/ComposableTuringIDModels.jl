@@ -106,6 +106,78 @@ end
     @test all(x -> 0 <= x <= 8, edge)
 end
 
+@testitem "NamedTuple data keeps blanks latent and leaves the caller's data alone" begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    using DynamicPPL: @varname
+    Random.seed!(64)
+
+    # A `missing` entry reached through a NamedTuple field must behave exactly
+    # as one reached through a plain vector: sampled as a latent, present in
+    # the chain, redrawn on every evaluation, and never written back into the
+    # array the caller handed over.
+    trials = fill(1000, 3)
+    y = Vector{Union{Missing, Int}}([10, 25, missing])
+    y_before = copy(y)
+    mdl = as_turing_model(BinomialError(), (y = y, N = trials), fill(0.02, 3))
+    chn = sample(mdl, Prior(), 20; progress = false)
+
+    @test isequal(y, y_before)
+    draws = vec(chn[@varname(y_t[3])])
+    @test length(draws) == 20
+    @test length(unique(draws)) > 1
+    # The observed entries stay data: they are not sampled.
+    @test !haskey(chn, @varname(y_t[1]))
+
+    # The same holds for the shared error-model loop (Poisson, NegBin, Normal),
+    # which also accepts its counts in a NamedTuple `y` field.
+    yp = Vector{Union{Missing, Int}}([5, missing, 7])
+    yp_before = copy(yp)
+    chp = sample(
+        as_turing_model(PoissonError(), (y = yp,), fill(6.0, 3)), Prior(), 20;
+        progress = false
+    )
+    @test isequal(yp, yp_before)
+    @test length(unique(vec(chp[@varname(y_t[2])]))) > 1
+
+    # A fully missing series in a NamedTuple field is left alone too.
+    ym = Vector{Union{Missing, Int}}(missing, 3)
+    chm = sample(
+        as_turing_model(BinomialError(), (y = ym, N = trials), fill(0.02, 3)),
+        Prior(), 5; progress = false
+    )
+    @test all(ismissing, ym)
+    @test length(unique(vec(chm[@varname(y_t[1])]))) > 1
+
+    # Wrapping the error model in a modifier changes none of this.
+    yw = Vector{Union{Missing, Int}}([10, 25, missing])
+    yw_before = copy(yw)
+    wrapped = TransformObservationModel(BinomialError(), x -> x ./ 100)
+    chw = sample(
+        as_turing_model(wrapped, (y = yw, N = trials), fill(2.0, 3)), Prior(),
+        20; progress = false
+    )
+    @test isequal(yw, yw_before)
+    @test length(unique(vec(chw[@varname(y_t[3])]))) > 1
+
+    # Reached through a composed `IDModel` the data takes the other route into
+    # the same helper: `concrete_observations` narrows the NamedTuple
+    # field-wise when the model is built, so the series arrives already a
+    # carrier. The guarantee has to hold on that path too.
+    yc = Vector{Union{Missing, Int}}([10, 25, missing])
+    yc_before = copy(yc)
+    composed = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+        BinomialError()
+    )
+    chc = sample(
+        as_turing_model(composed, (y = yc, N = trials), 3), Prior(), 20;
+        progress = false
+    )
+    @test isequal(yc, yc_before)
+    @test length(unique(vec(chc[@varname(y_t[3])]))) > 1
+    @test !haskey(chc, @varname(y_t[1]))
+end
+
 @testitem "define_y_t unpacks counts for vector or NamedTuple data" begin
     using ComposableTuringIDModels
     Y_t = fill(10.0, 5)

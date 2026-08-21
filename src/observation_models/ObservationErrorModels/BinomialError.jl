@@ -71,7 +71,10 @@ end
     p_t = clamp.(Y_t, 1.0e-6, 1 - 1.0e-6)
     dist = _TrialDist(obs_model, p_t, N_t)
 
-    y = y_t.y
+    # The successes always arrive in a `NamedTuple` field, so they are never a
+    # model argument DynamicPPL copies: `_scored_series` detaches them from the
+    # caller's data before anything is scored.
+    y = _scored_series(obs_model, y_t, Y_t)
     if y isa MissingObservations
         diff_t = length(y.value) - length(Y_t)
         @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
@@ -81,7 +84,7 @@ end
     else
         # Rebind `y_t` to the observed successes (the same name, so DynamicPPL
         # conditions on it when concrete).
-        y_t = define_y_t(obs_model, y_t, Y_t)
+        y_t = y
 
         diff_t = length(y_t) - length(Y_t)
         @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
