@@ -198,8 +198,8 @@ We fit that model to the reported cases simulated above.
 The reproduction number is still held at its simulated value, so the importation
 rate is what is being learned; with ``R_t`` free as well the two compete to
 explain the same growth and the fit is much less sharp.
-The unobserved days at the start are `missing` entries of `y_obs`, and are
-sampled rather than conditioned on.
+The unobserved days at the start are `missing` entries of `y_obs`, and are left
+out of the likelihood rather than estimated.
 """
 
 model = IDModel(

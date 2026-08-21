@@ -308,3 +308,30 @@ end
     @test generated_observables(:not_a_model, (; y_t = missing), :no_solution).generated ===
         missing
 end
+
+@testitem "forecast generates its horizon from the posterior" tags = [:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(104)
+    model = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal(1.0, 0.5)),
+        PoissonError()
+    )
+    T, h = 15, 5
+    y = Vector{Union{Missing, Int}}(
+        as_turing_model(model, fill(missing, T), T)().generated_y_t
+    )
+    y[[4, 9]] .= missing
+    chain = sample(as_turing_model(model, y, T), Prior(), 30; progress = false)
+    # Nothing about `y_t` is a parameter of the fit, gaps included, so the
+    # horizon cannot be read out of the posterior.
+    @test !any(k -> occursin("y_t", string(k)), collect(keys(chain)))
+
+    fc = forecast(model, y, chain, h)
+    # It is generated instead: the horizon comes back as counts, per draw.
+    @test all(x -> x isa Integer && x >= 0, vec(fc[@varname(y_t[T + 1])]))
+    @test length(vec(fc[@varname(y_t[T + h])])) == 30
+    # Generating rather than reading gives the in-sample points too, so the
+    # same chain carries the in-sample posterior predictive at the gaps.
+    @test length(vec(fc[@varname(y_t[4])])) == 30
+    @test all(x -> x isa Integer && x >= 0, vec(fc[@varname(y_t[9])]))
+end

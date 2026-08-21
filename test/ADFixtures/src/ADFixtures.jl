@@ -227,9 +227,10 @@ function _models()
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7])
     )
-    # Partially-missing observations: only the blank entries are latent. The
-    # error must be continuous, since a count family has no scalar bijector to
-    # link them through.
+    # Partially-missing observations: the blank entries are marginalised out,
+    # so the gradient covers the carrier's scoring loop skipping them. The
+    # scored series it returns is ragged, which Enzyme reverse cannot compile;
+    # see the KNOWN LIMIT above `_score_missing_observations!!`.
     partialmiss = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         NormalError()

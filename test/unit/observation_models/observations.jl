@@ -158,3 +158,105 @@ end
     r = bigλ * p / (1 - p)
     @test rand(SafeNegativeBinomial(r, p)) >= 0
 end
+
+@testitem "a gap in fitted data is marginalised out, not sampled" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using ComposableTuringIDModels: MissingObservations
+    using DynamicPPL: DynamicPPL, VarInfo, logjoint
+    Random.seed!(45)
+    model = IDModel(
+        DirectInfections(;
+            Z = RandomWalk(), initialisation = Normal(log(50), 0.2)
+        ),
+        NegativeBinomialError()
+    )
+    n = 20
+    y_full = fill(50, n)
+    y_gap = Vector{Union{Missing, Int}}(y_full)
+    y_gap[[3, 8, 14]] .= missing
+
+    vi_full = VarInfo(as_turing_model(model, y_full, n))
+    vi_gap = VarInfo(as_turing_model(model, y_gap, n))
+    # Punching holes in the data adds no parameters: an absent entry leaves the
+    # likelihood rather than becoming a latent to sample.
+    @test collect(keys(vi_gap)) == collect(keys(vi_full))
+    @test length(vi_gap[:]) == length(vi_full[:])
+    @test !any(vn -> occursin("y_t", string(vn)), keys(vi_gap))
+
+    # The returned series marks the gaps rather than filling them, and passes
+    # the observed entries through as given.
+    out = as_turing_model(model, y_gap, n)()
+    @test all(ismissing, out.generated_y_t[[3, 8, 14]])
+    @test out.generated_y_t[[1, 2, 20]] == y_full[[1, 2, 20]]
+
+    # Nothing at a gap reaches the likelihood: two carriers differing only in
+    # the placeholder they hold at the absent entries score identically, while
+    # the fully observed series scores differently (the observed entries do
+    # still contribute).
+    present = trues(n)
+    present[[3, 8, 14]] .= false
+    carrier = MissingObservations(copy(y_full), present)
+    shifted = MissingObservations(
+        map((v, p) -> p ? v : v + 1000, y_full, present), present
+    )
+    m_full = as_turing_model(model, y_full, n)
+    vi = VarInfo(m_full)
+    @test logjoint(as_turing_model(model, carrier, n), vi) ==
+        logjoint(as_turing_model(model, shifted, n), vi)
+    @test logjoint(m_full, vi) != logjoint(as_turing_model(model, carrier, n), vi)
+end
+
+@testitem "NUTS samples a discrete stream with gaps" tags = [:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(46)
+    # A count observation has no bijector to link, so a sampled gap would make
+    # this model unsamplable by NUTS. Marginalising the gaps out leaves only
+    # the continuous latents.
+    model = IDModel(
+        DirectInfections(;
+            Z = RandomWalk(), initialisation = Normal(log(50), 0.2)
+        ),
+        NegativeBinomialError()
+    )
+    n = 20
+    y = Vector{Union{Missing, Int}}(fill(50, n))
+    y[[4, 9, 15]] .= missing
+    chain = sample(
+        as_turing_model(model, y, n), NUTS(), 20; progress = false
+    )
+    @test size(chain, 1) == 20
+    @test !any(k -> occursin("y_t", string(k)), keys(chain))
+end
+
+@testitem "a gap is filled predictively after fitting, not during" begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    using DynamicPPL: VarInfo
+    Random.seed!(47)
+    model = IDModel(
+        DirectInfections(;
+            Z = RandomWalk(), initialisation = Normal(log(50), 0.2)
+        ),
+        PoissonError()
+    )
+    n = 12
+    y = Vector{Union{Missing, Int}}(fill(50, n))
+    y[[3, 7]] .= missing
+
+    # Fitting carries no `y_t` at all, gap or otherwise.
+    fit = as_turing_model(model, y, n)
+    @test !any(vn -> occursin("y_t", string(vn)), keys(VarInfo(fit)))
+    chain = sample(fit, Prior(), 20; progress = false)
+
+    # Replaying the posterior through a wholly unobserved series generates
+    # every point, the gaps among them, from the error model at the expected
+    # values that replay produces.
+    pred = predict(as_turing_model(model, fill(missing, n), n), chain)
+    drawn = reduce(hcat, (vec(pred[@varname(y_t[i])]) for i in 1:n))
+    @test size(drawn) == (20, n)
+    @test all(x -> x isa Integer && x >= 0, drawn)
+
+    # The same replay recovers the expected series the draws are taken at.
+    gens = vec(returned(as_turing_model(model, y, n), chain))
+    @test length(gens[1].expected_y_t) == n
+    @test all(>=(0), gens[1].expected_y_t)
+end
