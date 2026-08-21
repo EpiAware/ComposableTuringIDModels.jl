@@ -69,7 +69,7 @@ function ExpGrowthRate(;
         rt = RandomWalk(),
         transformation::Function = _oneexpy, initialisation = Normal()
     )
-    return ExpGrowthRate(_path_prior(rt), transformation, initialisation)
+    return ExpGrowthRate(path_prior(rt), transformation, initialisation)
 end
 
 # Cumulative sum along the time axis: the whole path for a single series, each

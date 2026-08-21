@@ -208,3 +208,34 @@ end
     )
     @test size(chain, 1) == 30
 end
+
+@testitem "every latent × error-model pairing keeps its names apart" begin
+    using ComposableTuringIDModels, Distributions
+    using DynamicPPL: DebugUtils
+    # Pins that only the Gaussian processes collide, and only on `σ`.
+    latents = (
+        RandomWalk(), AR(), MA(), IID(Normal()), Intercept(Normal()),
+        HierarchicalNormal(), HilbertSpaceGP(; m = 5), ExactGP(),
+    )
+    # `BinomialError` needs a trials series, so it is out of the sweep.
+    errors = (PoissonError(), NegativeBinomialError(), NormalError())
+    n = 20
+    function checks(latent, error_model)
+        renewal = Renewal(;
+            generation_time = [0.3, 0.4, 0.3], rt = latent,
+            initialisation = Normal()
+        )
+        mdl = as_turing_model(
+            IDModel(renewal, error_model), fill(10.0, n), n
+        )
+        return DebugUtils.check_model(mdl; error_on_failure = false)
+    end
+    for latent in latents, error_model in errors
+        collides = latent isa Union{HilbertSpaceGP, ExactGP} &&
+            error_model isa NormalError
+        @test checks(latent, error_model) == !collides
+        # Prefixing must work for every pairing, not just the colliding one.
+        prefixed = PrefixLatentModel(; model = latent, prefix = "latent")
+        @test checks(prefixed, error_model)
+    end
+end
