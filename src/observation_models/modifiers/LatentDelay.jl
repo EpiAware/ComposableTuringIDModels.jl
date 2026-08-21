@@ -86,6 +86,17 @@ struct LatentDelay{M <: AbstractObservationModel, D} <: AbstractObservationModel
     end
 end
 
+# A `LatentDelay` stores its PMF reversed for the convolution. Handing the
+# stored fields back to the public constructor reverses it a second time, and
+# says nothing, because a reversed PMF is still a valid one. Rebuild through the
+# raw constructor instead, which takes the fields exactly as stored. `Accessors`
+# reads this too, so `@set obs.model = ...` is safe on a delay.
+ConstructionBase.constructorof(::Type{<:LatentDelay}) = _rebuild_latent_delay
+
+function _rebuild_latent_delay(model, delay)
+    return LatentDelay{typeof(model), typeof(delay)}(model, delay)
+end
+
 # Fixed PMF: validate and store it reversed for the `LDStep` convolution (the
 # fixed path is behaviourally unchanged from the original modifier).
 function LatentDelay(model::AbstractObservationModel, pmf::AbstractVector{<:Real})

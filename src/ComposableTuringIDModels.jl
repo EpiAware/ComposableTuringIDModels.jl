@@ -32,6 +32,11 @@ using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
 using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
+# Rebuilding a component from its stored fields. Several wrappers transform an
+# argument before storing it, so they point `constructorof` at a raw constructor
+# rather than at the public one, which keeps `Accessors` (and the package's own
+# `rewrap`) from applying the transform a second time.
+using ConstructionBase: ConstructionBase
 using LinearAlgebra: dot, cholesky, Symmetric, I, UniformScaling
 using LogExpFunctions: softmax, xexpy, log1pexp
 using OrdinaryDiffEq: ODEProblem, ODEFunction, solve, remake, AutoVern7, Rodas5P
@@ -130,16 +135,17 @@ export IDProblem, NUTSampler, DirectSample,
 # --- extension points ---
 # Names a component author implements against but rarely calls: the shape
 # contract, the two seams that widen a model across strata, the renewal
-# step/modifier interfaces, and the prior-slot widening helpers a new
-# component's constructor and recursion call directly. Public but not
-# exported, so they are documented and supported without crowding the
-# namespace of a `using` call.
+# step/modifier interfaces, the prior-slot widening helpers a new component's
+# constructor and recursion call directly, and the observation-chain traversal
+# seam. Public but not exported, so they are documented and supported without
+# crowding the namespace of a `using` call.
 public ModelShape, across_shape, infection_strata,
     AbstractAccumulationStep, AbstractConstantRenewalStep,
     ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
     apply_modifier, renewal_foi, renewal_init_state, renewal_init_window,
     MissingObservations,
-    at, path_prior, prior_order, assert_prior_length
+    at, path_prior, prior_order, assert_prior_length,
+    wrapped_models, observation_components, rewrap
 
 # --- core architecture ---
 include("base/base.jl")
@@ -233,6 +239,11 @@ include("observation_models/Split.jl")
 
 # --- composition ---
 include("compose.jl")
+
+# Structural traversal of an assembled observation chain. Included after the
+# composition so it can dispatch on `IDModel` as well as on every observation
+# component.
+include("observation_models/traversal.jl")
 
 # --- inference orchestration ---
 include("inference/types.jl")
