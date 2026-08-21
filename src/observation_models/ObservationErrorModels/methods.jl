@@ -23,10 +23,9 @@ expected-observation vectors `Y_t` shorter than `y_t` (the expected values are
 aligned to the last `length(Y_t)` entries). Expected values are nudged by a tiny
 constant to avoid degenerate error distributions.
 
-A series with only *some* entries missing is fitted to the entries it has: a
-gap is missing at random, so it leaves the likelihood and is not sampled
-either. Predictive values at those points come from replaying the posterior
-through the model afterwards, the way [`forecast`](@ref) builds its horizon.
+A series with only *some* entries missing is fitted to the entries it has,
+the absent ones being marginalised out as described under
+[`MissingObservations`](@ref).
 
 The error family supplies [`generate_observation_error_priors`](@ref) (sampled
 as a submodel) and [`observation_error`](@ref) (the per-time-point distribution).
@@ -89,13 +88,10 @@ end
 # replaying the posterior through the model; `forecast` builds its horizon that
 # way.
 #
-# KNOWN LIMIT: a skipped entry comes back as `missing`, so the series returned
-# below is a `Union{Missing,T}` array, and Enzyme's reverse-mode type analysis
-# cannot compile one. This is the same limit the note below describes, and it
-# already applied to any entry outside `diff_t+1:n`; marginalising extends it to
-# every gap. Enzyme reverse on a gappy fit therefore needs the returned `y_t`
-# made concrete, which is a change to the observation contract rather than to
-# this loop.
+# A skipped entry comes back as `missing`, so the series returned below is a
+# `Union{Missing,T}` array wherever the observations have gaps. Making it
+# concrete would be a change to the observation contract rather than to this
+# loop.
 #
 # `y_t[i] ~ dist` decides sample-vs-observe by checking `y_t[i] === missing` at
 # run time, which needs a value that can actually hold `missing` at that lens,

@@ -73,10 +73,8 @@ carrier).
 its `y_t` automatically. It is exposed for data built elsewhere by simulating
 from a prior.
 
-A gap in a fitted series is marginalised out: it is neither scored nor sampled,
-so it costs no parameter. Predictive values at those points are generated after
-fitting, by replaying the posterior through the model — see [`forecast`](@ref),
-which does exactly that for its horizon.
+A gap in a fitted series is marginalised out, as described under
+[`MissingObservations`](@ref).
 
 # Arguments
 
