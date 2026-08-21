@@ -15,13 +15,24 @@ deeper hierarchy than this.
 "
 abstract type AbstractObservationErrorModel <: AbstractObservationModel end
 
+# The steps of `Y_t` that are scored. The observed and expected series end at
+# the same time point, so they are right-aligned and the head of whichever is
+# longer is left out: surplus observations are the chain's lead-in, and surplus
+# expected values are unobserved run-in. A `Split` produces the latter whenever
+# one branch's chain consumes a shorter lead-in than another's, since a single
+# series length has to serve every branch.
+_scored_steps(diff_t, Y_t) = max(1, 1 - diff_t):length(Y_t)
+
 @doc raw"
 Generate observations from an observation-error model.
 
 Supports missing observations (`y_t === missing`, simulating predictively) and
-expected-observation vectors `Y_t` shorter than `y_t` (the expected values are
-aligned to the last `length(Y_t)` entries). Expected values are nudged by a tiny
-constant to avoid degenerate error distributions.
+observed and expected series of different lengths. The two are right-aligned,
+so the last `min(length(y_t), length(Y_t))` entries of each are scored against
+one another: a longer `y_t` has its head left unscored (the chain's lead-in),
+and a longer `Y_t` has its head left unobserved (run-in the data does not
+cover). Expected values are nudged by a tiny constant to avoid degenerate error
+distributions.
 
 The error family supplies [`generate_observation_error_priors`](@ref) (sampled
 as a submodel) and [`observation_error`](@ref) (the per-time-point distribution).
@@ -42,7 +53,6 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
     y = y_t isa NamedTuple ? y_t.y : y_t
     if y isa MissingObservations
         diff_t = length(y.value) - length(Y_t)
-        @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
         y_t, __varinfo__ = _score_missing_observations!!(
             __model__.context, __varinfo__, y, diff_t, Y_t, dist
         )
@@ -54,13 +64,12 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
         y_t = define_y_t(obs_model, y_t, Y_t)
 
         diff_t = length(y_t) - length(Y_t)
-        @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
 
-        # Every entry is scored, including a `missing` one. Sampling the blanks
-        # is what `forecast` relies on: it pads the series with `missing` over
-        # the horizon and reads the drawn values back out of the chain.
-        # Skipping them would drop the horizon from the output.
-        for i in eachindex(Y_t)
+        # Every entry in range is scored, including a `missing` one. Sampling
+        # the blanks is what `forecast` relies on: it pads the series with
+        # `missing` over the horizon and reads the drawn values back out of the
+        # chain. Skipping them would drop the horizon from the output.
+        for i in _scored_steps(diff_t, Y_t)
             y_t[i + diff_t] ~ dist(i)
         end
     end
@@ -89,7 +98,9 @@ function (d::_ErrorDist)(i)
     )
 end
 
-(d::_TrialDist)(i) = observation_error(d.obs_model, d.p_t[i], d.N_t[i])
+function (d::_TrialDist)(i)
+    return observation_error(d.obs_model, d.p_t[i], d.N_t[i + d.n_diff])
+end
 
 function _score_missing_observations!!(
         context, varinfo, y::MissingObservations, diff_t, Y_t, dist
@@ -107,7 +118,7 @@ function _score_missing_observations!!(
     # sugar would splice in): it tells `VarInfo` storage the real type/length to
     # allocate for `y_t`'s entries, instead of growing an untyped array on the
     # fly the way `NoTemplate()` would.
-    for i in eachindex(Y_t)
+    for i in _scored_steps(diff_t, Y_t)
         idx = i + diff_t
         vn = DynamicPPL.VarName{:y_t}(DynamicPPL.Index((idx,), NamedTuple()))
         if y.present[idx]
@@ -122,7 +133,7 @@ function _score_missing_observations!!(
         end
         scored[idx] = val
     end
-    # Entries outside `diff_t+1:n` (only reached when `Y_t` is shorter than
+    # Entries outside the scored window (reached when `Y_t` is shorter than
     # `y_t`, e.g. a delay convolution) are never scored; keep them as given.
     for idx in 1:n
         isassigned(scored, idx) && continue
