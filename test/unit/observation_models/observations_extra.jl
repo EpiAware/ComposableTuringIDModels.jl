@@ -758,3 +758,47 @@ end
         missing, Y
     )()
 end
+
+@testitem "An aggregation window covering no expected values is not scored" begin
+    using ComposableTuringIDModels, DynamicPPL, Random
+    Random.seed!(308)
+    # Weekly reporting over 28 days with the delay OUTSIDE the aggregation, so
+    # it is measured in time points. An 8-entry PMF consumes the first seven
+    # days, leaving the window that ends on day 7 with no expected value to sum
+    # at all. That window says nothing about the data and must not be scored.
+    aggregation = [0, 0, 0, 0, 0, 0, 7]
+    Y = fill(1.0, 28)
+    y = fill(2, 28)
+    obs = LatentDelay(Aggregate(PoissonError(), aggregation), fill(1 / 8, 8))
+
+    function logdensity(model, data)
+        mdl = as_turing_model(model, data, Y)
+        return logjoint(mdl, VarInfo(mdl))
+    end
+
+    # The count reported in the uncovered window does not enter the likelihood.
+    moved = copy(y)
+    moved[7] = 99
+    @test logdensity(obs, y) == logdensity(obs, moved)
+    # A covered window's count still does.
+    covered = copy(y)
+    covered[14] = 99
+    @test logdensity(obs, y) != logdensity(obs, covered)
+    # The covered windows are untouched: each still sums its full seven days.
+    @test as_turing_model(obs, y, Y)().expected[[14, 21, 28]] == [7.0, 7.0, 7.0]
+
+    # A window only PARTIALLY covered keeps being scored, against the expected
+    # values that do cover it. A point mass at the third PMF entry is a lag of
+    # two, so the first window sums five of its seven days.
+    partial = LatentDelay(Aggregate(PoissonError(), aggregation), [0.0, 0.0, 1.0])
+    @test as_turing_model(partial, y, Y)().expected[7] == 5.0
+    part_moved = copy(y)
+    part_moved[7] = 99
+    @test logdensity(partial, y) != logdensity(partial, part_moved)
+
+    # Nothing left to score at all is an error, not an empty likelihood: the
+    # single window ends on day 7 and the delay consumes every one of them.
+    @test_throws Exception as_turing_model(
+        obs, fill(2, 8), fill(1.0, 8)
+    )()
+end
