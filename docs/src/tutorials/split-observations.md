@@ -189,20 +189,28 @@ reads from a single-stream model:
 ```@example split
 missmodel = as_turing_model(model, (cases = missing, deaths = missing), n)
 pred = predict(missmodel, chain)
-cases_bands = predictive_bands(pred, n, i -> @varname(cases.y_t[i]))
-deaths_bands = predictive_bands(pred, n, i -> @varname(deaths.y_t[i]))
+
+# Each stream is scored over its own expected series, so read its bands at its
+# own length. Both end on the same day, so a shared day axis ending at `n`
+# right-aligns them the way the model does.
+cases_days = (n - length(y.cases) + 1):n
+deaths_days = (n - length(y.deaths) + 1):n
+cases_bands = predictive_bands(
+    pred, length(y.cases), i -> @varname(cases.y_t[i]))
+deaths_bands = predictive_bands(
+    pred, length(y.deaths), i -> @varname(deaths.y_t[i]))
 
 fig = Figure(; size = (760, 620))
 ax1 = Axis(fig[1, 1]; ylabel = "Cases")
-ci_ribbon!(ax1, 1:n, cases_bands; color = :teal,
+ci_ribbon!(ax1, cases_days, cases_bands; color = :teal,
     label = "posterior predictive")
-scatter!(ax1, 1:n, y.cases; color = :black, markersize = 6,
+scatter!(ax1, cases_days, y.cases; color = :black, markersize = 6,
     label = "simulated")
 axislegend(ax1; position = :lt)
 ax2 = Axis(fig[2, 1]; xlabel = "Day", ylabel = "Deaths")
-ci_ribbon!(ax2, 1:n, deaths_bands; color = :firebrick,
+ci_ribbon!(ax2, deaths_days, deaths_bands; color = :firebrick,
     label = "posterior predictive")
-scatter!(ax2, 1:n, y.deaths; color = :black, markersize = 6,
+scatter!(ax2, deaths_days, y.deaths; color = :black, markersize = 6,
     label = "simulated")
 axislegend(ax2; position = :lt)
 fig
