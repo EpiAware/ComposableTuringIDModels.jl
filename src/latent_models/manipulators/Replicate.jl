@@ -52,7 +52,7 @@ struct Replicate{M <: PriorLike} <: AbstractPriorModel
         # an inner constructor because the default outer one would be more
         # specific than a plain `Replicate(model) = ...` method and so would
         # win, leaving the slot unwrapped.
-        wrapped = _path_prior(model)
+        wrapped = path_prior(model)
         return new{typeof(wrapped)}(wrapped)
     end
 end

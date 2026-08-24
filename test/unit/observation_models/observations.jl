@@ -230,3 +230,99 @@ end
     r = bigλ * p / (1 - p)
     @test rand(SafeNegativeBinomial(r, p)) >= 0
 end
+
+@testitem "SafeNegativeBinomial rejects an invalid shape or success probability" begin
+    using ComposableTuringIDModels, Distributions, Random
+
+    # Construction itself does not validate: `r`/`p` may transiently be
+    # out-of-domain Dual numbers on the AD path (e.g. built from a sampled
+    # cluster factor while evaluating `logpdf`), and validating eagerly there
+    # would throw on every such draw. `Base.rand` is the point where an
+    # invalid value must be caught, before it reaches the opaque `sqrt`/`Gamma`
+    # error deep inside sampling.
+    @test SafeNegativeBinomial(-1.0, 0.5) isa SafeNegativeBinomial
+
+    rng = Random.default_rng()
+
+    # A negative or zero `r` is rejected at `rand`, with a clear `DomainError`
+    # naming `r`.
+    err = try
+        rand(rng, SafeNegativeBinomial(-1.0, 0.5))
+        nothing
+    catch e
+        e
+    end
+    @test err isa DomainError
+    @test err.val == -1.0
+    @test occursin("r (the shape", err.msg)
+    @test occursin("SafeNegativeBinomial", err.msg)
+
+    err0 = try
+        rand(rng, SafeNegativeBinomial(0.0, 0.5))
+        nothing
+    catch e
+        e
+    end
+    @test err0 isa DomainError
+    @test err0.val == 0.0
+
+    # `p` must lie in `(0, 1]`.
+    errp = try
+        rand(rng, SafeNegativeBinomial(1.0, 0.0))
+        nothing
+    catch e
+        e
+    end
+    @test errp isa DomainError
+    @test errp.val == 0.0
+    @test occursin("p (the success", errp.msg)
+
+    errp2 = try
+        rand(rng, SafeNegativeBinomial(1.0, 1.5))
+        nothing
+    catch e
+        e
+    end
+    @test errp2 isa DomainError
+    @test errp2.val == 1.5
+
+    # `p == 1` is the valid degenerate boundary and must still sample.
+    @test rand(rng, SafeNegativeBinomial(1.0, 1.0)) == 0
+end
+
+@testitem "NegativeBinomialMeanClust propagates an invalid cluster factor" begin
+    using ComposableTuringIDModels, Distributions, Random
+
+    # `α <= 0` drives a non-positive `r = 1/α` through to `SafeNegativeBinomial`,
+    # which must still raise a named `DomainError` when sampled, rather than
+    # failing later with an opaque error.
+    err = try
+        rand(Random.default_rng(), NegativeBinomialMeanClust(10.0, -0.1))
+        nothing
+    catch e
+        e
+    end
+    @test err isa DomainError
+end
+
+@testitem "SafePoisson rejects a negative mean" begin
+    using ComposableTuringIDModels, Distributions, Random
+
+    # Construction does not validate, for the same AD-safety reason as
+    # `SafeNegativeBinomial` above.
+    @test SafePoisson(-1.0) isa SafePoisson
+
+    rng = Random.default_rng()
+    err = try
+        rand(rng, SafePoisson(-1.0))
+        nothing
+    catch e
+        e
+    end
+    @test err isa DomainError
+    @test err.val == -1.0
+    @test occursin("SafePoisson", err.msg)
+
+    # `λ == 0` is the valid degenerate boundary and must still sample.
+    @test rand(rng, SafePoisson(0.0)) == 0
+end

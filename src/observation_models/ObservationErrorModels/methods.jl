@@ -84,7 +84,7 @@ end
 # and the rest overwritten with their fresh draws) and the updated `VarInfo`.
 function (d::_ErrorDist)(i)
     return observation_error(
-        d.obs_model, d.pad_Y_t[i], map(p -> _at(p, i), values(d.priors))...
+        d.obs_model, d.pad_Y_t[i], map(p -> at(p, i), values(d.priors))...
     )
 end
 
