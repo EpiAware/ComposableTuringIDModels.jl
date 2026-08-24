@@ -370,25 +370,25 @@ data_requirements(model, 100)
 ```
 "
 function data_requirements(model, n::ModelShape)
-    return _requirements(model, missing, _n_time(n))
+    return _requirements(model, missing, _n_time(n), _n_strata(n))
 end
 
 function data_requirements(model, y_t, n::ModelShape)
-    return _requirements(model, y_t, _n_time(n))
+    return _requirements(model, y_t, _n_time(n), _n_strata(n))
 end
 
-function _requirements(model, y_t, n::Int)
+function _requirements(model, y_t, n::Int, strata::Int = 1)
     chain = _observation_chain(model)
     lead_in = observation_lead_in(chain)
     deepest = _max_lead_in(lead_in)
     streams = _stream_models(chain)
     entries = if streams === nothing
-        [_stream_requirement(:y_t, chain, lead_in, deepest, y_t, n)]
+        [_stream_requirement(:y_t, chain, lead_in, deepest, y_t, n, strata)]
     else
         [
             _stream_requirement(
                     k, streams[k], _stream(lead_in, k), deepest,
-                    _stream(y_t, k), n
+                    _stream(y_t, k), n, strata
                 ) for k in keys(streams)
         ]
     end
@@ -396,7 +396,8 @@ function _requirements(model, y_t, n::Int)
 end
 
 function _stream_requirement(
-        name::Symbol, model, lead_in::Int, deepest::Int, y_t, n::Int
+        name::Symbol, model, lead_in::Int, deepest::Int, y_t, n::Int,
+        strata::Int = 1
     )
     contract = _data_contract(_consumer(model))
     # One series serves every stream, so it covers the deepest lead-in and a
@@ -405,7 +406,7 @@ function _stream_requirement(
     return StreamRequirement(
         name, n, n_max, _n_scored(model, n_max), lead_in, contract.shape,
         _alignment(model), contract.fields,
-        _n_supplied(contract.shape, y_t)
+        _supplied_on_time_axis(contract.shape, y_t, strata)
     )
 end
 
@@ -487,6 +488,30 @@ _n_triangle_supplied(y_t::AbstractMatrix) = size(y_t, 1)
 # from the expected series, so they cover it exactly.
 _n_triangle_supplied(::Any) = nothing
 
+# True when `_n_supplied` already counted along the time axis: a matrix carries
+# its own axes, and a reporting triangle is counted down its reference days.
+_counts_time_axis(::AbstractMatrix) = true
+_counts_time_axis(::ReportingTriangle) = true
+_counts_time_axis(y::MissingObservations) = _counts_time_axis(y.value)
+_counts_time_axis(y::NamedTuple) =
+    hasproperty(y, :y) ? _counts_time_axis(y.y) : true
+_counts_time_axis(::Any) = false
+
+# A stratified model scores its expected series over `eachindex(Y_t)`, so a bare
+# error model sees one flat series of `n_strata * n_time` entries rather than a
+# matrix. Its length is a strata-major count, not a time-axis one, and comparing
+# it against a time-axis `n_max` reads `n_strata` times too many observations.
+# Put it back on the time axis first. `strata == 1` makes this a no-op for every
+# unstratified model.
+function _supplied_on_time_axis(shape::Symbol, y_t, strata::Int)
+    supplied = _n_supplied(shape, y_t)
+    supplied === nothing && return nothing
+    (strata == 1 || _counts_time_axis(y_t)) && return supplied
+    # A supply that does not divide evenly is the wrong length rather than a
+    # flattened panel; leave it so the caller still reports what was given.
+    return rem(supplied, strata) == 0 ? div(supplied, strata) : supplied
+end
+
 # --- printing ---------------------------------------------------------------
 
 function Base.show(io::IO, ::MIME"text/plain", r::DataRequirements)
@@ -555,22 +580,26 @@ function _check_observation_count(model, y_t, n::ModelShape)
     lead_in = observation_lead_in(chain)
     streams = _stream_models(chain)
     n_time = _n_time(n)
+    strata = _n_strata(n)
     deepest = _max_lead_in(lead_in)
     streams === nothing &&
-        return _check_stream(:y_t, chain, lead_in, deepest, y_t, n_time)
+        return _check_stream(:y_t, chain, lead_in, deepest, y_t, n_time, strata)
     for k in keys(streams)
         _check_stream(
             k, streams[k], _stream(lead_in, k), deepest, _stream(y_t, k),
-            n_time
+            n_time, strata
         )
     end
     return nothing
 end
 
 function _check_stream(
-        name::Symbol, model, lead_in::Int, deepest::Int, y_t, n::Int
+        name::Symbol, model, lead_in::Int, deepest::Int, y_t, n::Int,
+        strata::Int
     )
-    supplied = _n_supplied(_data_contract(_consumer(model)).shape, y_t)
+    supplied = _supplied_on_time_axis(
+        _data_contract(_consumer(model)).shape, y_t, strata
+    )
     supplied === nothing && return nothing
     n_max = n + deepest - lead_in
     supplied > n_max && throw(

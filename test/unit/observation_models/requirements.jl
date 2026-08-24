@@ -211,6 +211,37 @@ end
     @test data_requirements(model, Y, (2, 20)).series_length == 24
 end
 
+@testitem "a stratified stream counts a flat series on its time axis" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: Model
+    Random.seed!(1070)
+
+    # A bare error model scores its expected series over `eachindex(Y_t)`, so a
+    # stratified model hands it one flat `n_strata * n_time` series rather than
+    # a matrix. Counting that length against the time axis reads `n_strata`
+    # times too many observations and rejects a correct call.
+    model = IDModel(
+        Renewal(;
+            generation_time = [0.2, 0.3, 0.5],
+            rt = Replicate(RandomWalk()),
+            initialisation = Normal(log(50.0), 0.2)
+        ),
+        PoissonError()
+    )
+    y = as_turing_model(model, missing, (3, 8))(MersenneTwister(119)).generated_y_t
+    @test y isa AbstractVector
+    @test length(y) == 24
+
+    # The call the simulation itself implies must be accepted.
+    @test as_turing_model(model, y, (3, 8)) isa Model
+    @test data_fits(model, y, (3, 8))
+
+    # A genuinely over-long panel is still rejected, on the time axis.
+    @test_throws ArgumentError as_turing_model(model, repeat(y, 2), (3, 8))
+    # So is a length that is not a whole number of strata.
+    @test_throws ArgumentError as_turing_model(model, y[1:23], (3, 8))
+end
+
 @testitem "as_turing_model rejects the pre-0.2.0 series length" begin
     using ComposableTuringIDModels, Distributions
 
