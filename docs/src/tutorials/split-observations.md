@@ -307,7 +307,7 @@ weighted_data = (young = age.generated_y_t.young, old = age.generated_y_t.old,
 weighted_posterior = as_turing_model(weighted_model, weighted_data, n)
 weighted_chain = sample(
     weighted_posterior, NUTS(0.95; adtype = AutoMooncake(; config = nothing)),
-    MCMCThreads(), 250, 2; progress = false)
+    MCMCThreads(), 250, 4; progress = false)
 nothing # hide
 ```
 

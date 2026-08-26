@@ -98,8 +98,8 @@ recovered straight from the chain:
 end
 
 model = observe_path(z, n)
-fit = sample(model, NUTS(0.85; adtype = Turing.AutoForwardDiff()), 300;
-    progress = false)
+fit = sample(model, NUTS(0.85; adtype = Turing.AutoForwardDiff()),
+    MCMCThreads(), 300, 4; progress = false)
 # ρ is tracked as a generated quantity: `fit[:ρ]` is a per-draw coefficient path
 ρ_draws = reduce(hcat, vec(fit[:ρ]))     # (n-1) × draws
 ρ_mean = vec(mean(ρ_draws; dims = 2))

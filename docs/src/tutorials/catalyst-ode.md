@@ -281,7 +281,8 @@ seir_model = IDModel(
 
 seir_chain = sample(
     as_turing_model(seir_model, y_obs, n),
-    NUTS(0.95; adtype = AutoForwardDiff()), 200; progress = false)
+    NUTS(0.95; adtype = AutoForwardDiff()), MCMCThreads(), 200, 4;
+    progress = false)
 βe = vec(seir_chain[@varname(β)])
 αe = vec(seir_chain[@varname(α)])
 γe = vec(seir_chain[@varname(γ)])

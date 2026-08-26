@@ -96,8 +96,8 @@ dimension is hard-coded in the components:
 
 ```@example hier
 posterior = as_turing_model(model, Ydata)
-chain = sample(posterior, NUTS(0.85; adtype = Turing.AutoForwardDiff()), 300;
-    progress = false)
+chain = sample(posterior, NUTS(0.85; adtype = Turing.AutoForwardDiff()),
+    MCMCThreads(), 300, 4; progress = false)
 size(chain, 1)
 ```
 

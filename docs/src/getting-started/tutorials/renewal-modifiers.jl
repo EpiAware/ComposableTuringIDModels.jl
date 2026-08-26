@@ -212,7 +212,8 @@ model = IDModel(
 y_obs = sims.seeded.generated_y_t
 chain = sample(
     as_turing_model(model, y_obs, n),
-    NUTS(0.95; adtype = AutoMooncake(; config = nothing)), 250;
+    NUTS(0.95; adtype = AutoMooncake(; config = nothing)),
+    MCMCThreads(), 250, 4;
     progress = false
 )
 nothing # hide
