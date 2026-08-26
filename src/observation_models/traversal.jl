@@ -23,9 +23,11 @@ inner model in a plainly typed field needs no method of its own — whatever the
 field is called ([`ReportTriangle`](@ref) calls it `error_model`, everything else
 `model`).
 
-A component that holds what it wraps in some other shape (inside a `NamedTuple`,
-a vector, or behind a field typed loosely enough that the walk cannot see it)
-**must** define its own `wrapped_models`, and a matching [`rewrap`](@ref).
+A component that holds what it wraps inside a container (a `NamedTuple`, a
+vector) **must** define its own `wrapped_models`, and a matching
+[`rewrap`](@ref). The field's declared type does not matter: the walk tests the
+value it finds, so a loosely typed field holding a model directly is read like
+any other.
 Without one the walk reports it as wrapping nothing, and a traversal reads a
 shorter chain than the model actually has.
 
@@ -50,6 +52,13 @@ function wrapped_models(model::AbstractObservationModel)
     return _observation_fields(ntuple(i -> getfield(model, i), Val(n)))
 end
 
+# Deliberately not the same walk as `_component_children` in
+# `base/prettyprinting.jl`, which also descends into `Vector`/`Tuple` fields. That
+# one builds a display list of everything beneath a node; this one is the typed
+# `Tuple` seam `rewrap` rebuilds against, so a component holding its wrapped
+# models in a container states its own `wrapped_models` rather than having one
+# inferred from field shapes. A container-held model is therefore printed but not
+# walked, which is the contract the docstring above sets.
 _observation_fields(::Tuple{}) = ()
 function _observation_fields(values::Tuple)
     rest = _observation_fields(Base.tail(values))

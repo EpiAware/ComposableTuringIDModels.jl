@@ -196,3 +196,34 @@ end
     # The original is untouched.
     @test count(x -> x isa PoissonError, observation_components(obs)) == 2
 end
+
+@testitem "rewrap rejects the wrong number of replacements" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: wrapped_models, rewrap
+
+    # `rewrap`'s contract is that `models` matches what the component wraps.
+    # A mismatch is caught before the rebuild, so a wrapper is never handed a
+    # field it has no slot for or left holding a stale one.
+    ld = LatentDelay(PoissonError(), [0.5, 0.3, 0.2])
+    @test length(wrapped_models(ld)) == 1
+    @test_throws ArgumentError rewrap(ld, (PoissonError(), PoissonError()))
+    @test_throws ArgumentError rewrap(ld, ())
+
+    # A `Split` wraps one model per stream, so its arity is the stream count.
+    split = Split((cases = PoissonError(), deaths = PoissonError()))
+    @test length(wrapped_models(split)) == 2
+    @test_throws ArgumentError rewrap(split, (NegativeBinomialError(),))
+
+    # An error model wraps nothing, so anything but an empty tuple is wrong.
+    @test rewrap(PoissonError(), ()) isa PoissonError
+    @test_throws ArgumentError rewrap(PoissonError(), (PoissonError(),))
+
+    # The message names both counts, so a caller can see which side is wrong.
+    msg = try
+        rewrap(ld, (PoissonError(), PoissonError()))
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("wraps 1 observation model(s)", msg)
+    @test occursin("2 were supplied", msg)
+end
