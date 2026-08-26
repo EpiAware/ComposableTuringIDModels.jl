@@ -561,3 +561,59 @@ end
         @test lj(merge(y, NamedTuple{(k,)}((moved,)))) != base
     end
 end
+
+@testitem "a requirements report prints compactly and flags a misfit" begin
+    using ComposableTuringIDModels, Distributions
+
+    weekly = Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7])
+
+    # An aggregation is the end of the calendar walk: it consumes reporting
+    # windows rather than time points, so it adds no lead-in of its own.
+    @test observation_lead_in(weekly) == 0
+
+    r = data_requirements(weekly, fill(10, 28), 28)
+
+    # The compact `show` is what appears inside an array or an error message;
+    # the rich one is the report a user reads. Both are exercised, because a
+    # struct is only as useful as the two ways it prints.
+    @test repr(r) == "DataRequirements(28 observations, 1 stream, series 28)"
+    @test repr(r[:y_t]) == "y_t: 28 values, 4 of them scored — supplied 28"
+    @test sprint(show, MIME"text/plain"(), r[:y_t]) == repr(r[:y_t])
+
+    # `data_fits` answers for one stream as well as for the whole report.
+    @test data_fits(r[:y_t])
+    @test data_fits(r)
+
+    # A stream that does not fit says so in capitals rather than quietly, and
+    # `data_fits` agrees with the print.
+    short = data_requirements(weekly, fill(10, 20), 28)
+    out = sprint(show, MIME"text/plain"(), short)
+    @test occursin("SUPPLIED 20", out)
+    @test !occursin("— supplied 20", out)
+    @test !data_fits(short)
+    @test !data_fits(short[:y_t])
+
+    # An aggregation is indexed against the expected series rather than
+    # right-aligned to it, so a length that differs is rejected outright
+    # instead of being scored at the end.
+    model = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()), weekly
+    )
+    msg = try
+        as_turing_model(model, fill(10, 20), 28)
+        ""
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("takes exactly 28 values but 20 were supplied", msg)
+    @test occursin("indexed against the expected series", msg)
+
+    # A reporting triangle is the other exact-length component.
+    tri = ReportTriangle(PoissonError(), fill(0.25, 4))
+    @test ComposableTuringIDModels._alignment(tri) == :exact
+    @test ComposableTuringIDModels._alignment(weekly) == :exact
+    # Everything else right-aligns, which is the fallback the walk lands on.
+    @test ComposableTuringIDModels._alignment(PoissonError()) == :right
+    @test ComposableTuringIDModels._needs_input_calendar(weekly)
+    @test !ComposableTuringIDModels._needs_input_calendar(PoissonError())
+end
