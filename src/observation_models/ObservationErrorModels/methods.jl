@@ -15,13 +15,24 @@ deeper hierarchy than this.
 "
 abstract type AbstractObservationErrorModel <: AbstractObservationModel end
 
+# The steps of `Y_t` that are scored. The observed and expected series end at
+# the same time point, so they are right-aligned and the head of whichever is
+# longer is left out: surplus observations are the chain's lead-in, and surplus
+# expected values are unobserved run-in. A `Split` produces the latter whenever
+# one branch's chain consumes a shorter lead-in than another's, since a single
+# series length has to serve every branch.
+_scored_steps(diff_t, Y_t) = max(1, 1 - diff_t):length(Y_t)
+
 @doc raw"
 Generate observations from an observation-error model.
 
 Supports missing observations (`y_t === missing`, simulating predictively) and
-expected-observation vectors `Y_t` shorter than `y_t` (the expected values are
-aligned to the last `length(Y_t)` entries). Expected values are nudged by a tiny
-constant to avoid degenerate error distributions.
+observed and expected series of different lengths. The two are right-aligned,
+so the last `min(length(y_t), length(Y_t))` entries of each are scored against
+one another: a longer `y_t` has its head left unscored (the chain's lead-in),
+and a longer `Y_t` has its head left unobserved (run-in the data does not
+cover). Expected values are nudged by a tiny constant to avoid degenerate error
+distributions.
 
 A series with only *some* entries missing is fitted to the entries it has,
 the absent ones being marginalised out as described under
@@ -46,7 +57,6 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
     y = y_t isa NamedTuple ? y_t.y : y_t
     if y isa MissingObservations
         diff_t = length(y.value) - length(Y_t)
-        @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
         y_t, __varinfo__ = _score_missing_observations!!(
             __model__.context, __varinfo__, y, diff_t, Y_t, dist
         )
@@ -58,7 +68,6 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
         y_t = define_y_t(obs_model, y_t, Y_t)
 
         diff_t = length(y_t) - length(Y_t)
-        @assert diff_t >= 0 "The observation vector must be at least as long as the expected observation vector"
 
         # Every entry is scored, including a `missing` one, so the blanks are
         # drawn. That is how a predictive draw is taken from a fully missing
@@ -66,7 +75,7 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
         # matrix is never split into a carrier). A partially-missing vector
         # conditioned through `IDModel` arrives as a `MissingObservations`
         # carrier above instead, which decides per entry.
-        for i in eachindex(Y_t)
+        for i in _scored_steps(diff_t, Y_t)
             y_t[i + diff_t] ~ dist(i)
         end
     end
@@ -109,7 +118,9 @@ function (d::_ErrorDist)(i)
     )
 end
 
-(d::_TrialDist)(i) = observation_error(d.obs_model, d.p_t[i], d.N_t[i])
+function (d::_TrialDist)(i)
+    return observation_error(d.obs_model, d.p_t[i], d.N_t[i + d.n_diff])
+end
 
 function _score_missing_observations!!(
         context, varinfo, y::MissingObservations, diff_t, Y_t, dist
@@ -122,7 +133,7 @@ function _score_missing_observations!!(
     # accumulated its log-probability, so it is not part of what Enzyme
     # differentiates.
     scored = Vector{Any}(undef, n)
-    for i in eachindex(Y_t)
+    for i in _scored_steps(diff_t, Y_t)
         idx = i + diff_t
         # A gap reaches no tilde at all, so it costs neither a `VarName` nor a
         # `VarInfo` entry.
@@ -134,8 +145,8 @@ function _score_missing_observations!!(
         )
         scored[idx] = val
     end
-    # Left unassigned above: every marginalised gap, and any entry outside
-    # `diff_t+1:n` (only reached when `Y_t` is shorter than `y_t`, e.g. a delay
+    # Left unassigned above: every marginalised gap, and any entry outside the
+    # scored window (reached when `Y_t` is shorter than `y_t`, e.g. a delay
     # convolution, and so never scored). Keep both as given.
     for idx in 1:n
         isassigned(scored, idx) && continue

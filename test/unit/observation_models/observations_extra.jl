@@ -706,6 +706,49 @@ end
     @test size(fc, 1) == size(chain, 1)
 end
 
+@testitem "Aggregate right-aligns an expected series longer than its data" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: VarInfo, logjoint
+    Random.seed!(315)
+
+    # Scoring the overlap of the observed and expected series, rather than
+    # requiring the data to be the longer one, makes an expected series longer
+    # than its data a supported shape: a stream whose chain consumes a shorter
+    # lead-in than its neighbours' gets more expected values than the caller
+    # has observations. `Aggregate` has to take the same alignment, or the
+    # windows come off the head of the expected series instead of its tail.
+    aggregation = [0, 2, 0, 2, 0, 2, 0, 2]
+    agg = Aggregate(PoissonError(), aggregation)
+    y = fill(3, 8)
+
+    # Windows of two days ending on every second day. With the expected series
+    # four days longer than the data, the last window is the last two of ITS
+    # days (11 + 12), not of the data's.
+    Y_long = collect(1.0:12.0)
+    out = as_turing_model(agg, y, Y_long)()
+    @test out.expected == [0.0, 11.0, 0.0, 15.0, 0.0, 19.0, 0.0, 23.0]
+
+    # Equal lengths are unchanged.
+    equal = as_turing_model(agg, y, collect(1.0:8.0))()
+    @test equal.expected == [0.0, 3.0, 0.0, 7.0, 0.0, 11.0, 0.0, 15.0]
+
+    # The other direction — data longer than the expected series, the chain's
+    # own lead-in — also ends on the last expected day. The earliest window
+    # falls entirely before the expected series starts and is clipped to an
+    # empty sum, which is the pre-existing clipping behaviour rather than
+    # anything this alignment decides.
+    agg10 = Aggregate(PoissonError(), vcat(aggregation, [0, 2]))
+    lead_in = as_turing_model(agg10, fill(3, 10), collect(1.0:8.0))()
+    @test lead_in.expected[(end - 5):end] == [0.0, 7.0, 0.0, 11.0, 0.0, 15.0]
+
+    # The scored windows are the ones the alignment picks: the log-joint is the
+    # sum over the present days of their own window totals, so windows taken
+    # off the head of `Y_t` would not match.
+    mdl = as_turing_model(agg, y, Y_long)
+    ref = sum(logpdf.(SafePoisson.([11.0, 15.0, 19.0, 23.0] .+ 1.0e-6), 3))
+    @test logjoint(mdl, VarInfo(mdl)) ≈ ref
+end
+
 @testitem "A delay nested in an Aggregate right-aligns on windows" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(292)
