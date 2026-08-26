@@ -1,29 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" fill="none">
-  <defs>
-    <linearGradient id="ppl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a870c8"/><stop offset="1" stop-color="#8a4faf"/></linearGradient>
-    <linearGradient id="grn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#46b330"/><stop offset="1" stop-color="#328722"/></linearGradient>
-    <linearGradient id="red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dc4840"/><stop offset="1" stop-color="#c0342c"/></linearGradient>
-  </defs>
-  <g stroke="#949aa8" stroke-width="15" stroke-linecap="round">
-    <line x1="150" y1="150" x2="150" y2="66"/>
-    <line x1="150" y1="150" x2="74" y2="210"/>
-    <line x1="150" y1="150" x2="226" y2="210"/>
-  </g>
-  <circle cx="150" cy="150" r="23" fill="#3a3d4c"/>
-  <circle cx="150" cy="150" r="11.5" fill="none" stroke="#eef0f4" stroke-width="4.5"/>
-  <g>
-    <rect x="108" y="24" width="84" height="84" rx="20" fill="url(#ppl)"/>
-    <rect x="108.5" y="24.5" width="83" height="83" rx="19.5" fill="none" stroke="#fff" stroke-opacity=".25"/>
-    <circle cx="150" cy="66" r="9" fill="#fff"/><circle cx="150" cy="66" r="4" fill="#8a4faf"/>
-  </g>
-  <g>
-    <rect x="32" y="168" width="84" height="84" rx="20" fill="url(#grn)"/>
-    <rect x="32.5" y="168.5" width="83" height="83" rx="19.5" fill="none" stroke="#fff" stroke-opacity=".25"/>
-    <circle cx="74" cy="210" r="9" fill="#fff"/><circle cx="74" cy="210" r="4" fill="#328722"/>
-  </g>
-  <g>
-    <rect x="184" y="168" width="84" height="84" rx="20" fill="url(#red)"/>
-    <rect x="184.5" y="168.5" width="83" height="83" rx="19.5" fill="none" stroke="#fff" stroke-opacity=".25"/>
-    <circle cx="226" cy="210" r="9" fill="#fff"/><circle cx="226" cy="210" r="4" fill="#c0342c"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 440" role="img" aria-label="ComposableTuringIDModels.jl logo">
+  <title>ComposableTuringIDModels.jl logo</title>
+  <polygon points="200,30 364.5,125 364.5,315 200,410 35.5,315 35.5,125" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" opacity="0.4"/>
+
+  <!-- Connection Arrows -->
+  <path d="M 200,125 L 200,145" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+  <polygon points="200,150 196,142 204,142" fill="#94a3b8"/>
+  <path d="M 200,235 L 200,255" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+  <polygon points="200,260 196,252 204,252" fill="#94a3b8"/>
+
+  <!-- Node 1: LatentModel -->
+  <rect x="140" y="90" width="120" height="35" rx="6" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="4 2"/>
+  <text x="200" y="112" font-family="monospace" font-size="14" fill="#8b5cf6" text-anchor="middle">LatentModel</text>
+
+  <!-- Node 2: EpiModel with Turing.jl Visualizer -->
+  <rect x="130" y="150" width="140" height="85" rx="6" fill="none" stroke="#64748b" stroke-width="2"/>
+  <text x="200" y="172" font-family="monospace" font-size="14" fill="#64748b" text-anchor="middle">EpiModel</text>
+
+  <!-- Turing.jl classic intersecting distributions -->
+  <path d="M 145,220 C 160,220 170,185 180,185 C 190,185 200,220 215,220" fill="none" stroke="#ef4444" stroke-width="2.5" opacity="0.8"/>
+  <path d="M 165,220 C 180,220 190,175 200,175 C 210,175 220,220 235,220" fill="none" stroke="#10b981" stroke-width="2.5" opacity="0.8"/>
+  <path d="M 185,220 C 200,220 210,190 220,190 C 230,190 240,220 255,220" fill="none" stroke="#3b82f6" stroke-width="2.5" opacity="0.8"/>
+
+  <!-- Node 3: ObservationModel -->
+  <rect x="120" y="260" width="160" height="35" rx="6" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-dasharray="4 2"/>
+  <text x="200" y="282" font-family="monospace" font-size="14" fill="#0ea5e9" text-anchor="middle">ObservationModel</text>
+
+  <!-- Typography -->
+  <text x="200" y="335" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="600" fill="#64748b" text-anchor="middle">Composable</text>
+  <text x="200" y="355" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="500" fill="#64748b" text-anchor="middle">TuringID</text>
+  <text x="200" y="375" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="middle">Models.jl</text>
 </svg>

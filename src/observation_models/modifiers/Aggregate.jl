@@ -2,11 +2,12 @@
 # windows).
 
 # Scatter the predictions for the present time points back into a length-`n`
-# vector (zeros where not present). A modifier nested inside the aggregation
-# (e.g. `LatentDelay`) shortens the window series, so there can be fewer
-# predictions than present windows. They are the *last* windows, matching the
-# right-alignment every other observation chain uses, so the leading windows are
-# left at zero.
+# vector (zeros where not present). A `LatentDelay` shortens the window series
+# whichever side of the aggregation it sits on — nested inside it consumes
+# leading windows, wrapped outside it leaves leading windows uncovered — so
+# there can be fewer predictions than present windows. They are the *last*
+# windows, matching the right-alignment every other observation chain uses, so
+# the leading windows are left at zero.
 function _return_aggregate(pred_obs, idx, n)
     k = length(pred_obs)
     @assert k <= length(idx) "The aggregated model returned more predictions ($k) than reporting windows ($(length(idx)))"
@@ -32,6 +33,11 @@ Because the outermost modifier is applied first, the nesting of a
 convolves, so the delay is in *windows* and the leading windows it consumes go
 unpredicted, while `LatentDelay(Aggregate(model, aggregation), pmf)` delays the
 daily series before summing, so the delay is in *time points*.
+
+Either way the delay leaves the head of the series uncovered. A window with no
+expected values left to sum is dropped rather than scored against a zero it
+never measured, so the counts reported for it stay out of the likelihood. A
+window the delay only partially uncovers still has values to sum and is kept.
 
 # Arguments
 
@@ -115,8 +121,19 @@ end
     # already is.
     offset = n - length(Y_t)
     idx = findall(present)
-    agg_Y_t = map(idx) do i
-        sum(Y_t[max(1, i - aggregation[i] + 1 - offset):max(0, i - offset)])
+    # A window ending at or before `offset` is clipped away entirely: it covers
+    # no expected value, so its sum would be an exact zero meaning "nothing here
+    # is covered" rather than "we expect zero". Scoring that against the data is
+    # a silent, arbitrarily strong likelihood contribution, so those windows are
+    # dropped from the window series instead — the same treatment an
+    # unobservable lead-in gets everywhere else. They are the leading windows,
+    # so the error model's right-alignment leaves their counts unscored and
+    # `_return_aggregate` scatters the rest back into place. A window that is
+    # only *partially* covered still has expected values to sum and is kept.
+    scored = filter(>(offset), idx)
+    @assert !isempty(scored) "Every reporting window ends before the start of the expected observations, so there is nothing to score. Shorten the delay applied outside the aggregation, or lengthen the series."
+    agg_Y_t = map(scored) do i
+        sum(Y_t[max(1, i - aggregation[i] + 1 - offset):(i - offset)])
     end
     inner ~ as_turing_submodel(ag.model, y_t[present], agg_Y_t)
     # Scatter counts and means back into length-`n` vectors (zeros where absent).
