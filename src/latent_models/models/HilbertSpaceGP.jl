@@ -77,14 +77,13 @@ function _check_spectral_args(σ, ℓ)
     return nothing
 end
 
-# Shared construction-time guard for the two GP latent models. Both need ℓ > 0
-# (no spectral density, and a singular covariance, at ℓ ≤ 0) and σ ≥ 0. Checking
-# the *support* at construction rejects an unusable hyperprior — say
-# `length_scale = Normal()` — up front, rather than letting the first negative
-# proposal abort a chain a long way from its cause. The bound is ≥ 0 rather than
-# > 0 so that a prior with an open lower limit at zero (`Gamma`, `LogNormal`) is
-# accepted: it puts no mass on ℓ = 0, and `_check_spectral_args` is the backstop
-# for the measure-zero case.
+# Shared construction-time guard for the two GP latent models. Both need
+# ℓ > 0 and σ ≥ 0; checking the hyperprior's *support* at construction rejects
+# an unusable hyperprior (say `length_scale = Normal()`) up front rather than
+# letting the first negative proposal abort a chain far from its cause. The
+# bound is ≥ 0, not > 0, so a prior with an open lower limit at zero
+# (`Gamma`, `LogNormal`) is accepted; `_check_spectral_args` backstops the
+# measure-zero ℓ = 0 case.
 function _check_hyperprior_support(length_scale, marginal_std)
     ℓ_msg = "the length scale prior must not put mass on ℓ < 0"
     σ_msg = "the marginal standard deviation prior must not put mass on σ < 0"
@@ -364,13 +363,10 @@ end
     return gp
 end
 
-# Architecture note: CLAUDE.md's directive is "one `@model function
-# as_turing_model(m::MyModel, ...)` per struct". Here `as_turing_model` is
-# deliberately a *plain* function that builds the fixed basis once and then
-# delegates to the inner `@model _hsgp_model`. This keeps the basis construction
-# out of the differentiated per-evaluation path while preserving the single
-# `as_turing_model(model, n)` entry point; the `@model` is an implementation
-# detail of that one method, not a second public model per struct.
+# `as_turing_model` is deliberately a *plain* function: it builds the fixed
+# basis once, out of the differentiated per-evaluation path, and delegates to
+# the inner `@model _hsgp_model`. The `@model` is an implementation detail of
+# that one method, not a second public model per struct.
 function as_turing_model(model::HilbertSpaceGP, n::Int)
     @assert n > 1 "n must be greater than 1"
     Φ, sqrt_λ = hsgp_basis(n, model.m, model.c)

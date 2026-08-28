@@ -124,35 +124,24 @@ function forecast(
     return forecast(model, y, chain, horizon; rng = rng)
 end
 
-# Extend the latent innovation streams in `chain` to the length the horizon model
-# `fc_model` expects, drawing the extra tail entries from the prior so each draw's
-# in-sample path is preserved and its future is a genuine prior continuation.
+# Extend the latent innovation streams in `chain` to the length the horizon
+# model `fc_model` expects, drawing the extra tail entries from the prior so
+# each draw's in-sample path is preserved and its future is a genuine prior
+# continuation.
 #
-# The fitted chain stores each latent innovation stream as a single vector
-# parameter (e.g. a `RandomWalk`'s standard-normal increments) whose length is
-# tied to the fitting length `T`. Rebuilding the model at `T + h` asks for the
-# same parameter at the longer length, so `predict` alone errors on the
-# dimension mismatch. Here every resized vector parameter is padded per draw with
-# a fresh prior draw's tail; fixed-length parameters (scalars, AR damping) match
-# the model length already and are left untouched. The tail is taken from a fresh
-# prior draw of the horizon model, so it follows that stream's *actual* prior
-# (e.g. `HierarchicalNormal`'s standard-normal increments — the fitted scale and
-# any autoregressive/random-walk correlation are re-applied deterministically by
-# `predict` using the fitted parameters, not resampled).
+# Each stored innovation stream's length is tied to the fitting length `T`;
+# rebuilding the model at `T + h` asks for the same parameter at the longer
+# length, so `predict` alone errors on the dimension mismatch. Every vector
+# parameter is a candidate and the forecast model decides which are extended:
+# a stream is spliced only when the model draws MORE of it than the chain
+# holds. Parameters on an axis the horizon does not grow (a `Hierarchy`'s
+# per-stratum effects, say) are the same length in both models and are left
+# alone. The tail is a fresh prior draw of the horizon model, so it follows
+# that stream's actual prior; fitted scale and correlation are re-applied
+# deterministically by `predict`, not resampled.
 #
-# This reaches into the FlexiChains storage that Turing's `predict` consumes; if
-# FlexiChains gains a public API for length-extending a parameter this should
-# move onto it.
-#
-# Every vector parameter is a candidate, and the forecast model itself decides
-# which are actually extended: a stream is only spliced when the forecast model
-# draws MORE of it than the chain holds (the `length(full) > fit_len` test
-# below). A parameter on an axis the horizon does not grow — a `Hierarchy`'s
-# per-stratum effects, say — is the same length in both models, so it is left
-# alone without needing to be recognised as such. A length that grows with the
-# horizon is what "time-indexed" means here, which is why no heuristic on the
-# time-axis length is used or wanted: an innovation stream is typically shorter
-# than the series it drives.
+# This reaches into the FlexiChains storage `predict` consumes; a public
+# length-extension API there would replace it.
 function _extend_latent_draws(rng::AbstractRNG, fc_model, chain)
     extended = deepcopy(chain)
     data = extended._data
@@ -181,15 +170,12 @@ end
 
 # Correctness guard for the independent-tail extension above. Splicing an
 # independent prior tail onto the fitted head is exact only when the stream
-# *factorises* across the forecast boundary — the future entries are independent
-# of the fitted head under the prior. Every latent in this package is non-centred
-# (its resized stream is a parameter-free i.i.d. innovation sequence), so this
-# holds. A latent whose stored vector is itself jointly correlated (e.g. an
-# exact-GP `MvNormal`, or any process with dependence in the *stored* stream)
-# would instead need its tail drawn conditional on the head; an independent tail
-# would be wrong. Detect that case generically — no per-latent code — by checking
-# on a batch of prior draws that each resized stream's forecast tail is
-# uncorrelated with its fitted head, and refuse rather than silently mis-forecast.
+# *factorises* across the forecast boundary. Every latent in this package is
+# non-centred (a parameter-free i.i.d. innovation sequence), so this holds; a
+# stored stream with joint correlation (an exact-GP `MvNormal`) would need its
+# tail drawn conditional on the head. Detect that case generically by checking
+# on a batch of prior draws that each resized stream's tail is uncorrelated
+# with its head, and refuse rather than silently mis-forecast.
 const _FORECAST_INDEP_TOL = 0.5
 
 function _assert_factorised(rng::AbstractRNG, fc_model, resized)

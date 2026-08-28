@@ -225,11 +225,9 @@ end
 #
 # A scan step is a deterministic function, so a modifier that needs sampled
 # parameters (an importation rate, say) cannot draw them inside the scan. The
-# step is therefore resolved ONCE before the scan: every modifier is sampled
-# through its own `as_turing_model`, and the step is rebuilt from the resolved
-# modifiers. Modifiers that sample nothing return themselves, so the same call
-# covers both kinds and neither the step nor the infection model ever tests
-# what a modifier is.
+# step is resolved ONCE before the scan: every modifier is sampled through its
+# own `as_turing_model` and the step is rebuilt from the resolved modifiers.
+# Modifiers that sample nothing return themselves, so one call covers both.
 
 @doc raw"
 Resolve an accumulation step ahead of the scan, sampling any parameters its
