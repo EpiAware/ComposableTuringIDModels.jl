@@ -90,7 +90,7 @@ end
 
 @testitem "Renewal composes modifiers onto a RenewalStep" begin
     using ComposableTuringIDModels: RenewalStep, ConstantRenewalStep,
-        SusceptibleDepletion
+        SusceptibleDepletion, Renewal, RandomWalk
     gen_int = [0.2, 0.3, 0.5]
     plain = Renewal(gen_int; rt = RandomWalk())
     depleting = Renewal(

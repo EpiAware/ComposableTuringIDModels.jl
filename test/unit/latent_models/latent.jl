@@ -54,8 +54,111 @@ end
     names = string.(collect(keys(draw)))
     # The init prior slot is prefixed at the call site (prefix-on
     # `as_turing_submodel`), so a RandomWalk exposes its init under a namespace
-    # path (e.g. `rw_init.θ`); the inner HierarchicalNormal's `std` is a flat
+    # path (e.g. `init.θ`); the inner HierarchicalNormal's `std` is a flat
     # native-tilde scalar draw.
-    @test any(startswith("rw_init"), names)
+    @test any(startswith("init"), names)
     @test any(contains("std"), names)
+end
+
+@testitem "latent components name their parameters generically" begin
+    using ComposableTuringIDModels, Distributions
+    using DynamicPPL: VarInfo, DebugUtils
+    # A parameter is named for what it is, not for the component that draws
+    # it, so the same quantity reads the same way whichever process supplies
+    # it and a component that appears twice is told apart by a prefix rather
+    # than by a longer name.
+    varnames(model, n) = Symbol.(
+        string.(
+            keys(
+                VarInfo(
+                    as_turing_model(model, n)
+                )
+            )
+        )
+    )
+
+    ar = varnames(AR(), 20)
+    @test :init ∈ ar
+    @test :damp ∈ ar
+    @test :ar_init ∉ ar
+    @test :damp_AR ∉ ar
+
+    @test :init ∈ varnames(RandomWalk(), 20)
+    @test :mean ∈ varnames(Hierarchy(), 3)
+
+    # Two processes that now share `init` are told apart by the prefix their
+    # composition already applies.
+    combined = varnames(CombineLatentModels([AR(), RandomWalk()]), 20)
+    @test Symbol("Combine.1.init") ∈ combined
+    @test Symbol("Combine.2.init") ∈ combined
+
+    # `DiffLatentModel` composes two children, so it namespaces the inner
+    # process under `diff` and keeps the generic `init` for its own
+    # integration constants.
+    diffed = varnames(DiffLatentModel(model = AR()), 20)
+    @test :init ∈ diffed
+    @test Symbol("diff.init") ∈ diffed
+    @test Symbol("diff.damp") ∈ diffed
+    @test :latent_init ∉ diffed
+    @test DebugUtils.check_model(
+        as_turing_model(DiffLatentModel(model = AR()), 20);
+        error_on_failure = false
+    )
+end
+
+@testitem "DiffLatentModel namespaces its inner process under `diff`" begin
+    using ComposableTuringIDModels, Distributions
+    using DynamicPPL: VarInfo, DebugUtils, fix
+    # The bare names belong to `DiffLatentModel` itself and the prefixed ones
+    # to the process it differences, so an inner parameter reads as a
+    # parameter of the differenced series.
+    varnames(mdl) = Symbol.(string.(keys(VarInfo(mdl))))
+    checks(mdl) = DebugUtils.check_model(mdl; error_on_failure = false)
+
+    n = 20
+    inits = [Normal(), Normal()]
+    for inner in (AR(), RandomWalk(), HierarchicalNormal())
+        mdl = as_turing_model(
+            DiffLatentModel(; model = inner, init = inits), n
+        )
+        names = varnames(mdl)
+        @test :init ∈ names
+        @test :latent_init ∉ names
+        @test any(startswith("diff."), string.(names))
+        @test checks(mdl)
+    end
+
+    # `arima` inherits the namespacing rather than adding one of its own.
+    arima_names = varnames(as_turing_model(arima(), n))
+    @test :init ∈ arima_names
+    @test Symbol("diff.init") ∈ arima_names
+    @test Symbol("diff.damp") ∈ arima_names
+    @test Symbol("diff.θ") ∈ arima_names
+    @test checks(as_turing_model(arima(), n))
+
+    # A prefixed name has to be pinned through the nested form. The flat
+    # spelling and the old name are both silent no-ops.
+    mdl = as_turing_model(arima(), n)
+    pinned = fix(mdl, (diff = (damp = 0.1,),))
+    @test Symbol("diff.damp") ∉ varnames(pinned)
+    @test length(pinned()) == n
+    @test Symbol("diff.damp") ∈ varnames(fix(mdl, (var"diff.damp" = 0.1,)))
+    @test :init ∉ varnames(fix(mdl, (init = [0.0],)))
+    @test varnames(fix(mdl, (latent_init = [0.0],))) == varnames(mdl)
+
+    # Composed under a `Renewal` with an error model the names survive.
+    for inner in (AR(), RandomWalk(), HierarchicalNormal())
+        latent = DiffLatentModel(; model = inner, init = inits)
+        renewal = Renewal(;
+            generation_time = [0.3, 0.4, 0.3], rt = latent,
+            initialisation = Normal()
+        )
+        for error_model in (PoissonError(), NegativeBinomialError())
+            @test checks(
+                as_turing_model(
+                    IDModel(renewal, error_model), fill(10.0, n), n
+                )
+            )
+        end
+    end
 end

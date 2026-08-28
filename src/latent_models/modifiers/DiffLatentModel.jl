@@ -21,6 +21,14 @@ The `model` slot is a length-`n` PATH slot: a bare `Distribution` there is
 auto-wrapped in an [`Intercept`](@ref), giving a constant inner path; use
 [`IID`](@ref) for `n` independent draws.
 
+The inner process would otherwise draw its own `init` alongside this model's,
+so it is namespaced under `diff`. The bare `init` is this model's integration
+constants and `diff.damp`, `diff.init` and so on are parameters of the
+*differenced* series. Pin one through the nested form,
+`fix(mdl, (diff = (damp = 0.1,),))`. Spelling the dotted path as a single
+symbol matches nothing, and `fix` ignores a name the model does not have, so
+such a call silently pins nothing.
+
 Composing `DiffLatentModel` over an `AR` gives an ARIMA-style latent process.
 
 # Examples
@@ -29,6 +37,13 @@ using ComposableTuringIDModels, Distributions
 diff = DiffLatentModel(; model = RandomWalk(), init = [Normal(), Normal()])
 mdl = as_turing_model(diff, 10)
 rand(mdl)
+```
+
+The names the composition produces:
+
+```@example DiffLatentModel
+using DynamicPPL: VarInfo
+keys(VarInfo(mdl))
 ```
 "
 struct DiffLatentModel{M <: PriorLike, P <: PriorLike} <: AbstractLatentModel
@@ -61,9 +76,12 @@ end
 @model function as_turing_model(model::DiffLatentModel, n::Int)
     d = model.d
     @assert n > d "n must be longer than d"
-    latent_init ~ as_turing_submodel(model.init, d; prefix = true)
-    diff_latent ~ as_turing_submodel(model.model, n - d)
-    return _combine_diff(latent_init, diff_latent, d)
+    init ~ as_turing_submodel(model.init, d; prefix = true)
+    # The inner process draws its own `init`, so namespace it: the bare
+    # `init` above is this model's integration constants and `diff.*` are
+    # parameters of the differenced series.
+    diff ~ as_turing_submodel(model.model, n - d; prefix = true)
+    return _combine_diff(init, diff, d)
 end
 
 function _combine_diff(init, diff, d)

@@ -41,8 +41,8 @@ folded into a [`DirectInfections`](@ref) model observed with a
 ## Parameter names, and prefixing where they clash
 
 A component names its own parameters for what they are, not for which
-component owns them: a marginal standard deviation is `σ`, a length scale is
-`ℓ`, an innovation series is `ϵ_t`.
+component owns them: an initial value is `init`, a damping coefficient is
+`damp`, a marginal standard deviation is `σ`.
 Names stay short because a component knows nothing about what it will be
 composed with, and a self-describing name would be wrong as soon as the same
 component appeared twice.
@@ -64,13 +64,17 @@ bare = as_turing_model(
 keys(VarInfo(bare))
 ```
 
-There are four names for five parameters:
+There are four names for five parameters, and the model says so:
 
 ```@example prefixing
 DebugUtils.check_model(bare; error_on_failure = false)
 ```
 
+That is a hard stop, not a silent error.
+`sample` runs `check_model` first and refuses to run a model that fails it.
 
+The fix is a prefix applied where the conflict is, rather than a longer name
+everywhere.
 [`PrefixLatentModel`](@ref) wraps a latent process so its variables are
 namespaced, and [`PrefixObservationModel`](@ref) does the same for an
 observation model:
@@ -96,8 +100,9 @@ pinned the same way with `fix(prefixed, (gp = (σ = 0.2,),))`.
 Components that compose several children of the same kind prefix them
 already, so nothing needs adding there.
 [`CombineLatentModels`](@ref) names its components `Combine.1`, `Combine.2`
-and so on, [`ConcatLatentModels`](@ref) uses `Concat.1`, `Concat.2`, and
-[`Split`](@ref) prefixes each observation stream by its name.
+and so on, [`ConcatLatentModels`](@ref) uses `Concat.1`, `Concat.2`,
+[`DiffLatentModel`](@ref) namespaces the process it differences under `diff`,
+and [`Split`](@ref) prefixes each observation stream by its name.
 A Gaussian process reached through one of those never collides.
 
 ## The latent is folded into the infection model
