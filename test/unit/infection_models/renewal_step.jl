@@ -322,3 +322,22 @@ end
     @test all(d -> length(d) == 20, draws)
     @test all(isfinite, reduce(vcat, draws))
 end
+
+
+@testitem "exp_I_t is the incidence ImportedCases adds on top of" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(483)
+    # An importation modifier adds a spike on top of the force of infection, so
+    # the committed draw exceeds the renewal expectation wherever it bites. The
+    # portal is `Renewal`, whose `as_turing_model` resolves the modifier's
+    # priors through the pre-scan seam before accumulating.
+    gen_int = [0.2, 0.3, 0.5]
+    model = Renewal(
+        gen_int, ImportedCases(FixedIntercept(log(2.0)));
+        rt = RandomWalk(), initialisation = Normal()
+    )
+    out = as_turing_model(model, 30)()
+    @test haskey(out, :exp_I_t)
+    @test all(out.I_t .>= out.exp_I_t)
+    @test mean(out.I_t .- out.exp_I_t) > 0.0
+end
