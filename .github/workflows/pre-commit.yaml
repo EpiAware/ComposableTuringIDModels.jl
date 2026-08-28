@@ -18,8 +18,8 @@ jobs:
     # `language: julia` builds the hook's own env from the
     # `.pre-commit-config.yaml` `additional_dependencies` pin. Instead it
     # greps this repo's `.pre-commit-config.yaml` for the literal string
-    # `Runic@1.7.0` and fails if absent, so this input and that
-    # pin must agree (single source: `1.7.0`).
+    # `Runic@1.9` and fails if absent, so this input and that
+    # pin must agree (single source: `1.9`).
     with:
-      runic_version: '1.7.0'
+      runic_version: '1.9'
     secrets: inherit  # pragma: allowlist secret

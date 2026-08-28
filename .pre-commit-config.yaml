@@ -47,7 +47,7 @@ repos:
   rev: v2.2.0
   hooks:
   - id: runic
-    additional_dependencies: ['Runic@1.7.0']
+    additional_dependencies: ['Runic@1.9']
     # Runic is AST-based and errors rather than skips on the `{{PLACEHOLDER}}`
     # tokens in templates/, which are not valid Julia until substituted.
     # No-op in a normal package.
