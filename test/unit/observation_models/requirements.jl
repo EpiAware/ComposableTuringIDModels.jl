@@ -32,12 +32,13 @@ end
     @test observation_lead_in(ReportTriangle(PoissonError(), fill(1 / 3, 3))) == 0
 
     # An aggregation applied to a delayed series is on the time axis, so it
-    # passes the lead-in through; a delay applied inside one consumes reporting
-    # windows instead, which is not a series length.
+    # passes the lead-in through. A delay applied INSIDE one consumes reporting
+    # windows drawn from the series the aggregation already has, so the series
+    # does not lengthen and the lead-in in time points is zero.
     weekly = [0, 0, 0, 0, 0, 0, 7]
     @test observation_lead_in(LatentDelay(Aggregate(PoissonError(), weekly), pmf)) == 4
     @test observation_lead_in(Aggregate(PoissonError(), weekly)) == 0
-    @test_throws ArgumentError observation_lead_in(Aggregate(delayed, weekly))
+    @test observation_lead_in(Aggregate(delayed, weekly)) == 0
 
     # Streams of a Split run in parallel: the shared lead-in, not their sum.
     split = Split((cases = delayed, deaths = LatentDelay(PoissonError(), pmf)))
@@ -446,6 +447,15 @@ end
     # An aggregation indexes its data against the expected series rather than
     # right-aligning to it, so a shorter series is a call that fails.
     @test !data_fits(weekly, fill(10, n - 1), n)
+
+    # A delay INSIDE the aggregation costs scored windows rather than series
+    # length: it consumes the leading windows, which go unpredicted.
+    nested = Aggregate(LatentDelay(PoissonError(), fill(1 / 3, 3)), [0, 0, 0, 0, 0, 0, 7])
+    inner = data_requirements(nested, fill(10, n), n)
+    @test inner.series_length == n
+    @test inner[:y_t].n_required == n
+    @test inner[:y_t].n_scored == 4 - 2
+    @test data_fits(inner)
 
     # A delay in front of the aggregation lengthens the series, not the data.
     delayed = LatentDelay(weekly, fill(1 / 8, 8))

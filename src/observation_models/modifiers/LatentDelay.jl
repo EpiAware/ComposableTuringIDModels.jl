@@ -326,6 +326,14 @@ _delay_timevarying(::UncertainDelay{P, F, T, TV}) where {P, F, T, TV} = TV
     # it sizes it from the CONVOLVED series it actually reads. Sizing it here
     # instead would simulate a series as long as the input, with the lead-in at
     # its head coming back as `missing` rather than not coming back at all.
+    #
+    # An aggregation is the exception. Its reporting windows are fixed calendar
+    # objects read off the length of `y_t`, and it right-aligns a shorter `Y_t`
+    # against them, so it needs the series on the INPUT calendar rather than the
+    # convolved one. Sizing it here is what supplies that calendar.
+    if ismissing(y_t) && _needs_input_calendar(obs_model.model)
+        y_t = Vector{Missing}(missing, length(Y_t))
+    end
     spec = obs_model.delay
     n = length(Y_t)
 

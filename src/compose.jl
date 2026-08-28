@@ -72,19 +72,30 @@ even once every entry is concrete. Conditioning on that makes DynamicPPL
 `deepcopy` the argument on every evaluation, which Enzyme cannot differentiate
 in reverse mode. Narrowing avoids both the copy and the failure.
 
-A genuinely partially-missing vector (some entries observed, some `missing`)
-is split into a [`MissingObservations`](@ref) carrier instead: a concrete
-value vector plus a presence mask, neither of which admits `Missing` in its
-type. A fully missing vector, a partially- or fully-missing matrix (the
-strata data a data-driven [`Split`](@ref) reads shape from), and a scalar
-`missing`, are returned unchanged, and so is an array whose element type is
-already concrete. A `NamedTuple` of streams is narrowed field-wise, so each
+A vector with any `missing` in it is split into a [`MissingObservations`](@ref)
+carrier instead: a concrete value vector plus a presence mask, neither of which
+admits `Missing` in its type. This is also what detaches the data from the
+caller: the carrier is scored by reading it, so a blank's draw can never be
+written back into the array that was handed over. Data reached through a
+`NamedTuple` field or a struct field is not a model argument, so this is the
+only thing standing between it and the `y_t[i] ~ …` sugar's `setindex!!`.
+
+A partially- or fully-missing matrix (the strata data a data-driven
+[`Split`](@ref) reads shape from) and a scalar `missing` are returned
+unchanged, and so is an array whose element type is already concrete. A
+`Vector{Missing}` is returned unchanged too: it carries no value type to build
+a carrier from, and nothing can be written into it either (the sugar widens it
+into a fresh array). A `NamedTuple` of streams is narrowed field-wise, so each
 per-stream submodel receives a concrete vector (or a `MissingObservations`
 carrier).
 
 [`as_turing_model(::IDModel, y_t, n)`](@ref as_turing_model) applies this to
-its `y_t` automatically. It is exposed for data built elsewhere by simulating
-from a prior.
+its `y_t` automatically, and so does every observation model that reads its
+series out of a `NamedTuple` or a struct. It is exposed for data built
+elsewhere by simulating from a prior.
+
+A gap in a fitted series is marginalised out, as described under
+[`MissingObservations`](@ref).
 
 # Arguments
 
@@ -98,8 +109,13 @@ end
 function concrete_observations(y::AbstractVector)
     eltype(y) >: Missing || return y
     any(ismissing, y) || return identity.(y)
-    all(ismissing, y) && return y
     T = nonmissingtype(eltype(y))
+    # A `Vector{Missing}` (`T === Union{}`) has no value type to put in the
+    # carrier, and nothing can be written into it either, so leave it. Any
+    # other element type without a `zero` is copied instead: the copy is what
+    # gets written into, so the caller's array is still out of reach.
+    T === Union{} && return y
+    (isconcretetype(T) && T <: Number) || return copy(y)
     present = .!ismissing.(y)
     value = identity.(coalesce.(y, zero(T)))
     return MissingObservations(value, present)

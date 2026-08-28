@@ -34,6 +34,15 @@ where `N` is a scalar `Integer` (the same trials at every time point) or an
 `y = missing` while still supplying `N`, e.g.
 `y_t = (y = missing, N = fill(20, n))`.
 
+A per-time-point `N` is right-aligned against the expected series in the same
+way the observed successes are, so it can be given with one entry per
+observation or one per expected value. Both put the same trials on the same
+time points; only the unused head differs. `N` must be long enough to cover
+every scored time point (the overlap of the two series). This matters for a
+[`Split`](@ref) branch whose lead-in is shorter than its neighbours': it gets
+more expected values than the caller has observations, and its `N` does not
+have to be padded to match.
+
 This follows the same `NamedTuple`-data pattern as a [`Split`](@ref) stream: the
 shared [`define_y_t`](@ref) hook unpacks the `y` field that every error model
 scores, and `BinomialError` additionally reads the `N` field it needs.
@@ -54,35 +63,55 @@ struct BinomialError <: AbstractObservationErrorModel end
 define_y_t(::BinomialError, y_t, Y_t) = define_y_t(PoissonError(), y_t, Y_t)
 
 # Resolve the number of trials carried in the data to a per-time-point vector.
+# A scalar is broadcast across the expected series; a vector is taken as given
+# and aligned by `_trial_dist`.
 _binomial_trials(N::Integer, n) = fill(N, n)
-function _binomial_trials(N::AbstractVector{<:Integer}, n)
-    @assert length(N) == n "The number-of-trials vector `N` (length $(length(N))) must match the expected-observation series length ($n)"
-    return N
+_binomial_trials(N::AbstractVector{<:Integer}, n) = N
+
+# Build the per-time-point trials distribution, right-aligning the trials
+# against the expected series exactly as the observations are aligned. `n_diff`
+# shifts the trials so their last entry pairs with the last expected step, which
+# makes the two natural shapes — one entry per observation, or one per expected
+# value — put the same trials on the same time points, and leaves the head of
+# whichever runs longer unused. Trials that do not reach back to the first
+# scored step are rejected rather than quietly shifted.
+function _trial_dist(obs_model, p_t, N, diff_t)
+    n = length(p_t)
+    N_t = _binomial_trials(N, n)
+    first_step = first(_scored_steps(diff_t, p_t))
+    n_diff = length(N_t) - n
+    @assert first_step + n_diff >= 1 "The number of trials `N` (length $(length(N_t))) must cover every scored time point: $(n - first_step + 1) are needed to score $(n + diff_t) observations against $n expected values"
+    return _TrialDist(obs_model, p_t, N_t, n_diff)
 end
 
 @model function as_turing_model(obs_model::BinomialError, y_t, Y_t)
     @assert y_t isa NamedTuple&&haskey(y_t, :N) "BinomialError needs `y_t` to be a NamedTuple carrying the number of trials, e.g. `(y = successes, N = trials)` (use `y = missing` to simulate)"
 
-    # Read the number of trials from the data.
-    N_t = _binomial_trials(y_t.N, length(Y_t))
+    # Read the number of trials from the data before `y_t` is rebound to the
+    # observed successes below.
+    N = y_t.N
 
     # `Y_t` is the success probability; clamp away from 0/1 to avoid a degenerate
     # likelihood, mirroring the count families' `Y_t .+ 1e-6` nudge.
     p_t = clamp.(Y_t, 1.0e-6, 1 - 1.0e-6)
-    dist = _TrialDist(obs_model, p_t, N_t)
 
-    y = y_t.y
+    # The successes always arrive in a `NamedTuple` field, so they are never a
+    # model argument DynamicPPL copies: `_scored_series` detaches them from the
+    # caller's data before anything is scored.
+    y = _scored_series(obs_model, y_t, Y_t)
     if y isa MissingObservations
         diff_t = length(y.value) - length(Y_t)
+        dist = _trial_dist(obs_model, p_t, N, diff_t)
         y_t, __varinfo__ = _score_missing_observations!!(
             __model__.context, __varinfo__, y, diff_t, Y_t, dist
         )
     else
         # Rebind `y_t` to the observed successes (the same name, so DynamicPPL
         # conditions on it when concrete).
-        y_t = define_y_t(obs_model, y_t, Y_t)
+        y_t = y
 
         diff_t = length(y_t) - length(Y_t)
+        dist = _trial_dist(obs_model, p_t, N, diff_t)
 
         for i in _scored_steps(diff_t, Y_t)
             y_t[i + diff_t] ~ dist(i)
