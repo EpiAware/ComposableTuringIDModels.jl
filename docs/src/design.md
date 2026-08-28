@@ -322,12 +322,26 @@ expected series rather than nesting.
 
 `ComposableTuringIDModels.rewrap` is the other direction — the same wrapper
 rebuilt around new wrapped models, with everything else it holds carried across.
-Swapping every component of a given type is those two together:
+Swapping every component of a given type is [`swap`](@ref), which is those two
+together:
+
+```@example traversal
+using ComposableTuringIDModels: swap
+swapped = swap(x -> x isa PoissonError ? NegativeBinomialError() : x, obs)
+```
+
+Targeting a *single* component rather than every one of a type — one error
+model in a [`Split`](@ref), say — is the same pair on one address, built from
+[`wrapped_models`](@ref) and [`rewrap`](@ref) by position (in `wrapped_models`
+order):
 
 ```@example traversal
 using ComposableTuringIDModels: wrapped_models, rewrap
-swap(f, m) = f(rewrap(m, map(x -> swap(f, x), wrapped_models(m))))
-swapped = swap(x -> x isa PoissonError ? NegativeBinomialError() : x, obs)
+split = obs.model.model
+updated_split = rewrap(
+    split, (split.streams.cases, NegativeBinomialError())
+)
+one_swapped = rewrap(obs, (updated_split,))
 ```
 
 Several components transform or derive a field on construction.

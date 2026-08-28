@@ -162,11 +162,7 @@ end
 
 @testitem "traversal and rewrap compose into a type-keyed swap" begin
     using ComposableTuringIDModels, Distributions
-    using ComposableTuringIDModels: wrapped_models, rewrap,
-        observation_components
-
-    # The update case, written in terms of the two accessors alone.
-    swap(f, m) = f(rewrap(m, map(x -> swap(f, x), wrapped_models(m))))
+    using ComposableTuringIDModels: swap, observation_components
 
     obs = LatentDelay(
         Ascertainment(
@@ -195,6 +191,40 @@ end
     @test length(parts) == length(observation_components(obs))
     # The original is untouched.
     @test count(x -> x isa PoissonError, observation_components(obs)) == 2
+end
+
+@testitem "swap targets a single stream of a Split, not every one" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: swap, wrapped_models, rewrap,
+        observation_components
+
+    obs = LatentDelay(
+        Split((cases = PoissonError(), deaths = PoissonError())),
+        [0.5, 0.3, 0.2]
+    )
+
+    # `swap` with a predicate replaces every matching component. Address ONE
+    # stream instead through `wrapped_models`/`rewrap`: the `Split` holds both
+    # streams, so rewrite its streams first (by position, in `wrapped_models`
+    # order — a 0-field struct like `PoissonError` has no identity to match),
+    # then put the updated split back into the same wrapper.
+    split = obs.model
+    updated_split = rewrap(split, (split.streams.cases, NegativeBinomialError()))
+    replaced = rewrap(obs, (updated_split,))
+
+    leaves = observation_components(replaced)
+    @test count(x -> x isa PoissonError, leaves) == 1
+    @test count(x -> x isa NegativeBinomialError, leaves) == 1
+    # The cases stream is untouched, the deaths stream is the replacement.
+    @test replaced.model.streams.cases isa PoissonError
+    @test replaced.model.streams.deaths isa NegativeBinomialError
+    # Every wrapper survives.
+    wrappers(chain) = [
+        nameof(typeof(x))
+            for x in chain if !(x isa AbstractObservationErrorModel)
+    ]
+    @test wrappers(observation_components(replaced)) ==
+        wrappers(observation_components(obs))
 end
 
 @testitem "rewrap rejects the wrong number of replacements" begin

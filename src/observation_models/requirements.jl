@@ -287,7 +287,7 @@ Data that is not there to disagree — a `missing` stream, simulated at whatever
 length the chain produces — fits by construction.
 
 [`as_turing_model`](@ref) applies one further check this does not: a stream
-short by *exactly* its chain's lead-in is the pre-0.2.0 meaning of `n`, where
+short by *exactly* its chain's lead-in is the old meaning of `n`, where
 the caller added the lead-in to the series length by hand, and is rejected
 rather than fitted over a longer series than the caller means.
 
@@ -403,11 +403,6 @@ function _stream_requirement(
     )
 end
 
-# Whether a stream right-aligns its data against its expected series. The
-# per-time-point error families do, so a shorter series is scored at the end and
-# the earlier expected values are unobserved run-in. An `Aggregate` indexes its
-# data by a presence mask over the expected series, and a `ReportTriangle`
-# asserts its reference days, so neither tolerates a length that differs.
 # Whether a component reads its data on the calendar it was handed rather than
 # on the convolved series. Only an `Aggregate` does: its reporting windows are
 # indexed off `length(y_t)`, and it right-aligns a shorter expected series
@@ -419,6 +414,11 @@ _needs_input_calendar(model::AbstractObservationModel) = _needs_input_calendar(
 _needs_input_calendar(::Nothing) = false
 _needs_input_calendar(::Aggregate) = true
 
+# Whether a stream right-aligns its data against its expected series. The
+# per-time-point error families do, so a shorter series is scored at the end and
+# the earlier expected values are unobserved run-in. An `Aggregate` indexes its
+# data by a presence mask over the expected series, and a `ReportTriangle`
+# asserts its reference days, so neither tolerates a length that differs.
 _alignment(model::AbstractObservationModel) = _alignment(_wrapped_model(model))
 _alignment(::Nothing) = :right
 _alignment(::Aggregate) = :exact
@@ -578,7 +578,7 @@ end
 # error, because their head would never enter the likelihood. Fewer is not: the
 # data is right-aligned, so a series that starts later is scored at the end.
 # The one exception is a shortfall of exactly the chain's lead-in, which is the
-# pre-0.2.0 meaning of `n`.
+# old meaning of `n`.
 #
 # This walks the chain rather than building a `DataRequirements`: an
 # `IDProblem`'s model body reassembles its `IDModel` on every evaluation, so
@@ -619,7 +619,7 @@ function _check_stream(
         )
     )
     _check_exact_length(Val(_alignment(model)), name, supplied, n_max)
-    return _check_pre_020(name, supplied, lead_in, n)
+    return _check_legacy_n_length(name, supplied, lead_in, n)
 end
 
 # An exact-length component cannot right-align at all, so a series of the wrong
@@ -637,17 +637,17 @@ function _check_exact_length(::Val{:exact}, name, supplied, n_max)
     )
 end
 
-# A shortfall of exactly the chain's lead-in is the pre-0.2.0 idiom, where `n`
+# A shortfall of exactly the chain's lead-in is the old meaning of `n`, where
 # was the infection series length and the caller added the lead-in by hand.
 # Every observation would still be scored, but against a model run over a
 # longer series than the caller means, so name it.
-function _check_pre_020(name, supplied, lead_in, n)
+function _check_legacy_n_length(name, supplied, lead_in, n)
     (lead_in > 0 && n - supplied == lead_in) || return nothing
     throw(
         ArgumentError(
             "as_turing_model: stream `$name` was given $supplied " *
                 "observations for a model asked to cover $n, short by " *
-                "exactly this chain's lead-in, which is the pre-0.2.0 " *
+                "exactly this chain's lead-in, which is the old " *
                 "meaning of `n`. `n` is now the number of observations, not " *
                 "the length of the infection series: pass `length(y)`. If the " *
                 "stream really does have that many fewer observations, pad " *

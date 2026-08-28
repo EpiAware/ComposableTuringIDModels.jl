@@ -243,7 +243,7 @@ end
     @test_throws ArgumentError as_turing_model(model, y[1:23], (3, 8))
 end
 
-@testitem "as_turing_model rejects the pre-0.2.0 series length" begin
+@testitem "as_turing_model rejects the legacy series length" begin
     using ComposableTuringIDModels, Distributions
 
     obs = LatentDelay(PoissonError(), fill(1 / 15, 15))
@@ -263,7 +263,7 @@ end
     end
     @test err isa ArgumentError
     @test occursin("number of observations", err.msg)
-    @test occursin("pre-0.2.0", err.msg)
+    @test occursin("old meaning of `n`", err.msg)
 
     # More observations than the model can score is an error too: their head
     # would never enter the likelihood, which is the failure being removed.

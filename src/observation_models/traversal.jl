@@ -139,13 +139,8 @@ around them. Everything else the component holds — a delay PMF, an ascertainme
 prior, a [`Split`](@ref)'s stream names and weight map — is carried across
 unchanged.
 
-Updating a whole chain is this plus [`wrapped_models`](@ref), and needs nothing
-further:
-
-```julia
-swap(f, m) = f(rewrap(m, map(x -> swap(f, x), ComposableTuringIDModels.wrapped_models(m))))
-swap(x -> x isa PoissonError ? NegativeBinomialError() : x, obs)
-```
+Updating a whole chain is this plus [`wrapped_models`](@ref), via
+[`swap`](@ref).
 
 ## The contract for a new modifier
 
@@ -220,4 +215,56 @@ function rewrap(model::Split, models::Tuple)
     return Split(
         NamedTuple{keys(model.streams)}(models), model.names, model.map
     )
+end
+
+@doc raw"
+Rebuild every component of a given type in an observation chain.
+
+`swap(f, obs)` applies `f` to the whole chain and to every observation model it
+wraps, outermost first, with each component rebuilt by [`rewrap`](@ref) around
+its own replacements. `f` returns the replacement for the component it is
+given, so a type-keyed swap is a `filter`-like one-liner:
+
+```julia
+swap(x -> x isa PoissonError ? NegativeBinomialError() : x, obs)
+```
+
+Everything a wrapper holds beyond its inner model — a delay PMF, an
+ascertainment prior, a [`Split`](@ref)'s stream names and weight map — is the
+`rewrap` contract's to carry across, so it survives the swap. The original
+chain is left untouched.
+
+To target a *single* component rather than every one of a type, address it by
+position through [`wrapped_models`](@ref) and [`rewrap`](@ref) directly:
+
+```julia
+# Replace only the first component an error model wraps.
+wrapped = ComposableTuringIDModels.wrapped_models(obs)
+inner = rewrap(obs, (NegativeBinomialError(), Base.tail(wrapped)...))
+```
+
+## Arguments
+
+  - `f`: a callable mapping an observation model to its replacement, applied to
+    the chain and to each component it wraps.
+  - `model`: an observation model (or an [`IDModel`](@ref), whose
+    observation chain is traversed).
+
+# Examples
+```@example swap
+using ComposableTuringIDModels
+obs = LatentDelay(
+    Split((cases = PoissonError(), deaths = PoissonError())),
+    [0.5, 0.3, 0.2])
+ComposableTuringIDModels.swap(
+    x -> x isa PoissonError ? NegativeBinomialError() : x, obs)
+```
+"
+function swap(f, model::AbstractObservationModel)
+    return f(rewrap(model, map(x -> swap(f, x), wrapped_models(model))))
+end
+
+# A composed model's observation chain is its observation model's.
+function swap(f, model::IDModel)
+    return IDModel(model.infection_model, swap(f, model.observation_model))
 end

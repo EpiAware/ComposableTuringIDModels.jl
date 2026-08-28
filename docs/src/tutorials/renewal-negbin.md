@@ -373,9 +373,18 @@ a one-line change. Swapping the negative-binomial reporting for a
 ``R_t`` process — untouched:
 
 ```@example renewal
-poisson_model = IDModel(renewal, PoissonError())
+using ComposableTuringIDModels: swap
+poisson_model = swap(
+    model, err -> err isa NegativeBinomialError ? PoissonError() : err)
 length(rand(as_turing_model(poisson_model, fill(missing, n), n)))
 ```
+
+[`swap`](@ref) walks the fitted model's observation chain and replaces every
+component matching the predicate — here the single negative-binomial error —
+rebuilding each wrapper around its replacement, exactly as the fresh
+`IDModel(renewal, PoissonError())` would build it by hand. See
+[Inspecting and updating an observation chain](@ref obs-traversal) for the
+general form, which also targets a single stream of a [`Split`](@ref).
 
 ## References
 
