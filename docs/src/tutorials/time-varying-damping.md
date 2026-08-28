@@ -21,7 +21,6 @@ autoregression — the coefficient is one number for the whole series:
 
 ```@example tvdamp
 using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
-using Turing: to_submodel
 using Mooncake
 using ADTypes: AutoMooncake
 Random.seed!(80)
@@ -46,6 +45,13 @@ recursion is untouched:
 tv = AR(; damp = RandomWalk())
 (order = tv.p, transform = tv.transform)
 ```
+
+The transform is a first-class field of [`AR`](@ref), not baked into the
+constructor: the default is just what a ``\rho`` in ``(-1, 1)`` needs — `tanh`
+for a process-valued `damp` (an unbounded draw mapped into the stationary band),
+`identity` for an already-bounded `Distribution` — and any map can be passed as
+the `transform` keyword instead. So the coefficient is transformed where it is
+drawn, and the recursion reads the mapped path.
 
 Built with `as_turing_model(m, n)` it returns the numeric length-`n` path (like
 every other latent model), and tracks the coefficient path ``\rho_t`` as a
@@ -88,23 +94,27 @@ end
 ```
 
 The model wraps the time-varying `AR` in a thin observation of the path and fits
-under NUTS. The coefficient path is tracked as the generated quantity `ρ`, so it is
-recovered straight from the chain.
+under NUTS. The composition is the package's own stack rather than a
+hand-written `@model` loop: [`DirectInfections`](@ref) with
+`transformation = identity` and a fixed zero `initialisation` passes the `AR`
+path straight through as the expected series, and a [`NormalError`](@ref) with
+a fixed tiny standard deviation observes it. The coefficient path is tracked as
+the generated quantity `ρ`, so it is recovered straight from the chain.
 We draw two chains in parallel with `MCMCThreads()` and differentiate with
 [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend
 for this package (see [Automatic differentiation backend](@ref ad-backends)).
 
 ```@example tvdamp
-@model function observe_path(y, n)
-    latent ~ as_turing_submodel(AR(; damp = RandomWalk()), n)
-    for t in 1:n
-        y[t] ~ Normal(latent[t], 0.01)
-    end
-end
-
-model = observe_path(z, n)
+model = IDModel(
+    DirectInfections(
+        ; Z = AR(; damp = RandomWalk()), transformation = identity,
+        initialisation = FixedIntercept(0.0)
+    ),
+    NormalError(std = FixedIntercept(0.01))
+)
 fit = sample(
-    model, NUTS(0.85; adtype = AutoMooncake(; config = nothing)),
+    as_turing_model(model, z, n),
+    NUTS(0.85; adtype = AutoMooncake(; config = nothing)),
     MCMCThreads(), 300, 2; progress = false)
 # ρ is tracked as a generated quantity: `fit[:ρ]` is a per-draw coefficient path
 ρ_draws = reduce(hcat, vec(fit[:ρ]))     # (n-1) × draws
@@ -135,7 +145,7 @@ axislegend(ax; position = :lb)
 fig
 ```
 
-The band covers the true trajectory across the series, so the time-varying damping
+The band tracks the true trajectory across the series, so the time-varying damping
 is recovered from data — with the coefficient's evolution supplied as an ordinary
 prior process rather than coded by hand. The same mechanism widens any scalar
 parameter to a time-varying one: put a process in its slot instead of a
