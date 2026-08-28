@@ -149,8 +149,14 @@ function _extend_latent_draws(rng::AbstractRNG, fc_model, chain)
     extended = deepcopy(chain)
     data = extended._data
     resized = Dict{FlexiChains.Parameter, Int}()
+    # A generated quantity (a `:=` value) is recomputed by `predict`, not
+    # extended: it is not a model input, so a prior draw of the forecast model
+    # never samples it and there is no tail to draw. Probe one prior draw to
+    # tell input streams from generated quantities.
+    prior = Dict(vn => val for (vn, val) in pairs(rand(rng, fc_model)))
     for key in keys(data)
         key isa FlexiChains.Parameter || continue
+        haskey(prior, key.name) || continue
         sample = data[key][1, 1]
         sample isa AbstractVector && (resized[key] = length(sample))
     end

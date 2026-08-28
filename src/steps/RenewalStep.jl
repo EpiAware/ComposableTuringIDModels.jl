@@ -268,7 +268,12 @@ expectation equals the committed draw; with a [`SusceptibleDepletion`](@ref) or
 # Examples
 ```@example get_expected_state
 using ComposableTuringIDModels
-step = ComposableTuringIDModels.ConstantRenewalStep(reverse([0.2, 0.3, 0.5]))
+core = ComposableTuringIDModels.ConstantRenewalStep(reverse([0.2, 0.3, 0.5]))
+step = RenewalStep(core, (SusceptibleDepletion(100.0),))
+init = ComposableTuringIDModels.renewal_init_state(
+    step, [1.0], 0.0, 3)
+result = accumulate(step, [1.0, 2.0, 3.0]; init = init)
+ComposableTuringIDModels.get_expected_state(step, init, result)
 ```
 "
 function get_expected_state(::RenewalStep, initial_state, state)
