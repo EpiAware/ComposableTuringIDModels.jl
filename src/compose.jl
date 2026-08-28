@@ -73,6 +73,9 @@ carrier).
 its `y_t` automatically. It is exposed for data built elsewhere by simulating
 from a prior.
 
+A gap in a fitted series is marginalised out, as described under
+[`MissingObservations`](@ref).
+
 # Arguments
 
   - `y`: the data argument to narrow — an `AbstractArray`, a `NamedTuple` of

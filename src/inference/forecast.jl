@@ -26,9 +26,19 @@ each draw's innovation stream to the horizon length with fresh prior draws and
 then calls [`predict`](https://turinglang.org/) on the model rebuilt at length
 ``T + h``.
 
-The result is a chain of the same shape as the input containing the predicted
-observations `y_t[T+1] … y_t[T+h]` (the in-sample points stay conditioned on the
-data and so are not resampled). Pass it to [`generated_observables`](@ref) or
+The observations are drawn rather than inferred. Nothing about `y_t` is a
+parameter of the fitted model, so the horizon cannot be read out of the
+posterior; it is *generated* from it, by replaying each draw through the model
+at length ``T + h`` and sampling the observation error at the expected values
+that replay produces. This is the same step a Stan `generated quantities` block
+performs, and the same one [`predict`](https://turinglang.org/) on a
+fully-missing series performs in-sample.
+
+The result is a chain of the same shape as the input holding the predicted
+observations, indexable per time point as `y_t[T+1] … y_t[T+h]`. The in-sample
+points are generated too, so the same chain carries the in-sample posterior
+predictive; the fitted latent path is unchanged either way, because `y_t` never
+feeds back into it. Pass the chain to [`generated_observables`](@ref) or
 `returned` to recover the extended latent trajectories per draw.
 
 The extension is exact for the package's non-centred processes because their
@@ -70,9 +80,14 @@ function forecast(
     horizon ≥ 1 ||
         throw(ArgumentError("horizon must be ≥ 1, got $horizon"))
     n_time = _series_time_length(y)
-    y_ext = _extend_series(y, horizon)
+    # The forecast model sees NO observations: every time point is drawn from
+    # the error model at the expected values each posterior draw replays. The
+    # in-sample data would only pin points the fit has already accounted for,
+    # and conditioning on it cannot change the horizon, since `y_t` never feeds
+    # back into the latent path.
+    y_blank = _blank_series(y, n_time + horizon)
     shape = _obs_data_shape(model.observation_model, y, n_time + horizon)
-    fc_model = as_turing_model(model, y_ext, shape)
+    fc_model = as_turing_model(model, y_blank, shape)
     extended = _extend_latent_draws(rng, fc_model, chain)
     return predict(rng, fc_model, extended)
 end
@@ -84,14 +99,17 @@ _series_time_length(y::AbstractVector) = length(y)
 _series_time_length(y::AbstractMatrix) = size(y, 2)
 _series_time_length(y::NamedTuple) = _series_time_length(first(y))
 
-# Extend the observed series by `horizon` further TIME points of `missing`,
-# preserving its shape: append to a vector, add columns to a `strata x time`
-# matrix, or extend every stream of a `NamedTuple` in turn.
-_extend_series(y::AbstractVector, horizon) = vcat(y, fill(missing, horizon))
-function _extend_series(y::AbstractMatrix, horizon)
-    return hcat(y, fill(missing, size(y, 1), horizon))
+# A wholly unobserved series of `n_time` time points, shaped like `y`: a vector,
+# a `strata x time` matrix, or a `NamedTuple` with the same stream names (which
+# is what tells a data-driven `Split` which streams to build). Every entry is
+# `missing`, so the observation model draws every point predictively — the same
+# argument `as_turing_model(model, fill(missing, n), n)` takes to sample the
+# posterior predictive in-sample.
+_blank_series(::AbstractVector, n_time) = Vector{Missing}(missing, n_time)
+function _blank_series(y::AbstractMatrix, n_time)
+    return Matrix{Missing}(missing, size(y, 1), n_time)
 end
-_extend_series(y::NamedTuple, horizon) = map(v -> _extend_series(v, horizon), y)
+_blank_series(y::NamedTuple, n_time) = map(v -> _blank_series(v, n_time), y)
 
 @doc raw"
 Forecast from a fitted [`IDProblem`](@ref); see [`forecast`](@ref) for the model

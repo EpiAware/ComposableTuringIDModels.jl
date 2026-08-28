@@ -34,6 +34,10 @@ and a longer `Y_t` has its head left unobserved (run-in the data does not
 cover). Expected values are nudged by a tiny constant to avoid degenerate error
 distributions.
 
+A series with only *some* entries missing is fitted to the entries it has,
+the absent ones being marginalised out as described under
+[`MissingObservations`](@ref).
+
 The error family supplies [`generate_observation_error_priors`](@ref) (sampled
 as a submodel) and [`observation_error`](@ref) (the per-time-point distribution).
 
@@ -65,10 +69,12 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
 
         diff_t = length(y_t) - length(Y_t)
 
-        # Every entry in range is scored, including a `missing` one. Sampling
-        # the blanks is what `forecast` relies on: it pads the series with
-        # `missing` over the horizon and reads the drawn values back out of the
-        # chain. Skipping them would drop the horizon from the output.
+        # Every entry is scored, including a `missing` one, so the blanks are
+        # drawn. That is how a predictive draw is taken from a fully missing
+        # series, and how `forecast` fills a horizon appended to a matrix (a
+        # matrix is never split into a carrier). A partially-missing vector
+        # conditioned through `IDModel` arrives as a `MissingObservations`
+        # carrier above instead, which decides per entry.
         for i in _scored_steps(diff_t, Y_t)
             y_t[i + diff_t] ~ dist(i)
         end
@@ -76,22 +82,36 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
     return (; y_t, expected = Y_t)
 end
 
-# Score every entry of a `MissingObservations` carrier against a per-time-point
-# distribution, without ever building a `Union{Missing,T}` value.
+# Score the observed entries of a `MissingObservations` carrier against a
+# per-time-point distribution, without tilde-ing against a `Union{Missing,T}`
+# value.
+#
+# An absent entry is missing at random, so it drops out of the likelihood: it is
+# skipped, not sampled. Imputing one as a latent would be the wrong mechanism
+# rather than merely an expensive one — there is nothing to infer at a point
+# that contributes no likelihood term. Skipping is also what keeps a discrete
+# stream samplable (a sampled count would be a latent that HMC has to link, and
+# a count distribution has no bijector to link it with) and keeps the gradient
+# dimension of a continuous stream down to the parameters that carry
+# information. Predictive values at the gaps are generated after fitting, by
+# replaying the posterior through the model; `forecast` builds its horizon that
+# way.
+#
+# A skipped entry comes back as `missing`, so the series returned below is a
+# `Union{Missing,T}` array wherever the observations have gaps. Making it
+# concrete would be a change to the observation contract rather than to this
+# loop.
 #
 # `y_t[i] ~ dist` decides sample-vs-observe by checking `y_t[i] === missing` at
-# run time, which needs a value that can actually hold `missing` at that lens.
-# Building one freshly inside a model body — the only safe way to do it, since
-# reusing the model's stored argument across evaluations would let one draw's
-# sample leak into the next — is exactly the array Enzyme's reverse-mode type
-# analysis cannot compile. Driving `DynamicPPL.tilde_observe!!` and
-# `DynamicPPL.tilde_assume!!` directly off the carrier's own concrete `present`
-# mask needs no such value: every array touched on the AD-active path stays
-# plainly typed. `value` is copied so a fresh draw is taken on every evaluation
-# rather than mutating the model's stored argument in place.
+# run time, which needs a value that can actually hold `missing` at that lens,
+# and building one inside a model body is exactly the array Enzyme's
+# reverse-mode type analysis cannot compile. Driving
+# `DynamicPPL.tilde_observe!!` directly off the carrier's own concrete `present`
+# mask needs no such value: every array the likelihood touches stays plainly
+# typed, and the model's stored argument is never written to.
 #
-# Returns the scored series (a plain `Vector`, the observed entries as given
-# and the rest overwritten with their fresh draws) and the updated `VarInfo`.
+# Returns the scored series (the observed entries as given, the absent ones
+# `missing`) and the updated `VarInfo`.
 function (d::_ErrorDist)(i)
     return observation_error(
         d.obs_model, d.pad_Y_t[i], map(p -> at(p, i), values(d.priors))...
@@ -106,35 +126,28 @@ function _score_missing_observations!!(
         context, varinfo, y::MissingObservations, diff_t, Y_t, dist
     )
     n = length(y.value)
-    # A sampled draw's type follows the AD backend (e.g. a `ForwardDiff.Dual`,
-    # not a `Float64`), which is not known until `tilde_assume!!` returns, so
-    # `scored` is untyped until every entry is in. Narrowing it with the final
-    # `identity.()` (the same idiom `concrete_observations` uses) keeps this
-    # step off the model's stored arguments — it runs after every tilde call has
-    # already accumulated its log-probability, so it is not part of what Enzyme
+    # `scored` mixes the observed values with `missing` at the gaps, so it is
+    # untyped until every entry is in. Narrowing it with the final `identity.()`
+    # (the same idiom `concrete_observations` uses) keeps this step off the
+    # model's stored arguments — it runs after every tilde call has already
+    # accumulated its log-probability, so it is not part of what Enzyme
     # differentiates.
     scored = Vector{Any}(undef, n)
-    # `template` is the top-level `y_t` array itself (what the `y_t[idx] ~ ...`
-    # sugar would splice in): it tells `VarInfo` storage the real type/length to
-    # allocate for `y_t`'s entries, instead of growing an untyped array on the
-    # fly the way `NoTemplate()` would.
     for i in _scored_steps(diff_t, Y_t)
         idx = i + diff_t
+        # A gap reaches no tilde at all, so it costs neither a `VarName` nor a
+        # `VarInfo` entry.
+        y.present[idx] || continue
         vn = DynamicPPL.VarName{:y_t}(DynamicPPL.Index((idx,), NamedTuple()))
-        if y.present[idx]
-            val = y.value[idx]
-            _, varinfo = DynamicPPL.tilde_observe!!(
-                context, dist(i), val, vn, y.value, varinfo
-            )
-        else
-            val, varinfo = DynamicPPL.tilde_assume!!(
-                context, dist(i), vn, y.value, varinfo
-            )
-        end
+        val = y.value[idx]
+        _, varinfo = DynamicPPL.tilde_observe!!(
+            context, dist(i), val, vn, y.value, varinfo
+        )
         scored[idx] = val
     end
-    # Entries outside the scored window (reached when `Y_t` is shorter than
-    # `y_t`, e.g. a delay convolution) are never scored; keep them as given.
+    # Left unassigned above: every marginalised gap, and any entry outside the
+    # scored window (reached when `Y_t` is shorter than `y_t`, e.g. a delay
+    # convolution, and so never scored). Keep both as given.
     for idx in 1:n
         isassigned(scored, idx) && continue
         scored[idx] = y.present[idx] ? y.value[idx] : missing
