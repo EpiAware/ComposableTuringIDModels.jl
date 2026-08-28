@@ -37,6 +37,12 @@ end
     @test !(eltype(split.value) >: Missing)
     @test split.present == [true, false, true]
     @test split.value[[1, 3]] == [1, 3]
+    # Every stream of a `NamedTuple` of data is split the same way.
+    nt_gap = (
+        a = Vector{Union{Missing, Int}}([1, missing, 3]),
+        b = Vector{Union{Missing, Int}}([missing, 5, 6]),
+    )
+    @test all(v -> v isa MissingObservations, concrete_observations(nt_gap))
 
     # A fully missing vector is split too: `present` is all `false`, and the
     # value vector is a placeholder. Nothing a draw could be written into

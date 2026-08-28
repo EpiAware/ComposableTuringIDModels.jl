@@ -95,7 +95,7 @@ end
     @test_throws Exception as_turing_model(be, fill(3, 10), fill(0.3, 10))()
     @test_throws Exception as_turing_model(be, (y = missing,), fill(0.3, 10))()
 
-    # A trials vector whose length does not match the series is rejected.
+    # A trials vector too short to cover every scored step is rejected.
     @test_throws Exception as_turing_model(
         be, (y = missing, N = [5, 5, 5]),
         fill(0.2, 10)
@@ -106,6 +106,62 @@ end
     @test all(x -> 0 <= x <= 8, edge)
 end
 
+@testitem "BinomialError right-aligns its trials with the data" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using ComposableTuringIDModels: MissingObservations
+    using DynamicPPL: VarInfo, logjoint
+    Random.seed!(306)
+
+    be = BinomialError()
+    # An expected series longer than the data: what a `Split` branch with a
+    # shorter lead-in than its neighbours produces. The trials are data, so
+    # they are right-aligned exactly like the successes and may be given at
+    # the length of either series.
+    p = collect(range(0.2, 0.6; length = 10))
+    y = [2, 3, 4, 5]
+    N_expected = collect(11:20)             # padded to the expected series
+    N_data = N_expected[(end - 3):end]      # only the days the caller observed
+
+    ref = sum(logpdf.(Binomial.(N_data, p[(end - 3):end]), y))
+    padded = as_turing_model(be, (y = y, N = N_expected), p)
+    unpadded = as_turing_model(be, (y = y, N = N_data), p)
+    @test logjoint(padded, VarInfo(padded)) ≈ ref
+    @test logjoint(unpadded, VarInfo(unpadded)) ≈ ref
+
+    # A scalar is broadcast across the scored steps either way.
+    scalar = as_turing_model(be, (y = y, N = 20), p)
+    @test logjoint(scalar, VarInfo(scalar)) ≈
+        sum(logpdf.(Binomial.(20, p[(end - 3):end]), y))
+
+    # The other direction — the data runs longer than the expected series (the
+    # chain's lead-in) — takes the same alignment.
+    y_long = collect(2:13)
+    N_long = collect(21:32)
+    ref_long = sum(logpdf.(Binomial.(N_long[3:12], p), y_long[3:12]))
+    lead_in = as_turing_model(be, (y = y_long, N = N_long), p)
+    trimmed = as_turing_model(be, (y = y_long, N = N_long[3:12]), p)
+    @test logjoint(lead_in, VarInfo(lead_in)) ≈ ref_long
+    @test logjoint(trimmed, VarInfo(trimmed)) ≈ ref_long
+
+    # A partially observed series takes the same alignment. The gap is
+    # marginalised rather than drawn, so it comes back `missing`; the entries
+    # either side of it are still scored against the trials of their own day.
+    carrier = MissingObservations([2, 0, 4, 5], Bool[1, 0, 1, 1])
+    mdl = as_turing_model(be, (y = carrier, N = N_data), p)
+    out = mdl()
+    @test length(out.y_t) == 4
+    @test out.y_t[[1, 3, 4]] == [2, 4, 5]
+    @test ismissing(out.y_t[2])
+    # The alignment is what this pins: each observed entry against its own
+    # day's trials and probability. Being off by one would still return three
+    # observed entries, so check the log-joint rather than the shape.
+    ref_gap = sum([1, 3, 4]) do i
+        logpdf(Binomial(N_data[i], p[i + length(p) - 4]), carrier.value[i])
+    end
+    @test logjoint(mdl, VarInfo(mdl)) ≈ ref_gap
+
+    # Trials that do not cover every scored step are rejected.
+    @test_throws Exception as_turing_model(be, (y = y, N = [5, 5, 5]), p)()
 @testitem "NamedTuple data keeps blanks latent and leaves the caller's data alone" begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     using DynamicPPL: @varname
@@ -231,6 +287,29 @@ end
     @test rand(SafeNegativeBinomial(r, p)) >= 0
 end
 
+@testitem "an expected series longer than the data is right-aligned" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: MissingObservations
+    using DynamicPPL: VarInfo, logjoint
+
+    # The model runs longer than the data. The extra leading expected values
+    # are unobserved run-in and every observation is still scored against the
+    # day it belongs to.
+    Y_t = collect(10.0:1.0:19.0)
+    y = [12, 13, 14, 15]
+
+    mdl = as_turing_model(PoissonError(), y, Y_t)
+    ref = sum(logpdf.(SafePoisson.(Y_t[(end - 3):end] .+ 1.0e-6), y))
+    @test logjoint(mdl, VarInfo(mdl)) ≈ ref
+
+    # A `MissingObservations` carrier takes the same alignment: the observed
+    # entries come back as given and the gap is drawn.
+    carrier = MissingObservations([12, 0, 14, 15], Bool[1, 0, 1, 1])
+    out = as_turing_model(PoissonError(), carrier, Y_t)()
+    @test length(out.y_t) == 4
+    @test out.y_t[[1, 3, 4]] == [12, 14, 15]
+end
+
 @testitem "SafeNegativeBinomial rejects an invalid shape or success probability" begin
     using ComposableTuringIDModels, Distributions, Random
 
@@ -325,4 +404,153 @@ end
 
     # `λ == 0` is the valid degenerate boundary and must still sample.
     @test rand(rng, SafePoisson(0.0)) == 0
+end
+
+@testitem "a gap in fitted data is marginalised out, not sampled" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using ComposableTuringIDModels: MissingObservations
+    using DynamicPPL: DynamicPPL, VarInfo, logjoint
+    Random.seed!(45)
+    model = IDModel(
+        DirectInfections(;
+            Z = RandomWalk(), initialisation = Normal(log(50), 0.2)
+        ),
+        NegativeBinomialError()
+    )
+    n = 20
+    y_full = fill(50, n)
+    y_gap = Vector{Union{Missing, Int}}(y_full)
+    y_gap[[3, 8, 14]] .= missing
+
+    vi_full = VarInfo(as_turing_model(model, y_full, n))
+    vi_gap = VarInfo(as_turing_model(model, y_gap, n))
+    # Punching holes in the data adds no parameters: an absent entry leaves the
+    # likelihood rather than becoming a latent to sample.
+    @test collect(keys(vi_gap)) == collect(keys(vi_full))
+    @test length(vi_gap[:]) == length(vi_full[:])
+    @test !any(vn -> occursin("y_t", string(vn)), keys(vi_gap))
+
+    # The returned series marks the gaps rather than filling them, and passes
+    # the observed entries through as given.
+    out = as_turing_model(model, y_gap, n)()
+    @test all(ismissing, out.generated_y_t[[3, 8, 14]])
+    @test out.generated_y_t[[1, 2, 20]] == y_full[[1, 2, 20]]
+
+    # Nothing at a gap reaches the likelihood: two carriers differing only in
+    # the placeholder they hold at the absent entries score identically, while
+    # the fully observed series scores differently (the observed entries do
+    # still contribute).
+    present = trues(n)
+    present[[3, 8, 14]] .= false
+    carrier = MissingObservations(copy(y_full), present)
+    shifted = MissingObservations(
+        map((v, p) -> p ? v : v + 1000, y_full, present), present
+    )
+    m_full = as_turing_model(model, y_full, n)
+    vi = VarInfo(m_full)
+    @test logjoint(as_turing_model(model, carrier, n), vi) ==
+        logjoint(as_turing_model(model, shifted, n), vi)
+    @test logjoint(m_full, vi) != logjoint(as_turing_model(model, carrier, n), vi)
+end
+
+@testitem "NUTS samples a discrete stream with gaps" tags = [:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(46)
+    # A count observation has no bijector to link, so a sampled gap would make
+    # this model unsamplable by NUTS. Marginalising the gaps out leaves only
+    # the continuous latents.
+    model = IDModel(
+        DirectInfections(;
+            Z = RandomWalk(), initialisation = Normal(log(50), 0.2)
+        ),
+        NegativeBinomialError()
+    )
+    n = 20
+    y = Vector{Union{Missing, Int}}(fill(50, n))
+    y[[4, 9, 15]] .= missing
+    chain = sample(
+        as_turing_model(model, y, n), NUTS(), 20; progress = false
+    )
+    @test size(chain, 1) == 20
+    @test !any(k -> occursin("y_t", string(k)), keys(chain))
+end
+
+@testitem "a gap is filled predictively after fitting, not during" begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    using DynamicPPL: VarInfo
+    Random.seed!(47)
+    model = IDModel(
+        DirectInfections(;
+            Z = RandomWalk(), initialisation = Normal(log(50), 0.2)
+        ),
+        PoissonError()
+    )
+    n = 12
+    y = Vector{Union{Missing, Int}}(fill(50, n))
+    y[[3, 7]] .= missing
+
+    # Fitting carries no `y_t` at all, gap or otherwise.
+    fit = as_turing_model(model, y, n)
+    @test !any(vn -> occursin("y_t", string(vn)), keys(VarInfo(fit)))
+    chain = sample(fit, Prior(), 20; progress = false)
+
+    # Replaying the posterior through a wholly unobserved series generates
+    # every point, the gaps among them, from the error model at the expected
+    # values that replay produces.
+    pred = predict(as_turing_model(model, fill(missing, n), n), chain)
+    drawn = reduce(hcat, (vec(pred[@varname(y_t[i])]) for i in 1:n))
+    @test size(drawn) == (20, n)
+    @test all(x -> x isa Integer && x >= 0, drawn)
+
+    # The same replay recovers the expected series the draws are taken at.
+    gens = vec(returned(as_turing_model(model, y, n), chain))
+    @test length(gens[1].expected_y_t) == n
+    @test all(>=(0), gens[1].expected_y_t)
+end
+
+@testitem "a longer expected series marginalises a carrier's gaps" begin
+    using ComposableTuringIDModels, Distributions, Random, DynamicPPL
+    using ComposableTuringIDModels: concrete_observations
+
+    # The case neither branch could reach on its own. #302 makes an expected
+    # series longer than the data legitimate, which puts `diff_t` below zero;
+    # #319 marginalises a carrier's gaps. Together they index the presence mask
+    # at `i + diff_t`, which walks off the front unless the scored window is
+    # bounded (issue #325).
+    n_obs, lead_in = 40, 12
+    rng = MersenneTwister(325)
+    measured = sort(randperm(rng, n_obs)[1:15])
+    y = Vector{Union{Missing, Int}}(missing, n_obs)
+    y[measured] .= rand(rng, 5:50, 15)
+
+    carrier = concrete_observations(y)
+    @test carrier isa ComposableTuringIDModels.MissingObservations
+    Y_t = fill(20.0, n_obs + lead_in)
+    @test length(carrier.value) - length(Y_t) == -lead_in
+
+    mdl = as_turing_model(PoissonError(), carrier, Y_t)
+    vi = VarInfo(mdl)
+
+    # It evaluates at all, which is the regression, and to something finite.
+    lp = logjoint(mdl, vi)
+    @test isfinite(lp)
+
+    # A gap is marginalised rather than imputed, so no `y_t` reaches the chain.
+    @test !any(k -> occursin("y_t", string(k)), collect(keys(vi)))
+
+    # The likelihood is exactly the observed entries against their own expected
+    # values, right-aligned. An alignment off by the lead-in would fail here.
+    diff_t = length(carrier.value) - length(Y_t)
+    expected_lp = sum(measured) do idx
+        logpdf(Poisson(Y_t[idx - diff_t] + 1.0e-6), carrier.value[idx])
+    end
+    @test logjoint(mdl, vi) ≈ expected_lp
+
+    # Moving the earliest observation moves the log-joint, so nothing at the
+    # head is being silently dropped.
+    moved = copy(carrier.value)
+    moved[first(measured)] += 7
+    shifted = ComposableTuringIDModels.MissingObservations(moved, carrier.present)
+    m2 = as_turing_model(PoissonError(), shifted, Y_t)
+    @test !isapprox(logjoint(m2, VarInfo(m2)), lp)
 end

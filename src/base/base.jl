@@ -93,6 +93,11 @@ unused placeholder otherwise. Defined here (rather than in `compose.jl`, where
 observation-error models that score one directly, further down the include
 order.
 
+An absent entry is missing at random, so it is marginalised out: neither scored
+nor sampled, and costing no parameter. Predictive values at those points come
+from replaying the posterior afterwards, not from carrying them through the fit
+(see [`forecast`](@ref)).
+
 # Examples
 ```@example MissingObservations
 using ComposableTuringIDModels: MissingObservations
@@ -114,8 +119,12 @@ struct _ErrorDist{M, P, R}
     priors::R
 end
 
+# `n_diff` right-aligns the trials against the expected series, in the same
+# way the observations are aligned, so the trials vector may be given at either
+# length. See `_trial_dist`.
 struct _TrialDist{M, P, N}
     obs_model::M
     p_t::P
     N_t::N
+    n_diff::Int
 end
