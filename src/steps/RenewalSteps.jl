@@ -277,6 +277,11 @@ function get_state(::ConstantRenewalStep, initial_state, state)
     return _series(state .|> x -> x.val)
 end
 
+# A plain core has no modifiers, so the noise-free expectation is the draw
+# itself: the expected incidence series is the committed series.
+get_expected_state(step::ConstantRenewalStep, initial_state, state) =
+    get_state(step, initial_state, state)
+
 # `ConstantRenewalStep` is the force-of-infection primitive. The renewal step
 # users build through the [`Renewal`](@ref) helper is `RenewalStep` (see
 # `RenewalStep.jl`), which wraps this core and composes modifiers on top.

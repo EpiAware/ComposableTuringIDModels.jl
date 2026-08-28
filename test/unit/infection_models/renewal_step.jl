@@ -260,3 +260,65 @@ end
         gi, exp, PoissonError(), Normal(), kw.recurrent_step, kw.mixing, ()
     )
 end
+
+@testitem "the scan records the noise-free expectation alongside the draw" begin
+    using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
+        SusceptibleDepletion, accumulate_scan, renewal_init_state,
+        get_expected_state
+    # A plain core has no modifier: the expectation is the draw itself, and the
+    # assembled expectation series is the committed series.
+    rev_gen = reverse([0.2, 0.3, 0.5])
+    core = ConstantRenewalStep(rev_gen)
+    good = RenewalStep(core, (SusceptibleDepletion(1000.0),))
+    init = renewal_init_state(good, 5.0, 0.1, length(rev_gen))
+    Rt = [1.6, 1.4, 1.2, 1.0, 0.9, 0.8]
+
+    result = accumulate(good, Rt; init = init)
+    exp_val = get_expected_state(good, init, result)
+    @test length(exp_val) == length(Rt)
+    @test all(exp_val .>= 0)
+    # The expectation is the pre-modifier incidence: with susceptible depletion
+    # the committed draw is scaled down by the susceptible fraction, so it stays
+    # at or below the expectation and equals it only while the pool is full.
+    @test all(accumulate_scan(good, init, Rt) .<= exp_val .+ 1.0e-8)
+    @test maximum(accumulate_scan(good, init, Rt)) < maximum(exp_val)
+end
+
+@testitem "a plain renewal exposes exp_I_t identical to I_t" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(481)
+    gen_int = [0.2, 0.3, 0.5]
+    model = Renewal(; generation_time = gen_int, rt = RandomWalk(),
+        initialisation = Normal())
+    out = as_turing_model(model, 30)()
+    @test haskey(out, :exp_I_t)
+    @test out.exp_I_t ≈ out.I_t
+    # The stratified shape reports one expectation per stratum.
+    strat = Renewal(; generation_time = gen_int,
+        rt = Stratify(RandomWalk(), FixedIntercept(0.0)),
+        initialisation = Normal())
+    s = as_turing_model(strat, (2, 20))()
+    @test size(s.exp_I_t) == (2, 20)
+    @test s.exp_I_t ≈ s.I_t
+end
+
+@testitem "exp_I_t is a chain-recoverable generated quantity in a composed model" tags = [:sample] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(482)
+    gen_int = [0.2, 0.3, 0.5]
+    model = IDModel(
+        Renewal(
+            gen_int, SusceptibleDepletion(1000.0);
+            rt = RandomWalk(), initialisation = Normal()
+        ),
+        PoissonError()
+    )
+    y = as_turing_model(model, missing, 20)().generated_y_t
+    chn = sample(as_turing_model(model, y, 20), NUTS(), 15; progress = false)
+    # `exp_I_t` is tracked via `:=` like `ρ`, so it comes out of the chain, one
+    # series per draw.
+    draws = vec(chn[:exp_I_t])
+    @test length(draws) == 15
+    @test all(d -> length(d) == 20, draws)
+    @test all(isfinite, reduce(vcat, draws))
+end

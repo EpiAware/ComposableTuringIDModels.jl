@@ -14,9 +14,14 @@ where the latent model `rt` supplies the (log) reproduction number ``Z_t``, ``g`
 is `transformation`, ``g_i`` is the discrete generation interval, and the
 pre-window infections decay at the growth rate implied by ``\mathcal R_1``. The
 ``R_t`` process is generated *inside* the model, so `as_turing_model` takes a
-[`ModelShape`](@ref) `n` and returns the named tuple `(; I_t, Z_t, I_seed)` with
-`Z_t` the (log) ``R_t`` path and `I_seed` the seeding window the scan started
-from, which is not part of `I_t`.
+[`ModelShape`](@ref) `n` and returns the named tuple
+`(; I_t, Z_t, exp_I_t, I_seed)`. `Z_t` is the (log) ``R_t`` path. `exp_I_t` is
+the noise-free renewal *expectation*, the incidence reaching the modifier tuple
+before any modifier transforms it. It equals `I_t` when no modifier is present,
+and differs from it exactly where a [`SusceptibleDepletion`](@ref) or
+[`ImportedCases`](@ref) modifier bites. It is tracked as a generated quantity,
+so a chain recovers it as `chain[:exp_I_t]`. `I_seed` is the seeding window the
+scan started from, which is not part of `I_t`.
 
 The seeding window is deterministic unless `initialisation` is wrapped in a
 [`SeedingPath`](@ref), which estimates the whole run-up instead of decaying a
@@ -387,6 +392,10 @@ end
         I₀ = infection.transformation.(_seed(init_incidence, n))
         init = _make_renewal_init(scan_step, gen_int, I₀, first(Rts))
     end
-    I_t = accumulate_scan(scan_step, init, Rts)
-    return (; I_t, Z_t, I_seed = init.window)
+    # One scan, both series off the same accumulated states: the committed
+    # draw `I_t` and the expectation `exp_I_t` it was drawn around.
+    result = accumulate(scan_step, Rts; init = init)
+    I_t = get_state(scan_step, init, result)
+    exp_I_t := get_expected_state(scan_step, init, result)
+    return (; I_t, Z_t, exp_I_t, I_seed = init.window)
 end

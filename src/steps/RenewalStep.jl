@@ -206,13 +206,20 @@ function _thread_modifiers(mods::Tuple, incidence, substates::Tuple)
     return rest_inc, (s, rest_states...)
 end
 
+# A renewal step carries the noise-free expectation alongside the committed
+# draw: `exp_val` is the incidence arriving at the modifier tuple (the force of
+# infection the core computes), and `val` is that same incidence after every
+# modifier has transformed it. With no modifier in the tuple the two coincide.
 function (step::RenewalStep)(state, Rt)
     foi = renewal_foi(step.core, state.window, Rt)
     new_incidence, new_substates = _thread_modifiers(
         step.modifiers, foi, state.substates
     )
     new_window = _advance(state.window, new_incidence)
-    return (; val = new_incidence, window = new_window, substates = new_substates)
+    return (;
+        val = new_incidence, exp_val = foi, window = new_window,
+        substates = new_substates
+    )
 end
 
 function renewal_init_state(step::RenewalStep, I₀, r_approx, len_gen_int)
@@ -223,11 +230,49 @@ end
 
 function renewal_init_state(step::RenewalStep, window::AbstractArray)
     substates = map(mod -> modifier_init_state(mod, window), step.modifiers)
-    return (; val = _newest(window), window = window, substates = substates)
+    return (;
+        val = _newest(window), exp_val = _newest(window), window = window,
+        substates = substates
+    )
 end
 
 function get_state(::RenewalStep, initial_state, state)
     return _series(state .|> x -> x.val)
+end
+
+# Assemble the noise-free expectation series. A `_PlainRenewalStep` delegates
+# its scan to the bare core, whose states carry no `exp_val`; there is nothing
+# to transform, so the expectation is the draw itself.
+function get_expected_state(step::_PlainRenewalStep, initial_state, state)
+    return get_state(step, initial_state, state)
+end
+
+@doc raw"
+Assemble the noise-free renewal expectation series from a scan's accumulated
+states, mirroring [`get_state`](@ref)
+
+Each step's expectation is the incidence arriving at the modifier tuple (the
+force of infection the core computed) before any modifier transformed it — the
+value a stochastic renewal modifier would draw around. Without modifiers the
+expectation equals the committed draw; with a [`SusceptibleDepletion`](@ref) or
+[`ImportedCases`](@ref) modifier it is the draw those modifiers received, so
+`I_t` differs from `exp_I_t` exactly where the modifier bites.
+
+# Arguments
+
+  - `step`: the renewal step scanned (the same step `accumulate_scan` was
+    called with).
+  - `initial_state`: the seed state the scan started from.
+  - `state`: the raw accumulated output of `accumulate`.
+
+# Examples
+```@example get_expected_state
+using ComposableTuringIDModels
+step = ComposableTuringIDModels.ConstantRenewalStep(reverse([0.2, 0.3, 0.5]))
+```
+"
+function get_expected_state(::RenewalStep, initial_state, state)
+    return _series(state .|> x -> x.exp_val)
 end
 
 # --- the pre-scan seam ------------------------------------------------------
