@@ -353,6 +353,51 @@ end
     @test all(mt.observed)
 end
 
+@testitem "ReportTriangle narrows its counts at construction" begin
+    using ComposableTuringIDModels, Distributions
+    obs = ReportTriangle(PoissonError(), [0.6, 0.25, 0.15])   # Dmax = 2
+
+    # The count matrix the model scores is one of the model's own arguments,
+    # so it is built once when the model is constructed and DynamicPPL owns
+    # any copying it needs. Nothing about the data is unpacked, narrowed or
+    # copied inside the model body, where it would run on every evaluation
+    # (and where a run-time type computation crashes Mooncake's compiler).
+    N = Matrix{Union{Missing, Int}}([10 5 2; 12 6 3; 14 7 4])
+    tri = define_y_t(obs, N, fill(20.0, 3); now = 5)
+    mdl = as_turing_model(obs, tri, fill(20.0, 3))
+
+    @test mdl.args.y_t isa AbstractMatrix
+    @test mdl.args.y_t !== tri.counts
+    # Nothing is missing here, so the argument is narrowed to a concrete
+    # eltype and never sees DynamicPPL's `hasmissing` deepcopy.
+    @test eltype(mdl.args.y_t) === Int
+    @test mdl.args.y_t == tri.counts
+end
+
+@testitem "a ready-built ReportingTriangle is not written to" begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    using DynamicPPL: @varname
+    Random.seed!(73)
+    obs = ReportTriangle(PoissonError(), [0.6, 0.25, 0.15])   # Dmax = 2
+
+    # A triangle built outside the model is not one of the model's arguments,
+    # so DynamicPPL never copies it: a `missing` observed cell must still be
+    # sampled as a latent rather than written into the caller's matrix.
+    N = Matrix{Union{Missing, Int}}([10 5 2; 12 6 3; 14 7 4])
+    N[2, 1] = missing
+    tri = define_y_t(obs, N, fill(20.0, 3); now = 5)
+    before = copy(tri.counts)
+
+    chn = sample(
+        as_turing_model(obs, tri, fill(20.0, 3)), Prior(), 20; progress = false
+    )
+
+    @test isequal(tri.counts, before)
+    draws = vec(chn[@varname(y_t[2, 1])])
+    @test length(draws) == 20
+    @test length(unique(draws)) > 1
+end
+
 @testitem "ReportTriangle simulates, conditions, and recovers per-cell means" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(72)
@@ -799,5 +844,49 @@ end
     @test_throws Exception as_turing_model(
         Aggregate(LatentDelay(PoissonError(), fill(0.2, 5)), aggregation),
         missing, Y
+    )()
+end
+
+@testitem "An aggregation window covering no expected values is not scored" begin
+    using ComposableTuringIDModels, DynamicPPL, Random
+    Random.seed!(308)
+    # Weekly reporting over 28 days with the delay OUTSIDE the aggregation, so
+    # it is measured in time points. An 8-entry PMF consumes the first seven
+    # days, leaving the window that ends on day 7 with no expected value to sum
+    # at all. That window says nothing about the data and must not be scored.
+    aggregation = [0, 0, 0, 0, 0, 0, 7]
+    Y = fill(1.0, 28)
+    y = fill(2, 28)
+    obs = LatentDelay(Aggregate(PoissonError(), aggregation), fill(1 / 8, 8))
+
+    function logdensity(model, data)
+        mdl = as_turing_model(model, data, Y)
+        return logjoint(mdl, VarInfo(mdl))
+    end
+
+    # The count reported in the uncovered window does not enter the likelihood.
+    moved = copy(y)
+    moved[7] = 99
+    @test logdensity(obs, y) == logdensity(obs, moved)
+    # A covered window's count still does.
+    covered = copy(y)
+    covered[14] = 99
+    @test logdensity(obs, y) != logdensity(obs, covered)
+    # The covered windows are untouched: each still sums its full seven days.
+    @test as_turing_model(obs, y, Y)().expected[[14, 21, 28]] == [7.0, 7.0, 7.0]
+
+    # A window only PARTIALLY covered keeps being scored, against the expected
+    # values that do cover it. A point mass at the third PMF entry is a lag of
+    # two, so the first window sums five of its seven days.
+    partial = LatentDelay(Aggregate(PoissonError(), aggregation), [0.0, 0.0, 1.0])
+    @test as_turing_model(partial, y, Y)().expected[7] == 5.0
+    part_moved = copy(y)
+    part_moved[7] = 99
+    @test logdensity(partial, y) != logdensity(partial, part_moved)
+
+    # Nothing left to score at all is an error, not an empty likelihood: the
+    # single window ends on day 7 and the delay consumes every one of them.
+    @test_throws Exception as_turing_model(
+        obs, fill(2, 8), fill(1.0, 8)
     )()
 end

@@ -216,3 +216,68 @@ plain `IDModel(infection_model, observation_model)` constructor.
 No separate panel constructor is needed.
 See [Partial pooling across groups](@ref tutorial-hierarchy) and [Multiple
 observation streams](@ref tutorial-split) for worked examples.
+
+## [Inspecting and updating an observation chain](@id obs-traversal)
+
+An observation model is a nesting of modifiers around an error model, each
+holding what it wraps in a field, so a chain with a few modifiers is several
+levels deep.
+Displaying one prints the whole tree:
+
+```@example traversal
+using ComposableTuringIDModels, Distributions
+obs = LatentDelay(
+    Ascertainment(
+        Split((cases = PoissonError(), deaths = PoissonError())),
+        FixedIntercept(log(0.1))
+    ),
+    [0.5, 0.3, 0.2]
+)
+```
+
+Reading a component out of that structure, or putting a different one in, goes
+through two functions rather than through field paths.
+`ComposableTuringIDModels.wrapped_models` reports what a single component wraps,
+and `ComposableTuringIDModels.observation_components` is the walk built on it —
+every component of a chain, outermost first, with a [`Split`](@ref)'s branches
+followed in stream order.
+Both are public but not exported, so they are reached through the module name.
+
+Locating a component is a `filter` over the walk instead of a field path:
+
+```@example traversal
+using ComposableTuringIDModels: observation_components
+delays = filter(x -> x isa LatentDelay, observation_components(obs))
+length(delays), first(delays).delay
+```
+
+A quantity accumulated over a chain is a `sum` over the same walk.
+A quantity that does not accumulate reads the branching structure through
+`wrapped_models` instead, because a `Split`'s streams run in parallel off one
+expected series rather than nesting.
+
+`ComposableTuringIDModels.rewrap` is the other direction — the same wrapper
+rebuilt around new wrapped models, with everything else it holds carried across.
+Swapping every component of a given type is those two together:
+
+```@example traversal
+using ComposableTuringIDModels: wrapped_models, rewrap
+swap(f, m) = f(rewrap(m, map(x -> swap(f, x), wrapped_models(m))))
+swapped = swap(x -> x isa PoissonError ? NegativeBinomialError() : x, obs)
+```
+
+Several components transform or derive a field on construction.
+[`LatentDelay`](@ref) stores its delay PMF reversed for the convolution,
+[`Ascertainment`](@ref) stores its prior already wrapped in a
+[`PrefixLatentModel`](@ref), and [`Aggregate`](@ref) derives its presence mask
+from its window lengths.
+Each declares a `ConstructionBase.constructorof` that takes its fields as
+stored, so `rewrap` and `Accessors.@set` both rebuild them correctly.
+
+A modifier defined outside the package inherits both functions as long as it
+holds what it wraps in its own field.
+One that holds it somewhere the field walk cannot see, such as inside a
+container, must define `wrapped_models` and `rewrap` for itself, and one whose
+constructor cannot accept its own stored fields back must define
+`ConstructionBase.constructorof`.
+The docstrings state both contracts.

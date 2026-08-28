@@ -95,7 +95,10 @@ end
     # likelihood, mirroring the count families' `Y_t .+ 1e-6` nudge.
     p_t = clamp.(Y_t, 1.0e-6, 1 - 1.0e-6)
 
-    y = y_t.y
+    # The successes always arrive in a `NamedTuple` field, so they are never a
+    # model argument DynamicPPL copies: `_scored_series` detaches them from the
+    # caller's data before anything is scored.
+    y = _scored_series(obs_model, y_t, Y_t)
     if y isa MissingObservations
         diff_t = length(y.value) - length(Y_t)
         dist = _trial_dist(obs_model, p_t, N, diff_t)
@@ -105,7 +108,7 @@ end
     else
         # Rebind `y_t` to the observed successes (the same name, so DynamicPPL
         # conditions on it when concrete).
-        y_t = define_y_t(obs_model, y_t, Y_t)
+        y_t = y
 
         diff_t = length(y_t) - length(Y_t)
         dist = _trial_dist(obs_model, p_t, N, diff_t)

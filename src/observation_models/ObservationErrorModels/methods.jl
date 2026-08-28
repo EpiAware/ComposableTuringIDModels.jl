@@ -54,18 +54,17 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
     # A concrete callable rather than a closure: a closure defined in a model
     # body captures boxed locals, costing a dynamic dispatch per scored entry.
     dist = _ErrorDist(obs_model, pad_Y_t, priors)
-    y = y_t isa NamedTuple ? y_t.y : y_t
+    y = _scored_series(obs_model, y_t, Y_t)
     if y isa MissingObservations
         diff_t = length(y.value) - length(Y_t)
         y_t, __varinfo__ = _score_missing_observations!!(
             __model__.context, __varinfo__, y, diff_t, Y_t, dist
         )
     else
-        # Extract the count series scored by this model (plain vector, or
-        # `missing`, replaced by a length-`Y_t` vector of `missing`).
-        # Rebinding `y_t` keeps DynamicPPL treating the entries as conditioned
-        # observations.
-        y_t = define_y_t(obs_model, y_t, Y_t)
+        # The count series scored by this model (plain vector, or `missing`,
+        # replaced by a length-`Y_t` vector of `missing`). Rebinding `y_t`
+        # keeps DynamicPPL treating the entries as conditioned observations.
+        y_t = y
 
         diff_t = length(y_t) - length(Y_t)
 
@@ -200,6 +199,29 @@ end
 # `_score_missing_observations!!`).
 _restore_missing(y) = y
 _restore_missing(y::MissingObservations) = map((v, p) -> p ? v : missing, y.value, y.present)
+
+# The series an error model scores, detached from the caller's data.
+#
+# A series reached through a `NamedTuple` field is not one of the model's
+# arguments, so DynamicPPL never handles it: it is neither copied nor promoted,
+# and the `y_t[i] ~ …` sugar writes a blank's draw straight into the caller's
+# array. From the next evaluation on that entry is no longer `missing`, so it
+# is scored as data — frozen at whatever the first draw produced, and never a
+# tracked latent. [`concrete_observations`](@ref) — the same narrowing an
+# `IDModel` applies to its own `y_t` — is what detaches it: a series with any
+# blank in it becomes a [`MissingObservations`](@ref) carrier, which
+# `_score_missing_observations!!` scores by reading only.
+#
+# A series passed as the model's own `y_t` argument needs none of this:
+# DynamicPPL has already copied it. Neither does one an `IDModel` narrowed at
+# construction, which arrives as a carrier or a concrete vector and is returned
+# by the first branch below without touching the data.
+_scored_series(obs_model, y_t, Y_t) = define_y_t(obs_model, y_t, Y_t)
+_scored_series(obs_model, y_t::MissingObservations, Y_t) = y_t
+function _scored_series(obs_model, y_t::NamedTuple, Y_t)
+    y_t.y isa MissingObservations && return y_t.y
+    return concrete_observations(define_y_t(obs_model, y_t, Y_t))
+end
 
 @doc raw"
 Generate the priors required by an observation-error model. Returns a named

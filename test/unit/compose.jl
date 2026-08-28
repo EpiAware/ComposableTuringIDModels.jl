@@ -18,7 +18,8 @@
     @test all(>=(0), gen.I_t)
 end
 
-@testitem "concrete_observations narrows only when nothing is missing" begin
+@testitem "concrete_observations narrows or detaches missing data" begin
+    using ComposableTuringIDModels
     using ComposableTuringIDModels: concrete_observations, MissingObservations
 
     # Fully concrete data (no `missing` left) is narrowed to a concrete eltype.
@@ -43,10 +44,33 @@ end
     )
     @test all(v -> v isa MissingObservations, concrete_observations(nt_gap))
 
-    # A fully missing vector survives unchanged: there is nothing concrete to
-    # split out.
+    # A fully missing vector is split too: `present` is all `false`, and the
+    # value vector is a placeholder. Nothing a draw could be written into
+    # survives, so the caller's array cannot be mutated by scoring it.
     y_allgap = Vector{Union{Missing, Int}}(missing, 3)
-    @test concrete_observations(y_allgap) === y_allgap
+    allgap = concrete_observations(y_allgap)
+    @test allgap isa MissingObservations
+    @test !any(allgap.present)
+    @test !(eltype(allgap.value) >: Missing)
+
+    # A `Vector{Missing}` carries no value type to build a carrier from, and
+    # nothing can be written into it either (the tilde sugar widens it into a
+    # fresh array), so it survives unchanged.
+    y_bare = Vector{Missing}(missing, 3)
+    @test concrete_observations(y_bare) === y_bare
+
+    # An element type a carrier cannot be built from — abstract, or not a
+    # `Number`, so there is no `zero` to place behind the mask — is copied
+    # instead. The copy is what the tilde sugar writes into, so the caller's
+    # array is still out of reach, which is the guarantee this branch exists
+    # for. Such data is not narrowed and its blanks are not tracked latents.
+    y_abstract = Vector{Union{Missing, Real}}([1, missing, 3.0])
+    copied = concrete_observations(y_abstract)
+    @test copied !== y_abstract
+    @test isequal(copied, y_abstract)
+    @test !(copied isa MissingObservations)
+    copied[2] = 99
+    @test ismissing(y_abstract[2])
 
     # A `NamedTuple` of data streams (e.g. `BinomialError`'s `(y, N)`, or a
     # `Split` observation's per-stream series) is narrowed field-wise.
@@ -67,6 +91,17 @@ end
     # unchanged: only vectors are split into a `MissingObservations` carrier.
     y_mat_gap = Matrix{Union{Missing, Int}}([1 2; missing 4])
     @test concrete_observations(y_mat_gap) === y_mat_gap
+
+    # A `ReportingTriangle` keeps its counts in a struct field, which
+    # DynamicPPL cannot see into, so they are narrowed here rather than inside
+    # the model body on every evaluation.
+    tri = ReportingTriangle(
+        Matrix{Union{Missing, Int}}([1 2; 3 4]), trues(2, 2), 1
+    )
+    narrowed_tri = concrete_observations(tri)
+    @test eltype(narrowed_tri.counts) === Int
+    @test narrowed_tri.observed === tri.observed
+    @test narrowed_tri.Dmax == tri.Dmax
 end
 
 @testitem "composed model: as_turing_model narrows y_t automatically" begin
