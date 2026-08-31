@@ -35,6 +35,7 @@ ComposableTuringIDModels = {path = ".."}
 
 [compat]
 ADTypes = "1.23.0"
+Accessors = "0.1.45"
 Aqua = "0.8.16"
 BenchmarkTools = "1.8.0"
 Catalyst = "16.2.3"
@@ -47,8 +48,10 @@ EpiAwarePackageTools = "0.4.1"
 ExplicitImports = "1.15.0"
 ForwardDiff = "1.4.5"
 LogDensityProblems = "2.2.0"
+LogExpFunctions = "1.0.1"
 ModelingToolkit = "11.39.0"
 OrdinaryDiffEq = "7.6.0"
 Runic = "1.9"
 TestItemRunner = "1.1.5"
 TestItems = "1.0.0"
+Turing = "0.47.2"
