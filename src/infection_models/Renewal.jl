@@ -184,6 +184,22 @@ struct Renewal{
     mixing::K
     "The renewal modifiers composed onto the step."
     modifiers::M
+
+    function Renewal(
+            gen_int::G, transformation::F, rt, initialisation::S,
+            recurrent_step::A, mixing::K, modifiers::M
+        ) where {G, F <: Function, S <: PriorLike, A, K, M <: Tuple}
+        # `rt` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
+        # an `Intercept` (a constant path), never left as a scalar. The
+        # widening runs here rather than in the keyword constructor so the
+        # positional form cannot bypass it. `path_prior` is idempotent, so
+        # rebuilding a `Renewal` from its own fields changes nothing.
+        path = path_prior(rt)
+        return new{G, F, typeof(path), S, A, K, M}(
+            gen_int, transformation, path, initialisation, recurrent_step,
+            mixing, modifiers
+        )
+    end
 end
 
 function Renewal(;
@@ -196,7 +212,7 @@ function Renewal(;
         generation_time, mixing, mods; D_gen = D_gen, Δd = Δd
     )
     return Renewal(
-        gen_int, transformation, path_prior(rt), initialisation,
+        gen_int, transformation, rt, initialisation,
         recurrent_step, mixing, mods
     )
 end

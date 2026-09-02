@@ -230,3 +230,33 @@ end
         @test only(r.modifiers) isa SusceptibleDepletion
     end
 end
+
+@testitem "Renewal widens its rt slot on both construction paths" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using ComposableTuringIDModels: path_prior
+    Random.seed!(344)
+
+    # The positional constructor must widen a bare `Distribution` in the `rt`
+    # PATH slot exactly as the keyword one does. Left to Julia's generated
+    # constructor it does not: the slot draws a single scalar, which reaches
+    # the scan as an `R_t` with no time axis.
+    gi = [0.2, 0.3, 0.5]
+    kw = Renewal(;
+        generation_time = gi, rt = Normal(0, 0.1), initialisation = Normal()
+    )
+    pos = Renewal(
+        gi, exp, Normal(0, 0.1), Normal(), kw.recurrent_step, kw.mixing, ()
+    )
+
+    @test typeof(pos.rt) == typeof(kw.rt)
+    @test pos.rt isa Intercept
+    n = 20
+    @test length(as_turing_model(kw, n)().I_t) == n
+    @test length(as_turing_model(pos, n)().I_t) == n
+    # Rebuilding from stored fields is a no-op, so `Accessors.@set` is safe.
+    @test path_prior(kw.rt) === kw.rt
+    # Widening runs before `new`, so the slot's role guard still fires.
+    @test_throws TypeError Renewal(
+        gi, exp, PoissonError(), Normal(), kw.recurrent_step, kw.mixing, ()
+    )
+end

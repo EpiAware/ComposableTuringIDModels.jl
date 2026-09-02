@@ -74,8 +74,8 @@ Draw the coupling operator ahead of the scan.
 Samples the [`AbstractMixingModel`](@ref)'s parameters through
 [`as_turing_submodel`](@ref) and returns the [`ConstantRenewalStep`](@ref) the
 scan uses, carrying the realised operator. The operator's variables are
-namespaced under `core.mixing`, so a fixed and an inferred coupling differ in
-the chain and nowhere else.
+namespaced under `mixing`, whether or not the step carries modifiers, so a fixed
+and an inferred coupling differ in the chain and nowhere else.
 
 # Arguments
 

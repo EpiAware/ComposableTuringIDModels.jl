@@ -265,7 +265,11 @@ modifier's variables are namespaced `modifier_<i>` (see
 end
 
 @model function as_turing_model(step::RenewalStep, n)
-    core ~ as_turing_submodel(step.core, n; prefix = true)
+    # The core composes flat, as it does when a modifier-free renewal scans the
+    # core directly, so a drawn coupling operator is named the same way whether
+    # or not the step carries modifiers. The modifiers below carry their own
+    # positional prefixes, so nothing here can collide.
+    core ~ as_turing_submodel(step.core, n)
     modifiers ~ to_submodel(_resolve_modifiers(step.modifiers, n, 1), false)
     return RenewalStep(core, modifiers)
 end
