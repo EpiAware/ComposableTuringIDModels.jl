@@ -799,3 +799,93 @@ end
         obs, fill(2, 8), fill(1.0, 8)
     )()
 end
+
+@testitem "A MissingObservations carrier reads like the series it replaces" begin
+    using ComposableTuringIDModels: MissingObservations
+    carrier = MissingObservations([1, 0, 3, 4], Bool[1, 0, 1, 1])
+
+    # The carrier stands in for a `Vector{Union{Missing, Int}}`, so it reports
+    # the same shape and gives `missing` where the entry is absent.
+    @test length(carrier) == 4
+    @test size(carrier) == (4,)
+    @test eltype(carrier) == Union{Missing, Int}
+    @test carrier[1] == 1
+    @test ismissing(carrier[2])
+
+    # A vector index keeps value and mask together, so the result is still a
+    # carrier rather than a bare value vector.
+    masked = carrier[Bool[1, 1, 0, 1]]
+    @test masked isa MissingObservations
+    @test masked.value == [1, 0, 4]
+    @test masked.present == Bool[1, 0, 1]
+    @test carrier[[2, 3]].present == Bool[0, 1]
+end
+
+@testitem "Aggregate fits a partially-missing series" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using ComposableTuringIDModels: concrete_observations
+    using DynamicPPL: VarInfo
+    Random.seed!(326)
+    # A weekly aggregation over 28 days measured only on the reporting days.
+    # `concrete_observations` narrows this into a `MissingObservations`
+    # carrier, which `Aggregate` used to index straight into a `MethodError`.
+    weekly = Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7])
+    y = Vector{Union{Missing, Int}}(missing, 28)
+    y[7:7:28] .= [50, 60, 55, 65]
+
+    # Bare, on the narrowed carrier and on the ragged vector alike.
+    for data in (concrete_observations(y), y)
+        bare = as_turing_model(weekly, data, fill(10.0, 28))()
+        @test length(bare.y_t) == 28
+        @test bare.y_t[7:7:28] == [50, 60, 55, 65]
+    end
+
+    model = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()), weekly
+    )
+    mdl = as_turing_model(model, y, 28)
+    out = mdl()
+    @test length(out.generated_y_t) == 28
+    @test out.generated_y_t[7:7:28] == [50, 60, 55, 65]
+    # The blanks stay out of the likelihood rather than becoming latents.
+    @test !any(vn -> occursin("y_t", string(vn)), keys(VarInfo(mdl)))
+end
+
+@testitem "An aggregation window with no data is not scored" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: concrete_observations, MissingObservations
+    using DynamicPPL: VarInfo, logjoint
+    # Weekly reporting over 28 days with the window ending on day 14 unmeasured.
+    # That window has expected values to sum but no count to score them
+    # against, so it must drop out exactly as an uncovered window does.
+    agg = Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7])
+    Y = fill(2.0, 28)
+    y = Vector{Union{Missing, Int}}(missing, 28)
+    y[[7, 21, 28]] .= [10, 12, 14]
+    carrier = concrete_observations(y)
+
+    # The returned series marks the unmeasured window rather than filling it.
+    out = as_turing_model(agg, carrier, Y)()
+    @test ismissing(out.y_t[14])
+    @test out.y_t[[7, 21, 28]] == [10, 12, 14]
+    # Every present window still sums its full seven days of expected values.
+    @test out.expected[7:7:28] == fill(14.0, 4)
+
+    # Two carriers differing only in the placeholder at the absent entries
+    # score identically: nothing there reaches the likelihood.
+    shifted = MissingObservations(
+        map((v, p) -> p ? v : v + 1000, carrier.value, carrier.present),
+        carrier.present
+    )
+    mdl = as_turing_model(agg, carrier, Y)
+    vi = VarInfo(mdl)
+    @test logjoint(mdl, vi) ==
+        logjoint(as_turing_model(agg, shifted, Y), vi)
+
+    # And the log-joint is the sum over the measured windows alone.
+    ref = sum(logpdf.(SafePoisson.(fill(14.0 + 1.0e-6, 3)), [10, 12, 14]))
+    @test logjoint(mdl, vi) ≈ ref
+    # Measuring the fourth window adds its term, so the gap is a real omission.
+    full = as_turing_model(agg, fill(13, 28), Y)
+    @test logjoint(full, VarInfo(full)) != logjoint(mdl, vi)
+end

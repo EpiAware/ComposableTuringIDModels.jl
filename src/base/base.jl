@@ -98,16 +98,43 @@ nor sampled, and costing no parameter. Predictive values at those points come
 from replaying the posterior afterwards, not from carrying them through the fit
 (see [`forecast`](@ref)).
 
+It reads like the ragged vector it replaces: `length`, `size` and indexing, with
+`missing` at an absent entry and a vector index giving a carrier of the selected
+entries. A component that subsets its data positionally, such as
+[`Aggregate`](@ref), therefore takes one unchanged.
+
 # Examples
 ```@example MissingObservations
 using ComposableTuringIDModels: MissingObservations
 carrier = MissingObservations([1.0, 0.0, 3.0], [true, false, true])
-carrier.value[carrier.present]
+carrier[2], carrier[[1, 3]].value
 ```
 "
 struct MissingObservations{V <: AbstractVector, M <: AbstractVector{Bool}}
     value::V
     present::M
+end
+
+# The slice of the `AbstractVector` interface the carrier stands in for, so a
+# component that reads its data positionally (e.g. `Aggregate`) sees the ragged
+# series rather than the struct. A scalar index gives `missing` where the entry
+# is absent; a vector index (a presence mask, or indices) gives a carrier of the
+# selected entries, keeping value and mask together.
+#
+# Deliberately not an `AbstractVector` subtype: the observation-error models
+# dispatch on the carrier to score it by reading only, and inheriting array
+# behaviour would let it fall back into the `y_t[i] ~ ...` sugar those methods
+# exist to avoid.
+Base.length(y::MissingObservations) = length(y.value)
+Base.size(y::MissingObservations) = size(y.value)
+function Base.eltype(::Type{MissingObservations{V, M}}) where {V, M}
+    return Union{Missing, eltype(V)}
+end
+function Base.getindex(y::MissingObservations, i::Integer)
+    return y.present[i] ? y.value[i] : missing
+end
+function Base.getindex(y::MissingObservations, idx::AbstractVector)
+    return MissingObservations(y.value[idx], y.present[idx])
 end
 
 # Per-time-point error distributions, as concrete callables. A closure defined
