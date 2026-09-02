@@ -1,28 +1,6 @@
 # Moment-matched distributions: one guarded route from a `(mean, sd)` pair onto
-# a distribution family, shared by the observation-error models
-# (`ObservationError`) and by the stochastic renewal (`InfectionNoise`,
-# `StochasticRenewal`).
-#
-# Three things are wanted from that route and none of them is free.
-#
-# 1. GUARDS. A sampler exploring an unconstrained space reaches arguments that
-#    throw. `check_args = false` scores an invalid moment pair `-Inf` rather
-#    than raising a `DomainError` mid-gradient, but it is not enough on its
-#    own: the log-scale conversion `s² = log1p((sd / mean)²)` overflows to
-#    `Inf` once `sd / mean` passes `sqrt(floatmax)`, and `Inf` then reaches the
-#    constructor looking like a valid argument. `rand` validates and throws,
-#    which is what a `missing` observation hits. So an invalid pair is routed
-#    to a REJECTION distribution: `logpdf` is `-Inf` and `rand` returns `Inf`
-#    without throwing.
-# 2. CLOSED FORMS. `Normal` and `LogNormal` have a closed-form moment solve and
-#    a closed-form quantile, and the generic path allocates a distribution per
-#    call inside a differentiated loop. Writing the two out is measurably
-#    cheaper and keeps the return type concrete.
-# 3. TAILS. The generic draw round-trips through `cdf` then `quantile`, and
-#    that round trip has no resolution left in the tails: `cdf` saturates at
-#    exactly 1 by eight standard deviations out, so the draw comes back as the
-#    support's endpoint, and three digits are already gone before it gets
-#    there. Samplers do reach eight standard deviations.
+# a distribution family, shared by the observation-error models and by the
+# stochastic renewal.
 
 # The field type a family is stored under. `typeof(LogNormal)` is `UnionAll`,
 # which says nothing about *which* family it is, so every dispatch on the
@@ -35,9 +13,10 @@
 _family_type(::Type{F}) where {F} = Type{F}
 _family_type(dist) = typeof(dist)
 
-# The rejection distribution: `logpdf == -Inf` everywhere AND a `rand` that
-# does not throw, which an invalid `Reparameterised` cannot give (its `rand`
-# converts through `native`, which raises). A bare `Float64` sentinel is
+# The rejection distribution an invalid moment pair routes to: `logpdf ==
+# -Inf` everywhere AND a `rand` that does not throw, which an invalid
+# `Reparameterised` cannot give (its `rand` converts through `native`, which
+# raises) and which a `missing` observation needs. A bare `Float64` sentinel is
 # deliberate — giving it the input's type makes AD return `NaN` rather than
 # `0.0`. `logcdf` is `-Inf` too, so it stays safe to censor or truncate.
 _moment_reject(::Type{Normal}) = Normal(Inf, 1.0)
@@ -50,11 +29,11 @@ _moment_reject(family) = LogNormal(Inf, 1.0)
 # Whether a `(mean, sd)` pair describes a member of the family.
 #
 # The two closed-form families answer for themselves, in the coordinates their
-# own conversion uses: `LogNormal` squares `sd / mean`, so it is that square
-# that has to stay finite, and `Normal` takes the mean as its location and so
-# accepts any finite one. Every other family defers to the registered
-# `valid_moments` predicate, with the finiteness check `reparameterise` cannot
-# make from inside a moment guard added on top.
+# own conversion uses: `LogNormal` squares `sd / mean`, which overflows to
+# `Inf` once the ratio passes `sqrt(floatmax)` and then reaches the constructor
+# looking valid, and `Normal` takes the mean as its location and so accepts any
+# finite one. Every other family defers to the registered `valid_moments`
+# predicate, with a finiteness check on top.
 function _moment_valid(::Type{Normal}, mean, sd)
     return isfinite(mean) && isfinite(sd) && sd >= 0
 end
@@ -114,7 +93,9 @@ end
 #
 # The two closed forms are exact: a `Normal` is its own location-scale family,
 # and a `LogNormal` is one on the log scale. Everything else round-trips
-# through the normal CDF, which is where the tails go.
+# through the normal CDF, which has no resolution left in the tails — it
+# saturates at exactly 1 by eight standard deviations out, and the draw comes
+# back as the support's endpoint.
 _moment_quantile(::Type{Normal}, mean, sd, z) = mean + sd * z
 
 function _moment_quantile(::Type{LogNormal}, mean, sd, z)

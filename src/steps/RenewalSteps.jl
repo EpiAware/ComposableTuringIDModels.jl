@@ -198,11 +198,8 @@ end
 # --- the propose/commit split -----------------------------------------------
 #
 # A scan step computes an incidence and commits it in one call. A stochastic
-# renewal has to get between the two: it draws `I_t` around the incidence the
-# step proposes and commits the draw instead. Splitting the step into the two
-# halves lets both run the same arithmetic, so a modifier composes onto a
-# stochastic renewal exactly as it does onto a deterministic one and the two
-# cannot drift apart.
+# renewal has to get between the two, so the step is split in half and both
+# parameterisations run the same arithmetic.
 
 @doc raw"
 The incidence a renewal step proposes at `state`, and the modifier substates

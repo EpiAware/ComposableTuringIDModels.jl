@@ -86,11 +86,10 @@ end
 Whether a modifier is the one that gives infections their noise.
 
 A trait, `false` for every modifier by default. A stochastic-infection
-modifier sets it `true`, which is what marks the point in the modifier tuple
-where the renewal *expectation* stops being an expectation: the incidence
-entering the first such modifier is the value a generated expected-incidence
-quantity wants, rather than the force of infection before the whole tuple or
-the noisy incidence after it.
+modifier sets it `true`, marking the point in the modifier tuple where the
+renewal *expectation* stops being an expectation: the incidence entering the
+first such modifier is the last value that still is one, and the incidence
+after it is a draw.
 
 Implement `is_noise` alongside [`apply_modifier`](@ref) on any modifier that
 draws infections.

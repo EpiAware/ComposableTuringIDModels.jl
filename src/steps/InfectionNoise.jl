@@ -1,12 +1,5 @@
-# Stochastic infections: the noise specification both parameterisations share.
-#
-# A deterministic renewal fixes infections at the renewal expectation. This
-# gives them their own noise, matched to a negative binomial's first two
-# moments. The specification below says which family and how wide; the
-# CENTRED form ([`StochasticRenewal`](@ref)) draws `I_t` conditional on the
-# expectation inside the loop, and the NON-CENTRED form (the renewal modifier
-# in this file) draws standard normals before the scan and transforms them
-# against the expectation inside it.
+# Stochastic infections: the noise specification both parameterisations share,
+# and the non-centred renewal modifier that applies it.
 
 @doc raw"
 Stochastic infections for a renewal process: the noise family and its width.
@@ -194,8 +187,8 @@ function apply_modifier(mod::InfectionNoiseDraws, incidence, t)
     return drawn, t + 1
 end
 
-# The trait `exp_I_t` and anything else wanting the renewal expectation reads:
-# the incidence entering this modifier is the last point at which it is one.
+# The incidence entering this modifier is the last point at which it is still
+# the renewal expectation.
 is_noise(::InfectionNoise) = true
 is_noise(::InfectionNoiseDraws) = true
 
