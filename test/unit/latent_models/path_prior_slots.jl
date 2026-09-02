@@ -1,9 +1,9 @@
 # Every construction path must widen a PATH slot identically. A bare
 # `Distribution` in a length-`n` PATH slot is wrapped in an `Intercept`, so the
 # positional and keyword forms have to agree on the stored field type and on
-# the generated path length. Where `path_prior` is called only in an outer
-# keyword constructor, Julia's auto-generated positional constructor skips it
-# and the model silently builds a path of the wrong length (#344).
+# the generated path length. Widening belongs in an inner constructor: one
+# reached only through an outer keyword constructor leaves the positional form
+# storing an unwidened slot, which draws a scalar and sizes the path wrongly.
 
 @testitem "PATH slots widen identically on every construction path" begin
     using ComposableTuringIDModels, Distributions
@@ -51,8 +51,8 @@
             @test getfield(pos, slot) isa Intercept
             @test typeof(getfield(pos, slot)) == typeof(getfield(kw, slot))
         end
-        # Both forms generate the same-shaped path. Before the fix the
-        # positional form gave a length-2 path, or threw.
+        # Both forms generate the same-shaped path. An unwidened slot draws a
+        # single scalar, which sizes the path by the recursion rather than `n`.
         @test length(as_turing_model(pos, shape)()) == len
         @test length(as_turing_model(kw, shape)()) == len
     end
@@ -60,8 +60,8 @@
     for (name, pos, kw, slot, n) in infection_cases
         @test getfield(pos, slot) isa Intercept
         @test typeof(getfield(pos, slot)) == typeof(getfield(kw, slot))
-        # Before the fix `DirectInfections` returned an `I_t` of length 1 here,
-        # silently, and `ExpGrowthRate` threw.
+        # An unwidened latent slot sizes `I_t` by the scalar draw rather than
+        # by `n`, so the length is the assertion that catches it.
         @test length(as_turing_model(pos, n)().I_t) == n
         @test length(as_turing_model(kw, n)().I_t) == n
         @test path_prior(getfield(pos, slot)) === getfield(pos, slot)
