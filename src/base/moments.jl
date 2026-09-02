@@ -24,6 +24,17 @@
 #    support's endpoint, and three digits are already gone before it gets
 #    there. Samplers do reach eight standard deviations.
 
+# The field type a family is stored under. `typeof(LogNormal)` is `UnionAll`,
+# which says nothing about *which* family it is, so every dispatch on the
+# family would resolve at run time and whatever the moment core returns would
+# infer as `Any` — which then propagates through everything downstream, a
+# renewal recursion included. `Type{LogNormal}` has one instance, so the family
+# stays in the type domain and the caller stays concretely typed.
+#
+# A component storing a family calls this from its inner constructor.
+_family_type(::Type{F}) where {F} = Type{F}
+_family_type(dist) = typeof(dist)
+
 # The rejection distribution: `logpdf == -Inf` everywhere AND a `rand` that
 # does not throw, which an invalid `Reparameterised` cannot give (its `rand`
 # converts through `native`, which raises). A bare `Float64` sentinel is

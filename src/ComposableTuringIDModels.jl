@@ -118,7 +118,8 @@ export renewal_pressure, pairwise_gen_int, AbstractMixingModel, MixingStep,
 export SIRParams, SEIRParams, ODEProcess, CatalystODEParams
 
 # --- observation models ---
-export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDelay,
+export PoissonError, NegativeBinomialError, NormalError, LogNormalError,
+    ObservationError, BinomialError, LatentDelay,
     UncertainDelay, observation_error, generate_observation_error_priors,
     define_y_t
 
@@ -238,6 +239,7 @@ include("observation_models/ObservationErrorModels/methods.jl")
 include("observation_models/ObservationErrorModels/PoissonError.jl")
 include("observation_models/ObservationErrorModels/NegativeBinomialError.jl")
 include("observation_models/ObservationErrorModels/NormalError.jl")
+include("observation_models/ObservationErrorModels/ObservationError.jl")
 include("observation_models/ObservationErrorModels/BinomialError.jl")
 include("observation_models/modifiers/LatentDelay.jl")
 include("observation_models/modifiers/ascertainment/Ascertainment.jl")
