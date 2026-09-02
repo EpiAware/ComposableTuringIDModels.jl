@@ -140,3 +140,15 @@ end
     )
     @test isfinite(g)
 end
+
+@testitem "a family is a type, checked where it is passed" begin
+    using ComposableTuringIDModels, Distributions
+
+    # An instance handed in place of the family would otherwise be stored and
+    # fail deep inside the moment solve, so it is rejected at the constructor.
+    @test_throws ArgumentError InfectionNoise(; dist = LogNormal(0.0, 1.0))
+    @test_throws ArgumentError ObservationError(Normal(0.0, 1.0))
+    # The family itself is stored in the type domain, which is what keeps the
+    # draw's return type concrete.
+    @test fieldtype(typeof(InfectionNoise(; dist = Normal)), :dist) === Type{Normal}
+end

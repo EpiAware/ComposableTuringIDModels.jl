@@ -9,9 +9,20 @@
 # renewal recursion included. `Type{LogNormal}` has one instance, so the family
 # stays in the type domain and the caller stays concretely typed.
 #
-# A component storing a family calls this from its inner constructor.
+# A component storing a family calls this from its inner constructor, which is
+# also where an instance handed in place of the family is caught: it would
+# otherwise fail deep inside the moment solve instead.
 _family_type(::Type{F}) where {F} = Type{F}
-_family_type(dist) = typeof(dist)
+
+function _family_type(dist)
+    return throw(
+        ArgumentError(
+            "a family is a distribution type, e.g. `LogNormal`, not an " *
+                "instance of one ($(dist)). The component supplies the " *
+                "moments the family is matched to."
+        )
+    )
+end
 
 # The rejection distribution an invalid moment pair routes to: `logpdf ==
 # -Inf` everywhere AND a `rand` that does not throw, which an invalid
