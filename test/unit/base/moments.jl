@@ -48,13 +48,14 @@ end
     @test _moment_draw(Gamma, m, s, 9.0) == Inf
 end
 
-@testitem "invalid moments score -Inf rather than throwing" begin
+@testitem "invalid moments score -Inf and refuse to be drawn" begin
     using ComposableTuringIDModels, Distributions
     import ComposableTuringIDModels: _moment_dist
 
-    # A diverging proposal reaches arguments that throw. `logpdf` must be
-    # `-Inf` so the point is rejected, and `rand` must not raise, because
-    # imputing a `missing` observation samples from whatever this returns.
+    # Scoring and sampling want opposite things here. `logpdf` must be `-Inf`
+    # so a diverging proposal is rejected silently and cheaply. `rand` has no
+    # proposal to reject, so it raises rather than putting an `Inf` into a
+    # simulated series and telling nobody.
     invalid = (
         (LogNormal, -1.0, 1.0), (LogNormal, 1.0, -1.0), (LogNormal, NaN, 1.0),
         (LogNormal, Inf, 1.0), (LogNormal, 1.0, Inf), (Normal, Inf, 1.0),
@@ -63,7 +64,7 @@ end
     for (family, m, s) in invalid
         d = _moment_dist(family, m, s)
         @test logpdf(d, 3.0) == -Inf
-        @test isinf(rand(d))
+        @test_throws ArgumentError rand(d)
     end
 
     # The log-scale conversion squares `sd / mean`, which overflows to `Inf`
@@ -73,7 +74,7 @@ end
     @test isinf((10 * big)^2)
     d = _moment_dist(LogNormal, 1.0, 10 * big)
     @test logpdf(d, 3.0) == -Inf
-    @test isinf(rand(d))
+    @test_throws ArgumentError rand(d)
     # Just inside the overflow the pair is honoured rather than rejected.
     @test isfinite(logpdf(_moment_dist(LogNormal, 1.0, 0.1 * big), 3.0))
 end

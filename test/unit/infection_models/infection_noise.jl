@@ -214,3 +214,69 @@ end
     @test all(isfinite, g)
     @test !all(iszero, g)
 end
+
+@testitem "an epidemic-scale expectation draws, rather than going quiet" begin
+    using ComposableTuringIDModels, Distributions, Random
+    import ComposableTuringIDModels: _noise_sd, _soft_upper
+
+    # The soft cap is smooth, and smoothness costs it an absolute offset.
+    # Below that offset it returns zero or less, which is no coefficient of
+    # variation at all — reachable at a few million infections with a small
+    # overdispersion, which is an ordinary national-scale model. The cap is a
+    # limit, so it is not allowed to annihilate the value it limits.
+    noise = InfectionNoise(; overdispersion = 0.0)
+    for ι in (1.0e5, 1.0e6, 3.0e6, 1.0e8)
+        sd = _noise_sd(noise, ι, 0.0)
+        @test isfinite(sd)
+        @test sd > 0
+    end
+    # Where the smooth cap is still positive it is used unchanged, so R's
+    # constants are matched wherever they mean anything.
+    raw = sqrt(1 / 1.0e5)
+    @test _noise_sd(noise, 1.0e5, 0.0) ≈ _soft_upper(raw, 0.5, 10.0) * 1.0e5
+    @test _soft_upper(raw, 0.5, 10.0) < raw
+    # Past the crossover the exact coefficient of variation is used instead.
+    @test _noise_sd(noise, 3.0e6, 0.0) ≈ sqrt(1 / 3.0e6) * 3.0e6
+    @test _soft_upper(sqrt(1 / 3.0e6), 0.5, 10.0) < 0
+
+    # The whole model, at the scale that used to return a silent `NaN`.
+    gi = [0.2, 0.3, 0.5]
+    args = (;
+        rt = FixedIntercept(log(1.5)),
+        initialisation = FixedIntercept(log(3.0e6)),
+    )
+    non_centred = Renewal(gi, noise; args...)
+    centred = StochasticRenewal(gi; noise = noise, args...)
+    for m in (non_centred, centred)
+        I_t = as_turing_model(m, 12)(Xoshiro(3)).I_t
+        @test all(isfinite, I_t)
+        @test all(>(0), I_t)
+    end
+end
+
+@testitem "a model that cannot produce a value says so when asked for one" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: @varname
+    import ComposableTuringIDModels: _moment_dist
+
+    # Scoring and sampling want opposite things from an invalid moment pair.
+    # A rejected proposal must stay silent and cheap; a simulated value has no
+    # proposal to reject, so `Inf` there would be a wrong answer told to
+    # nobody.
+    d = _moment_dist(LogNormal, 100.0, -1.0)
+    @test logpdf(d, 50.0) == -Inf
+    @test_throws ArgumentError rand(d)
+    @test occursin(
+        "cannot produce a value", sprint(
+            showerror, try
+                rand(d)
+            catch e
+                e
+            end
+        )
+    )
+
+    # A `missing` observation on a model that is fine draws as before.
+    y = rand(Xoshiro(4), as_turing_model(NormalError(), missing, fill(10.0, 5)))
+    @test all(isfinite, y[@varname(y_t)])
+end

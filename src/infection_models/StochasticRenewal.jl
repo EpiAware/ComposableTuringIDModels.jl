@@ -206,11 +206,11 @@ end
 # step. Say so rather than seeding a strata axis the loop cannot fill.
 function as_turing_model(infection::StochasticRenewal, n::Dims{2})
     return error(
-        "`StochasticRenewal` runs one series: a stratified renewal needs " *
+        "`StochasticRenewal` runs one series. A stratified renewal needs " *
             "one draw per stratum at every step, and what that draw should " *
-            "be is undecided (see " *
-            "https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/352" *
-            "). Use `Renewal` with an `InfectionNoise` modifier for a " *
+            "be is an open question: " *
+            "https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/355" *
+            ". Use `Renewal` with an `InfectionNoise` modifier for a " *
             "stratified stochastic renewal, at the cost of a non-centred " *
             "parameterisation."
     )

@@ -44,7 +44,10 @@ end
     c = sqrt(1 / 1.0e4 + ξ^2)
     @test _noise_sd(capped, 1.0e4, ξ) ≈ (c - log1p(exp(-k * (u - c))) / k) * 1.0e4
     @test _noise_sd(capped, 1.0e4, ξ) > 0.97 * _noise_sd(uncapped, 1.0e4, ξ)
-    @test _noise_sd(InfectionNoise(; overdispersion = 0.0), 1.0e8, 0.0) < 0
+    # Past that point the cap would return a negative coefficient of
+    # variation, so the exact one is used instead and the draw stays valid.
+    @test _soft_upper(sqrt(1 / 1.0e8), 0.5, 10.0) < 0
+    @test _noise_sd(InfectionNoise(; overdispersion = 0.0), 1.0e8, 0.0) > 0
 
     # An expectation the recursion cannot come back from has no moment pair,
     # and must not raise from `sqrt` mid-gradient.

@@ -39,12 +39,23 @@ end
     @test all(>(0), mdl(Xoshiro(1)).y_t)
 
     # A process-valued prior makes the spread time-varying, with no other
-    # change: one `σ` per time point rather than one constant.
+    # change: one `σ` per time point rather than one constant. The process
+    # has to keep the spread positive, as any spread prior does — an
+    # unconstrained one draws a negative standard deviation, which is no
+    # distribution and simulating from it says so.
     tv = ObservationError(
-        LogNormal; sd = HierarchicalNormal(), relative = true
+        LogNormal;
+        sd = TransformLatentModel(HierarchicalNormal(), x -> exp.(x)),
+        relative = true
     )
     drawn_tv = rand(Xoshiro(1), as_turing_model(tv, missing, fill(100.0, 6)))
     @test length(drawn_tv[@varname(σ.ϵ_t)]) == 6
+    unconstrained = ObservationError(
+        LogNormal; sd = HierarchicalNormal(), relative = true
+    )
+    @test_throws ArgumentError rand(
+        Xoshiro(1), as_turing_model(unconstrained, missing, fill(100.0, 6))
+    )
 end
 
 @testitem "LogNormalError is relative noise about the expected value" begin
@@ -88,10 +99,10 @@ end
     @test any(contains("σ"), string.(collect(keys(drawn))))
 
     # A spread a diverging proposal drives non-finite now scores `-Inf`
-    # instead of raising.
+    # instead of raising, and refuses to be drawn from.
     d = observation_error(ne, 10.0, Inf)
     @test logpdf(d, 9.0) == -Inf
-    @test isinf(rand(d))
+    @test_throws ArgumentError rand(d)
 end
 
 @testitem "a moment error model rejects rather than raises on a bad proposal" begin
@@ -99,8 +110,8 @@ end
 
     # Every reachable failure of the log-scale conversion, from a sampler that
     # has wandered: the ratio overflow, a non-finite expectation, a
-    # non-positive spread. All score `-Inf`, and all can still be drawn,
-    # because imputing a `missing` observation calls `rand`.
+    # non-positive spread. All score `-Inf`, so the proposal is rejected with
+    # nothing raised on the differentiated path.
     lne = LogNormalError()
     for (Y_t, σ) in (
             (100.0, 10 * sqrt(floatmax(Float64))), (Inf, 0.2), (NaN, 0.2),
@@ -108,7 +119,9 @@ end
         )
         d = observation_error(lne, Y_t, σ)
         @test logpdf(d, 50.0) == -Inf
-        @test isinf(rand(d))
+        # Asking the same point for a value is a different question, and it
+        # has no answer.
+        @test_throws ArgumentError rand(d)
     end
 end
 

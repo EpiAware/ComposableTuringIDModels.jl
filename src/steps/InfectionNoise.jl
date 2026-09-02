@@ -4,62 +4,50 @@
 @doc raw"
 Stochastic infections for a renewal process: the noise family and its width.
 
-A deterministic renewal fixes infections at the renewal expectation
-``\iota_t``. `InfectionNoise` gives them a distribution of their own, matched
-to the first two moments of a negative binomial:
+A deterministic renewal fixes infections at the renewal expectation ``\iota_t``.
+`InfectionNoise` gives them a distribution of their own, matched to the first two moments of a negative binomial.
 
 ```math
 \mathbb{E}[I_t] = \iota_t, \qquad
 \mathrm{Var}[I_t] = \iota_t \left(1 + \iota_t \xi^2\right),
 ```
 
-with ``\iota_t = R_t \sum_i I_{t-i} g_i`` the renewal expectation and ``\xi``
-the overdispersion (``\xi = 0`` leaves Poisson variance). The coefficient of
-variation that follows is ``c_t = \sqrt{1/\iota_t + \xi^2}``, which diverges as
-``\iota_t`` approaches zero — an arbitrarily small expectation would otherwise
-get an arbitrarily wide draw, which is a funnel. A smooth upper limit
-``u - \mathrm{softplus}(u - c_t, k)`` holds it, with `cv_cap` = ``u`` and
-`cv_sharpness` = ``k``. An infinite `cv_cap` removes the limit and restores
-the exact negative-binomial variance.
+``\iota_t = R_t \sum_i I_{t-i} g_i`` is the renewal expectation and ``\xi`` the overdispersion, so ``\xi = 0`` leaves Poisson variance.
+The coefficient of variation that follows is ``c_t = \sqrt{1/\iota_t + \xi^2}``, which diverges as ``\iota_t`` approaches zero.
+An arbitrarily small expectation would then get an arbitrarily wide draw.
+A smooth upper limit ``u - \mathrm{softplus}(u - c_t, k)`` holds it, with `cv_cap` = ``u`` and `cv_sharpness` = ``k``.
+An infinite `cv_cap` removes the limit and restores the exact negative-binomial variance.
 
-Being smooth costs the limit an absolute offset,
-``\log(1 + e^{-k(u - c_t)}) / k``, which is 0.2% of the coefficient of
-variation at the defaults and a fixed ``6.7 \times 10^{-4}`` as ``c_t``
-approaches zero. With `overdispersion = 0` and a large enough expectation that
-offset takes the coefficient of variation to zero, leaving no valid moment
-pair — which scores ``-\infty`` rather than raising. Pass `cv_cap = Inf`
-there.
+Being smooth costs the limit an absolute offset, ``\log(1 + e^{-k(u - c_t)}) / k``, which is 0.2% of the coefficient of variation at the defaults and ``6.7 \times 10^{-4}`` as ``c_t`` approaches zero.
+Subtracting it from a smaller coefficient of variation would leave zero or less, which is no distribution at all, so the limit applies only while it returns a positive value.
+Below that the limit is nowhere near binding — 0.5 against ``6.7 \times 10^{-4}`` — and the exact coefficient of variation is used.
+This is reached with `overdispersion = 0` past a few million infections.
 
-`dist` is the family those moments are matched onto, which the machinery
-leaves free. The default `LogNormal` keeps infections positive by
-construction, so no truncation is needed and no proposal can drive a
-downstream log-normal observation model to a negative mean. `Normal` gives the
-linear form, at the cost of an unbounded support the renewal recursion can
-carry below zero. Any family `ReparameterisedDistributions` registers for
-`(:mean, :sd)` works.
+`dist` is the family those moments are matched onto.
+The default `LogNormal` keeps infections positive by construction, so no truncation is needed and no proposal can drive a downstream log-normal observation model to a negative mean.
+`Normal` gives the linear form, at the cost of an unbounded support the renewal recursion can carry below zero.
+Any family `ReparameterisedDistributions` registers for `(:mean, :sd)` works.
 
-The same specification drives both parameterisations:
+The same specification drives both parameterisations.
 
-  - [`StochasticRenewal`](@ref) is **centred** — infections are the sampled
-    parameter and the likelihood informs them directly. Prefer it.
-  - Used as a positional modifier on a [`Renewal`](@ref) it is **non-centred**
-    — standard normals are sampled and the location and scale applied inside
-    the scan. That is what the modifier seam can express, and it is the worse
-    parameterisation when the data are informative.
+  - [`StochasticRenewal`](@ref) is **centred**.
+    Infections are the sampled parameter and the likelihood informs them directly.
+    Prefer it.
+  - Used as a positional modifier on a [`Renewal`](@ref) it is **non-centred**.
+    Standard normals are sampled and the location and scale applied inside the scan.
+    That is what the modifier seam can express, and it is the worse parameterisation when the data are informative.
 
 # Keyword Arguments
 
   - `dist`: the noise family (default `LogNormal`).
-  - `overdispersion`: the prior for ``\xi``, or a fixed scalar. A fixed scalar
-    costs no parameter.
+  - `overdispersion`: the prior for ``\xi``, or a fixed scalar.
+    A fixed scalar costs no parameter.
   - `cv_cap`: the soft upper limit on the coefficient of variation.
   - `cv_sharpness`: how sharply that limit is approached.
 
 # Examples
 
-The specification on its own carries no priors beyond the overdispersion; it
-is a [`StochasticRenewal`](@ref) (or a [`Renewal`](@ref) modifier) that uses
-it. A wider family and no cap:
+A wider family and no cap, used by a [`StochasticRenewal`](@ref).
 
 ```@example InfectionNoise
 using ComposableTuringIDModels, Distributions
@@ -118,10 +106,20 @@ end
 # number raises, and the renewal has already gone somewhere it cannot come
 # back from — so it returns `NaN`, which the moment core's guards turn into a
 # `-Inf` score (centred) or a `NaN` draw (non-centred) rather than an error.
+#
+# An upper limit must not change a value that is already below it, and the
+# smooth one does: it costs an offset of `log1p(exp(-k(u - c)))/k`, which is
+# 6.7e-4 at the defaults. A small `ξ` and an expectation past a few million
+# make the raw coefficient of variation smaller than that offset, so the cap
+# returns zero or less — no distribution at all, at an incidence a
+# national-scale model reaches. The capped value is therefore used only while
+# it is positive. Below that the cap is nowhere near binding, 0.5 against
+# 6.7e-4, and the value it is not entitled to change is the exact one.
 function _noise_sd(noise::InfectionNoise, ι, ξ)
     ι > 0 || return convert(typeof(float(ι * ξ * noise.cv_cap)), NaN)
-    cv = _soft_upper(sqrt(inv(ι) + ξ^2), noise.cv_cap, noise.cv_sharpness)
-    return cv * ι
+    raw = sqrt(inv(ι) + ξ^2)
+    capped = _soft_upper(raw, noise.cv_cap, noise.cv_sharpness)
+    return (capped > 0 ? capped : raw) * ι
 end
 
 # The per-step distribution the CENTRED form scores `I_t` against.
@@ -195,26 +193,18 @@ is_noise(::InfectionNoiseDraws) = true
 @doc raw"
 Sample the **non-centred** infection noise ahead of the scan.
 
-Draws `n` standard normals through the [`IID`](@ref) seam and resolves the
-overdispersion slot, returning the [`InfectionNoiseDraws`](@ref) the scan
-uses. A fixed scalar `overdispersion` is passed straight through, so it costs
-no parameter. The draws are named `I_raw`, prefixed by the modifier's position
-in the renewal step's modifier tuple.
+Draws `n` standard normals through the [`IID`](@ref) seam and resolves the overdispersion slot, returning the [`InfectionNoiseDraws`](@ref) the scan uses.
+A fixed scalar `overdispersion` costs no parameter.
+The draws are named `I_raw`, prefixed by the modifier's position in the renewal step's modifier tuple.
 
-The parameterisation is non-centred because the modifier seam gives it no
-choice: `apply_modifier` is deterministic and a modifier's priors resolve
-before the scan, so the sampled quantity has to be the standard normal
-``\tilde I_t``, with the location and scale applied against ``\iota_t``
-inside the scan.
+The parameterisation is non-centred because the modifier seam gives it no choice.
+`apply_modifier` is deterministic and a modifier's priors resolve before the scan, so the sampled quantity has to be the standard normal ``\tilde I_t``, with the location and scale applied against ``\iota_t`` inside the scan.
 
 !!! warning \"Non-centred is the known-worse parameterisation here\"
-    When the observations inform the infections — the usual case for a renewal
-    model — a non-centred latent path costs sampling efficiency, and the cost
-    shows up as maximum tree depth rather than as a wrong answer.
-    [`StochasticRenewal`](@ref) draws the same noise **centred** and is what
-    to reach for. Use this modifier when a non-centred draw is specifically
-    wanted, or for a stratified renewal, which the centred loop does not
-    cover.
+    When the observations inform the infections, which is the usual case for a renewal model, a non-centred latent path costs sampling efficiency.
+    The cost shows up as maximum tree depth rather than as a wrong answer.
+    [`StochasticRenewal`](@ref) draws the same noise centred and is what to reach for.
+    Use this modifier when a non-centred draw is wanted, or for a stratified renewal, which the centred loop does not cover.
 
 # Arguments
 

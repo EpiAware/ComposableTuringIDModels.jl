@@ -24,18 +24,58 @@ function _family_type(dist)
     )
 end
 
-# The rejection distribution an invalid moment pair routes to: `logpdf ==
-# -Inf` everywhere AND a `rand` that does not throw, which an invalid
-# `Reparameterised` cannot give (its `rand` converts through `native`, which
-# raises) and which a `missing` observation needs. A bare `Float64` sentinel is
-# deliberate — giving it the input's type makes AD return `NaN` rather than
-# `0.0`. `logcdf` is `-Inf` too, so it stays safe to censor or truncate.
-_moment_reject(::Type{Normal}) = Normal(Inf, 1.0)
-_moment_reject(::Type{Gamma}) = Gamma(1.0, Inf)
-# Every other family falls back to the log-normal sentinel rather than one
-# built from its own parameters: what is asked of a sentinel is a `-Inf` score
-# and a finite-free draw, not membership of the family it stands in for.
-_moment_reject(family) = LogNormal(Inf, 1.0)
+# What an invalid moment pair routes to. Scoring and sampling want opposite
+# things from it, and this is the one place that can tell them apart.
+#
+# Scoring is the sampler's hot path and a diverging proposal is routine, so
+# `logpdf` is `-Inf`: silent, cheap, and the proposal is rejected. Sampling has
+# no proposal to reject. A `rand` that returned a number would put an `Inf`
+# into a simulated series and tell nobody, so it raises instead, naming the
+# moments that have no distribution.
+#
+# The support matches the family it stands in for, so the bijector a linked
+# `VarInfo` derives does not change with the validity of the moments.
+struct _NoDraw{F, T <: Real} <: ContinuousUnivariateDistribution
+    "The mean that has no distribution in this family."
+    mean::T
+    "The standard deviation that has no distribution in this family."
+    sd::T
+end
+
+function _NoDraw{F}(mean, sd) where {F}
+    m, s = promote(float(mean), float(sd))
+    return _NoDraw{F, typeof(m)}(m, s)
+end
+
+Base.minimum(::_NoDraw{Normal}) = -Inf
+Base.minimum(::_NoDraw) = 0.0
+Base.maximum(::_NoDraw) = Inf
+Distributions.insupport(::_NoDraw, ::Real) = true
+
+# A bare `Float64` `-Inf` is deliberate: giving it the input's type makes AD
+# return `NaN` where it should return the gradient it already had.
+Distributions.logpdf(::_NoDraw, ::Real) = -Inf
+Distributions.pdf(::_NoDraw, ::Real) = 0.0
+Distributions.logcdf(::_NoDraw, ::Real) = -Inf
+Distributions.cdf(::_NoDraw, ::Real) = 0.0
+Distributions.logccdf(::_NoDraw, ::Real) = 0.0
+Distributions.ccdf(::_NoDraw, ::Real) = 1.0
+
+function _no_draw(d::_NoDraw{F}) where {F}
+    return throw(
+        ArgumentError(
+            "no $(nameof(F)) has mean $(d.mean) and standard deviation " *
+                "$(d.sd), so this model cannot produce a value here. " *
+                "Scoring such a point rejects it, but simulating one has " *
+                "nothing to fall back on."
+        )
+    )
+end
+
+Base.rand(::AbstractRNG, d::_NoDraw) = _no_draw(d)
+Distributions.quantile(d::_NoDraw, ::Real) = _no_draw(d)
+
+_moment_reject(::Type{F}, mean, sd) where {F} = _NoDraw{F}(mean, sd)
 
 # Whether a `(mean, sd)` pair describes a member of the family.
 #
@@ -95,7 +135,7 @@ a `missing` observation can still be drawn.
   - `sd`: the standard deviation it is matched to.
 "
 function _moment_dist(family, mean, sd)
-    _moment_valid(family, mean, sd) || return _moment_reject(family)
+    _moment_valid(family, mean, sd) || return _moment_reject(family, mean, sd)
     return _native_dist(family, mean, sd)
 end
 
