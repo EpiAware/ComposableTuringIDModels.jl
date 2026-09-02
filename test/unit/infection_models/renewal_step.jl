@@ -265,14 +265,21 @@ end
     using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
         SusceptibleDepletion, accumulate_scan, renewal_init_state,
         get_expected_state
-    # A plain core has no modifier: the expectation is the draw itself, and the
-    # assembled expectation series is the committed series.
     rev_gen = reverse([0.2, 0.3, 0.5])
     core = ConstantRenewalStep(rev_gen)
-    good = RenewalStep(core, (SusceptibleDepletion(1000.0),))
-    init = renewal_init_state(good, 5.0, 0.1, length(rev_gen))
     Rt = [1.6, 1.4, 1.2, 1.0, 0.9, 0.8]
 
+    # A step with no modifier transforms nothing, so its expectation series is
+    # its committed series, on the bare core and on the step wrapping it.
+    for plain in (core, RenewalStep(core, ()))
+        init = renewal_init_state(plain, 5.0, 0.1, length(rev_gen))
+        result = accumulate(plain, Rt; init = init)
+        @test get_expected_state(plain, init, result) ==
+            accumulate_scan(plain, init, Rt)
+    end
+
+    good = RenewalStep(core, (SusceptibleDepletion(1000.0),))
+    init = renewal_init_state(good, 5.0, 0.1, length(rev_gen))
     result = accumulate(good, Rt; init = init)
     exp_val = get_expected_state(good, init, result)
     @test length(exp_val) == length(Rt)
@@ -288,21 +295,25 @@ end
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(481)
     gen_int = [0.2, 0.3, 0.5]
-    model = Renewal(; generation_time = gen_int, rt = RandomWalk(),
-        initialisation = Normal())
+    model = Renewal(;
+        generation_time = gen_int, rt = RandomWalk(),
+        initialisation = Normal()
+    )
     out = as_turing_model(model, 30)()
     @test haskey(out, :exp_I_t)
     @test out.exp_I_t ≈ out.I_t
     # The stratified shape reports one expectation per stratum.
-    strat = Renewal(; generation_time = gen_int,
+    strat = Renewal(;
+        generation_time = gen_int,
         rt = Stratify(RandomWalk(), FixedIntercept(0.0)),
-        initialisation = Normal())
+        initialisation = Normal()
+    )
     s = as_turing_model(strat, (2, 20))()
     @test size(s.exp_I_t) == (2, 20)
     @test s.exp_I_t ≈ s.I_t
 end
 
-@testitem "exp_I_t is a chain-recoverable generated quantity in a composed model" tags = [:sample] begin
+@testitem "exp_I_t comes back from a chain in a composed model" tags = [:sample] begin
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(482)
     gen_int = [0.2, 0.3, 0.5]
@@ -322,7 +333,6 @@ end
     @test all(d -> length(d) == 20, draws)
     @test all(isfinite, reduce(vcat, draws))
 end
-
 
 @testitem "exp_I_t is the incidence ImportedCases adds on top of" begin
     using ComposableTuringIDModels, Distributions, Random

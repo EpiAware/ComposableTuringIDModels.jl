@@ -206,10 +206,8 @@ function _thread_modifiers(mods::Tuple, incidence, substates::Tuple)
     return rest_inc, (s, rest_states...)
 end
 
-# A renewal step carries the noise-free expectation alongside the committed
-# draw: `exp_val` is the incidence arriving at the modifier tuple (the force of
-# infection the core computes), and `val` is that same incidence after every
-# modifier has transformed it. With no modifier in the tuple the two coincide.
+# `exp_val` is the force of infection reaching the modifier tuple; `val` is that
+# same incidence after every modifier has transformed it.
 function (step::RenewalStep)(state, Rt)
     foi = renewal_foi(step.core, state.window, Rt)
     new_incidence, new_substates = _thread_modifiers(
@@ -218,7 +216,7 @@ function (step::RenewalStep)(state, Rt)
     new_window = _advance(state.window, new_incidence)
     return (;
         val = new_incidence, exp_val = foi, window = new_window,
-        substates = new_substates
+        substates = new_substates,
     )
 end
 
@@ -232,7 +230,7 @@ function renewal_init_state(step::RenewalStep, window::AbstractArray)
     substates = map(mod -> modifier_init_state(mod, window), step.modifiers)
     return (;
         val = _newest(window), exp_val = _newest(window), window = window,
-        substates = substates
+        substates = substates,
     )
 end
 
@@ -249,14 +247,10 @@ end
 
 @doc raw"
 Assemble the noise-free renewal expectation series from a scan's accumulated
-states, mirroring [`get_state`](@ref)
+states, mirroring [`get_state`](@ref).
 
-Each step's expectation is the incidence arriving at the modifier tuple (the
-force of infection the core computed) before any modifier transformed it — the
-value a stochastic renewal modifier would draw around. Without modifiers the
-expectation equals the committed draw; with a [`SusceptibleDepletion`](@ref) or
-[`ImportedCases`](@ref) modifier it is the draw those modifiers received, so
-`I_t` differs from `exp_I_t` exactly where the modifier bites.
+Each step's expectation is the force of infection the core computed, before any
+modifier transformed it. Without modifiers it equals the committed draw.
 
 # Arguments
 
