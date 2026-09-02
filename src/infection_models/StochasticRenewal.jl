@@ -16,25 +16,18 @@ Z_t \sim \text{latent}, \qquad
 I_t \sim F(\iota_t, c_t \iota_t)
 ```
 
-``F`` and the coefficient of variation ``c_t`` come from the `noise`
-specification ([`InfectionNoise`](@ref)), matching a negative binomial's first
-two moments.
+``F`` and the coefficient of variation ``c_t`` come from the `noise` specification ([`InfectionNoise`](@ref)), matching a negative binomial's first two moments.
 Everything else is [`Renewal`](@ref)'s, and the two take the same arguments.
 
 Infections are the sampled parameter, so the likelihood informs them directly.
-The same noise applied through the renewal *modifier* seam can only be
-non-centred, which is the worse parameterisation when the data are informative
-about the latent path.
-Reach for this first, and for the modifier only when a non-centred draw is
-wanted or when the renewal is stratified.
+The same noise applied through the renewal modifier seam can only be non-centred, which is the worse parameterisation when the data are informative about the latent path.
+Reach for this first, and for the modifier only when a non-centred draw is wanted or when the renewal is stratified.
 
-The default `LogNormal` noise family keeps infections positive, which is where
-the centred draw's support constraint comes from.
+The default `LogNormal` noise family keeps infections positive, which is where the centred draw's support constraint comes from.
 A `Normal` family has no such bound.
 
 Single-series only.
-A stratified renewal needs one draw per stratum per step, which this does not
-provide (see issue #352).
+A stratified renewal needs one draw per stratum per step, which this does not provide.
 
 ## Fields
 

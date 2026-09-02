@@ -239,7 +239,7 @@ end
     @test _noise_sd(noise, 3.0e6, 0.0) ≈ sqrt(1 / 3.0e6) * 3.0e6
     @test _soft_upper(sqrt(1 / 3.0e6), 0.5, 10.0) < 0
 
-    # The whole model, at the scale that used to return a silent `NaN`.
+    # The whole model, at national-scale infections.
     gi = [0.2, 0.3, 0.5]
     args = (;
         rt = FixedIntercept(log(1.5)),
