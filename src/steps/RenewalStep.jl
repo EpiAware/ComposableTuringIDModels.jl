@@ -186,6 +186,10 @@ function renewal_init_state(step::_PlainRenewalStep, I₀, r_approx, len_gen_int
     return renewal_init_state(step.core, I₀, r_approx, len_gen_int)
 end
 
+function renewal_init_state(step::_PlainRenewalStep, window::AbstractArray)
+    return renewal_init_state(step.core, window)
+end
+
 function get_state(step::_PlainRenewalStep, initial_state, state)
     return get_state(step.core, initial_state, state)
 end
@@ -212,7 +216,12 @@ function (step::RenewalStep)(state, Rt)
 end
 
 function renewal_init_state(step::RenewalStep, I₀, r_approx, len_gen_int)
-    window = renewal_init_window(step.core, I₀, r_approx, len_gen_int)
+    return renewal_init_state(
+        step, renewal_init_window(step.core, I₀, r_approx, len_gen_int)
+    )
+end
+
+function renewal_init_state(step::RenewalStep, window::AbstractArray)
     substates = map(mod -> modifier_init_state(mod, window), step.modifiers)
     return (; val = _newest(window), window = window, substates = substates)
 end

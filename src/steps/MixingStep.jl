@@ -64,6 +64,10 @@ function renewal_init_state(step::MixingStep, I₀, r_approx, len_gen_int)
     return _unresolved_mixing(step)
 end
 
+function renewal_init_state(step::MixingStep, window::AbstractArray)
+    return _unresolved_mixing(step)
+end
+
 @doc raw"
 Draw the coupling operator ahead of the scan.
 

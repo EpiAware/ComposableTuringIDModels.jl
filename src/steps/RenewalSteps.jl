@@ -242,12 +242,19 @@ every AD backend.
 A new renewal step implements this, usually by wrapping
 [`renewal_init_window`](@ref).
 
+The two-argument method takes the window itself, for a renewal whose seeding
+window is drawn rather than decayed from a single seed (a [`SeedingPath`](@ref)
+`initialisation`). The four-argument method builds its window and defers to it,
+so a step's substates are assembled in one place.
+
 # Arguments
 
   - `step`: the renewal step being seeded.
   - `I₀`: the initial incidence, one value or one per stratum.
   - `r`: the growth rate implied by ``R_0``.
   - `len_gen_int`: the number of lags the generation interval covers.
+  - `window`: the incidence window itself (two-argument method), oldest to
+    newest.
 
 # Examples
 ```@example renewal_init_state
@@ -257,7 +264,12 @@ ComposableTuringIDModels.renewal_init_state(step, 10.0, 0.1, 3)
 ```
 "
 function renewal_init_state(step::ConstantRenewalStep, I₀, r, len_gen_int)
-    window = renewal_init_window(step, I₀, r, len_gen_int)
+    return renewal_init_state(
+        step, renewal_init_window(step, I₀, r, len_gen_int)
+    )
+end
+
+function renewal_init_state(::ConstantRenewalStep, window::AbstractArray)
     return (; val = _newest(window), window = window)
 end
 

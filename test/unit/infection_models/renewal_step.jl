@@ -97,8 +97,12 @@ end
         gen_int, SusceptibleDepletion(1000.0);
         rt = RandomWalk()
     )
-    @test plain.recurrent_step isa RenewalStep
-    @test isempty(plain.recurrent_step.modifiers)
+    # With no modifiers the step is the bare force-of-infection core, whichever
+    # constructor built it.
+    @test plain.recurrent_step isa ConstantRenewalStep
+    @test isempty(plain.modifiers)
+    @test Renewal(; generation_time = gen_int).recurrent_step isa
+        ConstantRenewalStep
     @test depleting.recurrent_step isa RenewalStep
     @test depleting.recurrent_step.core isa ConstantRenewalStep
     @test only(depleting.recurrent_step.modifiers) isa SusceptibleDepletion
@@ -144,4 +148,64 @@ end
     # A few NUTS steps exercise the composed-step gradient path (ForwardDiff).
     chn = sample(as_turing_model(model, y, 20), NUTS(), 30; progress = false)
     @test chn !== nothing
+end
+
+@testitem "Renewal combines a continuous generation time with a modifier" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: RenewalStep
+    # The call issue #269 reported as inexpressible: a continuous generation
+    # time discretised by the constructor, carrying a modifier.
+    renewal = Renewal(
+        Gamma(2, 1.5), SusceptibleDepletion(1000.0);
+        D_gen = 15.0, rt = RandomWalk(), initialisation = Normal(log(50), 0.2)
+    )
+    @test renewal.gen_int isa AbstractVector
+    @test sum(renewal.gen_int) ≈ 1
+    @test renewal.recurrent_step isa RenewalStep
+    @test only(renewal.recurrent_step.modifiers) isa SusceptibleDepletion
+    # One discretisation path: the interval matches the modifier-free model's,
+    # so a modifier does not force a second discretisation outside the package.
+    base = Renewal(; generation_time = Gamma(2, 1.5), D_gen = 15.0)
+    @test renewal.gen_int == base.gen_int
+    # The keyword form takes the same modifiers.
+    kw = Renewal(;
+        generation_time = Gamma(2, 1.5), D_gen = 15.0,
+        modifiers = SusceptibleDepletion(1000.0), rt = RandomWalk(),
+        initialisation = Normal(log(50), 0.2)
+    )
+    @test kw.gen_int == renewal.gen_int
+    @test only(kw.modifiers) isa SusceptibleDepletion
+    out = as_turing_model(renewal, 20)()
+    @test length(out.I_t) == 20
+    @test all(isfinite, out.I_t)
+end
+
+@testitem "Renewal composes a modifier onto an inferred generation interval" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: fix
+    gen = UncertainDelay(
+        LogNormal,
+        [Normal(1.9, 0.2), truncated(Normal(0.5, 0.2), 0, Inf)]; D = 14.0
+    )
+    # No interval is baked, so the modifiers are held on the model and the step
+    # is rebuilt with them per draw.
+    depleting = Renewal(
+        gen, SusceptibleDepletion(50.0);
+        rt = FixedIntercept(log(2.0)), initialisation = Normal(log(10), 0.1)
+    )
+    plain = Renewal(
+        gen; rt = FixedIntercept(log(2.0)),
+        initialisation = Normal(log(10), 0.1)
+    )
+    @test isnothing(depleting.recurrent_step)
+    @test only(depleting.modifiers) isa SusceptibleDepletion
+    @test isempty(plain.modifiers)
+    fixinit = (init_incidence = log(10.0),)
+    Random.seed!(51)
+    depleted = fix(as_turing_model(depleting, 25), fixinit)().I_t
+    Random.seed!(51)
+    undepleted = fix(as_turing_model(plain, 25), fixinit)().I_t
+    @test all(isfinite, depleted)
+    # A small population bites: depletion holds incidence below the plain path.
+    @test last(depleted) < last(undepleted)
 end
