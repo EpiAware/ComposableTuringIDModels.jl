@@ -150,7 +150,7 @@ public ModelShape, across_shape, infection_strata,
     apply_modifier, renewal_foi, renewal_init_state, renewal_init_window,
     MissingObservations,
     at, path_prior, prior_order, assert_prior_length,
-    wrapped_models, observation_components, rewrap
+    wrapped_models, observation_components, rewrap, swap
 
 # --- core architecture ---
 include("base/base.jl")
