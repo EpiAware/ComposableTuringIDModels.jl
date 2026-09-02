@@ -190,6 +190,13 @@ function renewal_init_state(step::_PlainRenewalStep, window::AbstractArray)
     return renewal_init_state(step.core, window)
 end
 
+# Its state is the core's, so the two halves of the step are the core's too.
+_propose(step::_PlainRenewalStep, state, Rt) = _propose(step.core, state, Rt)
+
+function _commit(step::_PlainRenewalStep, state, incidence, substates)
+    return _commit(step.core, state, incidence, substates)
+end
+
 function get_state(step::_PlainRenewalStep, initial_state, state)
     return get_state(step.core, initial_state, state)
 end
@@ -207,12 +214,24 @@ function _thread_modifiers(mods::Tuple, incidence, substates::Tuple)
 end
 
 function (step::RenewalStep)(state, Rt)
+    incidence, substates = _propose(step, state, Rt)
+    return _commit(step, state, incidence, substates)
+end
+
+# The proposal is the core's force of infection threaded through the
+# modifiers, each transforming it and advancing its own substate; the commit
+# advances the one shared window. See `_propose` in `RenewalSteps.jl` for why
+# the two are separable.
+function _propose(step::RenewalStep, state, Rt)
     foi = renewal_foi(step.core, state.window, Rt)
-    new_incidence, new_substates = _thread_modifiers(
-        step.modifiers, foi, state.substates
+    return _thread_modifiers(step.modifiers, foi, state.substates)
+end
+
+function _commit(::RenewalStep, state, incidence, substates)
+    return (;
+        val = incidence, window = _advance(state.window, incidence),
+        substates = substates,
     )
-    new_window = _advance(state.window, new_incidence)
-    return (; val = new_incidence, window = new_window, substates = new_substates)
 end
 
 function renewal_init_state(step::RenewalStep, I₀, r_approx, len_gen_int)

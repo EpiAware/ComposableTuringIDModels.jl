@@ -105,8 +105,9 @@ export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
     Stratify, Replicate
 
 # --- infection models ---
-export DirectInfections, ExpGrowthRate, Renewal, SeedingPath,
-    RenewalStep, SusceptibleDepletion, ImportedCases,
+export DirectInfections, ExpGrowthRate, Renewal, StochasticRenewal,
+    SeedingPath, RenewalStep, SusceptibleDepletion, ImportedCases,
+    InfectionNoise,
     R_to_r, r_to_R, expected_Rt
 export CombineInfections
 
@@ -185,6 +186,7 @@ include("steps/RenewalStep.jl")
 include("steps/MixingStep.jl")
 include("steps/Gravity.jl")
 include("steps/ImportedCases.jl")
+include("steps/InfectionNoise.jl")
 
 # --- utilities and distributions ---
 include("utils/HalfNormal.jl")
@@ -224,6 +226,7 @@ include("infection_models/DirectInfections.jl")
 include("infection_models/ExpGrowthRate.jl")
 include("infection_models/SeedingPath.jl")
 include("infection_models/Renewal.jl")
+include("infection_models/StochasticRenewal.jl")
 # `utils.jl` defines the `R_to_r(::Renewal)` method, so it follows `Renewal`.
 include("infection_models/utils.jl")
 include("infection_models/CombineInfections.jl")
