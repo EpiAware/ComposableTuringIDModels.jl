@@ -129,3 +129,26 @@ end
     # rather than a silently collapsed path.
     @test_throws "SeedingPath" _seed([1.0, 2.0], 5)
 end
+
+@testitem "a SeedingPath sizes itself to an inferred generation interval" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(266)
+    gen = UncertainDelay(
+        LogNormal,
+        [Normal(1.9, 0.2), truncated(Normal(0.5, 0.2), 0, Inf)]; D = 14.0
+    )
+    # No interval is baked, so the seeding window's length comes from the
+    # lag-dropped interval drawn per iteration.
+    seeded = Renewal(;
+        generation_time = gen, rt = RandomWalk(),
+        initialisation = SeedingPath(RandomWalk(; init = Normal(log(50), 0.5)))
+    )
+    out = as_turing_model(seeded, 20)()
+    # The drawn interval is discretised and lag-0-dropped exactly as a fixed one
+    # with the same horizon, so the window has that interval's length.
+    fixed = Renewal(; generation_time = LogNormal(1.9, 0.5), D_gen = 14.0)
+    @test length(out.I_seed) == length(fixed.gen_int)
+    @test all(>(0), out.I_seed)
+    @test length(out.I_t) == 20
+    @test all(isfinite, out.I_t)
+end

@@ -153,8 +153,8 @@ end
 @testitem "Renewal combines a continuous generation time with a modifier" begin
     using ComposableTuringIDModels, Distributions
     using ComposableTuringIDModels: RenewalStep
-    # The call issue #269 reported as inexpressible: a continuous generation
-    # time discretised by the constructor, carrying a modifier.
+    # A continuous generation time discretised by the constructor, carrying a
+    # modifier: the two compose in either constructor form.
     renewal = Renewal(
         Gamma(2, 1.5), SusceptibleDepletion(1000.0);
         D_gen = 15.0, rt = RandomWalk(), initialisation = Normal(log(50), 0.2)
@@ -208,4 +208,25 @@ end
     @test all(isfinite, depleted)
     # A small population bites: depletion holds incidence below the plain path.
     @test last(depleted) < last(undepleted)
+end
+
+@testitem "the modifiers keyword rejects a value that is not a modifier" begin
+    using ComposableTuringIDModels, Distributions
+    gen_int = [0.2, 0.3, 0.5]
+    # The positional form is constrained by its signature; the keyword form has
+    # to say so itself rather than failing inside the step's seam.
+    @test_throws "AbstractRenewalModifier" Renewal(;
+        generation_time = gen_int, modifiers = (Normal(),)
+    )
+    @test_throws "AbstractRenewalModifier" Renewal(;
+        generation_time = gen_int, modifiers = [SusceptibleDepletion(1.0e3), 1]
+    )
+    # A single modifier, a tuple and a vector of them are all accepted.
+    for mods in (
+            SusceptibleDepletion(1.0e3), (SusceptibleDepletion(1.0e3),),
+            [SusceptibleDepletion(1.0e3)],
+        )
+        r = Renewal(; generation_time = gen_int, modifiers = mods)
+        @test only(r.modifiers) isa SusceptibleDepletion
+    end
 end

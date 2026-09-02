@@ -220,9 +220,21 @@ function Renewal(
 end
 
 # The modifier slot takes one modifier or a collection of them; a tuple keeps
-# the step's modifier types concrete.
+# the step's modifier types concrete. The keyword form has no signature to
+# constrain it, as the positional one does, so what it was given is checked here
+# rather than failing as a `MethodError` from inside the step's seam.
 _modifier_tuple(mod::AbstractRenewalModifier) = (mod,)
-_modifier_tuple(mods) = Tuple(mods)
+
+function _modifier_tuple(mods)
+    tup = Tuple(mods)
+    all(m -> m isa AbstractRenewalModifier, tup) || throw(
+        ArgumentError(
+            "`modifiers` takes `AbstractRenewalModifier`s, but was given " *
+                "$(join(nameof.(typeof.(tup)), ", "))."
+        )
+    )
+    return tup
+end
 
 # The step a core and a modifier tuple make: the core with the modifiers
 # composed on, and the bare core when there are none, so a modifier-free renewal
