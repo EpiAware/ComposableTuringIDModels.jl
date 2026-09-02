@@ -61,11 +61,16 @@ using Tables: rowtable
 using Distributions: Distributions, Distribution, Sampleable,
     UnivariateDistribution,
     ContinuousUnivariateDistribution, ContinuousDistribution,
-    Normal, Poisson, NegativeBinomial, Binomial, Gamma, truncated,
+    Normal, LogNormal, Poisson, NegativeBinomial, Binomial, Gamma, truncated,
     cdf, ccdf, logcdf, logccdf, invlogcdf, pdf, logpdf, quantile,
     params, mean, var, std, mode, skewness, kurtosis,
     product_distribution
 using Statistics: Statistics
+
+# Moment parameterisations of the Distributions.jl families: `reparameterise`
+# solves a `(mean, sd)` pair for a family's native parameters, and
+# `valid_moments` is the per-family predicate that says whether it can.
+using ReparameterisedDistributions: reparameterise, valid_moments
 
 # --- core architecture ---
 export AbstractComposableModel, as_turing_model
@@ -159,6 +164,7 @@ include("base/roles.jl")
 include("base/shapes.jl")
 include("base/interfaces.jl")
 include("base/priors.jl")
+include("base/moments.jl")
 include("base/prettyprinting.jl")
 
 # --- accumulation steps ---
