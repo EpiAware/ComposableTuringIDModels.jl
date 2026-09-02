@@ -1,61 +1,40 @@
 # [Multiple observation streams: cases, deaths, and strata](@id tutorial-split)
 
 Real-time surveillance rarely watches an epidemic through a single lens.
-The same infections surface as reported cases, hospital admissions, deaths, and
-often each of these split by age, region, or variant.
-These streams share one underlying infection process but differ in their
-reporting delay, ascertainment, and noise [sherratt2021surveillance](@citep).
-Fitting them jointly — one infection trajectory, several observation streams —
-propagates uncertainty correctly and lets a sparse stream (deaths) borrow
-strength from a dense one (cases).
+The same infections surface as reported cases, hospital admissions, deaths, and often each of these split by age, region, or variant.
+These streams share one underlying infection process but differ in their reporting delay, ascertainment, and noise [sherratt2021surveillance](@citep).
+Fitting them jointly, one infection trajectory and several observation streams, propagates uncertainty correctly and lets a sparse stream (deaths) borrow strength from a dense one (cases).
 
-This tutorial uses one construct, [`Split`](@ref), for every multi-stream
-shape.
-`Split` observes the expected series arriving at the point where it sits in the
-pipeline through several named streams, so *where you place it* chooses the
-composition:
+This tutorial uses one construct, [`Split`](@ref), for every multi-stream shape.
+`Split` observes the expected series arriving at the point where it sits in the pipeline through several named streams, so *where you place it* chooses the composition.
 
-  - **parallel** — placed high, on infections: every stream observes the *same*
-    ``I_t`` (cases and deaths each a delayed, ascertained fraction of ``I_t``);
-  - **cascade** — placed low, after a shared layer: a later stream is observed
-    *downstream* of an earlier one (deaths as a delayed fraction of the
-    *expected reported cases*);
-  - **strata** — one stream per data-defined group (an age band).
+  - **Parallel**, placed high on infections.
+    Every stream observes the *same* ``I_t``, cases and deaths each a delayed, ascertained fraction of ``I_t``.
+  - **Cascade**, placed low after a shared layer.
+    A later stream is observed *downstream* of an earlier one, deaths as a delayed fraction of the *expected reported cases*.
+  - **Strata**, one stream per data-defined group such as an age band.
 
 ## How `Split` threads streams
 
-Every observation model in the package returns the uniform pair
-`(; y_t, expected)`: the sampled observations `y_t` and the pre-error `expected`
-series the error was scored against.
+Every observation model in the package returns the uniform pair `(; y_t, expected)`, the sampled observations `y_t` and the pre-error `expected` series the error was scored against.
 Exposing `expected` is what lets `Split` do all three shapes with one mechanism.
-`Split` feeds each stream the `expected` series reaching it, and — because
-`Split` is itself an observation model — a shared modifier can run *before* it.
-`Split((cases = …, deaths = …))` on its own splits infections (parallel), while
-`LatentDelay(Split((cases = …, deaths = …)), pmf)` applies a common delay first
-and then splits, so a stream nested inside another stream's pipeline sits
-downstream of it (cascade).
+`Split` feeds each stream the `expected` series reaching it, and because `Split` is itself an observation model a shared modifier can run *before* it.
+`Split((cases = …, deaths = …))` on its own splits infections (parallel).
+`LatentDelay(Split((cases = …, deaths = …)), pmf)` applies a common delay first and then splits, so a stream nested inside another stream's pipeline sits downstream of it (cascade).
 
 !!! note "The threaded quantity is the expected, not the realised, series"
-    A downstream stream reads its upstream stream's **expected** (pre-error)
-    series, never its realised, sampled counts.
+    A downstream stream reads its upstream stream's **expected** (pre-error) series, never its realised, sampled counts.
     So a cascade threads the *mean* reported cases into deaths, not a noisy draw.
-    The case where an observation depends on another stream's *realised*
-    (error-corrupted) observation — feeding sampled cases, not expected cases,
-    into deaths — is not covered here and is out of scope for now.
+    The case where an observation depends on another stream's *realised* observation is not covered here and is out of scope for now.
 
-`Split` also prefixes each stream's sampled variables with the stream name
-automatically, so the streams stay distinct without any manual prefix layer.
+`Split` also prefixes each stream's sampled variables with the stream name automatically, so the streams stay distinct without any manual prefix layer.
 
 ## Parallel: cases and deaths from shared infections
 
-We drive the streams with a renewal infection process, exactly as in the
-[renewal tutorial](@ref tutorial-renewal), and observe it through two
-pipelines.
+We drive the streams with a renewal infection process, exactly as in the [renewal tutorial](@ref tutorial-renewal), and observe it through two pipelines.
 Cases are a short-delay, high-ascertainment negative-binomial stream.
-Deaths are a long-delay stream whose ascertainment — the infection-fatality
-ratio — is itself *estimated*: each stream is a full observation model, so its
-ascertainment can be a fixed fraction or, as here, a latent [`Intercept`](@ref)
-model with a prior.
+Deaths are a long-delay stream whose ascertainment, the infection-fatality ratio, is itself *estimated*.
+Each stream is a full observation model, so its ascertainment can be a fixed fraction or, as here, a latent [`Intercept`](@ref) model with a prior.
 
 ```@example split
 using ComposableTuringIDModels, Distributions, Random, Turing, Mooncake
@@ -82,16 +61,14 @@ deaths = LatentDelay(
 parallel = Split((cases = cases, deaths = deaths))
 ```
 
-The composed model assembles the renewal infection process and the two-stream
-observation model exactly like a single-stream study.
+The composed model assembles the renewal infection process and the two-stream observation model exactly like a single-stream study.
 
 ```@example split
 model = IDModel(renewal, parallel)
 ```
 
 Passing `missing` data simulates a synthetic outbreak.
-The per-stream data contract is a `NamedTuple` keyed by stream name, and the
-returned `generated_y_t` is a `NamedTuple` of the two simulated series.
+The per-stream data contract is a `NamedTuple` keyed by stream name, and the returned `generated_y_t` is a `NamedTuple` of the two simulated series.
 
 ```@example split
 n = 70
@@ -107,11 +84,7 @@ Both are scored.
 Pass each stream the observations it has, and [`data_requirements`](@ref) reports the two lengths before the model is built.
 
 Fitting conditions on both streams at once.
-We draw two chains in parallel with `MCMCThreads()`, matching the other
-tutorials, and differentiate with
-[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended
-backend for this package (see
-[Automatic differentiation backend](@ref ad-backends)).
+We draw two chains in parallel with `MCMCThreads()`, matching the other tutorials, and differentiate with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for this package (see [Automatic differentiation backend](@ref ad-backends)).
 
 ```@example split
 ydata = (cases = y.cases, deaths = y.deaths)
@@ -122,26 +95,20 @@ chain = sample(
 nothing # hide
 ```
 
-The two streams keep their own overdispersion parameters — `Split` prefixes them
-`cases.cluster_factor` and `deaths.cluster_factor` — while sharing the one
-infection trajectory, and the deaths stream's estimated IFR intercept
-(`deaths.Ascertainment.intercept`) is recovered alongside them.
-The dense case stream pins the shared ``R_t`` process; the sparse death stream is
-observed jointly rather than fit in isolation.
+The two streams keep their own overdispersion parameters, prefixed by `Split` as `cases.cluster_factor` and `deaths.cluster_factor`, while sharing the one infection trajectory.
+The deaths stream's estimated IFR intercept (`deaths.Ascertainment.intercept`) is recovered alongside them.
+The dense case stream pins the shared ``R_t`` process.
+The sparse death stream is observed jointly rather than fit in isolation.
 
 ```@example split
 using MCMCChains
 summarystats(chain)
 ```
 
-Summary statistics confirm the parameters converged, but they do not show
-whether the fit actually tracks the two simulated series.
-Posterior-predictive draws from the same fitted chain, plotted against the
-simulated counts, close that loop.
-The helpers below turn a `time × draws` matrix into 50% and 95% credible
-bands and draw a median line with ribbons.
-`predictive_bands` walks a named stream's per-index sampled `y_t`, filling
-any index a stream's delay leaves unscored with `missing`.
+Summary statistics confirm the parameters converged, but they do not show whether the fit actually tracks the two simulated series.
+Posterior-predictive draws from the same fitted chain, plotted against the simulated counts, close that loop.
+The helpers below turn a `time × draws` matrix into 50% and 95% credible bands and draw a median line with ribbons.
+`predictive_bands` walks a named stream's per-index sampled `y_t`, filling any index a stream's delay leaves unscored with `missing`.
 
 ```@setup split
 using CairoMakie, Statistics
@@ -180,10 +147,7 @@ function predictive_bands(pred, n, vn)
 end
 ```
 
-`Split` prefixes each stream's `y_t`, so `predictive_bands` reads
-`cases.y_t[i]` and `deaths.y_t[i]` off the `predict` chain, the prefixed
-equivalent of the bare `y_t[i]` the [renewal tutorial](@ref tutorial-renewal)
-reads from a single-stream model:
+`Split` prefixes each stream's `y_t`, so `predictive_bands` reads `cases.y_t[i]` and `deaths.y_t[i]` off the `predict` chain, the prefixed equivalent of the bare `y_t[i]` the [renewal tutorial](@ref tutorial-renewal) reads from a single-stream model.
 
 ```@example split
 missmodel = as_turing_model(model, (cases = missing, deaths = missing), n)
@@ -215,26 +179,17 @@ axislegend(ax2; position = :lt)
 fig
 ```
 
-The band covers the simulated series on almost every day for both streams,
-and both medians track the outbreak's rise and fall rather than sitting flat
-at the mean.
-The sparser death series (82 simulated deaths against 6576 cases over the
-same 70 days) still recovers: its band is visibly wider, but it moves with
-the same underlying trajectory rather than needing its own signal to do so.
+The band covers the simulated series on almost every day for both streams, and both medians track the outbreak's rise and fall rather than sitting flat at the mean.
+The sparser death series (82 simulated deaths against 6576 cases over the same 70 days) still recovers.
+Its band is visibly wider, but it moves with the same underlying trajectory rather than needing its own signal to do so.
 
 ## Cascade: deaths downstream of reported cases
 
-In the parallel model, cases and deaths both branch off infections, so a
-reporting artefact in the case series (a weekend dip, an ascertainment change)
-does *not* touch deaths.
-Sometimes we want the opposite: deaths modelled as a delayed fraction of the
-*reported cases*, so whatever is reflected in cases propagates into deaths.
-That is a cascade ``I_t \to \text{cases} \to \text{deaths}``, and it needs no new
-construct and no mode flag — it is the same [`Split`](@ref) placed *lower* in the
-stack.
-Share the infection→case-report delay, then split: the cases stream applies its
-error to the delayed expectation, and the deaths stream sits downstream, delayed
-again by the case-report→death interval and scaled by the fatality fraction.
+In the parallel model, cases and deaths both branch off infections, so a reporting artefact in the case series (a weekend dip, an ascertainment change) does *not* touch deaths.
+Sometimes we want the opposite, deaths modelled as a delayed fraction of the *reported cases*, so whatever is reflected in cases propagates into deaths.
+That is a cascade ``I_t \to \text{cases} \to \text{deaths}``, and it is the same [`Split`](@ref) placed *lower* in the stack.
+Share the infection→case-report delay, then split.
+The cases stream applies its error to the delayed expectation, and the deaths stream sits downstream, delayed again by the case-report→death interval and scaled by the fatality fraction.
 
 ```@example split
 cascade = LatentDelay(                                   # infection→case delay
@@ -249,10 +204,8 @@ cascade_model = IDModel(renewal, cascade)
 cas = as_turing_model(cascade_model, (cases = missing, deaths = missing), n)()
 ```
 
-The `Split` sits *after* the shared case delay and *before* the error leaves, so
-the deaths stream's expected input is the delayed-and-ascertained *expected
-cases*, not the raw infections: it is both scaled by the fatality fraction and
-shortened by the case delay.
+The `Split` sits *after* the shared case delay and *before* the error leaves, so the deaths stream's expected input is the delayed-and-ascertained *expected cases* rather than the raw infections.
+It is both scaled by the fatality fraction and shortened by the case delay.
 
 ```@example split
 (cases_expected_length = length(cas.expected_y_t.cases),
@@ -263,11 +216,8 @@ shortened by the case delay.
 
 ## Strata: one stream per age band
 
-A stratified stream — one observation series per age band, region, or variant —
-is again the same construct, here composed with the renewal infection process
-and observed through one named stream per band.
-Each band is a full observation model, so its delay and ascertainment can differ,
-and its parameters are namespaced by the band name.
+A stratified stream, one observation series per age band, region, or variant, is again the same construct, here composed with the renewal infection process and observed through one named stream per band.
+Each band is a full observation model, so its delay and ascertainment can differ, and its parameters are namespaced by the band name.
 
 ```@example split
 strata_obs = Split((
@@ -283,19 +233,13 @@ strata_sim = as_turing_model(
 map(s -> sum(skipmissing(s)), strata_sim)                # totals per band
 ```
 
-The streams above each observe the *same* infections. When the streams instead
-draw on a **weighted mix** of infections — one band, another band, and a summed
-total — the same `Split` carries an `observation-strata × infection-strata` weight
-matrix, and a single **template** model is replicated once per data stream.
-`Split(template, W)` projects the infection series reaching it through `W`, so it
-composes inside an `IDModel` like any other observation model: the infections come
-from the modelled process, not a hand-built series.
-One weight matrix covers the one-to-one (an identity map), many-to-one (an
-aggregation row summing infection strata into one stream), and many-to-many
-(a general matrix) infection → observation cases.
+The streams above each observe the *same* infections.
+When the streams instead draw on a **weighted mix** of infections, one band, another band, and a summed total, the same `Split` carries an `observation-strata × infection-strata` weight matrix, and a single **template** model is replicated once per data stream.
+`Split(template, W)` projects the infection series reaching it through `W`, so it composes inside an `IDModel` like any other observation model.
+The infections come from the modelled process, not a hand-built series.
+One weight matrix covers the one-to-one (an identity map), many-to-one (an aggregation row summing infection strata into one stream), and many-to-many (a general matrix) infection → observation cases.
 
-Here the renewal process supplies one infection stratum, and `W` maps it onto a
-`young` band, an `old` band, and their `total`:
+Here the renewal process supplies one infection stratum, and `W` maps it onto a `young` band, an `old` band, and their `total`.
 
 ```@example split
 W = reshape([0.7, 0.3, 1.0], 3, 1)                  # young, old, and their total
@@ -306,15 +250,12 @@ age = as_turing_model(
 map(s -> sum(skipmissing(s)), age.generated_y_t)         # simulated total per band
 ```
 
-The aggregate `total` stream sees the summed expected infections of both bands —
-its expected series is exactly `young .+ old`.
+The aggregate `total` stream sees the summed expected infections of both bands, so its expected series is exactly `young .+ old`.
 
 Simulating checks that the forward map runs.
-It does not check that a many-to-one `W` is actually **recoverable** from
-data.
-Fitting `weighted_model` to its own simulated streams answers that: the fit
-conditions on `young`, `old`, and the aggregate `total` together, exactly as
-[`Split`](@ref) conditions on any other named streams.
+It does not check that a many-to-one `W` is actually **recoverable** from data.
+Fitting `weighted_model` to its own simulated streams answers that.
+The fit conditions on `young`, `old`, and the aggregate `total` together, exactly as [`Split`](@ref) conditions on any other named streams.
 
 ```@example split
 weighted_data = (young = age.generated_y_t.young, old = age.generated_y_t.old,
@@ -326,21 +267,16 @@ weighted_chain = sample(
 nothing # hide
 ```
 
-`young`, `old`, and `total` are not three independent counts: `total` is
-exactly `young + old`, so all three read the same one-stratum ``R_t`` path
-through fixed, unequal weights rather than each pinning it independently.
-That collinearity makes the ``\epsilon_t`` innovations mix more slowly than
-the two-stream parallel fit above — worth knowing before trusting any one
-tutorial's diagnostics at face value:
+`young`, `old`, and `total` are not three independent counts.
+`total` is exactly `young + old`, so all three read the same one-stratum ``R_t`` path through fixed, unequal weights rather than each pinning it independently.
+That collinearity makes the ``\epsilon_t`` innovations mix more slowly than the two-stream parallel fit above, worth knowing before trusting any one tutorial's diagnostics at face value.
 
 ```@example split
 summarystats(weighted_chain)
 ```
 
-Posterior-predictive bands per stream, plotted against the simulated counts,
-show whether the shared infection process and the `W` weights together
-recover each stratum — including `total`, which is nowhere in the infection
-process itself, only assembled from it by `W`:
+Posterior-predictive bands per stream, plotted against the simulated counts, show whether the shared infection process and the `W` weights together recover each stratum.
+That includes `total`, which is nowhere in the infection process itself and only assembled from it by `W`.
 
 ```@example split
 weighted_pred = predict(as_turing_model(
@@ -365,29 +301,15 @@ axislegend(ax_young; position = :lt)
 fig2
 ```
 
-Despite the slower mixing, the 95% band covers the simulated counts on almost
-every day for all three streams, so the many-to-one map is recovered, not
-merely simulated.
-A single shared ``R_t`` path, read through three collinear weighted views of
-it, is enough to pin that path: `young` and `old` need no independent signal
-of their own, and `total` — a stream the infection process never draws
-directly — still lands on its simulated series because `W` ties it to the
-same shared path.
-`Split(template, W)` many-to-one aggregation is not just forward-simulated
-here, it is fit and recovered.
+Despite the slower mixing, the 95% band covers the simulated counts on almost every day for all three streams, so the many-to-one map is recovered, not merely simulated.
+A single shared ``R_t`` path, read through three collinear weighted views of it, is enough to pin that path.
+`young` and `old` need no independent signal of their own, and `total` still lands on its simulated series because `W` ties it to the same shared path.
 
-Here the single renewal process supplied one infection stratum, broadcast
-through `W`. When the strata are genuinely **separate infection processes** —
-several distinct regions, say, each with its own latent — swap the single
-infection model for [`CombineInfections`](@ref): it draws each process
-independently and stacks the results into the same `infection-strata × time`
-matrix `Split`/`StrataMap` already expect, so `IDModel(CombineInfections([...]),
-Split(template, W))` maps several distinct infection processes onto streams
-end-to-end. For one process carried across a strata axis instead, with
-partially pooled per-stratum deviations, see [`Stratify`](@ref) and [Partial
-pooling across groups](@ref tutorial-hierarchy). It also composes with
-[`Renewal`](@ref)'s `mixing` slot, see [Coupled patch models](@ref
-tutorial-patches).
+Here the single renewal process supplied one infection stratum, broadcast through `W`.
+When the strata are genuinely **separate infection processes**, several distinct regions each with its own latent, swap the single infection model for [`CombineInfections`](@ref).
+It draws each process independently and stacks the results into the same `infection-strata × time` matrix `Split`/`StrataMap` already expect, so `IDModel(CombineInfections([...]), Split(template, W))` maps several distinct infection processes onto streams end-to-end.
+For one process carried across a strata axis instead, with partially pooled per-stratum deviations, see [`Stratify`](@ref) and [Partial pooling across groups](@ref tutorial-hierarchy).
+It also composes with [`Renewal`](@ref)'s `mixing` slot, see [Coupled patch models](@ref tutorial-patches).
 
 ## References
 
