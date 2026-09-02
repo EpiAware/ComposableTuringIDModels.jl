@@ -116,19 +116,16 @@ composition. The reporting-delay parameters flow through the same priors seam as
 every other parameter, so inferring the delay needs no change to the rest of the
 model.
 
-Each convolution shortens the expected series by `length(pmf) - 1`, because the
-head of a convolution is only partially observed. Two stacked delays therefore
-need the infection process to start that many days before the first report.
+Each convolution shortens the expected series by `length(pmf) - 1`.
+Two stacked delays therefore need the infection process to start that many days before the first report.
 [`observation_lead_in`](@ref) reads the number off the assembled chain:
 
 ```@example delays
 observation_lead_in(observation)
 ```
 
-An [`IDProblem`](@ref)'s `tspan` is the span of the *observations*, so
-`tspan = (1, length(y))` fits every report we have. The infection process is run
-over the extra lead-in days to support them, which the model derives from the
-chain rather than asking of us (see [What data a model needs](@ref lead-in)).
+An [`IDProblem`](@ref)'s `tspan` is the span of the *observations*, so `tspan = (1, length(y))` fits every report we have.
+The infection process runs over the extra lead-in days to support them, derived from the chain (see [What data a model needs](@ref lead-in)).
 [`data_requirements`](@ref) says what a chain needs before it is sampled.
 
 ## The data
@@ -275,12 +272,9 @@ axislegend(ax2; position = :lt)
 fig
 ```
 
-The weekly ``R_t`` is piecewise-constant by construction, stepping down through
-one as the first wave turns over. The ``R_t`` panel runs longer than the reports
-panel, because the infection process covers the delays' lead-in before the first
-report. The posterior-predictive band tracks the observed Italian reports, the
-layered observation model having absorbed the reporting pattern rather than the
-infection signal.
+The weekly ``R_t`` is piecewise-constant by construction, stepping down through one as the first wave turns over.
+The ``R_t`` panel runs longer than the reports panel, because the infection process covers the delays' lead-in before the first report.
+The posterior-predictive band tracks the observed Italian reports, the layered observation model having absorbed the reporting pattern rather than the infection signal.
 
 ## A time-varying reporting pattern
 

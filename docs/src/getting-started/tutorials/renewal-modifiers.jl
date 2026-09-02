@@ -97,8 +97,7 @@ Both panels use a log scale; the reported counts in the lower panel are floored
 at one so that zero-report days stay visible.
 The reporting delay leaves the first `length(delay) - 1` days without a reported
 count, so the lower panel starts on day `length(delay)`.
-`n` is the number of reports, and the infection process is run over the delay's
-lead-in on top of it, so the two panels share a day axis once that is added.
+`n` is the number of reports, and the infection process is run over the delay's lead-in on top of it, so the two panels share a day axis once that is added.
 """
 
 lead = observation_lead_in(obs)
@@ -202,8 +201,8 @@ We fit that model to the reported cases simulated above.
 The reproduction number is still held at its simulated value, so the importation
 rate is what is being learned; with ``R_t`` free as well the two compete to
 explain the same growth and the fit is much less sharp.
-Every simulated report is conditioned on: the model runs the infection process
-over the delay's lead-in itself, so nothing is dropped from the head.
+Every simulated report is conditioned on.
+The model runs the infection process over the delay's lead-in itself, so nothing is dropped from the head.
 """
 
 model = IDModel(

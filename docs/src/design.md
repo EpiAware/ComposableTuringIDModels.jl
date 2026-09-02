@@ -202,17 +202,10 @@ apply unchanged.
 
 The `n` passed to `as_turing_model` is the number of **observations**.
 That is not always the length of the infection series behind it.
-Every [`LatentDelay`](@ref) in an observation chain convolves the expected
-series with a delay PMF and returns a series shorter by `length(pmf) - 1`: the
-head of a convolution is only partially observed, so it is dropped rather than
-fitted.
+Every [`LatentDelay`](@ref) in an observation chain convolves the expected series with a delay PMF and returns a series shorter by `length(pmf) - 1`.
 
-The model covers that itself.
-It reads the chain's **lead-in**, runs the infection process over `n + lead_in`
-time points, and hands the observation model exactly `n` expected values, so
-every observation is scored.
-[`observation_lead_in`](@ref) reads the number off an assembled model, and
-[`data_requirements`](@ref) reports what a caller must supply:
+The model reads the chain's lead-in, runs the infection process over `n + lead_in` time points, and hands the observation model exactly `n` expected values, so every observation is scored.
+[`observation_lead_in`](@ref) reads the number off an assembled model, and [`data_requirements`](@ref) reports what a caller must supply:
 
 ```@example design
 delayed = LatentDelay(
@@ -227,33 +220,21 @@ data_requirements(delayed, y, length(y))
 ```
 
 [`data_fits`](@ref) is the same question as a yes or no.
-It asks whether every observation supplied would be scored, so more data than
-the model can score is `false`, and supplying that number to
-`as_turing_model` is an error rather than a series quietly fitted at a
+It asks whether every observation supplied would be scored, so more data than the model can score is `false`, and supplying that number to `as_turing_model` is an error.
 
 ```@example design
 data_fits(delayed, y, length(y)), data_fits(delayed, vcat(y, y), length(y))
 ```
 
-An [`IDProblem`](@ref)'s `tspan` is the span of the observations for the same
-reason, and [`forecast`](@ref) extends the observations by the horizon and
-derives the rest.
+An [`IDProblem`](@ref)'s `tspan` is the span of the observations for the same reason, and [`forecast`](@ref) extends the observations by the horizon and derives the rest.
 
-Length-preserving modifiers ([`Ascertainment`](@ref), [`RightTruncate`](@ref),
-[`ReportTriangle`](@ref), a [`Split`](@ref)'s streams) consume nothing of their
-own, so the lead-in comes from the delays alone.
-A [`Split`](@ref)'s streams run in parallel, so their lead-ins do not add up and
-the series covers the deepest of them.
-A stream with a shorter lead-in is then handed more expected values than `n`,
-which the report says as `up to`: supply `n` for every stream and every one is
-scored, or supply the extra earlier values for that stream if you have them.
+Length-preserving modifiers ([`Ascertainment`](@ref), [`RightTruncate`](@ref), [`ReportTriangle`](@ref), a [`Split`](@ref)'s streams) consume nothing of their own, so the lead-in comes from the delays alone.
+A [`Split`](@ref)'s streams run in parallel, so their lead-ins do not add up and the series covers the deepest of them.
+A stream with a shorter lead-in is then handed more expected values than `n`, which the report says as `up to`.
+Supply `n` for every stream and every one is scored, or supply the extra earlier values for that stream if you have them.
 
-What a stream asks for follows the model that scores it, not the shape of the
-data.
-A [`BinomialError`](@ref) takes `(y = successes, N = trials)`, a
-[`ReportTriangle`](@ref) a reference-day × delay matrix counted down its
-reference days, and an [`Aggregate`](@ref) a full series of which only the
-reporting windows are scored.
+What a stream asks for follows the model that scores it, not the shape of the data.
+A [`BinomialError`](@ref) takes `(y = successes, N = trials)`, a [`ReportTriangle`](@ref) a reference-day × delay matrix counted down its reference days, and an [`Aggregate`](@ref) a full series of which only the reporting windows are scored.
 Printing the requirements says which, per stream.
 
 ## Infection↔observation mappings
