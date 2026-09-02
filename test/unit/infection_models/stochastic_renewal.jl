@@ -230,3 +230,25 @@ end
         @test got.window ≈ want.window
     end
 end
+
+@testitem "the renewal summaries serve both renewal models" begin
+    using ComposableTuringIDModels, Distributions
+
+    # `R_to_r` and `expected_Rt` read the generation interval off the model,
+    # which the stochastic renewal carries exactly as the deterministic one
+    # does.
+    gen = [0.2, 0.3, 0.5]
+    det = Renewal(gen; rt = RandomWalk(), initialisation = Normal())
+    sto = StochasticRenewal(gen; rt = RandomWalk(), initialisation = Normal())
+    @test R_to_r(1.5, sto) ≈ R_to_r(1.5, det)
+    I_t = [100.0, 200.0, 300.0, 400.0, 500.0]
+    @test expected_Rt(sto, I_t) ≈ expected_Rt(det, I_t)
+    # An inferred interval has no single value for either to use.
+    inferred = StochasticRenewal(;
+        generation_time = UncertainDelay(
+            LogNormal, [Normal(1.9, 0.2), truncated(Normal(0.5, 0.2), 0, Inf)];
+            D = 14.0
+        )
+    )
+    @test_throws ArgumentError expected_Rt(inferred, I_t)
+end

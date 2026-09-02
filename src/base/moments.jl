@@ -55,7 +55,9 @@ _moment_reject(family) = LogNormal(Inf, 1.0)
 # accepts any finite one. Every other family defers to the registered
 # `valid_moments` predicate, with the finiteness check `reparameterise` cannot
 # make from inside a moment guard added on top.
-_moment_valid(::Type{Normal}, mean, sd) = isfinite(mean) && isfinite(sd) && sd >= 0
+function _moment_valid(::Type{Normal}, mean, sd)
+    return isfinite(mean) && isfinite(sd) && sd >= 0
+end
 
 function _moment_valid(::Type{LogNormal}, mean, sd)
     return isfinite(mean) && mean > 0 && isfinite(sd) && sd > 0 &&
@@ -64,7 +66,8 @@ end
 
 function _moment_valid(family, mean, sd)
     isfinite(mean) && isfinite(sd) || return false
-    return valid_moments(family, Val((:mean, :sd)), promote(float(mean), float(sd)))
+    vals = promote(float(mean), float(sd))
+    return valid_moments(family, Val((:mean, :sd)), vals)
 end
 
 # The moment solve itself, on a pair already known valid. `LogNormal` inverts

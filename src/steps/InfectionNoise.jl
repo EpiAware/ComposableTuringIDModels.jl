@@ -100,7 +100,9 @@ struct InfectionNoise{D, X, C} <: AbstractRenewalModifier
     # reach the field as `Type{F}` rather than as a `UnionAll` (see
     # `_family_type`), or every draw resolves its family at run time and the
     # incidence it returns infers as `Any` through the whole recursion.
-    function InfectionNoise(dist, overdispersion, cv_cap::C, cv_sharpness::C) where {C}
+    function InfectionNoise(
+            dist, overdispersion, cv_cap::C, cv_sharpness::C
+        ) where {C}
         return new{_family_type(dist), typeof(overdispersion), C}(
             dist, overdispersion, cv_cap, cv_sharpness
         )
@@ -152,4 +154,92 @@ end
 @model function _noise_overdispersion(noise::InfectionNoise, n)
     ξ ~ as_turing_submodel(noise.overdispersion, n; prefix = true)
     return ξ
+end
+
+# --- the non-centred modifier -----------------------------------------------
+
+@doc raw"
+A resolved [`InfectionNoise`](@ref) modifier: the drawn standard normals,
+ready to scan.
+
+This is what an [`InfectionNoise`](@ref) used as a renewal modifier returns
+from its pre-scan `as_turing_model` seam, following the [`ImportedCases`](@ref)
+→ [`ImportedRate`](@ref) pattern. Its substate is the step counter, so step
+``t`` reads its own ``\tilde I_t``.
+
+## Fields
+
+  - `raw`: the standard normal draws ``\tilde I_t``, one per time.
+  - `noise`: the [`InfectionNoise`](@ref) specification.
+  - `overdispersion`: the resolved ``\xi``.
+"
+struct InfectionNoiseDraws{V, N, X} <: AbstractRenewalModifier
+    "The standard normal draws, one per time."
+    raw::V
+    "The noise specification: the family and the soft cap."
+    noise::N
+    "The resolved overdispersion."
+    overdispersion::X
+end
+
+# The substate is the step counter: a scan step has no clock of its own, so a
+# per-time modifier carries the index it has reached. The window is unused —
+# a step counter has no shape of its own to match.
+modifier_init_state(::InfectionNoiseDraws, window) = 0
+
+function apply_modifier(mod::InfectionNoiseDraws, incidence, t)
+    drawn = _noise_draw(
+        mod.noise, incidence, at(mod.overdispersion, t + 1), mod.raw[t + 1]
+    )
+    return drawn, t + 1
+end
+
+# The trait `exp_I_t` and anything else wanting the renewal expectation reads:
+# the incidence entering this modifier is the last point at which it is one.
+is_noise(::InfectionNoise) = true
+is_noise(::InfectionNoiseDraws) = true
+
+@doc raw"
+Sample the **non-centred** infection noise ahead of the scan.
+
+Draws `n` standard normals through the [`IID`](@ref) seam and resolves the
+overdispersion slot, returning the [`InfectionNoiseDraws`](@ref) the scan
+uses. A fixed scalar `overdispersion` is passed straight through, so it costs
+no parameter. The draws are named `I_raw`, prefixed by the modifier's position
+in the renewal step's modifier tuple.
+
+The parameterisation is non-centred because the modifier seam gives it no
+choice: `apply_modifier` is deterministic and a modifier's priors resolve
+before the scan, so the sampled quantity has to be the standard normal
+``\tilde I_t``, with the location and scale applied against ``\iota_t``
+inside the scan.
+
+!!! warning \"Non-centred is the known-worse parameterisation here\"
+    When the observations inform the infections — the usual case for a renewal
+    model — a non-centred latent path costs sampling efficiency, and the cost
+    shows up as maximum tree depth rather than as a wrong answer.
+    [`StochasticRenewal`](@ref) draws the same noise **centred** and is what
+    to reach for. Use this modifier when a non-centred draw is specifically
+    wanted, or for a stratified renewal, which the centred loop does not
+    cover.
+
+# Arguments
+
+  - `mod`: the [`InfectionNoise`](@ref) specification.
+  - `n`: the length of the renewal series.
+
+# Examples
+```@example InfectionNoiseModifier
+using ComposableTuringIDModels, Distributions, Random
+r = Renewal(
+    [0.2, 0.3, 0.5], InfectionNoise();
+    rt = FixedIntercept(0.0), initialisation = Normal(log(500.0), 0.0)
+)
+as_turing_model(r, 8)(Xoshiro(1)).I_t
+```
+"
+@model function as_turing_model(mod::InfectionNoise, n)
+    I_raw ~ as_turing_submodel(IID(Normal()), n; prefix = true)
+    ξ ~ to_submodel(_noise_overdispersion(mod, n), false)
+    return InfectionNoiseDraws(I_raw, mod, ξ)
 end

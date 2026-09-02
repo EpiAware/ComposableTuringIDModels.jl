@@ -60,23 +60,29 @@ function R_to_r(R₀, w::AbstractVector{T}; newton_steps = 2, Δd = 1.0) where {
     return r_approx
 end
 
-# The fixed generation interval of a `Renewal`, or a clear error when it is
+# The two renewal infection models, which are the ones carrying a generation
+# interval: the deterministic scan and the centred stochastic loop take the
+# same arguments, so the deterministic summaries below serve both.
+const _RenewalModel = Union{Renewal, StochasticRenewal}
+
+# The fixed generation interval of a renewal model, or a clear error when it is
 # inferred: an uncertain interval (a pmf-producing prior model) varies per draw,
 # so there is no single interval for these deterministic summaries to use.
-function _fixed_gen_int(infection::Renewal)
+function _fixed_gen_int(infection::_RenewalModel)
     infection.gen_int isa AbstractVector && return infection.gen_int
     throw(
         ArgumentError(
             "`R_to_r`/`expected_Rt` need a fixed generation interval, but this " *
-                "`Renewal` has an inferred (uncertain) generation interval that varies " *
+                "model has an inferred (uncertain) generation interval that varies " *
                 "per draw. Summarise the sampled interval per posterior draw instead."
         )
     )
 end
 
-# Only `Renewal` carries a generation interval, so the model-typed method
-# dispatches on it specifically (the other infection models have no `gen_int`).
-function R_to_r(R₀, infection::Renewal; newton_steps = 2, Δd = 1.0)
+# Only the renewal models carry a generation interval, so the model-typed
+# method dispatches on them specifically (the other infection models have no
+# `gen_int`).
+function R_to_r(R₀, infection::_RenewalModel; newton_steps = 2, Δd = 1.0)
     return R_to_r(
         R₀, _fixed_gen_int(infection); newton_steps = newton_steps,
         Δd = Δd
@@ -113,7 +119,7 @@ function expected_Rt(gen_int::AbstractVector, infections::Vector{<:Real})
     return infections[(n + 1):end] ./ denom_Rt
 end
 
-function expected_Rt(infection::Renewal, infections::Vector{<:Real})
+function expected_Rt(infection::_RenewalModel, infections::Vector{<:Real})
     return expected_Rt(_fixed_gen_int(infection), infections)
 end
 

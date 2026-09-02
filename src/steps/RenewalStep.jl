@@ -82,6 +82,32 @@ function apply_modifier(mod::AbstractRenewalModifier, incidence, substate)
     return _unresolved_modifier(mod)
 end
 
+@doc raw"
+Whether a modifier is the one that gives infections their noise.
+
+A trait, `false` for every modifier by default. A stochastic-infection
+modifier sets it `true`, which is what marks the point in the modifier tuple
+where the renewal *expectation* stops being an expectation: the incidence
+entering the first such modifier is the value a generated expected-incidence
+quantity wants, rather than the force of infection before the whole tuple or
+the noisy incidence after it.
+
+Implement `is_noise` alongside [`apply_modifier`](@ref) on any modifier that
+draws infections.
+
+# Arguments
+
+  - `mod`: the modifier.
+
+# Examples
+```@example is_noise
+using ComposableTuringIDModels, Distributions
+import ComposableTuringIDModels: is_noise
+is_noise(SusceptibleDepletion(1000.0)), is_noise(InfectionNoise())
+```
+"
+is_noise(::AbstractRenewalModifier) = false
+
 # The default pre-scan seam: a modifier with no parameters of its own samples
 # nothing and scans as itself. Kept as a `@model` so every modifier resolves
 # through the same submodel call, with no branch on whether it samples.

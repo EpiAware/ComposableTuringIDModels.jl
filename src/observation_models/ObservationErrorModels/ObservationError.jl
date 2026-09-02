@@ -16,8 +16,9 @@ its standard deviation, with the family's native parameters solved for from
 that pair:
 
 ```math
-\mathbb{E}[y_t] = Y_t, \qquad \mathrm{sd}[y_t] = \sigma \ \text{or} \ \sigma Y_t,
-\qquad y_t \sim F(Y_t, \sigma)
+\mathbb{E}[y_t] = Y_t, \qquad
+\mathrm{sd}[y_t] = \sigma \ \text{or} \ \sigma Y_t, \qquad
+y_t \sim F(Y_t, \sigma)
 ```
 
 `relative` chooses between the two: `false` (the default) makes ``\sigma`` an
@@ -154,4 +155,6 @@ LogNormalError(; cv = HalfNormal(0.1)) = LogNormalError(cv)
     return (; cv = cv)
 end
 
-observation_error(::LogNormalError, Y_t, σ) = _moment_dist(LogNormal, Y_t, σ * Y_t)
+function observation_error(::LogNormalError, Y_t, σ)
+    return _moment_dist(LogNormal, Y_t, σ * Y_t)
+end

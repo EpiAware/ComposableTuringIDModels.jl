@@ -145,6 +145,25 @@ function _models()
         ),
         NegativeBinomialError()
     )
+    # Stochastic infections, both parameterisations. The centred one runs the
+    # renewal recursion as a `@model` loop rather than a scan, so the
+    # differentiated path is a chain of per-step tildes; the non-centred one
+    # transforms standard normals against the expectation inside the scan.
+    centred_noise = IDModel(
+        StochasticRenewal(
+            gen_int; rt = RandomWalk(), initialisation = Normal(),
+            noise = InfectionNoise(; overdispersion = HalfNormal(0.1))
+        ),
+        NegativeBinomialError()
+    )
+    noncentred_noise = IDModel(
+        Renewal(
+            gen_int, InfectionNoise(; overdispersion = HalfNormal(0.1));
+            rt = RandomWalk(), initialisation = Normal()
+        ),
+        NegativeBinomialError()
+    )
+
     # Exponential-growth-rate infections: a cumulative growth-rate path
     # exponentiated.
     egr = IDModel(
@@ -367,6 +386,8 @@ function _models()
     y_renewal = sim(renewal, n, 102)
     y_modifiers = sim(modifiers, n, 103)
     y_egr = sim(egr, n, 104)
+    y_centred = sim(centred_noise, n, 130)
+    y_noncentred = sim(noncentred_noise, n, 131)
     y_nowcast = sim(nowcast, n, 105)
     y_triangle = sim(triangle, n, 106)
     y_latdelay = sim(latdelay, n, 107)
@@ -502,6 +523,14 @@ function _models()
         (
             "ExpGrowthRate+Poisson posterior",
             as_turing_model(egr, y_egr, n),
+        ),
+        (
+            "StochasticRenewal+NegativeBinomial posterior",
+            as_turing_model(centred_noise, y_centred, n),
+        ),
+        (
+            "Renewal+InfectionNoise posterior",
+            as_turing_model(noncentred_noise, y_noncentred, n),
         ),
         # nowcasting
         (
@@ -764,8 +793,20 @@ function backend_broken_scenarios()
         # comes back as `Vector{Union{Missing,T}}`. Enzyme's reverse-mode type
         # analysis fails on the `similar(::Broadcasted, ::Type{Union{Missing,
         # Float64}})` that rebuilds it.
+        # The non-centred infection noise reads its own standard normal per
+        # step inside the scan, and Enzyme reverse fails to find a shadow for
+        # it (`EnzymeNoShadowError`). Every other backend, Enzyme forward
+        # included, agrees with the reference gradient, and the centred
+        # `StochasticRenewal` scenario passes on all seven — so the fault is
+        # in the backend rather than the model.
         "Enzyme reverse" => union(
-            reverse_only, Set(["DirectInfections+PartiallyMissing posterior"])
+            reverse_only,
+            Set(
+                [
+                    "DirectInfections+PartiallyMissing posterior",
+                    "Renewal+InfectionNoise posterior",
+                ]
+            )
         ),
         # Enzyme forward returns a finite but wrong gradient here, every entry
         # offset by the same constant. Every other backend agrees with the
