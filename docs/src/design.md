@@ -219,7 +219,17 @@ manual = CombineLatentModels(
 keys(rand(as_turing_model(manual, 40)))
 ```
 
-[`CombineLatentModels`](@ref) sums, so a multiplicative window effect on a positive path is the same composition in log space, wrapped in an `exp` transform.
+[`CombineLatentModels`](@ref) sums, so a multiplicative window effect is the same composition in log space under an `exp` transform.
+The window multiplies the path by `exp` of the drawn effect, and leaves it unchanged elsewhere.
+
+```@example design
+multiplied = TransformLatentModel(
+    CombineLatentModels(
+        [base, broadcast_window(Normal(log(2), 0.1), 20:30)], ["", "Window"]
+    ), x -> exp.(x)
+)
+keys(rand(as_turing_model(multiplied, 40)))
+```
 
 ## Composing accumulation steps
 

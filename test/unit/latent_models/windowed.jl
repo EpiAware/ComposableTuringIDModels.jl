@@ -131,3 +131,25 @@ end
     @test string.(keys(rand(as_turing_model(est_manual, 40)))) ==
         string.(keys(rand(as_turing_model(est_helper, 40))))
 end
+
+@testitem "a windowed effect multiplies under an exp transform" begin
+    using ComposableTuringIDModels, Distributions, Random
+    # `CombineLatentModels` sums, so a multiplicative window is the same
+    # composition in log space. The documented form is asserted here rather
+    # than left as a claim on the page.
+    base = RandomWalk(; init = Normal(0, 0.1), ϵ_t = IID(Normal(0, 0.05)))
+    win = 20:30
+    multiplied = TransformLatentModel(
+        CombineLatentModels(
+            [base, broadcast_window(FixedIntercept(log(2)), win)], ["", "Window"]
+        ), x -> exp.(x)
+    )
+    plain = TransformLatentModel(base, x -> exp.(x))
+    Random.seed!(106)
+    with_window = as_turing_model(multiplied, 40)()
+    Random.seed!(106)
+    without = as_turing_model(plain, 40)()
+    ratio = with_window ./ without
+    @test ratio[win] ≈ fill(2.0, length(win))
+    @test ratio[setdiff(1:40, win)] ≈ ones(40 - length(win))
+end
