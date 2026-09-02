@@ -95,9 +95,13 @@ posterior end-to-end.
 dimension is hard-coded in the components:
 
 ```@example hier
+using Mooncake
+using ADTypes: AutoMooncake
+
 posterior = as_turing_model(model, Ydata)
-chain = sample(posterior, NUTS(0.85; adtype = Turing.AutoForwardDiff()), 300;
-    progress = false)
+chain = sample(
+    posterior, NUTS(0.85; adtype = AutoMooncake(; config = nothing)),
+    MCMCThreads(), 300, 2; progress = false)
 size(chain, 1)
 ```
 

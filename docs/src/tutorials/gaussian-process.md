@@ -149,9 +149,11 @@ function fit_gp(latent, n_fit)
     model = id_model(latent)
     y = y_obs[1:n_fit]
     posterior = as_turing_model(model, y, n_fit)
+    n_chains = 2
     time = @elapsed chain = sample(posterior,
-        NUTS(0.9; adtype = AutoMooncake(; config = nothing)), 300;
-        initial_params = InitFromPrior(), progress = false)
+        NUTS(0.9; adtype = AutoMooncake(; config = nothing)),
+        MCMCThreads(), 300, n_chains;
+        initial_params = fill(InitFromPrior(), n_chains), progress = false)
     gen = vec(generated_observables(posterior, y, chain).generated)
     Z = reduce(hcat, (g.Z_t for g in gen))          # time × draw
     Z_mean = vec(mean(Z; dims = 2))

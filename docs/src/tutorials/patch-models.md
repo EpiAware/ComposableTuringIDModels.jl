@@ -180,13 +180,14 @@ cannot.
 Is a coupled, partially pooled patch process identifiable from data?
 
 ```@example patches
-using Turing
+using Turing, Mooncake
 using Turing: returned
+using ADTypes: AutoMooncake
 
 posterior = as_turing_model(patches, Ydata)
 chain = sample(
-    posterior, NUTS(0.85; adtype = Turing.AutoForwardDiff()), 300;
-    progress = false)
+    posterior, NUTS(0.85; adtype = AutoMooncake(; config = nothing)),
+    MCMCThreads(), 300, 2; progress = false)
 nothing # hide
 ```
 
