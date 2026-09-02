@@ -92,12 +92,19 @@ only through the per-group level and Poisson noise.
 Conditioning on the simulated counts and sampling with NUTS recovers the
 posterior end-to-end.
 `n_groups` again threads from the data matrix, so nothing about the group
-dimension is hard-coded in the components:
+dimension is hard-coded in the components.
+We draw two chains in parallel with `MCMCThreads()` and differentiate with
+[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend
+for this package (see [Automatic differentiation backend](@ref ad-backends)).
 
 ```@example hier
+using Mooncake
+using ADTypes: AutoMooncake
+
 posterior = as_turing_model(model, Ydata)
-chain = sample(posterior, NUTS(0.85; adtype = Turing.AutoForwardDiff()), 300;
-    progress = false)
+chain = sample(
+    posterior, NUTS(0.85; adtype = AutoMooncake(; config = nothing)),
+    MCMCThreads(), 300, 2; progress = false)
 size(chain, 1)
 ```
 

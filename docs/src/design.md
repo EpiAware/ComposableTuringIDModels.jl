@@ -220,7 +220,8 @@ using Turing, Mooncake
 using ADTypes: AutoMooncake
 y = as_turing_model(poisson_model, fill(missing, 30), 30)().generated_y_t
 posterior = as_turing_model(poisson_model, y, 30)
-chain = sample(posterior, NUTS(; adtype = AutoMooncake(; config = nothing)), 1_000)
+chain = sample(posterior, NUTS(; adtype = AutoMooncake(; config = nothing)),
+    MCMCThreads(), 1_000, 2)
 ```
 
 The standard Turing tools — `rand` for prior draws, `fix` to pin parameters,

@@ -149,9 +149,11 @@ function fit_gp(latent, n_fit)
     model = id_model(latent)
     y = y_obs[1:n_fit]
     posterior = as_turing_model(model, y, n_fit)
+    n_chains = 2
     time = @elapsed chain = sample(posterior,
-        NUTS(0.9; adtype = AutoMooncake(; config = nothing)), 300;
-        initial_params = InitFromPrior(), progress = false)
+        NUTS(0.9; adtype = AutoMooncake(; config = nothing)),
+        MCMCThreads(), 300, n_chains;
+        initial_params = fill(InitFromPrior(), n_chains), progress = false)
     gen = vec(generated_observables(posterior, y, chain).generated)
     Z = reduce(hcat, (g.Z_t for g in gen))          # time × draw
     Z_mean = vec(mean(Z; dims = 2))
@@ -175,7 +177,7 @@ score(f) = (days = f.n, cor = round(f.cor, digits = 2),
 Both fits recover the simulated ``\log R_t`` over the days they cover, and the posterior-trajectory figure below shows them agreeing where they overlap and following the simulated rise, peak and turn-over.
 The exact GP is fit to `n_ex` days rather than all `n` because its ``O(n^3)`` factorisation at the full length would dominate the cost of building this page.
 
-Those wall-clock times are single un-warmed runs over different series lengths, so read them as indicative.
+Those wall-clock times are un-warmed two-chain runs over different series lengths, so read them as indicative.
 One gradient of each composed log-density over the same `n_ex` days is the like-for-like comparison, and it is what the sampler pays per leapfrog step.
 
 ```@example gp

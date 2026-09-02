@@ -9,8 +9,8 @@ the numbers you see are produced by the code on the page.
 
 !!! note "Sampling settings"
     To keep the documentation build to a sensible time, these tutorials draw
-    moderate NUTS samples (250 draws across 4 chains for the multi-chain fits,
-    200-300 for the single-chain ones).
+    moderate NUTS samples: two chains of 200-300 draws each, run in parallel
+    with `MCMCThreads()`.
     The target acceptance rate (`adapt_delta`) has been raised across these tutorials
     to avoid divergent transitions. That is enough to demonstrate the models and produce
     stable figures; a real analysis would use more draws and check convergence diagnostics

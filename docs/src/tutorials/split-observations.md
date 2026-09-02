@@ -101,9 +101,10 @@ y = sim.generated_y_t
 ```
 
 Fitting conditions on both streams at once.
-We draw a full chain with NUTS, matching the other tutorials, and
-differentiate with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the
-recommended backend for this package (see
+We draw two chains in parallel with `MCMCThreads()`, matching the other
+tutorials, and differentiate with
+[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended
+backend for this package (see
 [Automatic differentiation backend](@ref ad-backends)).
 
 ```@example split
@@ -111,7 +112,7 @@ ydata = (cases = y.cases, deaths = y.deaths)
 posterior = as_turing_model(model, ydata, n)
 chain = sample(
     posterior, NUTS(0.95; adtype = AutoMooncake(; config = nothing)),
-    MCMCThreads(), 250, 4; progress = false)
+    MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
 

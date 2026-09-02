@@ -22,6 +22,8 @@ autoregression — the coefficient is one number for the whole series:
 ```@example tvdamp
 using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
 using Turing: to_submodel
+using Mooncake
+using ADTypes: AutoMooncake
 Random.seed!(80)
 
 constant = AR(; damp = Normal(0.4, 0.1))
@@ -87,7 +89,10 @@ end
 
 The model wraps the time-varying `AR` in a thin observation of the path and fits
 under NUTS. The coefficient path is tracked as the generated quantity `ρ`, so it is
-recovered straight from the chain:
+recovered straight from the chain.
+We draw two chains in parallel with `MCMCThreads()` and differentiate with
+[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend
+for this package (see [Automatic differentiation backend](@ref ad-backends)).
 
 ```@example tvdamp
 @model function observe_path(y, n)
@@ -98,8 +103,9 @@ recovered straight from the chain:
 end
 
 model = observe_path(z, n)
-fit = sample(model, NUTS(0.85; adtype = Turing.AutoForwardDiff()), 300;
-    progress = false)
+fit = sample(
+    model, NUTS(0.85; adtype = AutoMooncake(; config = nothing)),
+    MCMCThreads(), 300, 2; progress = false)
 # ρ is tracked as a generated quantity: `fit[:ρ]` is a per-draw coefficient path
 ρ_draws = reduce(hcat, vec(fit[:ρ]))     # (n-1) × draws
 ρ_mean = vec(mean(ρ_draws; dims = 2))
