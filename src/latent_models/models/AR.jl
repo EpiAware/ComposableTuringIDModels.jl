@@ -76,10 +76,14 @@ struct AR{
         @assert p > 0 "p must be greater than 0"
         assert_prior_length(damp, p, "damp")
         assert_prior_length(init, p, "init")
+        # `ϵ_t` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
+        # an `Intercept` (a constant innovation path), never left as a scalar.
+        # `damp` and `init` are per-step PARAMETER slots and stay bare.
+        wrapped = path_prior(ϵ_t)
         return new{
-            typeof(damp), typeof(init), typeof(p), typeof(ϵ_t),
+            typeof(damp), typeof(init), typeof(p), typeof(wrapped),
             typeof(transform),
-        }(damp, init, p, ϵ_t, transform)
+        }(damp, init, p, wrapped, transform)
     end
 end
 
@@ -101,7 +105,7 @@ function AR(;
     # `p`, and a process supplies its own length.
     p = prior_order(damp)
     init = (p > 1 && init isa Distribution) ? fill(init, p) : init
-    return AR(damp, init, p, path_prior(ϵ_t), transform)
+    return AR(damp, init, p, ϵ_t, transform)
 end
 
 @model function as_turing_model(model::AR, n::Int)

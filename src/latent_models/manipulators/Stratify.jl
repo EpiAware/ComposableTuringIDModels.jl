@@ -69,10 +69,19 @@ struct Stratify{S <: PriorLike, A <: PriorLike, F <: Function} <:
     across::A
     "How `across` and `shared` are broadcast together."
     combine::F
+
+    function Stratify(shared, across, combine::Function)
+        # `shared` and `across` are both PATH slots: a bare `Distribution` in
+        # either is wrapped in an `Intercept` (a constant path), never left as
+        # a scalar.
+        s = path_prior(shared)
+        a = path_prior(across)
+        return new{typeof(s), typeof(a), typeof(combine)}(s, a, combine)
+    end
 end
 
 function Stratify(shared, across; combine = +)
-    return Stratify(path_prior(shared), path_prior(across), combine)
+    return Stratify(shared, across, combine)
 end
 
 @model function as_turing_model(m::Stratify, n::Dims{2})
