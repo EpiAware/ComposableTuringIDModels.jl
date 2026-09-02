@@ -260,12 +260,10 @@ end
 
     # The generation interval is either fixed (its baked renewal step used
     # directly) or inferred: a pmf-producing prior model sampled through the
-    # single seam, at the shape the renewal needs (one pmf, or one per
-    # stratum), with the lag-0 bin dropped and the remainder renormalised per
-    # draw (the generation-interval convention the fixed distribution path
-    # applies at construction). The renewal step is built per draw so the
-    # gradient flows through the discretisation, and `mixing` is folded in
-    # exactly as the constructors fold it into the baked step.
+    # single seam at the shape the renewal needs, with the lag-0 bin dropped
+    # and the remainder renormalised per draw. The step is rebuilt per draw so
+    # the gradient flows through the discretisation, and `mixing` is folded in
+    # as the constructors fold it into the baked step.
     if infection.gen_int isa AbstractPriorModel
         gen ~ as_turing_submodel(
             infection.gen_int, _gen_int_shape(n)...; prefix = true

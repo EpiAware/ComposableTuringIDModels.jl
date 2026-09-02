@@ -69,15 +69,12 @@ end
 # --- Single-seam specialisations (clean names for the constant case) ---------
 #
 # A bare `Distribution` returns the distribution itself, so a component's
-# `θ ~ as_turing_submodel(model.slot, n)` is a plain native scalar draw named `θ`
-# (a single constant RV, zero submodel overhead, no `.θ` namespace). A vector of
-# distributions returns the product distribution (a native, per-element draw). A
-# process (or any other model) returns a namespaced submodel via the generic
-# method above — the length-`n`, e.g. time-varying / hierarchical, path. A
-# component consumes whichever it gets with [`at`](@ref), so supplying a process
-# makes the parameter vary with no rewiring while a `Distribution` keeps its clean
-# constant name. `n` is ignored for the scalar case, whatever shape it is asked
-# for.
+# `θ ~ as_turing_submodel(model.slot, n)` is a plain native scalar draw named
+# `θ` (no submodel overhead, no `.θ` namespace). A vector of distributions
+# returns the product distribution (a native, per-element draw). A process
+# returns a namespaced submodel via the generic method, the length-`n` path.
+# A component consumes whichever it gets with [`at`](@ref), so a `Distribution`
+# keeps its clean constant name while a process makes the parameter vary.
 
 as_turing_submodel(d::Distribution, ::ModelShape; prefix::Bool = false) = d
 
@@ -196,14 +193,12 @@ end
 # --- Time-varying-capable parameters ---------------------------------------
 #
 # The single seam above draws a parameter slot as EITHER a scalar (a bare
-# `Distribution` ⇒ one RV, a constant, no length-`n` allocation) OR a length-`n`
-# path (an `AbstractPriorModel` process ⇒ the process's own draw). A component
-# reads the result per step with `at`, so ONE recursion serves both the constant
-# and the time-varying (or hierarchical) case with no per-component special-casing
-# and no efficiency loss when the parameter is constant. This is general: any
-# per-step parameter is widened to optionally-time-varying just by drawing its slot
-# through [`as_turing_submodel`](@ref) and consuming it with [`at`](@ref) — see
-# [`AR`](@ref)'s damping for the worked example.
+# `Distribution` ⇒ one RV, a constant) OR a length-`n` path (an
+# `AbstractPriorModel` process ⇒ the process's own draw). A component reads
+# the result per step with `at`, so ONE recursion serves both the constant
+# and the time-varying (or hierarchical) case with no per-component
+# special-casing and no efficiency loss when the parameter is constant. See
+# [`AR`](@ref)'s damping for a worked example.
 
 @doc raw"
 Read a possibly-time-varying parameter at step `t`.

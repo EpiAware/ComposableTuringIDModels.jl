@@ -53,12 +53,12 @@ function wrapped_models(model::AbstractObservationModel)
 end
 
 # Deliberately not the same walk as `_component_children` in
-# `base/prettyprinting.jl`, which also descends into `Vector`/`Tuple` fields. That
-# one builds a display list of everything beneath a node; this one is the typed
-# `Tuple` seam `rewrap` rebuilds against, so a component holding its wrapped
-# models in a container states its own `wrapped_models` rather than having one
-# inferred from field shapes. A container-held model is therefore printed but not
-# walked, which is the contract the docstring above sets.
+# `base/prettyprinting.jl`, which also descends into `Vector`/`Tuple` fields.
+# That one builds a display list of everything beneath a node; this one is the
+# typed `Tuple` seam `rewrap` rebuilds against, so a component holding its
+# wrapped models in a container states its own `wrapped_models` rather than
+# having one inferred from field shapes. A container-held model is therefore
+# printed but not walked.
 _observation_fields(::Tuple{}) = ()
 function _observation_fields(values::Tuple)
     rest = _observation_fields(Base.tail(values))

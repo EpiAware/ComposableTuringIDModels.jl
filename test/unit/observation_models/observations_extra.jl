@@ -432,14 +432,11 @@ end
 @testitem "ReportTriangle observed row-sums reconcile with RightTruncate marginal" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(74)
-    # Consistency check: the observed row-sums of the triangle are the
-    # marginal that the right-truncation (CDF-scaling) nowcast conditions on. With
-    # `now = n`, reference day `t` has age `a = n - t` and observed delays
-    # `d = 0 … a`, so its expected observed row-sum is
+    # Consistency check: the observed triangle row-sums equal the marginal
+    # `RightTruncate` conditions on. With `now = n`, reference day `t` has age
+    # `a = n - t` and observed delays `d = 0 … a`, so
     #   Σ_{d=0}^{a} μ_t · p[d+1] = μ_t · F[a+1],
-    # exactly the CDF-scaled expected observed-so-far that `RightTruncate` applies.
-    # We assert the noise-free triangle row-sums equal the `RightTruncate` scaling
-    # (recovered here from the `ReportingCDF` completeness curve) to tolerance.
+    # the CDF-scaled expected observed-so-far that `RightTruncate` applies.
     pmf = [0.5, 0.3, 0.2]
     Dmax = length(pmf) - 1
     n = 8
