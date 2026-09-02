@@ -99,7 +99,7 @@ export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
     Stratify, Replicate
 
 # --- infection models ---
-export DirectInfections, ExpGrowthRate, Renewal,
+export DirectInfections, ExpGrowthRate, Renewal, SeedingPath,
     RenewalStep, SusceptibleDepletion, ImportedCases,
     R_to_r, r_to_R, expected_Rt
 export CombineInfections
@@ -209,6 +209,7 @@ include("latent_models/combinations/arima.jl")
 # --- infection models ---
 include("infection_models/DirectInfections.jl")
 include("infection_models/ExpGrowthRate.jl")
+include("infection_models/SeedingPath.jl")
 include("infection_models/Renewal.jl")
 # `utils.jl` defines the `R_to_r(::Renewal)` method, so it follows `Renewal`.
 include("infection_models/utils.jl")

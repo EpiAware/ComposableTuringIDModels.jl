@@ -14,8 +14,13 @@ where the latent model `rt` supplies the (log) reproduction number ``Z_t``, ``g`
 is `transformation`, ``g_i`` is the discrete generation interval, and the
 pre-window infections decay at the growth rate implied by ``\mathcal R_1``. The
 ``R_t`` process is generated *inside* the model, so `as_turing_model` takes a
-[`ModelShape`](@ref) `n` and returns the named tuple `(; I_t, Z_t)` with `Z_t`
-the (log) ``R_t`` path.
+[`ModelShape`](@ref) `n` and returns the named tuple `(; I_t, Z_t, I_seed)` with
+`Z_t` the (log) ``R_t`` path and `I_seed` the seeding window the scan started
+from, which is not part of `I_t`.
+
+The seeding window is deterministic unless `initialisation` is wrapped in a
+[`SeedingPath`](@ref), which estimates the whole run-up instead of decaying a
+single level.
 
 Renewal is the one infection model that needs a generation interval, so it takes
 one directly through the `generation_time` keyword, which dispatches on the value:
@@ -25,8 +30,11 @@ discretised internally (see the constructor), and a pmf-producing prior model
 **inferred** — its distribution's parameters carry priors and the interval is
 rediscretised per draw through the [`as_turing_submodel`](@ref) seam.
 
-`Renewal` is a step-composing helper: positional [`AbstractRenewalModifier`](@ref)
-arguments are composed onto the renewal [`RenewalStep`](@ref). Passing a
+`Renewal` is a step-composing helper: [`AbstractRenewalModifier`](@ref)s, given
+positionally or through the `modifiers` keyword, are composed onto the renewal
+[`RenewalStep`](@ref). Either form takes any generation time and the
+discretisation keywords, so a modifier and a continuous generation time compose:
+`Renewal(Gamma(2, 1.5), SusceptibleDepletion(N); D_gen = 15.0)`. Passing a
 [`SusceptibleDepletion`](@ref)`(N)` gives a renewal process with a fixed
 population ``N`` and susceptible depletion
 ```math
@@ -70,19 +78,24 @@ A partially pooled generation interval therefore needs no new component, e.g.
     here is auto-wrapped in an [`Intercept`](@ref), giving a constant path (one
     shared draw broadcast to length `n`); use [`IID`](@ref) for `n` independent
     draws, or [`Stratify`](@ref)/[`Replicate`](@ref) for a strata axis.
-  - `initialisation`: prior for the unconstrained initial infections (a
-    `Distribution` or prior model, sampled through [`as_turing_submodel`](@ref)).
+  - `initialisation`: prior for the unconstrained infections at ``t_0`` — a
+    LEVEL, one value or one per stratum (a `Distribution` or prior model,
+    sampled through [`as_turing_submodel`](@ref)). Wrap it in a
+    [`SeedingPath`](@ref) to estimate the whole seeding window instead.
   - `recurrent_step`: the renewal accumulation step (an
     [`AbstractConstantRenewalStep`](@ref)), or `nothing` when the generation
     interval is inferred and the step is built per draw.
   - `mixing`: the coupling operator applied to the incidence window before
     `R_t` (default `I`, uncoupled); see [`renewal_pressure`](@ref).
+  - `modifiers`: the [`AbstractRenewalModifier`](@ref)s composed onto the step.
+    Held here as well as in `recurrent_step` so the step can be rebuilt per
+    draw when the generation interval is inferred.
 
 ## Constructor
 
-  - `Renewal(; generation_time, rt, initialisation, transformation = exp,
-    mixing = I, D_gen = nothing, Δd = 1.0)` — one keyword constructor that
-    dispatches on `generation_time`:
+  - `Renewal(; generation_time, modifiers = (), rt, initialisation,
+    transformation = exp, mixing = I, D_gen = nothing, Δd = 1.0)` — one keyword
+    constructor that dispatches on `generation_time`:
 
       + a discrete probability **vector** (non-negative, sums to 1) is used
         directly as the generation interval;
@@ -95,6 +108,9 @@ A partially pooled generation interval therefore needs no new component, e.g.
         used as the generation interval). Its fixed horizon keeps the interval
         length constant across draws; the lag-0 bin is dropped and the remainder
         renormalised per draw, exactly as for the fixed distribution.
+
+  - `Renewal(generation_time, modifiers...; rt, initialisation, ...)` — the same
+    constructor with the generation time and the modifiers given positionally.
 
 # Examples
 
@@ -123,6 +139,24 @@ depleting = Renewal([0.2, 0.3, 0.5], SusceptibleDepletion(1000.0);
 rand(as_turing_model(depleting, 20))
 ```
 
+A continuous generation time discretised by the constructor, carrying a
+modifier:
+
+```@example Renewal
+discretised = Renewal(Gamma(2, 1.5), SusceptibleDepletion(1000.0);
+    D_gen = 15.0, rt = RandomWalk(), initialisation = Normal(log(50), 0.2))
+length(discretised.gen_int)
+```
+
+An estimated seeding window rather than a decaying one, through
+[`SeedingPath`](@ref):
+
+```@example Renewal
+seeded = Renewal(; generation_time = [0.2, 0.3, 0.5], rt = RandomWalk(),
+    initialisation = SeedingPath(RandomWalk(; init = Normal(log(50), 0.5))))
+as_turing_model(seeded, 20)().I_seed
+```
+
 A stratified renewal: one recursion per stratum, sharing a random walk in
 `R_t`-space with partially pooled per-stratum deviations, left uncoupled
 (`mixing` defaults to `I`):
@@ -133,69 +167,113 @@ strat = Renewal(; generation_time = [0.2, 0.3, 0.5],
 size(as_turing_model(strat, (3, 20))().I_t)
 ```
 "
-struct Renewal{G, F <: Function, L <: PriorLike, S <: PriorLike, A, K} <:
-    AbstractInfectionModel
+struct Renewal{
+        G, F <: Function, L <: PriorLike, S <: PriorLike, A, K, M <: Tuple,
+    } <: AbstractInfectionModel
     "Discrete generation interval, or a pmf-producing prior model when inferred."
     gen_int::G
     "Transformation between unconstrained and constrained domains."
     transformation::F
     "Latent process model generating the (log) reproduction number."
     rt::L
-    "Prior for the unconstrained initial infections."
+    "Prior for the unconstrained infections at ``t_0``, or a `SeedingPath`."
     initialisation::S
     "The renewal accumulation step (`nothing` when the interval is inferred)."
     recurrent_step::A
     "The coupling operator applied to the incidence window before `R_t`."
     mixing::K
+    "The renewal modifiers composed onto the step."
+    modifiers::M
+
+    function Renewal(
+            gen_int::G, transformation::F, rt, initialisation::S,
+            recurrent_step::A, mixing::K, modifiers::M
+        ) where {G, F <: Function, S <: PriorLike, A, K, M <: Tuple}
+        # `rt` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
+        # an `Intercept` (a constant path), never left as a scalar. The
+        # widening runs here rather than in the keyword constructor so the
+        # positional form cannot bypass it. `path_prior` is idempotent, so
+        # rebuilding a `Renewal` from its own fields changes nothing.
+        path = path_prior(rt)
+        return new{G, F, typeof(path), S, A, K, M}(
+            gen_int, transformation, path, initialisation, recurrent_step,
+            mixing, modifiers
+        )
+    end
 end
 
 function Renewal(;
-        generation_time, rt = RandomWalk(),
+        generation_time, modifiers = (), rt = RandomWalk(),
         initialisation = Normal(), transformation::Function = exp,
         mixing = I, D_gen = nothing, Δd = 1.0
     )
+    mods = _modifier_tuple(modifiers)
     gen_int, recurrent_step = _renewal_fields(
-        generation_time, mixing; D_gen = D_gen, Δd = Δd
+        generation_time, mixing, mods; D_gen = D_gen, Δd = Δd
     )
     return Renewal(
-        gen_int, transformation, path_prior(rt), initialisation,
-        recurrent_step, mixing
+        gen_int, transformation, rt, initialisation,
+        recurrent_step, mixing, mods
     )
 end
 
-# Positional modifier constructor: a discrete generation interval (a non-negative
-# pmf that sums to 1) with positional [`AbstractRenewalModifier`](@ref)s composed
-# onto the renewal step — e.g.
+# Positional modifier form: the generation time first, then the
+# [`AbstractRenewalModifier`](@ref)s composed onto the renewal step — e.g.
 # `Renewal([0.2, 0.3, 0.5], SusceptibleDepletion(1000.0); rt = RandomWalk())`.
+# It takes the same generation times and discretisation keywords as the keyword
+# form and delegates to it, so there is one construction path.
 function Renewal(
-        gen_int::AbstractVector,
+        generation_time::Union{AbstractVector, Distribution, AbstractPriorModel},
         modifiers::AbstractRenewalModifier...;
-        rt = RandomWalk(), mixing = I,
-        initialisation = Normal(), transformation::Function = exp
+        rt = RandomWalk(), mixing = I, initialisation = Normal(),
+        transformation::Function = exp, D_gen = nothing, Δd = 1.0
     )
-    @assert all(gen_int .>= 0) "Generation interval must be non-negative"
-    @assert sum(gen_int) ≈ 1 "Generation interval must sum to 1"
-    core = _renewal_step(gen_int, mixing)
-    recurrent_step = RenewalStep(core, modifiers)
-    return Renewal(
-        gen_int, transformation, path_prior(rt), initialisation,
-        recurrent_step, mixing
+    return Renewal(;
+        generation_time = generation_time, modifiers = modifiers, rt = rt,
+        mixing = mixing, initialisation = initialisation,
+        transformation = transformation, D_gen = D_gen, Δd = Δd
     )
 end
+
+# The modifier slot takes one modifier or a collection of them; a tuple keeps
+# the step's modifier types concrete. The keyword form has no signature to
+# constrain it, as the positional one does, so what it was given is checked here
+# rather than failing as a `MethodError` from inside the step's seam.
+_modifier_tuple(mod::AbstractRenewalModifier) = (mod,)
+
+function _modifier_tuple(mods)
+    tup = Tuple(mods)
+    all(m -> m isa AbstractRenewalModifier, tup) || throw(
+        ArgumentError(
+            "`modifiers` takes `AbstractRenewalModifier`s, but was given " *
+                "$(join(nameof.(typeof.(tup)), ", "))."
+        )
+    )
+    return tup
+end
+
+# The step a core and a modifier tuple make: the core with the modifiers
+# composed on, and the bare core when there are none, so a modifier-free renewal
+# keeps the step (and so the variable names) it has always had.
+_bake_step(core, mods::Tuple) = RenewalStep(core, mods)
+_bake_step(core, ::Tuple{}) = core
 
 # Fixed generation interval (a pmf vector or a continuous distribution): bake the
-# discretised interval and its renewal step (with `mixing` folded in) at
-# construction, exactly as before.
-function _renewal_fields(generation_time, mixing; D_gen = nothing, Δd = 1.0)
+# discretised interval and its renewal step (with `mixing` and the modifiers
+# folded in) at construction, exactly as before.
+function _renewal_fields(
+        generation_time, mixing, mods; D_gen = nothing, Δd = 1.0
+    )
     gen_int = _renewal_gen_int(generation_time; D_gen = D_gen, Δd = Δd)
-    return gen_int, _renewal_step(gen_int, mixing)
+    return gen_int, _bake_step(_renewal_step(gen_int, mixing), mods)
 end
 
 # Inferred generation interval: hold the pmf-producing prior model and build the
 # renewal step per draw inside the `@model`, so no interval or step is baked.
-# `mixing` is still folded in there (it lives on the struct, not the step).
+# `mixing` and the modifiers are folded in there instead (both live on the
+# struct, not on the step).
 function _renewal_fields(
-        generation_time::AbstractPriorModel, mixing;
+        generation_time::AbstractPriorModel, mixing, mods;
         D_gen = nothing, Δd = 1.0
     )
     return generation_time, nothing
@@ -252,27 +330,40 @@ end
 
 @model function as_turing_model(infection::Renewal, n::ModelShape)
     Z_t ~ as_turing_submodel(infection.rt, n)
-    init_incidence ~ as_turing_submodel(
-        infection.initialisation, _n_strata(n); prefix = true
-    )
-    I₀ = infection.transformation.(_seed(init_incidence, n))
     Rt = infection.transformation.(Z_t)
 
     # The generation interval is either fixed (its baked renewal step used
     # directly) or inferred: a pmf-producing prior model sampled through the
     # single seam at the shape the renewal needs, with the lag-0 bin dropped
     # and the remainder renormalised per draw. The step is rebuilt per draw so
-    # the gradient flows through the discretisation, and `mixing` is folded in
-    # as the constructors fold it into the baked step.
+    # the gradient flows through the discretisation, with `mixing` and the
+    # modifiers folded in as the constructors fold them into the baked step.
     if infection.gen_int isa AbstractPriorModel
         gen ~ as_turing_submodel(
             infection.gen_int, _gen_int_shape(n)...; prefix = true
         )
         gen_int = _drop_lag_zero(gen)
-        step = _renewal_step(gen_int, infection.mixing)
+        step = _bake_step(
+            _renewal_step(gen_int, infection.mixing), infection.modifiers
+        )
     else
         gen_int = infection.gen_int
         step = infection.recurrent_step
+    end
+
+    # The `initialisation` slot is either a level at ``t_0`` — one value, or one
+    # per stratum — or a whole seeding path, drawn at the incidence window's own
+    # shape. Both branches are decided by the slot's type, so nothing is chosen
+    # at run time.
+    if infection.initialisation isa SeedingPath
+        init_incidence ~ as_turing_submodel(
+            infection.initialisation.model,
+            _seeding_shape(n, _n_lags(gen_int)); prefix = true
+        )
+    else
+        init_incidence ~ as_turing_submodel(
+            infection.initialisation, _n_strata(n); prefix = true
+        )
     end
 
     # Resolve the step before scanning: any modifier carrying priors (e.g.
@@ -283,7 +374,19 @@ end
     scan_step ~ as_turing_submodel(step, n)
 
     Rts = _steps(Rt)
-    init = _make_renewal_init(scan_step, gen_int, I₀, first(Rts))
+    # A seeding path is the incidence window itself; a level is decayed into one
+    # at the growth rate implied by ``\mathcal R_1``.
+    if infection.initialisation isa SeedingPath
+        seed_window = infection.transformation.(init_incidence)
+        n_seed = _n_lags(seed_window)
+        @assert n_seed == _n_lags(gen_int) "a `SeedingPath` must draw one " *
+            "value per generation-interval lag, but it drew $(n_seed) for " *
+            "$(_n_lags(gen_int)) lags"
+        init = renewal_init_state(scan_step, seed_window)
+    else
+        I₀ = infection.transformation.(_seed(init_incidence, n))
+        init = _make_renewal_init(scan_step, gen_int, I₀, first(Rts))
+    end
     I_t = accumulate_scan(scan_step, init, Rts)
-    return (; I_t, Z_t)
+    return (; I_t, Z_t, I_seed = init.window)
 end

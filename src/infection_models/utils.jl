@@ -145,11 +145,22 @@ _steps(Rt::AbstractVector) = Rt
 _steps(Rt::AbstractMatrix) = collect.(eachcol(Rt))
 
 # The initial-infections seed: one value for a single series, one per stratum
-# otherwise. A bare `Distribution` in the slot draws one scalar; `only` on a
-# `Number` (or a length-1 vector) returns it unchanged, so it also covers the
-# `n::Int` case directly. Broadcast against `n::Dims{2}` gives the same seed to
-# every stratum.
-_seed(x, ::Int) = only(x)
+# otherwise. A bare `Distribution` in the slot draws one scalar; a `Number` (or a
+# length-1 vector) is returned unchanged, so it also covers the `n::Int` case
+# directly. Broadcast against `n::Dims{2}` gives the same seed to every stratum.
+# The slot is a LEVEL, so a draw of any other length is an error rather than a
+# silently collapsed path; `SeedingPath` is the way to estimate a seeding window.
+function _seed(x, ::Int)
+    length(x) == 1 || throw(
+        ArgumentError(
+            "`initialisation` is the level of infections at t₀, so it must " *
+                "draw one value for a single series, but it drew " *
+                "$(length(x)). A `Renewal` can estimate a whole seeding " *
+                "window instead: wrap the process in a `SeedingPath`."
+        )
+    )
+    return only(x)
+end
 _seed(x::Real, n::Dims{2}) = fill(x, n[1])
 function _seed(x::AbstractVector, n::Dims{2})
     @assert length(x) == n[1] "`initialisation` drew $(length(x)) values but the model has $(n[1]) strata"

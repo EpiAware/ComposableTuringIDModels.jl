@@ -273,7 +273,7 @@ patch_lines(sim_grav.I_t; ylabel = "Iₜ",
     title = "Gravity coupling, exponents drawn from their priors")
 ```
 
-The exponents are namespaced under `core.mixing` in the chain, so a fixed and an
+The exponents are namespaced under `mixing` in the chain, so a fixed and an
 inferred coupling differ there and nowhere else.
 `within` sets how much of a patch's force is its own, and has to be non-zero for
 `α` to be identifiable.

@@ -17,7 +17,9 @@ I_t \;\xrightarrow{\text{infections}}\;
 y_t \;\xrightarrow{\text{observations}}\; \text{data}
 ```
 
-The returned generated quantities are `(; generated_y_t, expected_y_t, I_t, Z_t)`.
+The returned generated quantities are `(; generated_y_t, expected_y_t, I_t, Z_t)`,
+with an `I_seed` for an infection model that exposes a seeding window (a
+[`Renewal`](@ref) does).
 `generated_y_t` is the observation model's sampled `y_t` (the observed-or-simulated
 series, or a `NamedTuple` of streams for a [`Split`](@ref)); `expected_y_t` is its
 pre-error `expected` series (the uniform observation return contract). `Z_t` is the
@@ -121,7 +123,17 @@ concrete_observations(y) = y
     # Uniform observation contract: sampled series and pre-error expected.
     generated_y_t = obs.y_t
     expected_y_t = obs.expected
-    return (; generated_y_t, expected_y_t, I_t, Z_t)
+    return merge(
+        (; generated_y_t, expected_y_t, I_t, Z_t), _seed_quantity(infections)
+    )
+end
+
+# The seeding window, passed on when the infection model exposes one (a
+# `Renewal` does, whether it decayed the window or drew it). The names are a
+# type parameter, so the branch is resolved at compile time and an infection
+# model without a seeding window returns exactly the tuple it always did.
+function _seed_quantity(infections::NamedTuple{names}) where {names}
+    return :I_seed in names ? (; I_seed = infections.I_seed) : (;)
 end
 
 function as_turing_model(model::IDModel, y_t, n)

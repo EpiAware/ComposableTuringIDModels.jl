@@ -2,7 +2,8 @@
 # `as_turing_model` signature fixed by its supertype:
 #
 #   latent       as_turing_model(m, n)        ⇒ a DynamicPPL.Model
-#   infection    as_turing_model(m, n)        ⇒ a DynamicPPL.Model ⇒ (; I_t, Z_t)
+#   infection    as_turing_model(m, n)        ⇒ a DynamicPPL.Model returning at
+#                                              least `I_t` and `Z_t`
 #   observation  as_turing_model(m, y_t, Y_t) ⇒ a DynamicPPL.Model
 #
 # The helpers below encode those contracts in a form usable from tests: each

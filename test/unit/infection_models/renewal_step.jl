@@ -97,8 +97,12 @@ end
         gen_int, SusceptibleDepletion(1000.0);
         rt = RandomWalk()
     )
-    @test plain.recurrent_step isa RenewalStep
-    @test isempty(plain.recurrent_step.modifiers)
+    # With no modifiers the step is the bare force-of-infection core, whichever
+    # constructor built it.
+    @test plain.recurrent_step isa ConstantRenewalStep
+    @test isempty(plain.modifiers)
+    @test Renewal(; generation_time = gen_int).recurrent_step isa
+        ConstantRenewalStep
     @test depleting.recurrent_step isa RenewalStep
     @test depleting.recurrent_step.core isa ConstantRenewalStep
     @test only(depleting.recurrent_step.modifiers) isa SusceptibleDepletion
@@ -144,4 +148,115 @@ end
     # A few NUTS steps exercise the composed-step gradient path (ForwardDiff).
     chn = sample(as_turing_model(model, y, 20), NUTS(), 30; progress = false)
     @test chn !== nothing
+end
+
+@testitem "Renewal combines a continuous generation time with a modifier" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: RenewalStep
+    # A continuous generation time discretised by the constructor, carrying a
+    # modifier: the two compose in either constructor form.
+    renewal = Renewal(
+        Gamma(2, 1.5), SusceptibleDepletion(1000.0);
+        D_gen = 15.0, rt = RandomWalk(), initialisation = Normal(log(50), 0.2)
+    )
+    @test renewal.gen_int isa AbstractVector
+    @test sum(renewal.gen_int) ≈ 1
+    @test renewal.recurrent_step isa RenewalStep
+    @test only(renewal.recurrent_step.modifiers) isa SusceptibleDepletion
+    # One discretisation path: the interval matches the modifier-free model's,
+    # so a modifier does not force a second discretisation outside the package.
+    base = Renewal(; generation_time = Gamma(2, 1.5), D_gen = 15.0)
+    @test renewal.gen_int == base.gen_int
+    # The keyword form takes the same modifiers.
+    kw = Renewal(;
+        generation_time = Gamma(2, 1.5), D_gen = 15.0,
+        modifiers = SusceptibleDepletion(1000.0), rt = RandomWalk(),
+        initialisation = Normal(log(50), 0.2)
+    )
+    @test kw.gen_int == renewal.gen_int
+    @test only(kw.modifiers) isa SusceptibleDepletion
+    out = as_turing_model(renewal, 20)()
+    @test length(out.I_t) == 20
+    @test all(isfinite, out.I_t)
+end
+
+@testitem "Renewal composes a modifier onto an inferred generation interval" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: fix
+    gen = UncertainDelay(
+        LogNormal,
+        [Normal(1.9, 0.2), truncated(Normal(0.5, 0.2), 0, Inf)]; D = 14.0
+    )
+    # No interval is baked, so the modifiers are held on the model and the step
+    # is rebuilt with them per draw.
+    depleting = Renewal(
+        gen, SusceptibleDepletion(50.0);
+        rt = FixedIntercept(log(2.0)), initialisation = Normal(log(10), 0.1)
+    )
+    plain = Renewal(
+        gen; rt = FixedIntercept(log(2.0)),
+        initialisation = Normal(log(10), 0.1)
+    )
+    @test isnothing(depleting.recurrent_step)
+    @test only(depleting.modifiers) isa SusceptibleDepletion
+    @test isempty(plain.modifiers)
+    fixinit = (init_incidence = log(10.0),)
+    Random.seed!(51)
+    depleted = fix(as_turing_model(depleting, 25), fixinit)().I_t
+    Random.seed!(51)
+    undepleted = fix(as_turing_model(plain, 25), fixinit)().I_t
+    @test all(isfinite, depleted)
+    # A small population bites: depletion holds incidence below the plain path.
+    @test last(depleted) < last(undepleted)
+end
+
+@testitem "the modifiers keyword rejects a value that is not a modifier" begin
+    using ComposableTuringIDModels, Distributions
+    gen_int = [0.2, 0.3, 0.5]
+    # The positional form is constrained by its signature; the keyword form has
+    # to say so itself rather than failing inside the step's seam.
+    @test_throws "AbstractRenewalModifier" Renewal(;
+        generation_time = gen_int, modifiers = (Normal(),)
+    )
+    @test_throws "AbstractRenewalModifier" Renewal(;
+        generation_time = gen_int, modifiers = [SusceptibleDepletion(1.0e3), 1]
+    )
+    # A single modifier, a tuple and a vector of them are all accepted.
+    for mods in (
+            SusceptibleDepletion(1.0e3), (SusceptibleDepletion(1.0e3),),
+            [SusceptibleDepletion(1.0e3)],
+        )
+        r = Renewal(; generation_time = gen_int, modifiers = mods)
+        @test only(r.modifiers) isa SusceptibleDepletion
+    end
+end
+
+@testitem "Renewal widens its rt slot on both construction paths" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using ComposableTuringIDModels: path_prior
+    Random.seed!(344)
+
+    # The positional constructor must widen a bare `Distribution` in the `rt`
+    # PATH slot exactly as the keyword one does. Left to Julia's generated
+    # constructor it does not: the slot draws a single scalar, which reaches
+    # the scan as an `R_t` with no time axis.
+    gi = [0.2, 0.3, 0.5]
+    kw = Renewal(;
+        generation_time = gi, rt = Normal(0, 0.1), initialisation = Normal()
+    )
+    pos = Renewal(
+        gi, exp, Normal(0, 0.1), Normal(), kw.recurrent_step, kw.mixing, ()
+    )
+
+    @test typeof(pos.rt) == typeof(kw.rt)
+    @test pos.rt isa Intercept
+    n = 20
+    @test length(as_turing_model(kw, n)().I_t) == n
+    @test length(as_turing_model(pos, n)().I_t) == n
+    # Rebuilding from stored fields is a no-op, so `Accessors.@set` is safe.
+    @test path_prior(kw.rt) === kw.rt
+    # Widening runs before `new`, so the slot's role guard still fires.
+    @test_throws TypeError Renewal(
+        gi, exp, PoissonError(), Normal(), kw.recurrent_step, kw.mixing, ()
+    )
 end

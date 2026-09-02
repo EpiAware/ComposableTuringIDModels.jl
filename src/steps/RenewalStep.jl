@@ -186,6 +186,10 @@ function renewal_init_state(step::_PlainRenewalStep, I₀, r_approx, len_gen_int
     return renewal_init_state(step.core, I₀, r_approx, len_gen_int)
 end
 
+function renewal_init_state(step::_PlainRenewalStep, window::AbstractArray)
+    return renewal_init_state(step.core, window)
+end
+
 function get_state(step::_PlainRenewalStep, initial_state, state)
     return get_state(step.core, initial_state, state)
 end
@@ -212,7 +216,12 @@ function (step::RenewalStep)(state, Rt)
 end
 
 function renewal_init_state(step::RenewalStep, I₀, r_approx, len_gen_int)
-    window = renewal_init_window(step.core, I₀, r_approx, len_gen_int)
+    return renewal_init_state(
+        step, renewal_init_window(step.core, I₀, r_approx, len_gen_int)
+    )
+end
+
+function renewal_init_state(step::RenewalStep, window::AbstractArray)
     substates = map(mod -> modifier_init_state(mod, window), step.modifiers)
     return (; val = _newest(window), window = window, substates = substates)
 end
@@ -256,7 +265,11 @@ modifier's variables are namespaced `modifier_<i>` (see
 end
 
 @model function as_turing_model(step::RenewalStep, n)
-    core ~ as_turing_submodel(step.core, n; prefix = true)
+    # The core composes flat, as it does when a modifier-free renewal scans the
+    # core directly, so a drawn coupling operator is named the same way whether
+    # or not the step carries modifiers. The modifiers below carry their own
+    # positional prefixes, so nothing here can collide.
+    core ~ as_turing_submodel(step.core, n)
     modifiers ~ to_submodel(_resolve_modifiers(step.modifiers, n, 1), false)
     return RenewalStep(core, modifiers)
 end

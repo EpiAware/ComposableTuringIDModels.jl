@@ -176,7 +176,36 @@ seeded = Renewal(gen_int, SusceptibleDepletion(1000.0),
 nothing # hide
 ```
 
+The generation time is a slot like any other, so a modifier composes onto a
+continuous generation time the constructor discretises for you.
+The discretisation keywords stay available alongside the modifiers, which keeps
+one discretisation path rather than a second one written outside the package.
+
+```@example design
+# The same modifier on a Gamma generation time discretised to 15 days.
+discretised = Renewal(Gamma(2, 1.5), SusceptibleDepletion(1000.0);
+    D_gen = 15.0, rt = RandomWalk())
+nothing # hide
+```
+
 See [Renewal modifiers](@ref renewal-modifiers) for what each contributes to a fitted model.
+
+## The seeding window
+
+A renewal process needs infections before the modelled window starts.
+By default `initialisation` is a level at ``t_0``: one value, decaying backwards
+at the growth rate implied by ``\mathcal R_1``.
+Wrapping a process in a [`SeedingPath`](@ref) estimates that run-up instead, so
+the data inform its shape rather than ``\mathcal R_1`` fixing it.
+
+```@example design
+seeding = Renewal(; generation_time = gen_int, rt = RandomWalk(),
+    initialisation = SeedingPath(RandomWalk(; init = Normal(log(50), 0.5))))
+as_turing_model(seeding, 20)().I_seed
+```
+
+The window is returned as `I_seed`, whether it was drawn or decayed, and is not
+part of `I_t`.
 
 ## Inference
 
