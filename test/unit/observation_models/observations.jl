@@ -164,60 +164,56 @@ end
     @test_throws Exception as_turing_model(be, (y = y, N = [5, 5, 5]), p)()
 end
 
-@testitem "NamedTuple data keeps blanks latent and leaves the caller's data alone" begin
-    using ComposableTuringIDModels, Distributions, Turing, Random
-    using DynamicPPL: @varname
+@testitem "NamedTuple data marginalises blanks, not the caller's array" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: VarInfo
     Random.seed!(64)
 
-    # A `missing` entry reached through a NamedTuple field is never written
-    # back into the array the caller handed over, and it is marginalised out of
-    # the likelihood rather than sampled as a latent — exactly as one reached
-    # through a plain vector.
+    # A blank reached through a NamedTuple field takes the same contract as one
+    # an `IDModel` narrows at construction: it leaves the likelihood rather than
+    # becoming a latent, comes back marked `missing`, and is never written into
+    # the array the caller handed over.
+    has_y_t(m) = any(vn -> occursin("y_t", string(vn)), keys(VarInfo(m)))
+
     trials = fill(1000, 3)
     y = Vector{Union{Missing, Int}}([10, 25, missing])
     y_before = copy(y)
     mdl = as_turing_model(BinomialError(), (y = y, N = trials), fill(0.02, 3))
-    chn = sample(mdl, Prior(), 20; progress = false)
+    out = mdl()
 
     @test isequal(y, y_before)
-    # The gap leaves the likelihood: no `y_t` parameter, the entry comes back
-    # `missing`, the observed entries stay data.
-    @test !any(k -> occursin("y_t", string(k)), collect(keys(chn)))
-    out = mdl()
-    @test isequal(out.y_t, [10, 25, missing])
-    @test !haskey(chn, @varname(y_t[3]))
-    @test !haskey(chn, @varname(y_t[1]))
+    @test !has_y_t(mdl)
+    @test isequal(out.y_t, y_before)
 
     # The same holds for the shared error-model loop (Poisson, NegBin, Normal),
     # which also accepts its counts in a NamedTuple `y` field.
     yp = Vector{Union{Missing, Int}}([5, missing, 7])
     yp_before = copy(yp)
-    chp = sample(
-        as_turing_model(PoissonError(), (y = yp,), fill(6.0, 3)), Prior(), 20;
-        progress = false
-    )
+    mp = as_turing_model(PoissonError(), (y = yp,), fill(6.0, 3))
+    @test isequal(mp().y_t, yp_before)
     @test isequal(yp, yp_before)
-    @test !any(k -> occursin("y_t", string(k)), collect(keys(chp)))
+    @test !has_y_t(mp)
 
-    # A fully missing series in a NamedTuple field is left alone too.
+    # A fully blank series in a NamedTuple field is marginalised whole. The
+    # predictive route is `y = missing`, which sizes the draw off `Y_t`.
     ym = Vector{Union{Missing, Int}}(missing, 3)
-    chm = sample(
-        as_turing_model(BinomialError(), (y = ym, N = trials), fill(0.02, 3)),
-        Prior(), 5; progress = false
-    )
+    mm = as_turing_model(BinomialError(), (y = ym, N = trials), fill(0.02, 3))
+    @test all(ismissing, mm().y_t)
     @test all(ismissing, ym)
-    @test !any(k -> occursin("y_t", string(k)), collect(keys(chm)))
+    @test !has_y_t(mm)
+    sim = as_turing_model(
+        BinomialError(), (y = missing, N = trials), fill(0.02, 3)
+    )
+    @test all(x -> 0 <= x <= 1000, sim().y_t)
 
     # Wrapping the error model in a modifier changes none of this.
     yw = Vector{Union{Missing, Int}}([10, 25, missing])
     yw_before = copy(yw)
     wrapped = TransformObservationModel(BinomialError(), x -> x ./ 100)
-    chw = sample(
-        as_turing_model(wrapped, (y = yw, N = trials), fill(2.0, 3)), Prior(),
-        20; progress = false
-    )
+    mw = as_turing_model(wrapped, (y = yw, N = trials), fill(2.0, 3))
+    @test isequal(mw().y_t, yw_before)
     @test isequal(yw, yw_before)
-    @test !any(k -> occursin("y_t", string(k)), collect(keys(chw)))
+    @test !has_y_t(mw)
 
     # Reached through a composed `IDModel` the data takes the other route into
     # the same helper: `concrete_observations` narrows the NamedTuple
@@ -229,13 +225,10 @@ end
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         BinomialError()
     )
-    chc = sample(
-        as_turing_model(composed, (y = yc, N = trials), 3), Prior(), 20;
-        progress = false
-    )
+    mc = as_turing_model(composed, (y = yc, N = trials), 3)
+    @test isequal(mc().generated_y_t, yc_before)
     @test isequal(yc, yc_before)
-    @test !any(k -> occursin("y_t", string(k)), collect(keys(chc)))
-    @test !haskey(chc, @varname(y_t[1]))
+    @test !has_y_t(mc)
 end
 
 @testitem "define_y_t unpacks counts for vector or NamedTuple data" begin

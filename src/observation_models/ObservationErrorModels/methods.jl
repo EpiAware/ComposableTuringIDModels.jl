@@ -85,29 +85,21 @@ end
 # per-time-point distribution, without tilde-ing against a `Union{Missing,T}`
 # value.
 #
-# An absent entry is missing at random, so it drops out of the likelihood: it is
-# skipped, not sampled. Imputing one as a latent would be the wrong mechanism
-# rather than merely an expensive one — there is nothing to infer at a point
-# that contributes no likelihood term. Skipping is also what keeps a discrete
-# stream samplable (a sampled count would be a latent that HMC has to link, and
-# a count distribution has no bijector to link it with) and keeps the gradient
-# dimension of a continuous stream down to the parameters that carry
-# information. Predictive values at the gaps are generated after fitting, by
-# replaying the posterior through the model; `forecast` builds its horizon that
-# way.
+# An absent entry is missing at random, so it drops out of the likelihood: it
+# is skipped, not sampled. There is nothing to infer at a point that carries
+# no likelihood term, and imputing one breaks a discrete stream outright — a
+# count distribution has no bijector for HMC to link it with — as well as
+# adding a dead gradient dimension to a continuous one. Predictive values at
+# the gaps come from replaying the posterior after fitting; `forecast` builds
+# its horizon that way.
 #
-# A skipped entry comes back as `missing`, so the series returned below is a
-# `Union{Missing,T}` array wherever the observations have gaps. Making it
-# concrete would be a change to the observation contract rather than to this
-# loop.
-#
-# `y_t[i] ~ dist` decides sample-vs-observe by checking `y_t[i] === missing` at
-# run time, which needs a value that can actually hold `missing` at that lens,
-# and building one inside a model body is exactly the array Enzyme's
+# `y_t[i] ~ dist` decides sample-vs-observe by checking `y_t[i] === missing`
+# at run time, so it needs a value that can hold `missing` at that lens, and
+# building that array inside a model body is exactly what Enzyme's
 # reverse-mode type analysis cannot compile. Driving
-# `DynamicPPL.tilde_observe!!` directly off the carrier's own concrete `present`
-# mask needs no such value: every array the likelihood touches stays plainly
-# typed, and the model's stored argument is never written to.
+# `DynamicPPL.tilde_observe!!` off the carrier's own concrete `present` mask
+# needs no such value: every array the likelihood touches stays plainly
+# typed.
 #
 # Returns the scored series (the observed entries as given, the absent ones
 # `missing`) and the updated `VarInfo`.
@@ -202,20 +194,14 @@ _restore_missing(y::MissingObservations) = map((v, p) -> p ? v : missing, y.valu
 
 # The series an error model scores, detached from the caller's data.
 #
-# A series reached through a `NamedTuple` field is not one of the model's
-# arguments, so DynamicPPL never handles it: it is neither copied nor promoted,
-# and the `y_t[i] ~ …` sugar writes a blank's draw straight into the caller's
-# array. From the next evaluation on that entry is no longer `missing`, so it
-# is scored as data — frozen at whatever the first draw produced, and never a
-# tracked latent. [`concrete_observations`](@ref) — the same narrowing an
-# `IDModel` applies to its own `y_t` — is what detaches it: a series with any
-# blank in it becomes a [`MissingObservations`](@ref) carrier, which
-# `_score_missing_observations!!` scores by reading only.
-#
-# A series passed as the model's own `y_t` argument needs none of this:
-# DynamicPPL has already copied it. Neither does one an `IDModel` narrowed at
-# construction, which arrives as a carrier or a concrete vector and is returned
-# by the first branch below without touching the data.
+# A series reached through a `NamedTuple` field is not a model argument, so
+# DynamicPPL neither copies nor promotes it and the `y_t[i] ~ …` sugar would
+# write a blank's draw straight back into the caller's array. Narrowing it with
+# [`concrete_observations`](@ref) (what an `IDModel` applies to its own `y_t`)
+# turns any blank into a [`MissingObservations`](@ref) carrier scored by
+# reading only. A series passed as the model's own `y_t` argument already has
+# DynamicPPL's copy, and an `IDModel`-narrowed series is already a carrier or
+# a concrete vector, so both pass through untouched.
 _scored_series(obs_model, y_t, Y_t) = define_y_t(obs_model, y_t, Y_t)
 _scored_series(obs_model, y_t::MissingObservations, Y_t) = y_t
 function _scored_series(obs_model, y_t::NamedTuple, Y_t)

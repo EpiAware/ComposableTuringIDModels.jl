@@ -69,12 +69,12 @@ _binomial_trials(N::Integer, n) = fill(N, n)
 _binomial_trials(N::AbstractVector{<:Integer}, n) = N
 
 # Build the per-time-point trials distribution, right-aligning the trials
-# against the expected series exactly as the observations are aligned. `n_diff`
-# shifts the trials so their last entry pairs with the last expected step, which
-# makes the two natural shapes — one entry per observation, or one per expected
-# value — put the same trials on the same time points, and leaves the head of
-# whichever runs longer unused. Trials that do not reach back to the first
-# scored step are rejected rather than quietly shifted.
+# against the expected series exactly as the observations are aligned.
+# `n_diff` shifts the trials so their last entry pairs with the last expected
+# step. The two natural shapes — one entry per observation, or one per
+# expected value — then put the same trials on the same time points, and the
+# head of whichever runs longer goes unused. Trials that do not reach back to
+# the first scored step are rejected rather than quietly shifted.
 function _trial_dist(obs_model, p_t, N, diff_t)
     n = length(p_t)
     N_t = _binomial_trials(N, n)

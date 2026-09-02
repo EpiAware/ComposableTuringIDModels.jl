@@ -160,14 +160,14 @@ end
     # extreme excursion), so scaling the matrix keeps that a valid, if
     # degenerate, draw instead of throwing mid-chain.
     K = σ^2 .* kernelmatrix(with_lengthscale(kernel, ℓ), x)
-    # The nugget tracks the diagonal of K, which is σ². A fixed absolute nugget
-    # is swamped once σ is large and the factorisation then fails on a matrix
-    # that is only numerically indefinite, which ends the chain; a nugget with a
-    # floor of `jitter` instead swamps the covariance when σ is small (at
-    # σ = 1e-3 a `jitter * (σ² + 1)` nugget inflates the variance by 100%). The
-    # absolute floor here is `jitter * eps()`, far below σ² for any σ the
-    # sampler can represent, and is only there to keep the factorisation
-    # defined at σ = 0 exactly, where K itself vanishes.
+    # The nugget tracks the diagonal of K, which is σ². A fixed absolute
+    # nugget is swamped once σ is large and the factorisation then fails on a
+    # matrix that is only numerically indefinite, ending the chain. A nugget
+    # with a floor of `jitter` instead swamps the covariance when σ is small:
+    # at σ = 1e-3 a `jitter * (σ² + 1)` nugget inflates the variance by 100%.
+    # The absolute floor here is `jitter * eps()`, far below σ² for any
+    # representable σ, and only keeps the factorisation defined at σ = 0
+    # exactly, where K itself vanishes.
     L = cholesky(Symmetric(K + (jitter * (σ^2 + eps())) * I)).L
     # Densify `L`: the triangular BLAS path (`trmv`) has no Enzyme forward
     # rule, a plain `gemv` does. Same maths to within a rounding order, and an
