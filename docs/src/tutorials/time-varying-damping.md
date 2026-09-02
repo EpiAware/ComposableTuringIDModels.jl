@@ -89,7 +89,10 @@ end
 
 The model wraps the time-varying `AR` in a thin observation of the path and fits
 under NUTS. The coefficient path is tracked as the generated quantity `ρ`, so it is
-recovered straight from the chain:
+recovered straight from the chain.
+We draw two chains in parallel with `MCMCThreads()` and differentiate with
+[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend
+for this package (see [Automatic differentiation backend](@ref ad-backends)).
 
 ```@example tvdamp
 @model function observe_path(y, n)

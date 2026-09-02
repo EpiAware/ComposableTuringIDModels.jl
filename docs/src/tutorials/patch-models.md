@@ -178,6 +178,9 @@ Everything above ran forward.
 Fitting the same model to the counts it produced asks what the forward runs
 cannot.
 Is a coupled, partially pooled patch process identifiable from data?
+We draw two chains in parallel with `MCMCThreads()` and differentiate with
+[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend
+for this package (see [Automatic differentiation backend](@ref ad-backends)).
 
 ```@example patches
 using Turing, Mooncake
