@@ -139,6 +139,83 @@ negbin_model = IDModel(
 nothing # hide
 ```
 
+## [An effect confined to a window](@id windowed-effect)
+
+An effect that applies only over part of the series needs no new component.
+[`TransformLatentModel`](@ref) reads the index, and
+[`CombineLatentModels`](@ref) sums paths, so a window is the two together.
+
+A fixed effect is one transform.
+The closure indexes the path it is given, so it does not need the series
+length:
+
+```@example design
+using ComposableTuringIDModels, Distributions
+
+base = RandomWalk(init = Normal(0, 0.1), ϵ_t = IID(Normal(0, 0.05)))
+
+# +2 on indices 20:30, unchanged elsewhere.
+fixed = TransformLatentModel(
+    base, x -> x .+ 2.0 .* in.(eachindex(x), Ref(20:30))
+)
+length(as_turing_model(fixed, 40)())
+```
+
+An estimated effect size is a latent process gated to the window and summed
+onto the base path.
+The gated process contributes zero outside the window, so the composed path is
+the base path there:
+
+```@example design
+effect = TransformLatentModel(
+    Intercept(Normal(1, 0.2)), x -> x .* in.(eachindex(x), Ref(20:30))
+)
+windowed = CombineLatentModels([base, effect], ["", "Window"])
+keys(rand(as_turing_model(windowed, 40)))
+```
+
+The prefix keeps the effect's parameter under its own name, so windows stack by
+adding members rather than by nesting:
+
+```@example design
+stacked = CombineLatentModels(
+    [
+        base,
+        TransformLatentModel(
+            Intercept(Normal(1.5, 0.1)), x -> x .* in.(eachindex(x), Ref(1:5))
+        ),
+        TransformLatentModel(
+            Intercept(Normal(2, 0.1)), x -> x .* in.(eachindex(x), Ref(20:30))
+        ),
+    ], ["", "Early", "Late"]
+)
+keys(rand(as_turing_model(stacked, 40)))
+```
+
+A latent process and a parameter prior share one role, so the same gated
+process drops into a per-step parameter slot.
+Here an [`AR`](@ref) is more strongly damped over the window and constant
+outside it:
+
+```@example design
+shifted = AR(
+    damp = CombineLatentModels(
+        [
+            FixedIntercept(0.4),
+            TransformLatentModel(
+                Intercept(Normal(0.4, 0.01)),
+                x -> x .* in.(eachindex(x), Ref(20:30))
+            ),
+        ], ["", "Shift"]
+    ), ϵ_t = IID(Normal(0, 0.1))
+)
+keys(rand(as_turing_model(shifted, 40)))
+```
+
+[`CombineLatentModels`](@ref) sums, so a multiplicative window effect on a
+positive path is the same composition in log space, wrapped in an `exp`
+transform.
+
 ## Composing accumulation steps
 
 The recurrences that drive the time series — a random walk, an autoregression, a
