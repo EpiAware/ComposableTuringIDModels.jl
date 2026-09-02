@@ -376,7 +376,6 @@ renewal infection process and its latent ``R_t`` process untouched.
 using ComposableTuringIDModels: swap
 poisson_model = swap(
     err -> err isa NegativeBinomialError ? PoissonError() : err, model)
-length(rand(as_turing_model(poisson_model, fill(missing, n), n)))
 ```
 
 [`swap`](@ref) walks the observation chain, replaces every component matching
