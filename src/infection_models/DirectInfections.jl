@@ -61,13 +61,22 @@ struct DirectInfections{L <: PriorLike, F <: Function, S <: PriorLike} <:
     transformation::F
     "Prior for the unconstrained initial infections."
     initialisation::S
+
+    function DirectInfections(Z, transformation::Function, initialisation)
+        # `Z` is a length-`n` PATH slot: a bare `Distribution` is wrapped in an
+        # `Intercept` (a constant path), never left as a scalar.
+        wrapped = path_prior(Z)
+        return new{typeof(wrapped), typeof(transformation), typeof(initialisation)}(
+            wrapped, transformation, initialisation
+        )
+    end
 end
 
 function DirectInfections(;
         Z = RandomWalk(),
         transformation::Function = exp, initialisation = Normal()
     )
-    return DirectInfections(path_prior(Z), transformation, initialisation)
+    return DirectInfections(Z, transformation, initialisation)
 end
 
 @model function as_turing_model(model::DirectInfections, n::ModelShape)

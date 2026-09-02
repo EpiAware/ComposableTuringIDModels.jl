@@ -37,6 +37,12 @@ struct RandomWalk{D <: PriorLike, E <: PriorLike} <: AbstractLatentModel
     function RandomWalk(init, ϵ_t)
         # `ϵ_t` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
         # an `Intercept` (a constant increment path), never left as a scalar.
+        # Widening here, not in the keyword constructor, is what makes every
+        # construction path agree. `path_prior` is idempotent, so rebuilding
+        # from stored fields is a fixed point and no
+        # `ConstructionBase.constructorof` is needed. Note that `rewrap` is
+        # observation-side only, so `Accessors.@set` is the reconstruction
+        # contract a latent model has to satisfy.
         wrapped = path_prior(ϵ_t)
         return new{typeof(init), typeof(wrapped)}(init, wrapped)
     end

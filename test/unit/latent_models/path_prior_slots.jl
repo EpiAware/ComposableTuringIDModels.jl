@@ -30,6 +30,21 @@
         ),
     ]
 
+    # The infection models take the same treatment on their latent slot, but
+    # return `(; I_t, Z_t)` rather than a bare path, so they are measured on
+    # `I_t`.
+    infection_cases = [
+        (
+            "DirectInfections", DirectInfections(d, exp, Normal()),
+            DirectInfections(; Z = d), :Z, 20,
+        ),
+        (
+            "ExpGrowthRate",
+            ExpGrowthRate(d, ComposableTuringIDModels._oneexpy, Normal()),
+            ExpGrowthRate(; rt = d), :rt, 20,
+        ),
+    ]
+
     for (name, pos, kw, slots, shape, len) in cases
         for slot in slots
             # The positional form must widen, not store the bare distribution.
@@ -40,6 +55,16 @@
         # positional form gave a length-2 path, or threw.
         @test length(as_turing_model(pos, shape)()) == len
         @test length(as_turing_model(kw, shape)()) == len
+    end
+
+    for (name, pos, kw, slot, n) in infection_cases
+        @test getfield(pos, slot) isa Intercept
+        @test typeof(getfield(pos, slot)) == typeof(getfield(kw, slot))
+        # Before the fix `DirectInfections` returned an `I_t` of length 1 here,
+        # silently, and `ExpGrowthRate` threw.
+        @test length(as_turing_model(pos, n)().I_t) == n
+        @test length(as_turing_model(kw, n)().I_t) == n
+        @test path_prior(getfield(pos, slot)) === getfield(pos, slot)
     end
 
     # `path_prior` is idempotent, so rebuilding a component from its own stored
@@ -75,6 +100,14 @@ end
     st2 = @set st.combine = *
     @test st2.shared === st.shared
     @test st2.across === st.across
+
+    di = DirectInfections(; Z = d)
+    @test typeof(
+        DirectInfections(di.Z, di.transformation, di.initialisation)
+    ) == typeof(di)
+    di2 = @set di.initialisation = Normal(1, 1)
+    @test di2.Z === di.Z
+    @test length(as_turing_model(di2, 20)().I_t) == 20
 end
 
 @testitem "the role guard survives moving widening into the constructor" begin
@@ -85,4 +118,6 @@ end
     @test_throws TypeError MA(PoissonError(), 1, Normal())
     @test_throws TypeError AR(PoissonError(), Normal(), 1, Normal(), identity)
     @test_throws TypeError Stratify(PoissonError(), Normal(), +)
+    @test_throws TypeError DirectInfections(PoissonError(), exp, Normal())
+    @test_throws TypeError ExpGrowthRate(PoissonError(), exp, Normal())
 end
