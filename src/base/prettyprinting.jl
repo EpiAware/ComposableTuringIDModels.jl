@@ -52,6 +52,12 @@ function _component_children(model::AbstractComposableModel)
     return children
 end
 
+# The label a node shows in the tree. A component whose behaviour is set by a
+# non-component field rather than by its own type overrides this, so the tree
+# says which behaviour it is. Non-component fields are otherwise leaves the tree
+# never reaches.
+_node_label(model) = string(nameof(typeof(model)))
+
 # Recursively print the component children beneath an already-printed node, using
 # box-drawing connectors and an accumulated `prefix` for indentation.
 function _print_component_tree(io::IO, children, prefix::AbstractString)
@@ -60,7 +66,7 @@ function _print_component_tree(io::IO, children, prefix::AbstractString)
         is_last = i == n
         print(
             io, '\n', prefix, is_last ? "└─ " : "├─ ",
-            role, ": ", nameof(typeof(child))
+            role, ": ", _node_label(child)
         )
         child_prefix = string(prefix, is_last ? "   " : "│  ")
         _print_component_tree(io, _component_children(child), child_prefix)
@@ -71,7 +77,7 @@ end
 # Rich (REPL / `display`) rendering: the concrete component name followed by the
 # recursive, indented component tree.
 function Base.show(io::IO, ::MIME"text/plain", model::AbstractComposableModel)
-    print(io, nameof(typeof(model)))
+    print(io, _node_label(model))
     _print_component_tree(io, _component_children(model), "")
     return nothing
 end

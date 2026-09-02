@@ -141,80 +141,85 @@ nothing # hide
 
 ## [An effect confined to a window](@id windowed-effect)
 
-An effect that applies only over part of the series needs no new component.
-[`TransformLatentModel`](@ref) reads the index, and
-[`CombineLatentModels`](@ref) sums paths, so a window is the two together.
-
-A fixed effect is one transform.
-The closure indexes the path it is given, so it does not need the series
-length:
+[`broadcast_window`](@ref) builds a latent model that equals its inner model on a declared index window and zero everywhere else.
+Summing it onto a base path with [`CombineLatentModels`](@ref) gives an effect that is active only over that window.
 
 ```@example design
 using ComposableTuringIDModels, Distributions
 
 base = RandomWalk(init = Normal(0, 0.1), ϵ_t = IID(Normal(0, 0.05)))
-
-# +2 on indices 20:30, unchanged elsewhere.
-fixed = TransformLatentModel(
-    base, x -> x .+ 2.0 .* in.(eachindex(x), Ref(20:30))
+windowed = CombineLatentModels(
+    [base, broadcast_window(Normal(1, 0.2), 20:30)], ["", "Window"]
 )
-length(as_turing_model(fixed, 40)())
-```
-
-An estimated effect size is a latent process gated to the window and summed
-onto the base path.
-The gated process contributes zero outside the window, so the composed path is
-the base path there:
-
-```@example design
-effect = TransformLatentModel(
-    Intercept(Normal(1, 0.2)), x -> x .* in.(eachindex(x), Ref(20:30))
-)
-windowed = CombineLatentModels([base, effect], ["", "Window"])
 keys(rand(as_turing_model(windowed, 40)))
 ```
 
-The prefix keeps the effect's parameter under its own name, so windows stack by
-adding members rather than by nesting:
+The inner slot is a PATH slot, so one helper covers a known effect and an estimated one.
+A [`FixedIntercept`](@ref) gives a constant.
+A bare `Distribution` gives one estimated level held across the window.
+A process gives an effect that varies within the window, and it is generated over the window rather than over the whole series.
+
+```@example design
+known = broadcast_window(FixedIntercept(2.0), 20:30)
+varying = broadcast_window(RandomWalk(), 20:30)
+nothing # hide
+```
+
+Windows stack by adding members, and each keeps its own prefix.
 
 ```@example design
 stacked = CombineLatentModels(
     [
         base,
-        TransformLatentModel(
-            Intercept(Normal(1.5, 0.1)), x -> x .* in.(eachindex(x), Ref(1:5))
-        ),
-        TransformLatentModel(
-            Intercept(Normal(2, 0.1)), x -> x .* in.(eachindex(x), Ref(20:30))
-        ),
+        broadcast_window(Normal(1.5, 0.1), 1:5),
+        broadcast_window(Normal(2, 0.1), 20:30),
     ], ["", "Early", "Late"]
 )
 keys(rand(as_turing_model(stacked, 40)))
 ```
 
-A latent process and a parameter prior share one role, so the same gated
-process drops into a per-step parameter slot.
-Here an [`AR`](@ref) is more strongly damped over the window and constant
-outside it:
+A window touching either end of the series is an ordinary case.
+The window is part of the broadcast rule, so it shows in the model tree.
+
+```@example design
+broadcast_window(Normal(1, 0.2), 1:10)
+```
+
+A latent process and a parameter prior share one role, so a windowed effect drops into a per-step parameter slot.
+Here an [`AR`](@ref) is more strongly damped over the window and constant outside it.
 
 ```@example design
 shifted = AR(
     damp = CombineLatentModels(
-        [
-            FixedIntercept(0.4),
-            TransformLatentModel(
-                Intercept(Normal(0.4, 0.01)),
-                x -> x .* in.(eachindex(x), Ref(20:30))
-            ),
-        ], ["", "Shift"]
+        [FixedIntercept(0.4), broadcast_window(Normal(0.4, 0.01), 20:30)],
+        ["", "Shift"]
     ), ϵ_t = IID(Normal(0, 0.1))
 )
 keys(rand(as_turing_model(shifted, 40)))
 ```
 
-[`CombineLatentModels`](@ref) sums, so a multiplicative window effect on a
-positive path is the same composition in log space, wrapped in an `exp`
-transform.
+### How it is built
+
+[`broadcast_window`](@ref) is a [`BroadcastLatentModel`](@ref) under an [`InWindow`](@ref) rule, in the same way that [`broadcast_dayofweek`](@ref) is one under [`RepeatEach`](@ref).
+The rule asks for a series as long as the window and places it, so nothing is drawn for the indices outside.
+
+Without the helper the same effect is a transform that reads the index, summed on by [`CombineLatentModels`](@ref).
+This generates the effect over the whole series and then masks it, so it is the longer route for a process, but it shows what the helper is doing.
+
+```@example design
+manual = CombineLatentModels(
+    [
+        base,
+        TransformLatentModel(
+            Intercept(Normal(1, 0.2)),
+            x -> x .* in.(eachindex(x), Ref(20:30))
+        ),
+    ], ["", "Window"]
+)
+keys(rand(as_turing_model(manual, 40)))
+```
+
+[`CombineLatentModels`](@ref) sums, so a multiplicative window effect on a positive path is the same composition in log space, wrapped in an `exp` transform.
 
 ## Composing accumulation steps
 
