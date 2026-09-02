@@ -32,6 +32,9 @@ They progress from a single renewal model to a layered observation process, a me
     The same autoregressive latent process with its damping coefficient itself allowed to vary over time, so the amount of mean reversion in ``\log R_t`` is learned rather than fixed.
   - [Partial pooling across groups](@ref tutorial-hierarchy).
     A panel of groups sharing one infection process structure but with group-level parameters drawn from a common population distribution, so information is pooled across groups without forcing them to be identical.
+  - [Coupled patch models](@ref tutorial-patches).
+    Several patches over one time axis, built a layer at a time, from independent patches to a shared partially pooled process to a mixing matrix that moves infection pressure between them.
+    The finished model is fit to data simulated from itself, and the coupling is then swapped for a [`Gravity`](@ref) model and for one written as a single method.
   - [Renewal modifiers: depletion and importation](@ref renewal-modifiers).
     One delayed renewal process compared against the same process extended with [`SusceptibleDepletion`](@ref) and [`ImportedCases`](@ref), so each modifier's contribution is visible against a shared baseline.
 
