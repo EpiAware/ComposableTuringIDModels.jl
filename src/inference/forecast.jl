@@ -173,11 +173,12 @@ end
 # Correctness guard for the independent-tail extension above. Splicing an
 # independent prior tail onto the fitted head is exact only when the stream
 # *factorises* across the forecast boundary. Every latent in this package is
-# non-centred (a parameter-free i.i.d. innovation sequence), so this holds; a
-# stored stream with joint correlation (an exact-GP `MvNormal`) would need its
-# tail drawn conditional on the head. Detect that case generically by checking
-# on a batch of prior draws that each resized stream's tail is uncorrelated
-# with its head, and refuse rather than silently mis-forecast.
+# non-centred (its resized stream is a parameter-free i.i.d. innovation
+# sequence), so this holds. A stored stream with joint correlation (an
+# exact-GP `MvNormal`) would need its tail drawn conditional on the head.
+# Detect that case generically by checking on a batch of prior draws that each
+# resized stream's tail is uncorrelated with its head, and refuse rather than
+# silently mis-forecast.
 const _FORECAST_INDEP_TOL = 0.5
 
 function _assert_factorised(rng::AbstractRNG, fc_model, resized)

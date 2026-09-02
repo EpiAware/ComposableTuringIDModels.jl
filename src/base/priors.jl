@@ -71,8 +71,8 @@ end
 # A bare `Distribution` returns the distribution itself, so a component's
 # `θ ~ as_turing_submodel(model.slot, n)` is a plain native scalar draw named
 # `θ` (no submodel overhead, no `.θ` namespace). A vector of distributions
-# returns the product distribution (a native, per-element draw); a process
-# returns a namespaced submodel via the generic method — the length-`n` path.
+# returns the product distribution (a native, per-element draw). A process
+# returns a namespaced submodel via the generic method, the length-`n` path.
 # A component consumes whichever it gets with [`at`](@ref), so a `Distribution`
 # keeps its clean constant name while a process makes the parameter vary.
 
@@ -198,7 +198,7 @@ end
 # the result per step with `at`, so ONE recursion serves both the constant
 # and the time-varying (or hierarchical) case with no per-component
 # special-casing and no efficiency loss when the parameter is constant. See
-# [`AR`](@ref)'s damping for the worked example.
+# [`AR`](@ref)'s damping for a worked example.
 
 @doc raw"
 Read a possibly-time-varying parameter at step `t`.

@@ -85,15 +85,21 @@ end
 # per-time-point distribution, without tilde-ing against a `Union{Missing,T}`
 # value.
 #
-# An absent entry is missing at random, so it contributes no likelihood term
-# and is skipped rather than sampled (imputing it would add a latent HMC
-# cannot link for a count family, and an unneeded gradient dimension for a
-# continuous one). Predictive values at gaps come
-# from replaying the posterior, not from this loop. Skipping needs no
-# `Union{Missing,T}` array, which is exactly the array Enzyme's reverse-mode
-# type analysis cannot compile inside a model body; driving
-# `DynamicPPL.tilde_observe!!` directly off the carrier's concrete `present`
-# mask keeps every array the likelihood touches plainly typed.
+# An absent entry is missing at random, so it drops out of the likelihood: it
+# is skipped, not sampled. There is nothing to infer at a point that carries
+# no likelihood term, and imputing one breaks a discrete stream outright — a
+# count distribution has no bijector for HMC to link it with — as well as
+# adding a dead gradient dimension to a continuous one. Predictive values at
+# the gaps come from replaying the posterior after fitting; `forecast` builds
+# its horizon that way.
+#
+# `y_t[i] ~ dist` decides sample-vs-observe by checking `y_t[i] === missing`
+# at run time, so it needs a value that can hold `missing` at that lens, and
+# building that array inside a model body is exactly what Enzyme's
+# reverse-mode type analysis cannot compile. Driving
+# `DynamicPPL.tilde_observe!!` off the carrier's own concrete `present` mask
+# needs no such value: every array the likelihood touches stays plainly
+# typed.
 #
 # Returns the scored series (the observed entries as given, the absent ones
 # `missing`) and the updated `VarInfo`.

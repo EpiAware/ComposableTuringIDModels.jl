@@ -318,9 +318,10 @@ end
 
 # The reporting triangle is assembled — and its count matrix narrowed — before
 # the model is built, not inside the model body. Everything the body needs is
-# then one of its own arguments, so DynamicPPL owns any copying the count
-# matrix needs, a ready-built `ReportingTriangle` handed in by a caller is
-# never written to, and no unpacking or narrowing runs per evaluation. Doing
+# then one of its own arguments. DynamicPPL owns any copying the count matrix
+# needs — it deepcopies an argument that still holds a `missing` — so a
+# ready-built `ReportingTriangle` handed in by a caller is never written to,
+# and no unpacking or narrowing runs per evaluation. Doing
 # any of it in the body also puts a run-time type computation on the AD path,
 # which crashes Mooncake's compiler ("Unreachable reached") when the count
 # matrix's element type is not known at inference time.
