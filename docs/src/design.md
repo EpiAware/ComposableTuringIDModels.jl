@@ -230,7 +230,6 @@ data_requirements(delayed, y, length(y))
 It asks whether every observation supplied would be scored, so more data than
 the model can score is `false`, and supplying that number to
 `as_turing_model` is an error rather than a series quietly fitted at a
-different length:
 
 ```@example design
 data_fits(delayed, y, length(y)), data_fits(delayed, vcat(y, y), length(y))
