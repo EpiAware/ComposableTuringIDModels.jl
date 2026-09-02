@@ -63,13 +63,22 @@ struct ExpGrowthRate{L <: PriorLike, F <: Function, S <: PriorLike} <:
     transformation::F
     "Prior for the unconstrained initial infections."
     initialisation::S
+
+    function ExpGrowthRate(rt, transformation::Function, initialisation)
+        # `rt` is a length-`n` PATH slot: a bare `Distribution` is wrapped in an
+        # `Intercept` (a constant path), never left as a scalar.
+        wrapped = path_prior(rt)
+        return new{typeof(wrapped), typeof(transformation), typeof(initialisation)}(
+            wrapped, transformation, initialisation
+        )
+    end
 end
 
 function ExpGrowthRate(;
         rt = RandomWalk(),
         transformation::Function = _oneexpy, initialisation = Normal()
     )
-    return ExpGrowthRate(path_prior(rt), transformation, initialisation)
+    return ExpGrowthRate(rt, transformation, initialisation)
 end
 
 # Cumulative sum along the time axis: the whole path for a single series, each

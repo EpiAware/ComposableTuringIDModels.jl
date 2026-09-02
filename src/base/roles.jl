@@ -49,13 +49,16 @@ a (log) reproduction number or growth-rate path — and maps that to infections,
 no external latent path is threaded in. Its role interface is
 
 ```julia
-as_turing_model(model::AbstractInfectionModel, n)  # ⇒ (; I_t, Z_t)
+as_turing_model(model::AbstractInfectionModel, n)  # ⇒ at least (; I_t, Z_t)
 ```
 
-where the returned named tuple carries the infection path `I_t` and the model's
-internal latent draw `Z_t` (the (log) ``R_t`` / growth-rate path, or `nothing`
-for models with no exposable latent such as [`ODEProcess`](@ref)). Exposing
-`Z_t` keeps the latent recoverable as a generated quantity downstream.
+where the returned named tuple carries **at least** the infection path `I_t` and
+the model's internal latent draw `Z_t` (the (log) ``R_t`` / growth-rate path, or
+`nothing` for models with no exposable latent such as [`ODEProcess`](@ref)).
+Exposing `Z_t` keeps the latent recoverable as a generated quantity downstream.
+A model may return further quantities of its own alongside those two — a
+[`Renewal`](@ref) returns the seeding window it started from as `I_seed` — and a
+consumer reads the fields it needs by name rather than the whole tuple.
 
 Members include [`DirectInfections`](@ref), [`ExpGrowthRate`](@ref),
 [`Renewal`](@ref) and [`ODEProcess`](@ref). Only [`Renewal`](@ref) carries a
