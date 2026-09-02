@@ -177,7 +177,7 @@ score(f) = (days = f.n, cor = round(f.cor, digits = 2),
 Both fits recover the simulated ``\log R_t`` over the days they cover, and the posterior-trajectory figure below shows them agreeing where they overlap and following the simulated rise, peak and turn-over.
 The exact GP is fit to `n_ex` days rather than all `n` because its ``O(n^3)`` factorisation at the full length would dominate the cost of building this page.
 
-Those wall-clock times are single un-warmed runs over different series lengths, so read them as indicative.
+Those wall-clock times are un-warmed two-chain runs over different series lengths, so read them as indicative.
 One gradient of each composed log-density over the same `n_ex` days is the like-for-like comparison, and it is what the sampler pays per leapfrog step.
 
 ```@example gp
