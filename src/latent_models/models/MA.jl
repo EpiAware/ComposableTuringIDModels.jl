@@ -41,7 +41,10 @@ struct MA{C <: PriorLike, Q <: Int, E <: PriorLike} <: AbstractLatentModel
     function MA(θ, q::Int, ϵ_t)
         @assert q > 0 "q must be greater than 0"
         assert_prior_length(θ, q, "θ")
-        return new{typeof(θ), typeof(q), typeof(ϵ_t)}(θ, q, ϵ_t)
+        # `ϵ_t` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
+        # an `Intercept` (a constant innovation path), never left as a scalar.
+        wrapped = path_prior(ϵ_t)
+        return new{typeof(θ), typeof(q), typeof(wrapped)}(θ, q, wrapped)
     end
 end
 
@@ -54,7 +57,7 @@ function MA(;
         ϵ_t = HierarchicalNormal()
     )
     q = prior_order(θ)
-    return MA(θ, q, path_prior(ϵ_t))
+    return MA(θ, q, ϵ_t)
 end
 
 @model function as_turing_model(model::MA, n::Int)
