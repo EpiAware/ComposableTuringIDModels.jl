@@ -136,7 +136,10 @@ end
 # a stream is spliced only when the model draws MORE of it than the chain
 # holds. Parameters on an axis the horizon does not grow (a `Hierarchy`'s
 # per-stratum effects, say) are the same length in both models and are left
-# alone. The tail is a fresh prior draw of the horizon model, so it follows
+# alone. No heuristic on the time-axis length is used or wanted: an innovation
+# stream is typically shorter than the series it drives.
+#
+# The tail is a fresh prior draw of the horizon model, so it follows
 # that stream's actual prior; fitted scale and correlation are re-applied
 # deterministically by `predict`, not resampled.
 #
@@ -155,7 +158,6 @@ function _extend_latent_draws(rng::AbstractRNG, fc_model, chain)
     _assert_factorised(rng, fc_model, resized)
     ni, nc = size(chain)
     for j in 1:nc, i in 1:ni
-
         prior = Dict(vn => val for (vn, val) in pairs(rand(rng, fc_model)))
         for (key, fit_len) in resized
             full = prior[key.name]

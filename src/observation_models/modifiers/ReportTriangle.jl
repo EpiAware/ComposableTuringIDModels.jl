@@ -322,8 +322,8 @@ end
 # matrix needs, a ready-built `ReportingTriangle` handed in by a caller is
 # never written to, and no unpacking or narrowing runs per evaluation. Doing
 # any of it in the body also puts a run-time type computation on the AD path,
-# which crashes Mooncake's compiler when the count matrix's element type is
-# not known at inference time.
+# which crashes Mooncake's compiler ("Unreachable reached") when the count
+# matrix's element type is not known at inference time.
 function as_turing_model(obs_model::ReportTriangle, y_t, Y_t)
     tri = define_y_t(obs_model, y_t, Y_t)
     n = length(Y_t)

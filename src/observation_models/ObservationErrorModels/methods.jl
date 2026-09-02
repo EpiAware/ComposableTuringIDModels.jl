@@ -85,9 +85,10 @@ end
 # per-time-point distribution, without tilde-ing against a `Union{Missing,T}`
 # value.
 #
-# A gap contributes no likelihood term: it is skipped, not sampled (imputing
-# it would add a latent HMC cannot link for a count family, and an unneeded
-# gradient dimension for a continuous one). Predictive values at gaps come
+# An absent entry is missing at random, so it contributes no likelihood term
+# and is skipped rather than sampled (imputing it would add a latent HMC
+# cannot link for a count family, and an unneeded gradient dimension for a
+# continuous one). Predictive values at gaps come
 # from replaying the posterior, not from this loop. Skipping needs no
 # `Union{Missing,T}` array, which is exactly the array Enzyme's reverse-mode
 # type analysis cannot compile inside a model body; driving

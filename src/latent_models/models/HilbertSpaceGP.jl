@@ -78,7 +78,8 @@ function _check_spectral_args(σ, ℓ)
 end
 
 # Shared construction-time guard for the two GP latent models. Both need
-# ℓ > 0 and σ ≥ 0; checking the hyperprior's *support* at construction rejects
+# ℓ > 0 (no spectral density, and a singular covariance, at ℓ ≤ 0) and
+# σ ≥ 0. Checking the hyperprior's *support* at construction rejects
 # an unusable hyperprior (say `length_scale = Normal()`) up front rather than
 # letting the first negative proposal abort a chain far from its cause. The
 # bound is ≥ 0, not > 0, so a prior with an open lower limit at zero
