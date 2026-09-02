@@ -46,12 +46,11 @@ tv = AR(; damp = RandomWalk())
 (order = tv.p, transform = tv.transform)
 ```
 
-The transform is a first-class field of [`AR`](@ref), not baked into the
-constructor: the default is just what a ``\rho`` in ``(-1, 1)`` needs — `tanh`
-for a process-valued `damp` (an unbounded draw mapped into the stationary band),
-`identity` for an already-bounded `Distribution` — and any map can be passed as
-the `transform` keyword instead. So the coefficient is transformed where it is
-drawn, and the recursion reads the mapped path.
+`transform` is a field of [`AR`](@ref), not something the constructor bakes in.
+The default is what a ``\rho`` in ``(-1, 1)`` needs.
+A process-valued `damp` gets `tanh`, mapping an unbounded draw into the stationary band, and an already-bounded `Distribution` gets `identity`.
+Pass any other map as the `transform` keyword.
+The coefficient is transformed where it is drawn, so the recursion reads the mapped path.
 
 Built with `as_turing_model(m, n)` it returns the numeric length-`n` path (like
 every other latent model), and tracks the coefficient path ``\rho_t`` as a
@@ -93,21 +92,15 @@ end
     ρ_end = round(ρ_true[end], digits = 2))
 ```
 
-The model wraps the time-varying `AR` in a thin observation of the path and fits
-under NUTS. The composition is the package's own stack rather than a
-hand-written `@model` loop: [`DirectInfections`](@ref) with
-`transformation = identity` and a fixed zero `initialisation` passes the `AR`
-path straight through as the expected series, and a [`NormalError`](@ref) with
-a fixed tiny standard deviation observes it. The coefficient path is tracked as
-the generated quantity `ρ`, so it is recovered straight from the chain.
-We draw two chains in parallel with `MCMCThreads()` and differentiate with
-[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend
-for this package (see [Automatic differentiation backend](@ref ad-backends)).
+The fit is built from the package's own components rather than a hand-written `@model` loop.
+[`DirectInfections`](@ref) with `transformation = identity` and a fixed zero `initialisation` passes the `AR` path through as the expected series, and a [`NormalError`](@ref) with a fixed standard deviation observes it.
+The coefficient path is tracked as the generated quantity `ρ`, so it comes straight from the chain.
+We draw two chains in parallel with `MCMCThreads()` and differentiate with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for this package (see [Automatic differentiation backend](@ref ad-backends)).
 
 ```@example tvdamp
 model = IDModel(
-    DirectInfections(
-        ; Z = AR(; damp = RandomWalk()), transformation = identity,
+    DirectInfections(;
+        Z = AR(; damp = RandomWalk()), transformation = identity,
         initialisation = FixedIntercept(0.0)
     ),
     NormalError(std = FixedIntercept(0.01))
@@ -145,7 +138,7 @@ axislegend(ax; position = :lb)
 fig
 ```
 
-The band tracks the true trajectory across the series, so the time-varying damping
+The band covers the true trajectory across the series, so the time-varying damping
 is recovered from data — with the coefficient's evolution supplied as an ordinary
 prior process rather than coded by hand. The same mechanism widens any scalar
 parameter to a time-varying one: put a process in its slot instead of a
