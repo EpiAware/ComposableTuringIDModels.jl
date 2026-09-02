@@ -227,6 +227,34 @@ end
         wrappers(observation_components(obs))
 end
 
+@testitem "swap reaches an IDModel's chain and leaves its infections alone" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: swap, observation_components
+
+    # An `IDModel` delegates to its observation model, so the composed and bare
+    # forms give the same chain, and the infection process is passed through
+    # by identity rather than rebuilt.
+    infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal())
+    obs = LatentDelay(
+        Split((cases = PoissonError(), deaths = PoissonError())),
+        [0.5, 0.3, 0.2]
+    )
+    to_negbin = x -> x isa PoissonError ? NegativeBinomialError() : x
+
+    swapped = swap(to_negbin, IDModel(infection, obs))
+    @test swapped isa IDModel
+    @test swapped.infection_model === infection
+    @test all(
+        x -> !(x isa PoissonError), observation_components(swapped)
+    )
+    @test count(
+        x -> x isa NegativeBinomialError, observation_components(swapped)
+    ) == 2
+    # Same chain either way in.
+    @test observation_components(swapped.observation_model) ==
+        observation_components(swap(to_negbin, obs))
+end
+
 @testitem "rewrap rejects the wrong number of replacements" begin
     using ComposableTuringIDModels, Distributions
     using ComposableTuringIDModels: wrapped_models, rewrap
