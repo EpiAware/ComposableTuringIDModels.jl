@@ -269,7 +269,7 @@ nothing # hide
 
 `young`, `old`, and `total` are not three independent counts.
 `total` is exactly `young + old`, so all three read the same one-stratum ``R_t`` path through fixed, unequal weights rather than each pinning it independently.
-That collinearity makes the ``\epsilon_t`` innovations mix more slowly than the two-stream parallel fit above, worth knowing before trusting any one tutorial's diagnostics at face value.
+That collinearity makes the ``\epsilon_t`` innovations mix more slowly than the two-stream parallel fit above.
 
 ```@example split
 summarystats(weighted_chain)
@@ -301,7 +301,7 @@ axislegend(ax_young; position = :lt)
 fig2
 ```
 
-Despite the slower mixing, the 95% band covers the simulated counts on almost every day for all three streams, so the many-to-one map is recovered, not merely simulated.
+Despite the slower mixing, the 95% band covers the simulated counts on almost every day for all three streams, so the many-to-one map is recovered.
 A single shared ``R_t`` path, read through three collinear weighted views of it, is enough to pin that path.
 `young` and `old` need no independent signal of their own, and `total` still lands on its simulated series because `W` ties it to the same shared path.
 

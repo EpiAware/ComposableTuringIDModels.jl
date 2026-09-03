@@ -206,7 +206,6 @@ fig
 ```
 
 The mechanistic infectious-proportion curve peaks mid-outbreak, and the posterior-predictive in-bed counts bracket the observed epidemic curve.
-The SIR dynamics, scaled by the population and Poisson observation model, reproduce the boarding-school outbreak.
 
 ## Adding a stochastic ascertainment process
 
@@ -242,7 +241,7 @@ stochastic_model = IDModel(sir_process, stochastic_obs)
 nothing # hide
 ```
 
-Swapping the deterministic observation model for the stochastic one is a single structural change, and the SIR infection process is reused untouched.
+Swapping the deterministic observation model for the stochastic one is a single structural change.
 The composed model is fit exactly as before.
 The ascertainment process adds latent parameters, so we raise the NUTS target acceptance rate a little to keep the sampler stable through the ODE solve.
 

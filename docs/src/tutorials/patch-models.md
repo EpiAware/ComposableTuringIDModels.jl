@@ -154,8 +154,7 @@ axislegend(ax_obs; position = :lt)
 fig_obs
 ```
 
-That is the whole model.
-A shared, partially pooled process, a one-directional mixing matrix, and a negative-binomial stream per patch.
+The model is a shared, partially pooled process, a one-directional mixing matrix, and a negative-binomial stream per patch.
 
 ## Fitting it
 
@@ -274,7 +273,6 @@ patch_lines(sim_exo.I_t ./ sim_coupled.I_t;
 ## Writing a coupling
 
 A coupling is a method of [`renewal_pressure`](@ref) taking the convolved incidence window and returning the pressure on each patch.
-Adding one is the whole extension.
 Here the patches sit on a ring, and each takes a share of its two neighbours.
 
 ```@example patches
@@ -305,5 +303,4 @@ patch_lines(sim_ring.I_t ./ sim_pooled.I_t;
 ```
 
 Every patch lifts, because on a ring every patch has two neighbours, and the lift compounds because imported infections then transmit onward.
-Nothing else changed.
-The same process, the same seeding, the same observation model, and no change anywhere in the renewal recursion.
+The process, the seeding, the observation model and the renewal recursion are all unchanged.

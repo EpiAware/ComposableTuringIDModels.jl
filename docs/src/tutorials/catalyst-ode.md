@@ -18,7 +18,7 @@ This page fits the SIR network to a real outbreak, then swaps in SEIR without to
     The hand-coded [`SIRParams`](@ref) / [`SEIRParams`](@ref) remain the zero-latency default.
     The declarative path is opt-in for users building new or more complex compartmental models.
 
-## Declaring and grokking a network
+## Declaring and inspecting a network
 
 We declare SIR as two reactions.
 Each reads like the transmission diagram, a rate constant then the species that react.
@@ -45,7 +45,6 @@ end
 nothing # hide
 ```
 
-The point of the generic path is that we can *grok* any network symbolically.
 Catalyst reads off the species and rate parameters we then attach priors to.
 
 ```@example catalyst
@@ -207,7 +206,7 @@ The declarative SIR dynamics, scaled by the population and Poisson observation m
 ## The same API on a different network
 
 The payoff of the generic path is that a different compartmental model is a different reaction network passed to the *same* [`CatalystODEParams`](@ref).
-We add an exposed class ``E`` to make SEIR, grok it the same way, and fit it with no change to the observation model or the composition.
+We add an exposed class ``E`` to make SEIR, read it the same way, and fit it with no change to the observation model or the composition.
 
 ```math
 \begin{aligned}
@@ -252,9 +251,8 @@ seir_chain = sample(
 (β = mean(βe), α = mean(αe), γ = mean(γe), R0 = mean(βe ./ γe))
 ```
 
-Both fits ran through the same [`CatalystODEParams`](@ref), the same [`ODEProcess`](@ref) contract, and the same FlexiChains readback.
 Adding a fourth compartment, a vaccinated class, or a second strain is a matter of writing a different reaction network and passing it to the same type, and the vector field and Jacobian follow automatically.
-That is the trade the Catalyst extension offers, a one-off symbolic-compilation cost and a heavier dependency tree in exchange for declarative, model-agnostic, self-consistent dynamics.
+The Catalyst extension trades a one-off symbolic-compilation cost and a heavier dependency tree for declarative, model-agnostic dynamics.
 
 ## References
 

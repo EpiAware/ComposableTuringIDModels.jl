@@ -92,7 +92,6 @@ post_mean = vec(mean(level_draws; dims = 2))
 ```
 
 The posterior per-group levels line up with the simulated truth.
-A plot with 80% credible intervals against the ``y = x`` line makes the recovery visible.
 
 ```@example hier
 using CairoMakie
