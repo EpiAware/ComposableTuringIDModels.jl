@@ -392,8 +392,9 @@ end
         I₀ = infection.transformation.(_seed(init_incidence, n))
         init = _make_renewal_init(scan_step, gen_int, I₀, first(Rts))
     end
-    # One scan, both series off the same accumulated states: the committed
-    # draw `I_t` and the expectation `exp_I_t` it was drawn around.
+    # One scan feeds both series off the same accumulated states. `I_t` is
+    # the committed draw. `exp_I_t` is the incidence the modifier tuple
+    # received.
     result = accumulate(scan_step, Rts; init = init)
     I_t = get_state(scan_step, init, result)
     exp_I_t := get_expected_state(scan_step, init, result)

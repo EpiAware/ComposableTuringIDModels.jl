@@ -238,19 +238,16 @@ function get_state(::RenewalStep, initial_state, state)
     return _series(state .|> x -> x.val)
 end
 
-# Assemble the noise-free expectation series. A `_PlainRenewalStep` delegates
-# its scan to the bare core, whose states carry no `exp_val`; there is nothing
-# to transform, so the expectation is the draw itself.
-function get_expected_state(step::_PlainRenewalStep, initial_state, state)
-    return get_state(step, initial_state, state)
-end
-
 @doc raw"
 Assemble the noise-free renewal expectation series from a scan's accumulated
 states, mirroring [`get_state`](@ref).
 
 Each step's expectation is the force of infection the core computed, before any
 modifier transformed it. Without modifiers it equals the committed draw.
+
+Only the renewal steps carry an expectation. Any other
+[`AbstractAccumulationStep`](@ref) has none, and calling this on one says so
+rather than failing with a bare `MethodError`.
 
 # Arguments
 
@@ -264,12 +261,27 @@ modifier transformed it. Without modifiers it equals the committed draw.
 using ComposableTuringIDModels
 core = ComposableTuringIDModels.ConstantRenewalStep(reverse([0.2, 0.3, 0.5]))
 step = RenewalStep(core, (SusceptibleDepletion(100.0),))
-init = ComposableTuringIDModels.renewal_init_state(
-    step, [1.0], 0.0, 3)
+init = ComposableTuringIDModels.renewal_init_state(step, 1.0, 0.0, 3)
 result = accumulate(step, [1.0, 2.0, 3.0]; init = init)
 ComposableTuringIDModels.get_expected_state(step, init, result)
 ```
 "
+function get_expected_state(step::AbstractAccumulationStep, initial_state, state)
+    return error(
+        "$(typeof(step)) has no noise-free expectation. " *
+            "`get_expected_state` is defined for the renewal steps, where " *
+            "the expectation is the force of infection before any modifier " *
+            "transforms it. A step that has one must implement it."
+    )
+end
+
+# A `_PlainRenewalStep` delegates its scan to the bare core, whose states carry
+# no `exp_val`. Nothing transforms the incidence, so the expectation is the
+# committed draw.
+function get_expected_state(step::_PlainRenewalStep, initial_state, state)
+    return get_state(step, initial_state, state)
+end
+
 function get_expected_state(::RenewalStep, initial_state, state)
     return _series(state .|> x -> x.exp_val)
 end

@@ -284,11 +284,25 @@ end
     exp_val = get_expected_state(good, init, result)
     @test length(exp_val) == length(Rt)
     @test all(exp_val .>= 0)
-    # The expectation is the pre-modifier incidence: with susceptible depletion
-    # the committed draw is scaled down by the susceptible fraction, so it stays
-    # at or below the expectation and equals it only while the pool is full.
+    # The expectation is the pre-modifier incidence. Susceptible depletion
+    # scales the committed draw down by the susceptible fraction, so the draw
+    # stays at or below the expectation and equals it only while the pool is
+    # full.
     @test all(accumulate_scan(good, init, Rt) .<= exp_val .+ 1.0e-8)
     @test maximum(accumulate_scan(good, init, Rt)) < maximum(exp_val)
+end
+
+@testitem "get_expected_state names a step that has no expectation" begin
+    using ComposableTuringIDModels: ARStep, get_expected_state
+    # Only the renewal steps carry an expectation. `get_expected_state` is
+    # public with a generic name, so a caller reaching it on another
+    # accumulation step gets the step named rather than a bare `MethodError`.
+    step = ARStep([0.5])
+    state = (; val = 1.0, window = [1.0])
+    @test_throws "ARStep" get_expected_state(step, state, [state])
+    @test_throws "has no noise-free expectation" get_expected_state(
+        step, state, [state]
+    )
 end
 
 @testitem "a plain renewal exposes exp_I_t identical to I_t" begin

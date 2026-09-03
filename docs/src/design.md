@@ -115,8 +115,8 @@ infection model takes only a series length and returns `(; I_t, Z_t)`: the
 infection path and the internal latent draw, kept accessible as a generated
 quantity. Only [`Renewal`](@ref) needs a generation interval, so it alone takes
 one; the others take a `transformation` directly.
-A [`Renewal`](@ref) also returns `exp_I_t`, the noise-free expectation the committed incidence was drawn around.
-It is the incidence reaching the modifier tuple, so it equals `I_t` when no modifier is present.
+A [`Renewal`](@ref) also returns `exp_I_t`, the incidence reaching the modifier tuple before any modifier transforms it.
+It equals `I_t` when no modifier is present.
 It is tracked as a generated quantity, so a chain recovers it.
 
 ## Swap-in, swap-out
