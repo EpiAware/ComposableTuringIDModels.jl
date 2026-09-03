@@ -85,14 +85,11 @@ end
 @doc raw"
 Whether a modifier is the one that gives infections their noise.
 
-A trait, `false` for every modifier by default. A stochastic-infection
-modifier sets it `true`, marking the point in the modifier tuple where the
-renewal *expectation* stops being an expectation: the incidence entering the
-first such modifier is the last value that still is one, and the incidence
-after it is a draw.
+A trait, `false` for every modifier by default.
+A stochastic-infection modifier sets it `true`, marking the point in the modifier tuple where the renewal expectation stops being an expectation.
+The incidence entering the first such modifier is the last value that still is one, and the incidence after it is a draw.
 
-Implement `is_noise` alongside [`apply_modifier`](@ref) on any modifier that
-draws infections.
+Implement `is_noise` alongside [`apply_modifier`](@ref) on any modifier that draws infections.
 
 # Arguments
 

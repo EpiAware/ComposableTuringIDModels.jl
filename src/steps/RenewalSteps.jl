@@ -205,9 +205,9 @@ end
 The incidence a renewal step proposes at `state`, and the modifier substates
 that go with it, as `(incidence, substates)`.
 
-The first half of a step. [`accumulate_scan`](@ref) commits the proposal
-straight away; a [`StochasticRenewal`](@ref) draws around it first. The
-default method is the plain force of infection with no substates.
+The first half of a step.
+[`accumulate_scan`](@ref) commits the proposal straight away, while a [`StochasticRenewal`](@ref) draws around it first.
+The default method is the plain force of infection with no substates.
 "
 function _propose(step::AbstractConstantRenewalStep, state, Rt)
     return renewal_foi(step, state.window, Rt), ()
@@ -217,8 +217,8 @@ end
 Advance a renewal step's state by committing `incidence`, with the substates
 [`_propose`](@ref) returned alongside it.
 
-The second half of a step: the shared incidence window advances once, whether
-the committed value is the proposal itself or a draw around it.
+The second half of a step.
+The shared incidence window advances once, whether the committed value is the proposal itself or a draw around it.
 "
 function _commit(::AbstractConstantRenewalStep, state, incidence, substates)
     return (; val = incidence, window = _advance(state.window, incidence))

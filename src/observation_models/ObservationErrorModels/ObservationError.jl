@@ -1,12 +1,12 @@
 # The generic moment-parameterised observation-error model, and the two
 # location-scale families that are common enough to keep a name of their own.
 #
-# One type per family means adding a family means adding a type, and the types
-# differ only in which family they name and in whether the spread is absolute
-# or relative to the expected value. `ObservationError` takes both as
-# arguments. `NormalError` and `LogNormalError` stay as named components,
-# because a name is worth having for the two families most models reach for,
-# and both are the same two lines over the shared moment core.
+# One type per family makes every new family a new type, and those types differ
+# only in which family they name and in whether the spread is absolute or
+# relative to the expected value. `ObservationError` takes both as arguments.
+# `NormalError` and `LogNormalError` stay as named components, because a name is
+# worth having for the two families most models reach for, and both are the same
+# two lines over the shared moment core.
 
 @doc raw"
 An observation-error model parameterised by the moments of any family.
@@ -21,24 +21,19 @@ that pair:
 y_t \sim F(Y_t, \sigma)
 ```
 
-`relative` chooses between the two: `false` (the default) makes ``\sigma`` an
-absolute standard deviation, `true` makes it a coefficient of variation, so
-the noise scales with the expected value. A relative log-normal is the usual
-choice for a concentration or another strictly positive continuous
-measurement; an absolute normal is [`NormalError`](@ref).
+`relative` chooses between the two.
+`false`, the default, makes ``\sigma`` an absolute standard deviation.
+`true` makes it a coefficient of variation, so the noise scales with the expected value.
+A relative log-normal is the usual choice for a concentration or another strictly positive continuous measurement.
+An absolute normal is [`NormalError`](@ref).
 
-The family is any `ReparameterisedDistributions` registers for `(:mean, :sd)`,
-which is how a new family becomes a call rather than a new type.
+The family is any `ReparameterisedDistributions` registers for `(:mean, :sd)`, which is how a new family becomes a call rather than a new type.
 `Normal` and `LogNormal` take a closed-form path instead of the moment solve.
-An invalid moment pair — which a diverging sampler reaches — scores `-\infty`
-rather than raising mid-gradient, and can still be drawn when the observation
-is `missing`.
+An invalid moment pair, which a diverging sampler reaches, scores ``-\infty`` rather than raising mid-gradient.
 
-`sd` sets the prior for ``\sigma`` — a `Distribution` (a constant, one scalar
-RV) or a process (a length-`n`, e.g. time-varying, spread). It is drawn
-through the single [`as_turing_submodel`](@ref) seam and read per time point
-via `at`, so a process makes the observation noise time-varying with no other
-change. It is sampled under the name `σ`.
+`sd` sets the prior for ``\sigma``, either a `Distribution` giving one scalar or a process giving a length-`n` spread.
+It is drawn through the single [`as_turing_submodel`](@ref) seam and read per time point via `at`, so a process makes the observation noise time-varying.
+It is sampled under the name `σ`.
 
 # Arguments
 
@@ -115,11 +110,10 @@ converted to its native parameters:
 s^2 = \log(1 + \sigma^2), \qquad \mu_t = \log Y_t - s^2 / 2
 ```
 
-``s`` does not depend on ``Y_t``: a constant coefficient of variation is a
-constant variance on the log scale, which is what makes this the
-relative-noise family. It is the natural error model for a strictly positive
-continuous measurement — a concentration, a prevalence — where the spread
-grows with the level, which [`NormalError`](@ref) cannot express.
+``s`` does not depend on ``Y_t``.
+A constant coefficient of variation is a constant variance on the log scale, which is what makes this the relative-noise family.
+It is the natural error model for a strictly positive continuous measurement, such as a concentration or a prevalence, where the spread grows with the level.
+[`NormalError`](@ref) cannot express that.
 
 `cv` sets the prior for ``\sigma``, drawn through the single
 [`as_turing_submodel`](@ref) seam and read per time point via `at`, so a

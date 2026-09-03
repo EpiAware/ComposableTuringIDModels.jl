@@ -2,7 +2,7 @@
 # and the non-centred renewal modifier that applies it.
 
 @doc raw"
-Stochastic infections for a renewal process: the noise family and its width.
+Stochastic infections for a renewal process, giving the noise family and its width.
 
 A deterministic renewal fixes infections at the renewal expectation ``\iota_t``.
 `InfectionNoise` gives them a distribution of their own, matched to the first two moments of a negative binomial.
@@ -20,7 +20,7 @@ An infinite `cv_cap` removes the limit and restores the exact negative-binomial 
 
 Being smooth costs the limit an absolute offset, ``\log(1 + e^{-k(u - c_t)}) / k``, which is 0.2% of the coefficient of variation at the defaults and ``6.7 \times 10^{-4}`` as ``c_t`` approaches zero.
 Subtracting it from a smaller coefficient of variation would leave zero or less, which is no distribution at all, so the limit applies only while it returns a positive value.
-Below that the limit is nowhere near binding — 0.5 against ``6.7 \times 10^{-4}`` — and the exact coefficient of variation is used.
+Below that the limit is nowhere near binding, 0.5 against ``6.7 \times 10^{-4}``, and the exact coefficient of variation is used.
 This is reached with `overdispersion = 0` past a few million infections.
 
 `dist` is the family those moments are matched onto.
@@ -40,8 +40,7 @@ The same specification drives both parameterisations.
 # Keyword Arguments
 
   - `dist`: the noise family (default `LogNormal`).
-  - `overdispersion`: the prior for ``\xi``, or a fixed scalar.
-    A fixed scalar costs no parameter.
+  - `overdispersion`: the prior for ``\xi``, or a fixed scalar that costs no parameter.
   - `cv_cap`: the soft upper limit on the coefficient of variation.
   - `cv_sharpness`: how sharply that limit is approached.
 
@@ -102,19 +101,18 @@ end
 # `ι`, under the soft cap: `sqrt(iota (1 + iota ξ²))`, written as `c_t ι` so
 # the cap applies to the coefficient of variation.
 #
-# A non-positive expectation has no such moment pair — `sqrt` of a negative
-# number raises, and the renewal has already gone somewhere it cannot come
-# back from — so it returns `NaN`, which the moment core's guards turn into a
-# `-Inf` score (centred) or a `NaN` draw (non-centred) rather than an error.
+# A non-positive expectation has no such moment pair, so it returns `NaN`. The
+# moment core's guards turn that into a `-Inf` score (centred) or a `NaN` draw
+# (non-centred) rather than an error.
 #
 # An upper limit must not change a value that is already below it, and the
-# smooth one does: it costs an offset of `log1p(exp(-k(u - c)))/k`, which is
-# 6.7e-4 at the defaults. A small `ξ` and an expectation past a few million
-# make the raw coefficient of variation smaller than that offset, so the cap
-# returns zero or less — no distribution at all, at an incidence a
-# national-scale model reaches. The capped value is therefore used only while
-# it is positive. Below that the cap is nowhere near binding, 0.5 against
-# 6.7e-4, and the value it is not entitled to change is the exact one.
+# smooth one does. It costs an offset of `log1p(exp(-k(u - c)))/k`, which is
+# 6.7e-4 at the defaults. A small `ξ` and an expectation past a few million make
+# the raw coefficient of variation smaller than that offset, so the cap returns
+# zero or less, which is no distribution at all at an incidence a national-scale
+# model reaches. The capped value is therefore used only while it is positive.
+# Below that the cap is nowhere near binding, 0.5 against 6.7e-4, and the exact
+# value stands.
 function _noise_sd(noise::InfectionNoise, ι, ξ)
     ι > 0 || return convert(typeof(float(ι * ξ * noise.cv_cap)), NaN)
     raw = sqrt(inv(ι) + ξ^2)
@@ -132,12 +130,12 @@ function _noise_draw(noise::InfectionNoise, ι, ξ, z)
     return _moment_draw(noise.dist, ι, _noise_sd(noise, ι, ξ), z)
 end
 
-# The overdispersion slot, drawn once per model. A fixed scalar is a constant,
-# not a point-mass parameter: it stays out of the sampled space entirely,
-# which is what a fixed overdispersion is for. Kept as a `@model` so both
-# parameterisations resolve the slot through the same call with no branch on
-# what the slot holds. `n` is the series length, so a process-valued prior
-# gives a time-varying overdispersion read per step with `at`.
+# The overdispersion slot, drawn once per model. A fixed scalar is a constant
+# rather than a point-mass parameter, so it stays out of the sampled space.
+# Kept as a `@model` so both parameterisations resolve the slot through the
+# same call with no branch on what the slot holds. `n` is the series length, so
+# a process-valued prior gives a time-varying overdispersion read per step with
+# `at`.
 @model function _noise_overdispersion(noise::InfectionNoise{<:Any, <:Real}, n)
     return noise.overdispersion
 end
@@ -173,9 +171,9 @@ struct InfectionNoiseDraws{V, N, X} <: AbstractRenewalModifier
     overdispersion::X
 end
 
-# The substate is the step counter: a scan step has no clock of its own, so a
-# per-time modifier carries the index it has reached. The window is unused —
-# a step counter has no shape of its own to match.
+# The substate is the step counter. A scan step has no clock of its own, so a
+# per-time modifier carries the index it has reached. The window is unused,
+# because a step counter has no shape of its own to match.
 modifier_init_state(::InfectionNoiseDraws, window) = 0
 
 function apply_modifier(mod::InfectionNoiseDraws, incidence, t)

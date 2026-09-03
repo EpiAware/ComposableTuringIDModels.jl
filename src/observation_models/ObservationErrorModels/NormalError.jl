@@ -16,9 +16,8 @@ minimal non-count observation error, useful for already-aggregated or transforme
 quantities (e.g. log-incidence, prevalence proportions, wastewater
 concentrations) where a Gaussian likelihood is appropriate.
 
-The noise is **absolute**: ``\sigma`` does not scale with the expected value.
-For noise proportional to it use [`LogNormalError`](@ref), and for any other
-family [`ObservationError`](@ref).
+The noise is **absolute**, so ``\sigma`` does not scale with the expected value.
+For noise proportional to it use [`LogNormalError`](@ref), and for any other family [`ObservationError`](@ref).
 
 The field `std` sets the prior for ``\sigma`` — a `Distribution` (a constant, one
 scalar RV) or a process (a length-`n`, e.g. time-varying, standard deviation). It
@@ -46,6 +45,6 @@ NormalError(; std = HalfNormal(0.1)) = NormalError(std)
     return (; σ = σ)
 end
 
-# Through the shared moment core rather than a bare constructor, so a spread a
-# diverging sampler drives non-finite scores `-Inf` rather than raising.
+# Through the shared moment core rather than a bare constructor, so a
+# non-finite spread from a diverging sampler scores `-Inf` rather than raising.
 observation_error(::NormalError, Y_t, σ) = _moment_dist(Normal, Y_t, σ)

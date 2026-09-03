@@ -3,15 +3,15 @@
 # stochastic renewal.
 
 # The field type a family is stored under. `typeof(LogNormal)` is `UnionAll`,
-# which says nothing about *which* family it is, so every dispatch on the
-# family would resolve at run time and whatever the moment core returns would
-# infer as `Any` — which then propagates through everything downstream, a
-# renewal recursion included. `Type{LogNormal}` has one instance, so the family
-# stays in the type domain and the caller stays concretely typed.
+# which says nothing about which family it is, so every dispatch on the family
+# would resolve at run time and whatever the moment core returns would infer as
+# `Any`. That propagates through everything downstream, a renewal recursion
+# included. `Type{LogNormal}` has one instance, so the family stays in the type
+# domain and the caller stays concretely typed.
 #
-# A component storing a family calls this from its inner constructor, which is
-# also where an instance handed in place of the family is caught: it would
-# otherwise fail deep inside the moment solve instead.
+# A component storing a family calls this from its inner constructor. That is
+# also where an instance handed in place of the family is caught, rather than
+# deep inside the moment solve.
 _family_type(::Type{F}) where {F} = Type{F}
 
 function _family_type(dist)
@@ -80,9 +80,9 @@ _moment_reject(::Type{F}, mean, sd) where {F} = _NoDraw{F}(mean, sd)
 # Whether a `(mean, sd)` pair describes a member of the family.
 #
 # The two closed-form families answer for themselves, in the coordinates their
-# own conversion uses: `LogNormal` squares `sd / mean`, which overflows to
-# `Inf` once the ratio passes `sqrt(floatmax)` and then reaches the constructor
-# looking valid, and `Normal` takes the mean as its location and so accepts any
+# own conversion uses. `LogNormal` squares `sd / mean`, which overflows to `Inf`
+# once the ratio passes `sqrt(floatmax)` and then reaches the constructor
+# looking valid. `Normal` takes the mean as its location, so it accepts any
 # finite one. Every other family defers to the registered `valid_moments`
 # predicate, with a finiteness check on top.
 function _moment_valid(::Type{Normal}, mean, sd)
@@ -102,11 +102,11 @@ end
 
 # The moment solve itself, on a pair already known valid. `LogNormal` inverts
 #   mean = exp(μ + s² / 2),  var = mean² (exp(s²) - 1)
-# to `s² = log1p((sd / mean)²)` and `μ = log(mean) - s² / 2`, which is exactly
-# what `reparameterise` registers for the family — the fast path is the same
-# algebra without the wrapper, so the two agree to the last bit and the return
-# type stays a plain `LogNormal`. `Normal` is native in these coordinates and
-# has no registered reparameterisation at all.
+# to `s² = log1p((sd / mean)²)` and `μ = log(mean) - s² / 2`, which is what
+# `reparameterise` registers for the family. The fast path is the same algebra
+# without the wrapper, so the two agree to the last bit and the return type
+# stays a plain `LogNormal`. `Normal` is native in these coordinates and has no
+# registered reparameterisation.
 _native_dist(::Type{Normal}, mean, sd) = Normal(mean, sd)
 
 function _native_dist(::Type{LogNormal}, mean, sd)
@@ -123,10 +123,9 @@ The distribution of family `family` with mean `mean` and standard deviation
 `sd`, or a rejection distribution when that pair describes no member of the
 family.
 
-The guarded entry point every moment-parameterised component builds its
-per-time-point distribution through. An invalid pair scores `-Inf` and samples
-`Inf`, so a diverging proposal is rejected rather than raising mid-gradient and
-a `missing` observation can still be drawn.
+The guarded entry point every moment-parameterised component builds its per-time-point distribution through.
+An invalid pair scores ``-\infty``, so a diverging proposal is rejected rather than raising mid-gradient.
+Asking one for a value raises instead, because there is no proposal to reject and no honest number to return.
 
 # Arguments
 
@@ -142,11 +141,11 @@ end
 # The moment-matched quantile at a standard normal draw `z`, on a pair already
 # known valid.
 #
-# The two closed forms are exact: a `Normal` is its own location-scale family,
-# and a `LogNormal` is one on the log scale. Everything else round-trips
-# through the normal CDF, which has no resolution left in the tails — it
-# saturates at exactly 1 by eight standard deviations out, and the draw comes
-# back as the support's endpoint.
+# The two closed forms are exact. A `Normal` is its own location-scale family
+# and a `LogNormal` is one on the log scale. Everything else round-trips through
+# the normal CDF, which has no resolution left in the tails. It saturates at
+# exactly 1 by eight standard deviations out, and the draw comes back as the
+# support's endpoint.
 _moment_quantile(::Type{Normal}, mean, sd, z) = mean + sd * z
 
 function _moment_quantile(::Type{LogNormal}, mean, sd, z)
@@ -166,10 +165,8 @@ quantile at the standard normal draw `z`.
 X = F^{-1}_{m, s}(\Phi(z)), \qquad z \sim \mathrm{Normal}(0, 1)
 ```
 
-`NaN` for a `(mean, sd)` pair describing no member of the family, which a
-guarded observation model downstream turns into a `-Inf` score. The guard is
-what keeps `quantile` — which raises on an invalid pair, as `rand` does — off
-an unreachable branch.
+`NaN` for a `(mean, sd)` pair describing no member of the family, which a guarded observation model downstream turns into a ``-\infty`` score.
+The guard keeps `quantile` off such a pair, which it raises on as `rand` does.
 
 # Arguments
 
