@@ -35,10 +35,10 @@ vector of them).
     prefix::P
 end
 
-# `PrefixLatentModel` wraps whatever its inner model returns, so it serves both
-# a length-`n` path and an `(n_strata, n_time)` shape. The two methods below
-# delegate to one shared `@model`, which avoids both the duplication and a
-# dispatch ambiguity against the `AbstractPriorModel`/`Dims{2}` guard.
+# `PrefixLatentModel` wraps whatever its inner model returns, so it serves both a
+# length-`n` path and an `(n_strata, n_time)` shape.
+# The two methods below delegate to one shared `@model`, which avoids a dispatch
+# ambiguity against the `AbstractPriorModel`/`Dims{2}` guard.
 @model function _prefix_latent(model::PrefixLatentModel, n)
     submodel ~ to_submodel(
         prefix(as_turing_model(model.model, n), Symbol(model.prefix)), false

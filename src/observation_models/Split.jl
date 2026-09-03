@@ -1,7 +1,5 @@
-# Observation composition: split one expected series into several named
-# observation streams. Each stream sees the expected series arriving at the point
-# where `Split` sits in the pipeline, so placement alone gives parallel streams
-# (split high, on infections) or a cascade (split low, after a shared delay).
+# Each stream sees the expected series arriving at the point where `Split` sits
+# in the pipeline, so placement alone gives parallel streams or a cascade.
 
 @doc raw"
 A strata mapping supplied as the expected series to a [`Split`](@ref): project a
@@ -217,12 +215,11 @@ function Split(template::AbstractObservationModel, map::AbstractMatrix)
     return Split(template, nothing, map)
 end
 
-# Pretty-printing: a Split's children are its named streams, one per line, so the
-# split reads as a branch per stream rather than an opaque `Split` leaf. The
-# generic field walk skips the `streams` NamedTuple (a NamedTuple is neither an
-# `AbstractComposableModel` nor a `Tuple`), so name each stream explicitly here;
-# the shared tree printer then handles the connectors and nesting indentation. In
-# the data-driven strata mode `streams` is a single template, shown as one child.
+# The generic field walk skips the `streams` NamedTuple, which is neither an
+# `AbstractComposableModel` nor a `Tuple`, so each stream is named explicitly
+# here.
+# In the data-driven strata mode `streams` is a single template, shown as one
+# child.
 function _component_children(m::Split)
     m.streams isa NamedTuple ||
         return Tuple{String, AbstractComposableModel}[("template", m.streams)]
@@ -232,9 +229,9 @@ function _component_children(m::Split)
     ]
 end
 
-# Ordered stream names: fixed for explicit streams; else the `y_t` keys for a
-# NamedTuple, or `"group1", "group2", ...` for a plain data matrix (rows are
-# streams).
+# Ordered stream names, fixed for explicit streams.
+# Otherwise the `y_t` keys for a `NamedTuple`, or `"group1", "group2", …` for a
+# plain data matrix whose rows are streams.
 function _split_names(m::Split, y_t)
     m.names === nothing || return m.names
     y_t isa NamedTuple && return collect(string.(keys(y_t)))
@@ -245,28 +242,25 @@ function _split_names(m::Split, y_t)
     )
 end
 
-# Per-Split expected input: with a stored weight `map` the incoming series is the
-# infection strata (a matrix, or a vector taken as one stratum) projected through
-# it; otherwise the incoming series is used directly (dispatch on its type).
+# With a stored weight `map` the incoming series is the infection strata
+# projected through it.
+# Otherwise the incoming series is used directly.
 function _split_expected(m::Split, Y_t, names)
     m.map === nothing && return _split_expected(Y_t, names)
     strata = Y_t isa AbstractMatrix ? Y_t : permutedims(collect(Y_t))
     return _split_expected(StrataMap(strata, m.map), names)
 end
 
-# Per-stream models: the named entries, or the template replicated per stream.
-# The named branch is a `Tuple`, not a `Vector`: differently-typed streams
-# infer a packed `Union` eltype Enzyme's type analysis rejects. The template
-# branch is a single concrete type already.
+# The named branch is a `Tuple` rather than a `Vector`, because differently-typed
+# streams infer a packed `Union` eltype Enzyme's type analysis rejects.
 function _split_models(m::Split, names)
     m.streams isa NamedTuple && return Tuple(m.streams[Symbol(nm)] for nm in names)
     return [m.streams for _ in names]
 end
 
-# Per-stream data: a NamedTuple splits by name; an AbstractMatrix splits by
-# row (stream `k` is row `k`, matching `_split_names`'s matrix branch);
-# anything else (a `missing` or a nested placeholder vector) is shared to
-# every stream.
+# A `NamedTuple` splits by name and an `AbstractMatrix` by row, matching
+# `_split_names`'s matrix branch.
+# Anything else is shared to every stream.
 function _split_y_t(names, y_t::NamedTuple)
     @assert Set(Symbol.(names)) == Set(keys(y_t)) "The stream names $(Tuple(names)) must match the observed-series keys $(keys(y_t))"
     return [y_t[Symbol(nm)] for nm in names]

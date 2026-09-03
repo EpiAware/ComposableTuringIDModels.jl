@@ -77,9 +77,9 @@ end
     d = model.d
     @assert n > d "n must be longer than d"
     init ~ as_turing_submodel(model.init, d; prefix = true)
-    # The inner process draws its own `init`, so namespace it: the bare
-    # `init` above is this model's integration constants and `diff.*` are
-    # parameters of the differenced series.
+    # The inner process draws its own `init`, so it is namespaced.
+    # The bare `init` above is this model's integration constants and `diff.*`
+    # are parameters of the differenced series.
     diff ~ as_turing_submodel(model.model, n - d; prefix = true)
     return _combine_diff(init, diff, d)
 end

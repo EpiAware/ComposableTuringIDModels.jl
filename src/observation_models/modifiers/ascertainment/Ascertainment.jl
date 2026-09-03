@@ -26,8 +26,7 @@ name) unless the prefix is the empty string.
 # Examples
 ```@example Ascertainment
 using ComposableTuringIDModels, Distributions
-# A latent model gives a time-varying ascertainment effect. The default
-# transform reads the effect on the log scale, so `log(0.1)` is a 10%
+# The default transform reads the effect on the log scale, so `log(0.1)` is a 10%
 # ascertainment rate.
 obs = Ascertainment(PoissonError(), FixedIntercept(log(0.1)))
 rand(as_turing_model(obs, missing, fill(10.0, 5)))
@@ -68,11 +67,10 @@ struct Ascertainment{
             F <: Function, P <: String,
         }
         @assert hasmethod(transform, Tuple{Vector, Vector}) "transform must have a method for (Vector, Vector)"
-        # A latent model is used as-is (a time-varying effect); a bare
-        # `Distribution` is wrapped in an `Intercept` (a single constant factor
-        # drawn once and broadcast). Namespace it under `latent_prefix` via
-        # `PrefixLatentModel` so the ascertainment variables stay distinct; an
-        # empty prefix opts out, leaving the prior unprefixed.
+        # A bare `Distribution` is wrapped in an `Intercept`, a single constant
+        # factor drawn once and broadcast.
+        # `PrefixLatentModel` namespaces it under `latent_prefix` so the
+        # ascertainment variables stay distinct, and an empty prefix opts out.
         coerced = _ascertainment_prior(latent_model)
         prior = latent_prefix == "" ? coerced :
             PrefixLatentModel(coerced, latent_prefix)
@@ -81,10 +79,10 @@ struct Ascertainment{
         )
     end
 
-    # The raw constructor, taking the fields exactly as stored, with the prior
-    # already coerced and prefixed. Rebuilding a component goes through this
-    # rather than through the constructor above, which would prefix a second
-    # time.
+    # The raw constructor, taking the fields exactly as stored with the prior
+    # already coerced and prefixed.
+    # Rebuilding goes through this rather than through the constructor above,
+    # which would prefix a second time.
     function Ascertainment{M, L, F, P}(
             model, latent_model, transform, latent_prefix
         ) where {M, L, F, P}
@@ -94,7 +92,7 @@ end
 
 # An `Ascertainment` stores its prior already wrapped in a `PrefixLatentModel`,
 # so a rebuild through the public constructor wraps it again and nothing throws.
-# Point `ConstructionBase` (and so `Accessors`) at the raw constructor.
+# Point `ConstructionBase`, and so `Accessors`, at the raw constructor.
 ConstructionBase.constructorof(::Type{<:Ascertainment}) = _rebuild_ascertainment
 
 function _rebuild_ascertainment(model, latent_model, transform, latent_prefix)

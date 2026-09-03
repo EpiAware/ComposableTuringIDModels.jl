@@ -71,9 +71,8 @@ struct Stratify{S <: PriorLike, A <: PriorLike, F <: Function} <:
     combine::F
 
     function Stratify(shared, across, combine::Function)
-        # `shared` and `across` are both PATH slots: a bare `Distribution` in
-        # either is wrapped in an `Intercept` (a constant path), never left as
-        # a scalar.
+        # `shared` and `across` are both path slots, so a bare `Distribution` in
+        # either is wrapped in an `Intercept` rather than left as a scalar.
         s = path_prior(shared)
         a = path_prior(across)
         return new{typeof(s), typeof(a), typeof(combine)}(s, a, combine)

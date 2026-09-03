@@ -1,6 +1,5 @@
-# The headline composition: a full infections → observations model assembled from
-# two components, each itself an `as_turing_model`. The latent (parameter) process
-# is owned by the infection model, not a separate top-level slot.
+# The latent parameter process is owned by the infection model rather than by a
+# separate top-level slot.
 
 @doc raw"
 A composed epidemiological model linking an infection process and an observation
@@ -112,10 +111,10 @@ function concrete_observations(y::AbstractVector)
     eltype(y) >: Missing || return y
     any(ismissing, y) || return identity.(y)
     T = nonmissingtype(eltype(y))
-    # A `Vector{Missing}` (`T === Union{}`) has no value type to put in the
-    # carrier, and nothing can be written into it either, so leave it. Any
-    # other element type without a `zero` is copied instead: the copy is what
-    # gets written into, so the caller's array is still out of reach.
+    # A `Vector{Missing}` has no value type to put in the carrier, and nothing
+    # can be written into it either, so leave it.
+    # Any other element type without a `zero` is copied instead, so the caller's
+    # array is still out of reach.
     T === Union{} && return y
     (isconcretetype(T) && T <: Number) || return copy(y)
     present = .!ismissing.(y)
@@ -125,9 +124,9 @@ end
 concrete_observations(y::NamedTuple) = map(concrete_observations, y)
 concrete_observations(y) = y
 
-# Narrowing must happen before `y_t` is stored on the `Model`: DynamicPPL's
-# `hasmissing`/`deepcopy` check runs on the stored argument, so doing it inside
-# this body would be too late. Hence the private `@model` plus the wrapper.
+# Narrowing must happen before `y_t` is stored on the `Model`, because
+# DynamicPPL's `hasmissing`/`deepcopy` check runs on the stored argument.
+# Hence the private `@model` plus the wrapper.
 @model function _as_turing_model_idmodel(model::IDModel, y_t, n)
     infections ~ as_turing_submodel(model.infection_model, n)
     I_t = infections.I_t
@@ -141,10 +140,9 @@ concrete_observations(y) = y
     )
 end
 
-# The seeding window, passed on when the infection model exposes one (a
-# `Renewal` does, whether it decayed the window or drew it). The names are a
-# type parameter, so the branch is resolved at compile time and an infection
-# model without a seeding window returns exactly the tuple it always did.
+# The seeding window, passed on when the infection model exposes one.
+# The names are a type parameter, so the branch is resolved at compile time and
+# an infection model without a seeding window returns the tuple it always did.
 function _seed_quantity(infections::NamedTuple{names}) where {names}
     return :I_seed in names ? (; I_seed = infections.I_seed) : (;)
 end
@@ -156,11 +154,11 @@ function as_turing_model(model::IDModel, y_t, n)
     )
 end
 
-# The shape the infection process is built at. `n` is the number of
-# observations, so the series carries the chain's lead-in on top of it: the
-# delays consume the head of the convolution, and what is left is exactly the
-# `n` expected values the error model scores. A stratified model grows along its
-# time axis only.
+# The shape the infection process is built at.
+# `n` is the number of observations, so the series carries the chain's lead-in on
+# top of it.
+# The delays consume the head of the convolution, leaving exactly the `n`
+# expected values the error model scores.
 _series_shape(model, n::Int) = n + _series_lead_in(model)
 function _series_shape(model, n::Dims{2})
     return (n[1], n[2] + _series_lead_in(model))

@@ -1,9 +1,9 @@
-# Role supertypes: the shallow layer beneath `AbstractComposableModel` that encodes
-# what role a component plays (latent / infection / observation). Each role fixes
-# the `as_turing_model` signature its members must implement; the composer and the
-# manipulators dispatch and constrain on these so a wrong-role component fails at
-# construction. This is the only type structure beyond the single root supertype —
-# there is no deeper hierarchy and no per-concept `generate_*` functions.
+# Role supertypes: the shallow layer beneath `AbstractComposableModel` encoding
+# what role a component plays.
+# Each role fixes the `as_turing_model` signature its members must implement, and
+# the composer and the manipulators constrain on these so a wrong-role component
+# fails at construction.
+# This is the only type structure beyond the single root supertype.
 
 @doc raw"
 Supertype for **prior** models — a parameter prior expressed as a length-`n`

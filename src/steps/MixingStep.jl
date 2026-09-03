@@ -46,9 +46,10 @@ struct MixingStep{T, M <: AbstractMixingModel} <: AbstractConstantRenewalStep
     mixing::M
 end
 
-# A `MixingStep` is not scannable: its operator does not exist until the seam
-# has drawn it. Name the step and point at the seam rather than failing with a
-# bare `MethodError` from inside the recursion.
+# A `MixingStep` is not scannable, because its operator does not exist until the
+# seam has drawn it.
+# Name the step and point at the seam rather than failing with a bare
+# `MethodError` from inside the recursion.
 function _unresolved_mixing(step)
     return error(
         "$(typeof(step)) has no scan interface. A drawn coupling " *
@@ -87,9 +88,9 @@ and an inferred coupling differ in the chain and nowhere else.
     return ConstantRenewalStep(step.rev_gen_int, mixing)
 end
 
-# The renewal core implied by a generation interval and a coupling operator: a
-# plain core for a fixed operator, a `MixingStep` for a drawn one. Both reverse
-# the interval the same way, so the two paths cannot drift.
+# The renewal core implied by a generation interval and a coupling operator.
+# A fixed operator gives a plain core and a drawn one gives a `MixingStep`.
+# Both reverse the interval the same way, so the two paths cannot drift.
 function _renewal_step(gen_int, mixing)
     return ConstantRenewalStep(_reverse_lags(gen_int), mixing)
 end

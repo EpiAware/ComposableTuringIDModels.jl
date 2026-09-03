@@ -1,13 +1,9 @@
-# Public, model-agnostic Catalyst ODE parameter component.
-#
-# The struct and its docstring live here in `src/` so `CatalystODEParams` is a
-# first-class, exported, `@ref`-able public component — not something users have
-# to dig out of `Base.get_extension`. Its fields are fully type-parameterised and
-# name no `Catalyst`/`ModelingToolkit` types, so this file has no heavy-stack
-# dependency. Everything that DOES need Catalyst — the `ReactionSystem`
-# constructor, the `as_turing_model` sampling method, and the `remake_ode_problem`
-# hook — lives in the `ComposableTuringIDModelsCatalystExt` extension and is only defined
-# once a user runs `using Catalyst, ModelingToolkit`.
+# The struct and its docstring live in `src/` so `CatalystODEParams` is an
+# exported, `@ref`-able public component rather than something users dig out of
+# `Base.get_extension`.
+# Its fields name no `Catalyst` or `ModelingToolkit` types, so this file has no
+# heavy-stack dependency.
+# Everything that does need Catalyst lives in `ComposableTuringIDModelsCatalystExt`.
 
 @doc raw"
 Declarative, model-agnostic ODE parameter component built from **any** `Catalyst`
