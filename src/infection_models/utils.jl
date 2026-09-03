@@ -182,3 +182,73 @@ _init_rate(Rt₀::AbstractVector, w::AbstractVector) = R_to_r.(Rt₀, Ref(w))
 function _init_rate(Rt₀::AbstractVector, w::AbstractMatrix)
     return [R_to_r(Rt₀[g], view(w, g, :)) for g in eachindex(Rt₀)]
 end
+
+# The setup both renewal models share, up to the point where their recursions
+# diverge: the ``R_t`` path, the generation interval and the step it bakes, the
+# seeding window, and the initial state. `Renewal` scans it and
+# `StochasticRenewal` loops over it drawing as it goes, so everything before
+# that is written once here.
+#
+# Called through `to_submodel(..., false)`, which keeps `Z_t`, `gen`,
+# `init_incidence` and `scan_step` at the names they carry when drawn inline.
+@model function _renewal_setup(infection::_RenewalModel, n::ModelShape)
+    Z_t ~ as_turing_submodel(infection.rt, n)
+    Rt = infection.transformation.(Z_t)
+
+    # The generation interval is either fixed (its baked renewal step used
+    # directly) or inferred: a pmf-producing prior model sampled through the
+    # single seam at the shape the renewal needs, with the lag-0 bin dropped
+    # and the remainder renormalised per draw. The step is rebuilt per draw so
+    # the gradient flows through the discretisation, with `mixing` and the
+    # modifiers folded in as the constructors fold them into the baked step.
+    if infection.gen_int isa AbstractPriorModel
+        gen ~ as_turing_submodel(
+            infection.gen_int, _gen_int_shape(n)...; prefix = true
+        )
+        gen_int = _drop_lag_zero(gen)
+        step = _bake_step(
+            _renewal_step(gen_int, infection.mixing), infection.modifiers
+        )
+    else
+        gen_int = infection.gen_int
+        step = infection.recurrent_step
+    end
+
+    # The `initialisation` slot is either a level at ``t_0`` — one value, or one
+    # per stratum — or a whole seeding path, drawn at the incidence window's own
+    # shape. Both branches are decided by the slot's type, so nothing is chosen
+    # at run time.
+    if infection.initialisation isa SeedingPath
+        init_incidence ~ as_turing_submodel(
+            infection.initialisation.model,
+            _seeding_shape(n, _n_lags(gen_int)); prefix = true
+        )
+    else
+        init_incidence ~ as_turing_submodel(
+            infection.initialisation, _n_strata(n); prefix = true
+        )
+    end
+
+    # Resolve the step before the recursion: any modifier carrying priors (e.g.
+    # `ImportedCases`) draws them here and hands back the modifier the recursion
+    # uses, and a drawn `mixing` model (e.g. `Gravity`) draws its parameters and
+    # hands back a resolved core, while a purely deterministic step returns
+    # itself. One seam, no branch on what the step's modifiers or mixing are.
+    scan_step ~ as_turing_submodel(step, n)
+
+    Rts = _steps(Rt)
+    # A seeding path is the incidence window itself; a level is decayed into one
+    # at the growth rate implied by ``\mathcal R_1``.
+    if infection.initialisation isa SeedingPath
+        seed_window = infection.transformation.(init_incidence)
+        n_seed = _n_lags(seed_window)
+        @assert n_seed == _n_lags(gen_int) "a `SeedingPath` must draw one " *
+            "value per generation-interval lag, but it drew $(n_seed) for " *
+            "$(_n_lags(gen_int)) lags"
+        init = renewal_init_state(scan_step, seed_window)
+    else
+        I₀ = infection.transformation.(_seed(init_incidence, n))
+        init = _make_renewal_init(scan_step, gen_int, I₀, first(Rts))
+    end
+    return (; Z_t, Rts, scan_step, init)
+end

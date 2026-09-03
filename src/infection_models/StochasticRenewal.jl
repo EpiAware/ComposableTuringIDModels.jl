@@ -2,7 +2,7 @@
 #
 # A centred draw needs `I_t ~ dist(ι_t, …)` with `ι_t` known during the
 # recursion, and a scan step is a deterministic function. So this is an
-# infection model rather than a renewal modifier: it runs the recursion as a
+# infection model rather than a renewal modifier. It runs the recursion as a
 # `@model` loop over the propose/commit halves of a step, drawing in between.
 
 @doc raw"
@@ -40,7 +40,7 @@ A stratified renewal needs one draw per stratum per step, which this does not pr
     [`SeedingPath`](@ref).
   - `recurrent_step`: the renewal accumulation step (`nothing` when the
     generation interval is inferred).
-  - `mixing`: the coupling operator; single-series here, so `I`.
+  - `mixing`: the coupling operator, which is `I` because this is single-series.
   - `modifiers`: the renewal modifiers composed onto the step.
   - `noise`: the [`InfectionNoise`](@ref) specification.
 
@@ -139,52 +139,13 @@ function StochasticRenewal(
 end
 
 @model function as_turing_model(infection::StochasticRenewal, n::Int)
-    Z_t ~ as_turing_submodel(infection.rt, n)
-    Rt = infection.transformation.(Z_t)
-
-    if infection.gen_int isa AbstractPriorModel
-        gen ~ as_turing_submodel(
-            infection.gen_int, _gen_int_shape(n)...; prefix = true
-        )
-        gen_int = _drop_lag_zero(gen)
-        step = _bake_step(
-            _renewal_step(gen_int, infection.mixing), infection.modifiers
-        )
-    else
-        gen_int = infection.gen_int
-        step = infection.recurrent_step
-    end
-
-    if infection.initialisation isa SeedingPath
-        init_incidence ~ as_turing_submodel(
-            infection.initialisation.model,
-            _seeding_shape(n, _n_lags(gen_int)); prefix = true
-        )
-    else
-        init_incidence ~ as_turing_submodel(
-            infection.initialisation, _n_strata(n); prefix = true
-        )
-    end
-
-    scan_step ~ as_turing_submodel(step, n)
+    setup ~ to_submodel(_renewal_setup(infection, n), false)
     ξ ~ to_submodel(_noise_overdispersion(infection.noise, n), false)
-
-    Rts = _steps(Rt)
-    if infection.initialisation isa SeedingPath
-        seed_window = infection.transformation.(init_incidence)
-        n_seed = _n_lags(seed_window)
-        @assert n_seed == _n_lags(gen_int) "a `SeedingPath` must draw one " *
-            "value per generation-interval lag, but it drew $(n_seed) for " *
-            "$(_n_lags(gen_int)) lags"
-        init = renewal_init_state(scan_step, seed_window)
-    else
-        I₀ = infection.transformation.(_seed(init_incidence, n))
-        init = _make_renewal_init(scan_step, gen_int, I₀, first(Rts))
-    end
 
     # The recursion, written out because each step's distribution depends on
     # the step before it. `I_t` is typed from the state it starts in, so the
     # container holds whatever the AD backend in use puts in it.
+    scan_step, init, Rts = setup.scan_step, setup.init, setup.Rts
     state = init
     I_t = Vector{typeof(init.val * first(Rts))}(undef, n)
     for t in 1:n
@@ -192,7 +153,7 @@ end
         I_t[t] ~ _noise_dist(infection.noise, ι, at(ξ, t))
         state = _commit(scan_step, state, I_t[t], substates)
     end
-    return (; I_t, Z_t, I_seed = init.window)
+    return (; I_t, Z_t = setup.Z_t, I_seed = init.window)
 end
 
 # One draw per step, and a stratified renewal would need one per stratum per

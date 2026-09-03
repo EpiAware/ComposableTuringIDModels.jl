@@ -255,3 +255,58 @@ end
     )
     @test_throws ArgumentError expected_Rt(inferred, I_t)
 end
+
+@testitem "the shared setup keeps both renewal models' variable names" begin
+    using ComposableTuringIDModels, Distributions, DynamicPPL, Random
+
+    # Both models draw their setup through one submodel with prefixing off, so
+    # every name is the one it carries when the setup is written out inline.
+    # Pinned here because a prefix slipping back on renames every chain and
+    # nothing else would fail.
+    varnames(m, n) = string.(collect(keys(VarInfo(Xoshiro(1), as_turing_model(m, n)))))
+    gen = [0.2, 0.3, 0.5]
+    uncertain = UncertainDelay(
+        LogNormal, [Normal(1.9, 0.2), truncated(Normal(0.5, 0.2), 0, Inf)];
+        D = 14.0
+    )
+    latent = ["init", "std", "ϵ_t"]
+    seed_path = SeedingPath(RandomWalk(; init = Normal(log(50), 0.5)))
+    seed_names = ["init_incidence.init", "init_incidence.std", "init_incidence.ϵ_t"]
+
+    det(; kwargs...) = Renewal(; rt = RandomWalk(), kwargs...)
+    @test varnames(det(; generation_time = gen, initialisation = Normal()), 20) ==
+        [latent; "init_incidence"]
+    @test varnames(det(; generation_time = gen, initialisation = seed_path), 20) ==
+        [latent; seed_names]
+    @test varnames(det(; generation_time = uncertain, initialisation = Normal()), 20) ==
+        [latent; "gen.θ"; "init_incidence"]
+    @test varnames(
+        Renewal(gen, ImportedCases(Normal(-1, 0.5)); rt = RandomWalk()), 20
+    ) == [latent; "init_incidence"; "modifier_1.import_rates"]
+    @test varnames(
+        det(;
+            generation_time = gen, initialisation = Normal(),
+            rt = Stratify(RandomWalk(), Hierarchy())
+        ), (3, 20)
+    ) == [
+        latent; "across.mean"; "across.group_effects.ϵ_t"; "init_incidence"
+    ]
+
+    n = 12
+    I_names = ["I_t[$t]" for t in 1:n]
+    sto(; kwargs...) = StochasticRenewal(; rt = RandomWalk(), kwargs...)
+    @test varnames(sto(; generation_time = gen, initialisation = Normal()), n) ==
+        [latent; "init_incidence"; I_names]
+    @test varnames(sto(; generation_time = gen, initialisation = seed_path), n) ==
+        [latent; seed_names; I_names]
+    @test varnames(sto(; generation_time = uncertain, initialisation = Normal()), n) ==
+        [latent; "gen.θ"; "init_incidence"; I_names]
+    # A drawn overdispersion sits between the setup and the recursion, as it
+    # does when the setup is inline.
+    @test varnames(
+        sto(;
+            generation_time = gen, initialisation = Normal(),
+            noise = InfectionNoise(; overdispersion = Exponential(0.1))
+        ), n
+    ) == [latent; "init_incidence"; "ξ"; I_names]
+end
