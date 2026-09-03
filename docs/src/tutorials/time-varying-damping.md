@@ -43,7 +43,6 @@ recursion is untouched:
 
 ```@example tvdamp
 tv = AR(; damp = RandomWalk())
-(order = tv.p, transform = tv.transform)
 ```
 
 `transform` is a field of [`AR`](@ref), so the map is replaceable.
@@ -90,13 +89,11 @@ end
     ρ_end = round(ρ_true[end], digits = 2))
 ```
 
-The recursion is written out rather than drawn from `AR` itself because the check below needs a ``\rho_t`` that is known and crosses zero.
-Drawing the model would give a random walk of unknown shape, and nothing to recover against.
 
 [`DirectInfections`](@ref) with `transformation = identity` and a fixed zero `initialisation` passes the `AR` path through as the expected series.
 A [`NormalError`](@ref) with a fixed standard deviation observes it.
 Fitting under NUTS recovers `ρ` from the chain.
-We draw two chains in parallel with `MCMCThreads()` and differentiate with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for this package (see [Automatic differentiation backend](@ref ad-backends)).
+We draw two chains in parallel with `MCMCThreads()` and differentiate with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/).
 
 ```@example tvdamp
 model = IDModel(
@@ -152,7 +149,5 @@ Nothing about this is specific to `AR`.
 [`arma`](@ref) takes the same `damp` slot, and [`DiffLatentModel`](@ref) differences whatever it wraps, so a time-varying-damping ARIMA is the two of them composed with no custom code:
 
 ```@example tvdamp
-arima_tv = DiffLatentModel(; model = arma(; damp = RandomWalk()),
-    init = [Normal(0.3, 0.3)])
-(order = arima_tv.model.p, transform = arima_tv.model.transform)
+arima_tv = arima(; damp = RandomWalk(), diff_init = [Normal(0.3, 0.3)])
 ```
