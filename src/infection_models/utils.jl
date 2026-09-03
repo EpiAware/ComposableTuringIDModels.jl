@@ -183,11 +183,10 @@ function _init_rate(Rt₀::AbstractVector, w::AbstractMatrix)
     return [R_to_r(Rt₀[g], view(w, g, :)) for g in eachindex(Rt₀)]
 end
 
-# The setup both renewal models share, up to the point where their recursions
-# diverge: the ``R_t`` path, the generation interval and the step it bakes, the
-# seeding window, and the initial state. `Renewal` scans it and
-# `StochasticRenewal` loops over it drawing as it goes, so everything before
-# that is written once here.
+# Everything both renewal models do before their recursions diverge. That is the
+# `R_t` path, the generation interval and the step it bakes, the seeding window
+# and the initial state. `Renewal` scans it and `StochasticRenewal` loops over
+# it drawing as it goes.
 #
 # Called through `to_submodel(..., false)`, which keeps `Z_t`, `gen`,
 # `init_incidence` and `scan_step` at the names they carry when drawn inline.

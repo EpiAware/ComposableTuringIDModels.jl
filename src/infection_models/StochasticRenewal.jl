@@ -142,10 +142,11 @@ end
     setup ~ to_submodel(_renewal_setup(infection, n), false)
     ξ ~ to_submodel(_noise_overdispersion(infection.noise, n), false)
 
+    scan_step, init, Rts = setup.scan_step, setup.init, setup.Rts
+
     # The recursion, written out because each step's distribution depends on
     # the step before it. `I_t` is typed from the state it starts in, so the
     # container holds whatever the AD backend in use puts in it.
-    scan_step, init, Rts = setup.scan_step, setup.init, setup.Rts
     state = init
     I_t = Vector{typeof(init.val * first(Rts))}(undef, n)
     for t in 1:n

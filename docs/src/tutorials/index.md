@@ -62,10 +62,12 @@ mechanistic compartmental model, and a flexible Gaussian-process latent:
     groups sharing one infection process structure but with group-level
     parameters drawn from a common population distribution, so information is
     pooled across groups without forcing them to be identical.
-  - [Renewal modifiers: depletion and importation](@ref renewal-modifiers) —
-    one delayed renewal process compared against the same process extended with
-    [`SusceptibleDepletion`](@ref) and [`ImportedCases`](@ref), so each
-    modifier's contribution is visible against a shared baseline.
+  - [Renewal modifiers](@ref renewal-modifiers) — one delayed renewal process
+    compared against the same process extended with
+    [`SusceptibleDepletion`](@ref), [`ImportedCases`](@ref) and
+    [`InfectionNoise`](@ref), so each modifier's contribution is visible against
+    a shared baseline, and both stochastic parameterisations are fitted back to
+    simulated data.
 
 Every example uses the same recipe: assemble components into a model, call
 [`as_turing_model`](@ref) (directly or through [`IDModel`](@ref) /
