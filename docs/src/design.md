@@ -136,99 +136,6 @@ poisson_model = IDModel(
 negbin_model = IDModel(
     DirectInfections(; Z = latent, initialisation = Normal()),
     NegativeBinomialError())
-nothing # hide
-```
-
-## [An effect confined to a window](@id windowed-effect)
-
-[`broadcast_window`](@ref) builds a latent model that equals its inner model on a declared index window and zero everywhere else.
-Summing it onto a base path with [`CombineLatentModels`](@ref) gives an effect that is active only over that window.
-
-```@example design
-using ComposableTuringIDModels, Distributions
-
-base = RandomWalk(init = Normal(0, 0.1), ϵ_t = IID(Normal(0, 0.05)))
-windowed = CombineLatentModels(
-    [base, broadcast_window(Normal(1, 0.2), 20:30)], ["", "Window"]
-)
-keys(rand(as_turing_model(windowed, 40)))
-```
-
-The inner slot is a PATH slot, so one helper covers a known effect and an estimated one.
-A [`FixedIntercept`](@ref) gives a constant.
-A bare `Distribution` gives one estimated level held across the window.
-A process gives an effect that varies within the window, and it is generated over the window rather than over the whole series.
-
-```@example design
-known = broadcast_window(FixedIntercept(2.0), 20:30)
-varying = broadcast_window(RandomWalk(), 20:30)
-nothing # hide
-```
-
-Windows stack by adding members, and each keeps its own prefix.
-
-```@example design
-stacked = CombineLatentModels(
-    [
-        base,
-        broadcast_window(Normal(1.5, 0.1), 1:5),
-        broadcast_window(Normal(2, 0.1), 20:30),
-    ], ["", "Early", "Late"]
-)
-keys(rand(as_turing_model(stacked, 40)))
-```
-
-A window touching either end of the series is an ordinary case.
-The window is part of the broadcast rule, so it shows in the model tree.
-
-```@example design
-broadcast_window(Normal(1, 0.2), 1:10)
-```
-
-A latent process and a parameter prior share one role, so a windowed effect drops into a per-step parameter slot.
-Here an [`AR`](@ref) is more strongly damped over the window and constant outside it.
-
-```@example design
-shifted = AR(
-    damp = CombineLatentModels(
-        [FixedIntercept(0.4), broadcast_window(Normal(0.4, 0.01), 20:30)],
-        ["", "Shift"]
-    ), ϵ_t = IID(Normal(0, 0.1))
-)
-keys(rand(as_turing_model(shifted, 40)))
-```
-
-### How it is built
-
-[`broadcast_window`](@ref) is a [`BroadcastLatentModel`](@ref) under an [`InWindow`](@ref) rule, in the same way that [`broadcast_dayofweek`](@ref) is one under [`RepeatEach`](@ref).
-The rule asks for a series as long as the window and places it, so nothing is drawn for the indices outside.
-
-Without the helper the same effect is a transform that reads the index, summed on by [`CombineLatentModels`](@ref).
-This generates the effect over the whole series and then masks it, so it is the longer route for a process, but it shows what the helper is doing.
-
-```@example design
-manual = CombineLatentModels(
-    [
-        base,
-        TransformLatentModel(
-            Intercept(Normal(1, 0.2)),
-            x -> x .* in.(eachindex(x), Ref(20:30))
-        ),
-    ], ["", "Window"]
-)
-keys(rand(as_turing_model(manual, 40)))
-```
-
-[`CombineLatentModels`](@ref) sums, so a multiplicative window effect is the same composition in log space under an `exp` transform.
-The window multiplies the path by `exp` of the drawn effect, and leaves it unchanged elsewhere.
-
-```@example design
-multiplied = TransformLatentModel(
-    CombineLatentModels(
-        [base, broadcast_window(Normal(log(2), 0.1), 20:30)], ["", "Window"]
-    ), x -> exp.(x)
-)
-keys(rand(as_turing_model(multiplied, 40)))
 ```
 
 ## Composing accumulation steps
@@ -245,9 +152,7 @@ a step-composing helper — pass the modifier and it is composed onto the step:
 ```@example design
 gen_int = [0.2, 0.3, 0.5]
 
-# A renewal process with a fixed population of 1000 and susceptible depletion.
 depleting = Renewal(gen_int, SusceptibleDepletion(1000.0); rt = RandomWalk())
-nothing # hide
 ```
 
 A scan step is a deterministic function, so a modifier that needs *sampled*
@@ -260,12 +165,8 @@ renewal model tests what a modifier is. [`ImportedCases`](@ref) is the worked
 example, and modifiers apply in the order given:
 
 ```@example design
-# Susceptible depletion, then importation added on top of the depleted
-# incidence with its rate estimated. The importation prior is on the
-# unconstrained scale, mapped onto a positive rate by the modifier.
 seeded = Renewal(gen_int, SusceptibleDepletion(1000.0),
     ImportedCases(Normal(0.0, 1.0)); rt = RandomWalk())
-nothing # hide
 ```
 
 The generation time is a slot like any other, so a modifier composes onto a
@@ -274,10 +175,8 @@ The discretisation keywords stay available alongside the modifiers, which keeps
 one discretisation path rather than a second one written outside the package.
 
 ```@example design
-# The same modifier on a Gamma generation time discretised to 15 days.
 discretised = Renewal(Gamma(2, 1.5), SusceptibleDepletion(1000.0);
     D_gen = 15.0, rt = RandomWalk())
-nothing # hide
 ```
 
 See [Renewal modifiers](@ref renewal-modifiers) for what each contributes to a fitted model.
