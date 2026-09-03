@@ -94,8 +94,9 @@ export SqExponentialKernel, Matern32Kernel, Matern52Kernel, spectral_density,
 # --- latent modifiers / manipulators / combinations / broadcasting ---
 export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
     CombineLatentModels, ConcatLatentModels, BroadcastLatentModel,
-    RepeatEach, RepeatBlock, broadcast_rule, broadcast_n, broadcast_dayofweek,
-    broadcast_weekly, equal_dimensions, arma, arima, Hierarchy,
+    RepeatEach, RepeatBlock, InWindow, broadcast_rule, broadcast_n,
+    broadcast_dayofweek, broadcast_weekly, broadcast_window, equal_dimensions,
+    arma, arima, Hierarchy,
     Stratify, Replicate
 
 # --- infection models ---

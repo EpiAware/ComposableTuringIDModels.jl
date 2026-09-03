@@ -136,7 +136,6 @@ poisson_model = IDModel(
 negbin_model = IDModel(
     DirectInfections(; Z = latent, initialisation = Normal()),
     NegativeBinomialError())
-nothing # hide
 ```
 
 ## Composing accumulation steps
@@ -153,9 +152,7 @@ a step-composing helper — pass the modifier and it is composed onto the step:
 ```@example design
 gen_int = [0.2, 0.3, 0.5]
 
-# A renewal process with a fixed population of 1000 and susceptible depletion.
 depleting = Renewal(gen_int, SusceptibleDepletion(1000.0); rt = RandomWalk())
-nothing # hide
 ```
 
 A scan step is a deterministic function, so a modifier that needs *sampled*
@@ -168,12 +165,8 @@ renewal model tests what a modifier is. [`ImportedCases`](@ref) is the worked
 example, and modifiers apply in the order given:
 
 ```@example design
-# Susceptible depletion, then importation added on top of the depleted
-# incidence with its rate estimated. The importation prior is on the
-# unconstrained scale, mapped onto a positive rate by the modifier.
 seeded = Renewal(gen_int, SusceptibleDepletion(1000.0),
     ImportedCases(Normal(0.0, 1.0)); rt = RandomWalk())
-nothing # hide
 ```
 
 The generation time is a slot like any other, so a modifier composes onto a
@@ -182,10 +175,8 @@ The discretisation keywords stay available alongside the modifiers, which keeps
 one discretisation path rather than a second one written outside the package.
 
 ```@example design
-# The same modifier on a Gamma generation time discretised to 15 days.
 discretised = Renewal(Gamma(2, 1.5), SusceptibleDepletion(1000.0);
     D_gen = 15.0, rt = RandomWalk())
-nothing # hide
 ```
 
 See [Renewal modifiers](@ref renewal-modifiers) for what each contributes to a fitted model.
