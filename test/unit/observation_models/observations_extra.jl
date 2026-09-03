@@ -828,7 +828,7 @@ end
     Random.seed!(326)
     # A weekly aggregation over 28 days measured only on the reporting days.
     # `concrete_observations` narrows this into a `MissingObservations`
-    # carrier, which `Aggregate` used to index straight into a `MethodError`.
+    # carrier, which `Aggregate` indexes directly.
     weekly = Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7])
     y = Vector{Union{Missing, Int}}(missing, 28)
     y[7:7:28] .= [50, 60, 55, 65]
@@ -872,7 +872,7 @@ end
     @test out.expected[7:7:28] == fill(14.0, 4)
 
     # Two carriers differing only in the placeholder at the absent entries
-    # score identically: nothing there reaches the likelihood.
+    # score identically. Nothing there reaches the likelihood.
     shifted = MissingObservations(
         map((v, p) -> p ? v : v + 1000, carrier.value, carrier.present),
         carrier.present

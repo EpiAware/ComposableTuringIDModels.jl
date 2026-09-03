@@ -40,9 +40,9 @@ never measured, so the counts reported for it stay out of the likelihood. A
 window the delay only partially uncovers still has values to sum and is kept.
 
 A window whose count is absent drops out the same way. A partially-missing
-series arrives as a [`MissingObservations`](@ref) carrier, the present windows
-are taken from it as a carrier of their own, and the error model marginalises
-the absent ones out. Only the windows with data are scored.
+series arrives as a [`MissingObservations`](@ref) carrier. The present windows
+are taken from it as a carrier of their own, so the error model marginalises
+the absent ones out.
 
 # Arguments
 

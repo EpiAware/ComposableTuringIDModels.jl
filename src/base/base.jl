@@ -98,10 +98,10 @@ nor sampled, and costing no parameter. Predictive values at those points come
 from replaying the posterior afterwards, not from carrying them through the fit
 (see [`forecast`](@ref)).
 
-It reads like the ragged vector it replaces: `length`, `size` and indexing, with
-`missing` at an absent entry and a vector index giving a carrier of the selected
-entries. A component that subsets its data positionally, such as
-[`Aggregate`](@ref), therefore takes one unchanged.
+The carrier reads like the ragged vector it replaces. It reports `length` and
+`size`. A scalar index gives `missing` at an absent entry, and a vector index
+gives a carrier of the selected entries. A component that subsets its data
+positionally, such as [`Aggregate`](@ref), therefore takes one unchanged.
 
 # Examples
 ```@example MissingObservations
@@ -115,13 +115,7 @@ struct MissingObservations{V <: AbstractVector, M <: AbstractVector{Bool}}
     present::M
 end
 
-# The slice of the `AbstractVector` interface the carrier stands in for, so a
-# component that reads its data positionally (e.g. `Aggregate`) sees the ragged
-# series rather than the struct. A scalar index gives `missing` where the entry
-# is absent; a vector index (a presence mask, or indices) gives a carrier of the
-# selected entries, keeping value and mask together.
-#
-# Deliberately not an `AbstractVector` subtype: the observation-error models
+# Deliberately not an `AbstractVector` subtype. The observation-error models
 # dispatch on the carrier to score it by reading only, and inheriting array
 # behaviour would let it fall back into the `y_t[i] ~ ...` sugar those methods
 # exist to avoid.
