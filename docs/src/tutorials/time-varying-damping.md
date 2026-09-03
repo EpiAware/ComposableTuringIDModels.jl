@@ -21,7 +21,6 @@ autoregression — the coefficient is one number for the whole series:
 
 ```@example tvdamp
 using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
-using Turing: to_submodel
 using Mooncake
 using ADTypes: AutoMooncake
 Random.seed!(80)
@@ -44,8 +43,11 @@ recursion is untouched:
 
 ```@example tvdamp
 tv = AR(; damp = RandomWalk())
-(order = tv.p, transform = tv.transform)
 ```
+
+`transform` is a field of [`AR`](@ref), so the map is replaceable.
+It defaults to `tanh` for a process `damp`, which maps an unbounded draw into the stationary band ``(-1, 1)``, and to `identity` for a `Distribution`, whose bounds are the user's to choose.
+The coefficient is transformed where it is drawn, so the recursion reads the mapped path.
 
 Built with `as_turing_model(m, n)` it returns the numeric length-`n` path (like
 every other latent model), and tracks the coefficient path ``\rho_t`` as a
@@ -87,24 +89,24 @@ end
     ρ_end = round(ρ_true[end], digits = 2))
 ```
 
-The model wraps the time-varying `AR` in a thin observation of the path and fits
-under NUTS. The coefficient path is tracked as the generated quantity `ρ`, so it is
-recovered straight from the chain.
-We draw two chains in parallel with `MCMCThreads()` and differentiate with
-[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend
-for this package (see [Automatic differentiation backend](@ref ad-backends)).
+
+[`DirectInfections`](@ref) with `transformation = identity` and a fixed zero `initialisation` passes the `AR` path through as the expected series.
+A [`NormalError`](@ref) with a fixed standard deviation observes it.
+Fitting under NUTS recovers `ρ` from the chain.
+We draw two chains in parallel with `MCMCThreads()` and differentiate with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/).
 
 ```@example tvdamp
-@model function observe_path(y, n)
-    latent ~ as_turing_submodel(AR(; damp = RandomWalk()), n)
-    for t in 1:n
-        y[t] ~ Normal(latent[t], 0.01)
-    end
-end
-
-model = observe_path(z, n)
+model = IDModel(
+    DirectInfections(;
+        Z = AR(; damp = RandomWalk()), transformation = identity,
+        initialisation = FixedIntercept(0.0)),
+    NormalError(; std = FixedIntercept(0.01)))
+posterior = as_turing_model(model, z, n)
+# Seed here, not only at the top: the simulation above consumes the stream, so
+# an unrelated edit would otherwise move this fit's numbers.
+Random.seed!(180)
 fit = sample(
-    model, NUTS(0.85; adtype = AutoMooncake(; config = nothing)),
+    posterior, NUTS(0.85; adtype = AutoMooncake(; config = nothing)),
     MCMCThreads(), 300, 2; progress = false)
 # ρ is tracked as a generated quantity: `fit[:ρ]` is a per-draw coefficient path
 ρ_draws = reduce(hcat, vec(fit[:ρ]))     # (n-1) × draws
@@ -112,7 +114,7 @@ fit = sample(
 (correlation_with_truth = round(cor(ρ_mean, ρ_true), digits = 2),)
 ```
 
-The posterior mean damping path tracks the true ramp, including the sign change.
+The posterior median damping path tracks the true ramp, including the sign change.
 Plotting it against the truth with an 80% credible band makes the recovery
 visible:
 
@@ -127,7 +129,7 @@ fig = Figure(; size = (760, 420))
 ax = Axis(fig[1, 1]; xlabel = "Time step", ylabel = "Damping ρₜ")
 band!(ax, 1:(n - 1), lo, hi; color = (:seagreen, 0.25))
 lines!(ax, 1:(n - 1), md; color = :seagreen, linewidth = 2,
-    label = "posterior mean")
+    label = "posterior median")
 lines!(ax, 1:(n - 1), ρ_true; color = :black, linestyle = :dash, linewidth = 2,
     label = "true ρₜ")
 hlines!(ax, [0.0]; color = :grey, linestyle = :dot)
@@ -142,3 +144,10 @@ parameter to a time-varying one: put a process in its slot instead of a
 `Distribution`. Only the order-1 case is built so far; time-varying coefficients
 for higher-order AR(`p`) are tracked in
 [#113](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/113).
+
+Nothing about this is specific to `AR`.
+[`arma`](@ref) takes the same `damp` slot, and [`DiffLatentModel`](@ref) differences whatever it wraps, so a time-varying-damping ARIMA is the two of them composed with no custom code:
+
+```@example tvdamp
+arima_tv = arima(; damp = RandomWalk(), diff_init = [Normal(0.3, 0.3)])
+```
