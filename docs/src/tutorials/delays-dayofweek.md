@@ -116,6 +116,18 @@ composition. The reporting-delay parameters flow through the same priors seam as
 every other parameter, so inferring the delay needs no change to the rest of the
 model.
 
+Each convolution shortens the expected series by `length(pmf) - 1`.
+Two stacked delays therefore need the infection process to start that many days before the first report.
+[`observation_lead_in`](@ref) reads the number off the assembled chain:
+
+```@example delays
+observation_lead_in(observation)
+```
+
+An [`IDProblem`](@ref)'s `tspan` is the span of the *observations*, so `tspan = (1, length(y))` fits every report we have.
+The infection process runs over the extra lead-in days to support them, derived from the chain (see [What data a model needs](@ref lead-in)).
+[`data_requirements`](@ref) says what a chain needs before it is sampled.
+
 ## The data
 
 We fit the model to the daily confirmed COVID-19 cases from Italy's first wave
@@ -231,16 +243,10 @@ function ci_ribbon!(ax, ts, bands; color, label)
     lines!(ax, x, b[:, 3]; color = color, linewidth = 2, label = label)
 end
 
-# the two delay convolutions leave the first few reference days unscored,
-# so those predictive entries are filled with `missing` and skipped
+# every reference day is scored, so every predictive entry is there
 function predictive_bands(pred, n)
-    ndraws = length(vec(pred[@varname(y_t[n])]))
     rows = map(1:n) do i
-        try
-            permutedims(vec(pred[@varname(y_t[i])]))
-        catch
-            fill(missing, 1, ndraws)
-        end
+        permutedims(vec(pred[@varname(y_t[i])]))
     end
     credible_bands(reduce(vcat, rows))
 end
@@ -266,12 +272,9 @@ axislegend(ax2; position = :lt)
 fig
 ```
 
-The weekly ``R_t`` is piecewise-constant by construction, stepping down through
-one as the first wave turns over. The posterior-predictive band starts partway
-into the series — the two delay convolutions leave the earliest reference days
-without a fully supported expected count — and from there tracks the observed
-Italian reports, the layered observation model having absorbed the reporting
-pattern rather than the infection signal.
+The weekly ``R_t`` is piecewise-constant by construction, stepping down through one as the first wave turns over.
+The ``R_t`` panel runs longer than the reports panel, because the infection process covers the delays' lead-in before the first report.
+The posterior-predictive band tracks the observed Italian reports, the layered observation model having absorbed the reporting pattern rather than the infection signal.
 
 ## A time-varying reporting pattern
 

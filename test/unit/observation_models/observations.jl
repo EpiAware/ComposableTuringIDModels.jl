@@ -263,13 +263,13 @@ end
     Random.seed!(12)
     obs = LatentDelay(PoissonError(), truncated(Normal(5.0, 2.0), 0.0, Inf))
     Y_t = fill(10.0, 30)
+    # LatentDelay drops the partially observed head of the convolution, so a
+    # predictive draw is the convolved series rather than the series it was
+    # handed, and every entry of it is drawn.
     sim = as_turing_model(obs, missing, Y_t)().y_t
-    @test length(sim) == length(Y_t)
-    # LatentDelay deliberately leaves the head of the series unobserved
-    # (partially observed data), so only the non-missing tail is filled.
-    observed = filter(!ismissing, sim)
-    @test !isempty(observed)
-    @test all(>=(0), observed)
+    @test length(sim) == length(Y_t) - observation_lead_in(obs)
+    @test !isempty(sim)
+    @test all(>=(0), sim)
 end
 
 @testitem "safe count distributions tolerate very large means" begin

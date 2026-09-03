@@ -125,6 +125,11 @@ export Ascertainment, ascertainment_dayofweek, Aggregate, RightTruncate,
 # --- observation composition ---
 export Split, StrataMap
 
+# --- observation diagnostics ---
+# What data a model needs, and how much of the series its delays consume.
+export data_requirements, data_fits, observation_lead_in
+export DataRequirements, StreamRequirement
+
 # --- composition ---
 export IDModel
 
@@ -146,7 +151,7 @@ public ModelShape, across_shape, infection_strata,
     apply_modifier, renewal_foi, renewal_init_state, renewal_init_window,
     MissingObservations,
     at, path_prior, prior_order, assert_prior_length,
-    wrapped_models, observation_components, rewrap
+    wrapped_models, observation_components, rewrap, swap
 
 # --- core architecture ---
 include("base/base.jl")
@@ -246,6 +251,9 @@ include("compose.jl")
 # composition so it can dispatch on `IDModel` as well as on every observation
 # component.
 include("observation_models/traversal.jl")
+
+# What data an assembled model needs, read off the traversal seam above.
+include("observation_models/requirements.jl")
 
 # --- inference orchestration ---
 include("inference/types.jl")

@@ -368,14 +368,17 @@ fig_fc
 ## Swap a component
 
 Because the parts share one interface, an alternative observation assumption is
-a one-line change. Swapping the negative-binomial reporting for a
-[`PoissonError`](@ref) leaves the renewal infection process — and its latent
-``R_t`` process — untouched:
+a one-line change.
+Swapping the negative-binomial reporting for a [`PoissonError`](@ref) leaves the renewal infection process and its latent ``R_t`` process untouched.
 
 ```@example renewal
-poisson_model = IDModel(renewal, PoissonError())
-length(rand(as_turing_model(poisson_model, fill(missing, n), n)))
+using ComposableTuringIDModels: swap
+poisson_model = swap(
+    err -> err isa NegativeBinomialError ? PoissonError() : err, model)
 ```
+
+[`swap`](@ref) walks the observation chain, replaces every component matching the predicate and rebuilds each wrapper around its replacement.
+See [Inspecting and updating an observation chain](@ref obs-traversal) for the general form, which also targets a single stream of a [`Split`](@ref).
 
 ## References
 

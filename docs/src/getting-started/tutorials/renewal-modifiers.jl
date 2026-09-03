@@ -97,9 +97,12 @@ Both panels use a log scale; the reported counts in the lower panel are floored
 at one so that zero-report days stay visible.
 The reporting delay leaves the first `length(delay) - 1` days without a reported
 count, so the lower panel starts on day `length(delay)`.
+`n` is the number of reports, and the infection process is run over the delay's lead-in on top of it, so the two panels share a day axis once that is added.
 """
 
-obs_days = length(delay):n
+lead = observation_lead_in(obs)
+inf_days = 1:(n + lead)
+obs_days = (lead + 1):(n + lead)
 
 fig = Figure(; size = (760, 560))
 ax1 = Axis(fig[1, 1]; ylabel = "Infections Iₜ", yscale = log10)
@@ -111,11 +114,11 @@ labels = (
 )
 for k in keys(sims)
     lines!(
-        ax1, 1:n, sims[k].I_t; color = colours[k], linewidth = 2,
+        ax1, inf_days, sims[k].I_t; color = colours[k], linewidth = 2,
         label = labels[k]
     )
     scatter!(
-        ax2, obs_days, max.(sims[k].generated_y_t[obs_days], 1);
+        ax2, obs_days, max.(sims[k].generated_y_t, 1);
         color = colours[k], markersize = 7
     )
 end
@@ -176,11 +179,11 @@ ax3 = Axis(
     yscale = log10
 )
 lines!(
-    ax3, 1:n, sub_plain.I_t; color = :grey30, linewidth = 2,
+    ax3, inf_days, sub_plain.I_t; color = :grey30, linewidth = 2,
     label = "Rₜ = 0.8"
 )
 lines!(
-    ax3, 1:n, sub_seeded.I_t; color = :teal, linewidth = 2,
+    ax3, inf_days, sub_seeded.I_t; color = :teal, linewidth = 2,
     label = "Rₜ = 0.8 + importation"
 )
 axislegend(ax3; position = :rt)
@@ -198,8 +201,8 @@ We fit that model to the reported cases simulated above.
 The reproduction number is still held at its simulated value, so the importation
 rate is what is being learned; with ``R_t`` free as well the two compete to
 explain the same growth and the fit is much less sharp.
-The unobserved days at the start are `missing` entries of `y_obs`, and are left
-out of the likelihood rather than estimated.
+Every simulated report is conditioned on.
+The model runs the infection process over the delay's lead-in itself, so nothing is dropped from the head.
 """
 
 model = IDModel(
@@ -237,7 +240,9 @@ The posterior predictive then tracks the simulated series.
 pred = predict(as_turing_model(model, fill(missing, n), n), chain)
 y_draws(i) = Float64.(vec(pred[@varname(y_t[i])]))
 quantiles(i) = quantile(y_draws(i), [0.05, 0.5, 0.95])
-bands = reduce(hcat, map(quantiles, obs_days))
+## `y_t` is indexed on the reported series, which runs 1:n; `obs_days` puts
+## those reports back on the infection process's day axis for the plot.
+bands = reduce(hcat, map(quantiles, 1:n))
 
 fig3 = Figure(; size = (760, 300))
 ax4 = Axis(
@@ -253,7 +258,7 @@ lines!(
     label = "posterior predictive"
 )
 scatter!(
-    ax4, obs_days, max.(y_obs[obs_days], 1); color = :black,
+    ax4, obs_days, max.(y_obs, 1); color = :black,
     markersize = 7, label = "simulated"
 )
 axislegend(ax4; position = :lt)

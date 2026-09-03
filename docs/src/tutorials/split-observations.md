@@ -97,8 +97,14 @@ returned `generated_y_t` is a `NamedTuple` of the two simulated series.
 n = 70
 sim = as_turing_model(model, (cases = missing, deaths = missing), n)()
 y = sim.generated_y_t
-(total_cases = sum(skipmissing(y.cases)), total_deaths = sum(skipmissing(y.deaths)))
+(total_cases = sum(y.cases), total_deaths = sum(y.deaths),
+    n_cases = length(y.cases), n_deaths = length(y.deaths))
 ```
+
+The two series come back at different lengths.
+One infection series serves both streams, so it is long enough for the deeper infection→death delay, and the shorter infection→report delay leaves the cases stream with expected values for earlier days too.
+Both are scored.
+Pass each stream the observations it has, and [`data_requirements`](@ref) reports the two lengths before the model is built.
 
 Fitting conditions on both streams at once.
 We draw two chains in parallel with `MCMCThreads()`, matching the other
@@ -182,20 +188,28 @@ reads from a single-stream model:
 ```@example split
 missmodel = as_turing_model(model, (cases = missing, deaths = missing), n)
 pred = predict(missmodel, chain)
-cases_bands = predictive_bands(pred, n, i -> @varname(cases.y_t[i]))
-deaths_bands = predictive_bands(pred, n, i -> @varname(deaths.y_t[i]))
+
+# Each stream is scored over its own expected series, so read its bands at its
+# own length. Both end on the same day, so a shared day axis ending at `n`
+# right-aligns them the way the model does.
+cases_days = (n - length(y.cases) + 1):n
+deaths_days = (n - length(y.deaths) + 1):n
+cases_bands = predictive_bands(
+    pred, length(y.cases), i -> @varname(cases.y_t[i]))
+deaths_bands = predictive_bands(
+    pred, length(y.deaths), i -> @varname(deaths.y_t[i]))
 
 fig = Figure(; size = (760, 620))
 ax1 = Axis(fig[1, 1]; ylabel = "Cases")
-ci_ribbon!(ax1, 1:n, cases_bands; color = :teal,
+ci_ribbon!(ax1, cases_days, cases_bands; color = :teal,
     label = "posterior predictive")
-scatter!(ax1, 1:n, y.cases; color = :black, markersize = 6,
+scatter!(ax1, cases_days, y.cases; color = :black, markersize = 6,
     label = "simulated")
 axislegend(ax1; position = :lt)
 ax2 = Axis(fig[2, 1]; xlabel = "Day", ylabel = "Deaths")
-ci_ribbon!(ax2, 1:n, deaths_bands; color = :firebrick,
+ci_ribbon!(ax2, deaths_days, deaths_bands; color = :firebrick,
     label = "posterior predictive")
-scatter!(ax2, 1:n, y.deaths; color = :black, markersize = 6,
+scatter!(ax2, deaths_days, y.deaths; color = :black, markersize = 6,
     label = "simulated")
 axislegend(ax2; position = :lt)
 fig

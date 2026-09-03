@@ -219,6 +219,45 @@ The standard Turing tools — `rand` for prior draws, `fix` to pin parameters,
 `condition` (or `|`) to condition on values, and `sample` for inference — all
 apply unchanged.
 
+## [What data a model needs](@id lead-in)
+
+The `n` passed to `as_turing_model` is the number of **observations**.
+That is not always the length of the infection series behind it.
+Every [`LatentDelay`](@ref) in an observation chain convolves the expected series with a delay PMF and returns a series shorter by `length(pmf) - 1`.
+
+The model reads the chain's lead-in, runs the infection process over `n + lead_in` time points, and hands the observation model exactly `n` expected values, so every observation is scored.
+[`observation_lead_in`](@ref) reads the number off an assembled model, and [`data_requirements`](@ref) reports what a caller must supply:
+
+```@example design
+delayed = LatentDelay(
+    LatentDelay(PoissonError(), fill(1 / 15, 15)), fill(1 / 30, 30))
+y = fill(10, 60)
+
+observation_lead_in(delayed)
+```
+
+```@example design
+data_requirements(delayed, y, length(y))
+```
+
+[`data_fits`](@ref) is the same question as a yes or no.
+It asks whether every observation supplied would be scored, so more data than the model can score is `false`, and supplying that number to `as_turing_model` is an error.
+
+```@example design
+data_fits(delayed, y, length(y)), data_fits(delayed, vcat(y, y), length(y))
+```
+
+An [`IDProblem`](@ref)'s `tspan` is the span of the observations for the same reason, and [`forecast`](@ref) extends the observations by the horizon and derives the rest.
+
+Length-preserving modifiers ([`Ascertainment`](@ref), [`RightTruncate`](@ref), [`ReportTriangle`](@ref), a [`Split`](@ref)'s streams) consume nothing of their own, so the lead-in comes from the delays alone.
+A [`Split`](@ref)'s streams run in parallel, so their lead-ins do not add up and the series covers the deepest of them.
+A stream with a shorter lead-in is then handed more expected values than `n`, which the report says as `up to`.
+Supply `n` for every stream and every one is scored, or supply the extra earlier values for that stream if you have them.
+
+What a stream asks for follows the model that scores it, not the shape of the data.
+A [`BinomialError`](@ref) takes `(y = successes, N = trials)`, a [`ReportTriangle`](@ref) a reference-day × delay matrix counted down its reference days, and an [`Aggregate`](@ref) a full series of which only the reporting windows are scored.
+Printing the requirements says which, per stream.
+
 ## Infection↔observation mappings
 
 An infection model does not have to generate a single curve. Two components
@@ -284,12 +323,26 @@ expected series rather than nesting.
 
 `ComposableTuringIDModels.rewrap` is the other direction — the same wrapper
 rebuilt around new wrapped models, with everything else it holds carried across.
-Swapping every component of a given type is those two together:
+Swapping every component of a given type is [`swap`](@ref), which is those two
+together:
+
+```@example traversal
+using ComposableTuringIDModels: swap
+swapped = swap(x -> x isa PoissonError ? NegativeBinomialError() : x, obs)
+```
+
+Targeting a *single* component rather than every one of a type — one error
+model in a [`Split`](@ref), say — is the same pair on one address, built from
+[`wrapped_models`](@ref) and [`rewrap`](@ref) by position (in `wrapped_models`
+order):
 
 ```@example traversal
 using ComposableTuringIDModels: wrapped_models, rewrap
-swap(f, m) = f(rewrap(m, map(x -> swap(f, x), wrapped_models(m))))
-swapped = swap(x -> x isa PoissonError ? NegativeBinomialError() : x, obs)
+split = obs.model.model
+updated_split = rewrap(
+    split, (split.streams.cases, NegativeBinomialError())
+)
+one_swapped = rewrap(obs, (updated_split,))
 ```
 
 Several components transform or derive a field on construction.

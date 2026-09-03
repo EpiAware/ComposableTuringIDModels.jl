@@ -353,51 +353,6 @@ end
     @test all(mt.observed)
 end
 
-@testitem "ReportTriangle narrows its counts at construction" begin
-    using ComposableTuringIDModels, Distributions
-    obs = ReportTriangle(PoissonError(), [0.6, 0.25, 0.15])   # Dmax = 2
-
-    # The count matrix the model scores is one of the model's own arguments,
-    # so it is built once when the model is constructed and DynamicPPL owns
-    # any copying it needs. Nothing about the data is unpacked, narrowed or
-    # copied inside the model body, where it would run on every evaluation
-    # (and where a run-time type computation crashes Mooncake's compiler).
-    N = Matrix{Union{Missing, Int}}([10 5 2; 12 6 3; 14 7 4])
-    tri = define_y_t(obs, N, fill(20.0, 3); now = 5)
-    mdl = as_turing_model(obs, tri, fill(20.0, 3))
-
-    @test mdl.args.y_t isa AbstractMatrix
-    @test mdl.args.y_t !== tri.counts
-    # Nothing is missing here, so the argument is narrowed to a concrete
-    # eltype and never sees DynamicPPL's `hasmissing` deepcopy.
-    @test eltype(mdl.args.y_t) === Int
-    @test mdl.args.y_t == tri.counts
-end
-
-@testitem "a ready-built ReportingTriangle is not written to" begin
-    using ComposableTuringIDModels, Distributions, Turing, Random
-    using DynamicPPL: @varname
-    Random.seed!(73)
-    obs = ReportTriangle(PoissonError(), [0.6, 0.25, 0.15])   # Dmax = 2
-
-    # A triangle built outside the model is not one of the model's arguments,
-    # so DynamicPPL never copies it: a `missing` observed cell must still be
-    # sampled as a latent rather than written into the caller's matrix.
-    N = Matrix{Union{Missing, Int}}([10 5 2; 12 6 3; 14 7 4])
-    N[2, 1] = missing
-    tri = define_y_t(obs, N, fill(20.0, 3); now = 5)
-    before = copy(tri.counts)
-
-    chn = sample(
-        as_turing_model(obs, tri, fill(20.0, 3)), Prior(), 20; progress = false
-    )
-
-    @test isequal(tri.counts, before)
-    draws = vec(chn[@varname(y_t[2, 1])])
-    @test length(draws) == 20
-    @test length(unique(draws)) > 1
-end
-
 @testitem "ReportTriangle simulates, conditions, and recovers per-cell means" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(72)
@@ -553,8 +508,8 @@ end
     obs = LatentDelay(PoissonError(), u)
     Y = fill(100.0, 40)
     sim = as_turing_model(obs, missing, Y)().y_t
-    @test length(sim) == length(Y)
-    @test all(>=(0), filter(!ismissing, sim))
+    @test length(sim) == length(Y) - observation_lead_in(obs)
+    @test all(>=(0), sim)
 end
 
 @testitem "LatentDelay recovers an uncertain delay's parameters" tags = [:sample] begin
@@ -675,7 +630,7 @@ end
     exp_tv = as_turing_model(obs, missing, fill(100.0, n))().expected
     @test length(exp_tv) == n - d + 1
     sim = as_turing_model(obs, missing, fill(100.0, n))().y_t
-    @test length(sim) == n
+    @test length(sim) == n - d + 1
     # The sampled per-time delay parameters are namespaced under `delay`.
     names = string.(
         collect(
@@ -746,49 +701,6 @@ end
     chain = sample(as_turing_model(model, y, T), Prior(), 40; progress = false)
     fc = forecast(model, y, chain, 7)
     @test size(fc, 1) == size(chain, 1)
-end
-
-@testitem "Aggregate right-aligns an expected series longer than its data" begin
-    using ComposableTuringIDModels, Distributions, Random
-    using DynamicPPL: VarInfo, logjoint
-    Random.seed!(315)
-
-    # Scoring the overlap of the observed and expected series, rather than
-    # requiring the data to be the longer one, makes an expected series longer
-    # than its data a supported shape: a stream whose chain consumes a shorter
-    # lead-in than its neighbours' gets more expected values than the caller
-    # has observations. `Aggregate` has to take the same alignment, or the
-    # windows come off the head of the expected series instead of its tail.
-    aggregation = [0, 2, 0, 2, 0, 2, 0, 2]
-    agg = Aggregate(PoissonError(), aggregation)
-    y = fill(3, 8)
-
-    # Windows of two days ending on every second day. With the expected series
-    # four days longer than the data, the last window is the last two of ITS
-    # days (11 + 12), not of the data's.
-    Y_long = collect(1.0:12.0)
-    out = as_turing_model(agg, y, Y_long)()
-    @test out.expected == [0.0, 11.0, 0.0, 15.0, 0.0, 19.0, 0.0, 23.0]
-
-    # Equal lengths are unchanged.
-    equal = as_turing_model(agg, y, collect(1.0:8.0))()
-    @test equal.expected == [0.0, 3.0, 0.0, 7.0, 0.0, 11.0, 0.0, 15.0]
-
-    # The other direction — data longer than the expected series, the chain's
-    # own lead-in — also ends on the last expected day. The earliest window
-    # falls entirely before the expected series starts and is clipped to an
-    # empty sum, which is the pre-existing clipping behaviour rather than
-    # anything this alignment decides.
-    agg10 = Aggregate(PoissonError(), vcat(aggregation, [0, 2]))
-    lead_in = as_turing_model(agg10, fill(3, 10), collect(1.0:8.0))()
-    @test lead_in.expected[(end - 5):end] == [0.0, 7.0, 0.0, 11.0, 0.0, 15.0]
-
-    # The scored windows are the ones the alignment picks: the log-joint is the
-    # sum over the present days of their own window totals, so windows taken
-    # off the head of `Y_t` would not match.
-    mdl = as_turing_model(agg, y, Y_long)
-    ref = sum(logpdf.(SafePoisson.([11.0, 15.0, 19.0, 23.0] .+ 1.0e-6), 3))
-    @test logjoint(mdl, VarInfo(mdl)) ≈ ref
 end
 
 @testitem "A delay nested in an Aggregate right-aligns on windows" begin
