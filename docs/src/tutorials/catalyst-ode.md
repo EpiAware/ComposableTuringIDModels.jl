@@ -105,7 +105,7 @@ nothing # hide
 !!! warning "Use forward-mode autodiff for ODE models"
     The rest of these docs recommend Mooncake as the default AD backend, but ODE infection models are the exception and sample under **ForwardDiff** today.
     Reverse-mode **NUTS through the ODE solver is not yet supported** on the Catalyst path.
-    The cause is how this package builds and rebuilds its `ODEProblem`, not a limitation of Turing or `SciMLSensitivity`, and it is tracked in [issue #375](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/375).
+    The block is in how this extension builds and remakes its `ODEProblem`, not in Turing or `SciMLSensitivity`.
     We therefore pass `AutoForwardDiff()` to NUTS explicitly.
 
 ```@example catalyst
@@ -206,9 +206,8 @@ The declarative SIR dynamics, scaled by the population and Poisson observation m
 ## The same API on a network built from parts
 
 A different compartmental model is a different reaction network passed to the *same* [`CatalystODEParams`](@ref).
-Catalyst goes further than that.
-A network does not have to be written out whole.
-It can be assembled from smaller networks, which is the compositional idea behind this package applied one layer down.
+A network also does not have to be written out whole.
+It can be assembled from smaller networks.
 
 We build SEIR from two reaction components.
 `@network_component` declares a network that is deliberately unfinished, and `extend` merges components into one network, unifying species that share a name.
@@ -237,11 +236,11 @@ seir = complete(extend(transmission, removal; name = :seir))
 
 ``I`` is written in both components and is unified into one compartment, so the assembled network has four species and three rates.
 `complete` marks it finished and ready to build a problem from.
-The species come back in neither component's written order, which makes the point in [A note on species ordering](@ref) sharper.
-The layout now depends on which components were merged and in what order, and sampling and indexing stay symbolic so nothing downstream depends on it.
+The species come back in neither component's written order, since the layout now depends on which components were merged and in what order.
+Sampling and indexing stay symbolic, so nothing downstream reads that layout, as [A note on species ordering](@ref) sets out.
 
 !!! note "`extend` and `compose` namespace differently"
-    `extend` merges components into one flat network and unifies species that share a name, which is what a compartmental model wants.
+    `extend` merges components into one flat network, which is what a compartmental model wants, because compartments must be shared rather than duplicated.
     `compose` instead nests one network inside another and namespaces the inner species, so a subsystem's ``I`` becomes `patch₊I`.
     [`CatalystODEParams`](@ref) reads either, but a composed system names its sampled variables after the namespaced symbols.
 
