@@ -115,7 +115,8 @@ negbin = swap(x -> x isa PoissonError ? NegativeBinomialError() : x, base)
 ```
 
 `Accessors.@set` replaces **one** component named by its path.
-The path is the field path the model prints, so a component nested several levels down is one line.
+The path is the object's own field path, so a component nested several levels down is one line.
+A printed tree labels each branch with the `_model` suffix trimmed, so the `infection` branch is the `infection_model` field.
 
 ```@example design
 using Accessors
@@ -140,9 +141,10 @@ deaths_negbin = @set split_obs.model.streams.deaths = NegativeBinomialError()
 
 The [`LatentDelay`](@ref) survives with its delay intact, so only the named stream changes.
 
-`ComposableTuringIDModels.wrapped_models` and `ComposableTuringIDModels.rewrap` sit underneath both tools.
-They are the seam a component *author* implements so that `swap` and `@set` work on a new component, rather than something a user calls.
-[Inspecting and updating an observation chain](@ref obs-traversal) covers them and the walk built on them.
+Both tools rest on a seam a component *author* implements rather than one a user calls.
+`swap` walks a chain with `ComposableTuringIDModels.wrapped_models` and rebuilds it with `ComposableTuringIDModels.rewrap`.
+`@set` goes through `ConstructionBase.constructorof`, which a component whose public constructor derives a field defines for itself.
+[Inspecting and updating an observation chain](@ref obs-traversal) covers the walk and both seams.
 
 ## Composing accumulation steps
 
