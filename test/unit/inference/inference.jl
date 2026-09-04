@@ -1,5 +1,5 @@
 @testitem "IDProblem pairs a model with its data and needs no length" begin
-    using ComposableTuringIDModels, Distributions, Random
+    using ComposableTuringIDModels, Distributions, Random, Accessors
     using DynamicPPL: VarInfo
     Random.seed!(71)
     infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal())
@@ -16,8 +16,62 @@
     @test keys(VarInfo(as_turing_model(IDProblem(model, y)))) ==
         keys(VarInfo(as_turing_model(model, y, length(y))))
 
-    # A second argument refits the same model to different data.
-    @test length(as_turing_model(problem, fill(5, 12))().generated_y_t) == 12
+    # Refitting to a different series is a new problem, built with `Accessors`,
+    # rather than a second argument to `as_turing_model`.
+    refit = @set problem.data = fill(5, 12)
+    @test isequal(refit.model, problem.model)
+    @test isequal(refit.data, fill(5, 12))
+    @test isequal(problem.data, Vector{Missing}(missing, 20))
+    @test length(as_turing_model(refit)().generated_y_t) == 12
+end
+
+@testitem "IDProblem refuses streams that disagree at construction" begin
+    using ComposableTuringIDModels, Distributions, Accessors
+    infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal())
+    # Two streams over one infection stratum, so the observation count is read
+    # off `cases` and `deaths` can genuinely contradict it.
+    obs = Split(
+        (cases = PoissonError(), deaths = PoissonError()),
+        reshape([1.0, 1.0], 2, 1)
+    )
+    ragged = (cases = fill(5, 30), deaths = fill(1, 40))
+    @test_throws ArgumentError IDProblem(infection, obs, ragged)
+    # The guard is an inner constructor, so respecifying into the same mistake
+    # is refused too.
+    ok = IDProblem(infection, obs, (cases = fill(5, 30), deaths = fill(1, 30)))
+    @test_throws ArgumentError @set ok.data = ragged
+
+    # It never refuses what `as_turing_model` accepts. A shorter stream is
+    # right-aligned rather than wrong, and a single series cannot disagree with
+    # a count read off itself.
+    @test IDProblem(infection, obs, (cases = fill(5, 30), deaths = fill(1, 20))) isa
+        IDProblem
+    @test IDProblem(infection, PoissonError(), fill(5, 30)) isa IDProblem
+    # Both simulation routes stay constructible.
+    @test IDProblem(infection, PoissonError(), Vector{Missing}(missing, 20)) isa
+        IDProblem
+    @test IDProblem(
+        infection, obs, (
+            cases = Vector{Missing}(missing, 20), deaths = Vector{Missing}(missing, 20),
+        )
+    ) isa IDProblem
+    # And a model reading named fields rather than streams is not mistaken for
+    # two disagreeing streams.
+    @test IDProblem(
+        infection, BinomialError(), (y = fill(5, 30), N = fill(20, 30))
+    ) isa IDProblem
+end
+
+@testitem "IDProblem refuses a bare length in place of its data" begin
+    using ComposableTuringIDModels, Distributions
+    problem = IDProblem(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+        PoissonError(), fill(5, 30)
+    )
+    # The generic method would report as if no data had been supplied, which
+    # discards the half of the pairing the type exists for.
+    @test_throws ArgumentError data_requirements(problem, 30)
+    @test_throws ArgumentError data_requirements(problem, (2, 30))
 end
 
 @testitem "IDProblem prints its component tree and a data summary" begin
@@ -65,6 +119,19 @@ end
     )
     @test occursin("└─ data: 30 observations in each of y, N", binom)
 
+    blank_streams = render(
+        IDProblem(
+            infection, Split((cases = PoissonError(), deaths = PoissonError())),
+            (
+                cases = Vector{Missing}(missing, 30),
+                deaths = Vector{Missing}(missing, 30),
+            )
+        )
+    )
+    @test occursin(
+        "└─ data: none, 30 time points (simulating from the prior)", blank_streams
+    )
+
     strata = render(
         IDProblem(
             DirectInfections(;
@@ -75,6 +142,19 @@ end
         )
     )
     @test occursin("└─ data: 2 strata x 30 observations", strata)
+
+    blank_strata = render(
+        IDProblem(
+            DirectInfections(;
+                Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
+                initialisation = IID(Normal())
+            ),
+            PoissonError(), Matrix{Missing}(missing, 2, 30)
+        )
+    )
+    @test occursin(
+        "└─ data: none, 30 time points (simulating from the prior)", blank_strata
+    )
 
     # Compact rendering stays one line, as it does for a component.
     @test sprint(show, IDProblem(infection, PoissonError(), fill(5, 30))) ==

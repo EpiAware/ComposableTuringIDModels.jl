@@ -126,10 +126,18 @@ problem = IDProblem(renewal, observation, y_obs)
 ```
 
 The problem carries its own length, so nothing about the series is restated and [`data_requirements`](@ref) reads straight off it.
+Construction checks the data against the model, so streams that disagree with each other are refused here rather than at build time.
 Passing a blank series in place of the reports, `Vector{Missing}(missing, n)`, would instead simulate from the prior.
 
 ```@example delays
 data_requirements(problem)
+```
+
+Fitting the same model to a different series is a new problem rather than a different call, so it is built the way every other part of a composition is respecified, with [Accessors](https://juliaobjects.github.io/Accessors.jl/).
+
+```@example delays
+using Accessors
+@set problem.data = y_obs[1:28]
 ```
 
 Fitting conditions on the observed reports, differentiating with the recommended [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) backend, described under [Automatic differentiation backend](@ref ad-backends).
