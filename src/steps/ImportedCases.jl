@@ -1,24 +1,12 @@
-# Imported (externally seeded) cases as a renewal modifier.
+# A scan step is a deterministic function, so the rate is drawn once before the
+# scan through the modifier seam (`as_turing_model(mod, n)`), which returns an
+# `ImportedRate` holding the drawn path.
 #
-# `ImportedCases` is the worked example of a modifier that carries priors. The
-# rate it adds is *sampled*, and a scan step is a deterministic function, so the
-# rate is drawn once before the scan through the modifier seam
-# (`as_turing_model(mod, n)`, see `AbstractRenewalModifier`). That returns an
-# `ImportedRate` — the same modifier with the drawn path in place of the prior —
-# which then behaves like any other modifier in the scan: it transforms the
-# proposed incidence and carries its own substate.
-#
-# The substate is the step counter, which is how a per-time quantity is read
-# inside a scan whose step sees no clock. Nothing about this is specific to
-# importation: any modifier needing a per-time input resolves it the same way.
-#
-# The prior is on the UNCONSTRAINED scale, like `Renewal`'s `rt` and
-# `initialisation` slots, and the modifier maps it through its own
-# `transformation` before adding it. An importation rate is a count per unit
-# time and cannot be negative, and a slot that accepts any latent process has to
-# make that hold structurally — an unconstrained process (a `RandomWalk`, an
-# `AR`) spends much of its time below zero, and subtracting that from the
-# incidence is not importation.
+# The prior is on the UNCONSTRAINED scale and is mapped through the modifier's
+# own `transformation` before being added.
+# An importation rate cannot be negative, and a slot that accepts any latent
+# process has to make that hold structurally, because an unconstrained process
+# spends much of its time below zero.
 
 @doc raw"
 Imported-cases modifier for [`RenewalStep`](@ref).
@@ -152,9 +140,9 @@ struct ImportedRate{V} <: AbstractRenewalModifier
     rate::V
 end
 
-# The substate is the step counter: a scan step has no clock of its own, so a
-# per-time modifier carries the index it has reached. The window is unused —
-# a step counter has no shape of its own to match.
+# A scan step has no clock of its own, so a per-time modifier carries the index
+# it has reached as its substate.
+# The window is unused, because a step counter has no shape to match.
 modifier_init_state(::ImportedRate, window) = 0
 
 function apply_modifier(mod::ImportedRate, incidence, t)

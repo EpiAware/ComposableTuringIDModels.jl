@@ -1,18 +1,12 @@
-# Dependency-free pretty-printing for model components.
-#
-# A composed model is a tree of components: an `IDModel` holds an infection and
-# an observation model, an infection model owns a latent process, a modifier
-# wraps an inner model, and so on. The default Julia `show` renders such a value
-# as its full nested parametric type (`RandomWalk{Normal{...}, ...}` — a
-# screenful), which is unreadable. Here we render the component *tree* instead:
-# each node is the role it plays plus its concrete component name, and we recurse
-# only through the slots that are themselves components, leaving distributions,
-# data and step structs as leaves. This is display-only; it changes nothing about
-# how a model is constructed or sampled.
+# The default Julia `show` renders a composed model as its full nested
+# parametric type, which is a screenful.
+# This renders the component tree instead, recursing only through slots that are
+# themselves components and leaving distributions, data and step structs as
+# leaves.
+# It is display-only.
 
-# Turn a field name into the role label shown in the tree, dropping a trailing
-# `_model`/`_models` so `infection_model` reads as `infection` and `latent_model`
-# as `latent`, while a plain name such as `rt` or `models` is kept as-is.
+# `infection_model` reads as `infection`, while a plain name such as `rt` or
+# `models` is kept as it is.
 function _role_label(f::Symbol)
     s = String(f)
     for suffix in ("_models", "_model")
@@ -23,18 +17,14 @@ function _role_label(f::Symbol)
     return s
 end
 
-# Whether a value is a component the tree should recurse into. Components are
-# `AbstractComposableModel`s. A raw prior slot holds a bare `Distribution` (or a
-# vector of them), which is not a component and so is a leaf automatically; a
-# richer prior (a latent model used as a prior, e.g. `RandomWalk`) is itself a
-# component and is still recursed into.
+# A raw prior slot holds a bare `Distribution`, which is not a component and so
+# is a leaf automatically.
+# A latent model used as a prior is a component and is still recursed into.
 _is_tree_component(v) = v isa AbstractComposableModel
 
-# Collect the component children of `model` as `(role, child)` pairs. A field is a
-# child when its value is a tree component (see [`_is_tree_component`](@ref)), or a
-# vector/tuple containing components (as combined/stacked models hold); leaf fields
-# (bare-distribution priors, generation intervals, step structs, functions) are
-# skipped so the tree stays compact.
+# A field is a child when its value is a tree component, or a vector or tuple
+# containing components.
+# Leaf fields are skipped so the tree stays compact.
 function _component_children(model::AbstractComposableModel)
     children = Tuple{String, AbstractComposableModel}[]
     for f in fieldnames(typeof(model))
@@ -52,9 +42,9 @@ function _component_children(model::AbstractComposableModel)
     return children
 end
 
-# The label a node shows in the tree. A component whose behaviour is set by a
-# non-component field rather than by its own type overrides this, so the tree
-# says which behaviour it is. Non-component fields are otherwise leaves the tree
+# The label a node shows in the tree.
+# A component whose behaviour is set by a non-component field rather than by its
+# own type overrides this, because such fields are otherwise leaves the tree
 # never reaches.
 _node_label(model) = string(nameof(typeof(model)))
 
@@ -82,7 +72,6 @@ function Base.show(io::IO, ::MIME"text/plain", model::AbstractComposableModel)
     return nothing
 end
 
-# Compact (nested / `print` / `repr`) rendering: just the concrete component name,
-# never the nested parametric type. Keeps a model legible inside arrays, tuples
-# and error messages without dumping its whole type signature.
+# Compact rendering, for a model nested inside an array, a tuple or an error
+# message.
 Base.show(io::IO, model::AbstractComposableModel) = print(io, nameof(typeof(model)))

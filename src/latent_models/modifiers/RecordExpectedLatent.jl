@@ -37,10 +37,10 @@ struct RecordExpectedLatent{M <: PriorLike} <: AbstractLatentModel
     end
 end
 
-# `RecordExpectedLatent` wraps whatever its inner model returns, so it serves
-# both a length-`n` path and an `(n_strata, n_time)` shape. The two methods
-# below delegate to one shared `@model`, which avoids both the duplication and
-# a dispatch ambiguity against the `AbstractPriorModel`/`Dims{2}` guard.
+# `RecordExpectedLatent` wraps whatever its inner model returns, so it serves both a
+# length-`n` path and an `(n_strata, n_time)` shape.
+# The two methods below delegate to one shared `@model`, which avoids a dispatch
+# ambiguity against the `AbstractPriorModel`/`Dims{2}` guard.
 @model function _record_expected_latent(model::RecordExpectedLatent, n)
     latent ~ as_turing_submodel(model.model, n)
     exp_latent := latent

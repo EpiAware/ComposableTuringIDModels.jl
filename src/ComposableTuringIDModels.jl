@@ -22,29 +22,27 @@ rand(as_turing_model(model, missing, 20))
 "
 module ComposableTuringIDModels
 
-# This package does NOT blanket-reexport Distributions/Turing: users
-# `using ComposableTuringIDModels, Distributions, Turing`. Only the names the
-# package itself uses or extends are imported below, which keeps the public
-# surface to the package's own exports.
+# Distributions and Turing are deliberately not blanket-reexported, so users
+# write `using ComposableTuringIDModels, Distributions, Turing`.
+# Only the names the package itself uses or extends are imported below.
 
 using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
     returned
 using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
-# Rebuilding a component from its stored fields. Several wrappers transform an
-# argument before storing it, so they point `constructorof` at a raw constructor
-# rather than at the public one, which keeps `Accessors` (and the package's own
-# `rewrap`) from applying the transform a second time.
+# Several wrappers transform an argument before storing it, so they point
+# `constructorof` at a raw constructor rather than at the public one.
+# That keeps `Accessors` and `rewrap` from applying the transform a second time.
 using ConstructionBase: ConstructionBase
 using LinearAlgebra: dot, cholesky, Symmetric, I, UniformScaling
 using LogExpFunctions: softmax, xexpy, log1pexp
 using OrdinaryDiffEq: ODEProblem, ODEFunction, solve, remake, AutoVern7, Rodas5P
 using Random: AbstractRNG, randexp, default_rng
 
-# KernelFunctions.jl supplies the ecosystem-standard covariance kernel types used
-# by `HilbertSpaceGP`; the package adds only the 1-D spectral densities those
-# kernels need for the Hilbert-space approximation (see HilbertSpaceGP.jl).
+# KernelFunctions.jl supplies the covariance kernel types.
+# The package adds only the 1-D spectral densities the Hilbert-space
+# approximation needs.
 using KernelFunctions: Kernel, SqExponentialKernel, Matern32Kernel,
     Matern52Kernel, with_lengthscale, kernelmatrix
 
@@ -76,8 +74,8 @@ export implements_prior_interface,
 export as_turing_submodel
 
 # --- utilities and distributions ---
-# (double-interval censoring is provided by CensoredDistributions.jl, used
-# internally by `Renewal` / `LatentDelay`; it is not re-exported here.)
+# Double-interval censoring comes from CensoredDistributions.jl and is not
+# re-exported here.
 export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial,
     NegativeBinomialMeanClust, condition_model
 
@@ -85,9 +83,8 @@ export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial
 export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept,
     FixedIntercept,
     Null, DiffLatentModel, HilbertSpaceGP, ExactGP
-# Covariance kernels for `HilbertSpaceGP` / `ExactGP` are re-exported from
-# KernelFunctions.jl (the ecosystem standard); `spectral_density` adds the
-# Hilbert-space weights those kernels need.
+# Covariance kernels are re-exported from KernelFunctions.jl.
+# `spectral_density` adds the Hilbert-space weights those kernels need.
 export SqExponentialKernel, Matern32Kernel, Matern52Kernel, spectral_density,
     standardised_index
 
@@ -139,12 +136,9 @@ export IDProblem, NUTSampler, DirectSample,
     spread_draws, get_param_array, forecast
 
 # --- extension points ---
-# Names a component author implements against but rarely calls: the shape
-# contract, the two seams that widen a model across strata, the renewal
-# step/modifier interfaces, the prior-slot widening helpers a new component's
-# constructor and recursion call directly, and the observation-chain traversal
-# seam. Public but not exported, so they are documented and supported without
-# crowding the namespace of a `using` call.
+# Names a component author implements against but rarely calls.
+# Public but not exported, so they are documented and supported without crowding
+# the namespace of a `using` call.
 public ModelShape, across_shape, infection_strata,
     AbstractAccumulationStep, AbstractConstantRenewalStep,
     ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
@@ -162,9 +156,8 @@ include("base/priors.jl")
 include("base/prettyprinting.jl")
 
 # --- accumulation steps ---
-# The backend-agnostic `accumulate_scan` machinery and the concrete step structs
-# it scans over. Included early so every step type is defined before the model
-# components that construct them.
+# Included early so every step type is defined before the model components that
+# construct them.
 include("steps/AbstractAccumulationStep.jl")
 include("steps/accumulate_scan.jl")
 include("steps/RWStep.jl")
@@ -247,9 +240,8 @@ include("observation_models/Split.jl")
 # --- composition ---
 include("compose.jl")
 
-# Structural traversal of an assembled observation chain. Included after the
-# composition so it can dispatch on `IDModel` as well as on every observation
-# component.
+# Included after the composition so it can dispatch on `IDModel` as well as on
+# every observation component.
 include("observation_models/traversal.jl")
 
 # What data an assembled model needs, read off the traversal seam above.

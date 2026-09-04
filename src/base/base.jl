@@ -110,18 +110,18 @@ struct MissingObservations{V <: AbstractVector, M <: AbstractVector{Bool}}
     present::M
 end
 
-# Per-time-point error distributions, as concrete callables. A closure defined
-# inside a `@model` body captures boxed locals, which costs a dynamic dispatch
-# on every entry of a scoring loop; a struct stays inferable.
+# Per-time-point error distributions, as concrete callables.
+# A closure defined inside a `@model` body captures boxed locals, which costs a
+# dynamic dispatch on every entry of a scoring loop, while a struct stays
+# inferable.
 struct _ErrorDist{M, P, R}
     obs_model::M
     pad_Y_t::P
     priors::R
 end
 
-# `n_diff` right-aligns the trials against the expected series, in the same
-# way the observations are aligned, so the trials vector may be given at either
-# length. See `_trial_dist`.
+# `n_diff` right-aligns the trials against the expected series the same way the
+# observations are aligned, so the trials vector may be given at either length.
 struct _TrialDist{M, P, N}
     obs_model::M
     p_t::P

@@ -2,17 +2,12 @@
 
 A spatial or age-stratified epidemic runs several patches over one time axis.
 This page builds one coupled patch model a layer at a time.
-Each layer is simulated and plotted before the next is added, so what the layer
-does is visible rather than asserted.
-The finished model is then fitted to data simulated from itself, to see whether
-the coupling is recoverable.
-The last two sections swap the coupling for the other options in the package,
-and write a new one.
+Each layer is simulated and plotted before the next is added, so what the layer does is visible rather than asserted.
+The finished model is then fitted to data simulated from itself, to see whether the coupling is recoverable.
+The last two sections swap the coupling for the other options in the package, and write a new one.
 
-Partial pooling across groups has [its own tutorial](@ref tutorial-hierarchy)
-and is used here without deriving it again.
-So does [observing several streams](@ref tutorial-split), including the weight
-matrix that maps many infection strata onto fewer reported streams.
+Partial pooling across groups has [its own tutorial](@ref tutorial-hierarchy) and is used here without deriving it again.
+So does [observing several streams](@ref tutorial-split), including the weight matrix that maps many infection strata onto fewer reported streams.
 
 ```@example patches
 using ComposableTuringIDModels, Distributions, Random, Statistics
@@ -49,8 +44,7 @@ nothing # hide
 
 ## Independent patches
 
-[`Replicate`](@ref) draws one latent process per patch and stacks them into the
-`strata × time` matrix a renewal process needs.
+[`Replicate`](@ref) draws one latent process per patch and stacks them into the `strata × time` matrix a renewal process needs.
 
 ```@example patches
 Random.seed!(11)
@@ -66,10 +60,8 @@ There is no common driver and no infection pressure moving between patches.
 
 ## A shared process across patches
 
-[`Stratify`](@ref) draws the process once over time and a deviation once over
-the patch axis, then combines them.
-A [`Hierarchy`](@ref) in the `across` slot shrinks each patch's deviation toward
-the shared level.
+[`Stratify`](@ref) draws the process once over time and a deviation once over the patch axis, then combines them.
+A [`Hierarchy`](@ref) in the `across` slot shrinks each patch's deviation toward the shared level.
 
 ```@example patches
 Random.seed!(11)
@@ -83,16 +75,14 @@ patch_lines(exp.(sim_pooled.Z_t); ylabel = "Rₜ",
 ```
 
 The three paths now move together and differ by a per-patch offset.
-Swap `across` for `IID` to pool nothing, or `FixedIntercept(0.0)` to collapse
-the patches onto one identical path.
+Swap `across` for `IID` to pool nothing, or `FixedIntercept(0.0)` to collapse the patches onto one identical path.
 
 ## Coupling the patches
 
 A shared `R_t` is still not coupling.
 Each patch's incidence so far depends only on its own history.
 [`Renewal`](@ref)'s `mixing` slot changes that.
-Every step convolves each patch's own incidence history with the generation
-interval, and `K` then redistributes the resulting pressures across patches:
+Every step convolves each patch's own incidence history with the generation interval, and `K` then redistributes the resulting pressures across patches.
 
 ```math
 \Lambda_{g,t} = \mathcal R_{g,t} \sum_h K_{gh} \sum_i g_i I_{h,t-i}
@@ -117,8 +107,7 @@ sim_coupled = as_turing_model(coupled, (n_strata, n_time))()
 nothing # hide
 ```
 
-The seed is the same as the uncoupled run, so the `R_t` paths and the initial
-incidence are identical and every difference in incidence is the coupling.
+The seed is the same as the uncoupled run, so the `R_t` paths and the initial incidence are identical and every difference in incidence is the coupling.
 
 ```@example patches
 fig = Figure(; size = (720, 320))
@@ -134,15 +123,12 @@ fig
 ```
 
 Patch 1 sits on the line because it receives nothing.
-Patch 3 lifts furthest and patch 2 a little, in proportion to the column of `K`
-that feeds them, and the gap widens over time because imported infections then
-transmit onward.
+Patch 3 lifts furthest and patch 2 a little, in proportion to the column of `K` that feeds them, and the gap widens over time because imported infections then transmit onward.
 
 ## Observing the patches
 
 [`Split`](@ref) observes each row of the infection matrix as its own stream.
-One error model given without stream names is used for every patch, and each
-stream's parameters are namespaced by stream.
+One error model given without stream names is used for every patch, and each stream's parameters are namespaced by stream.
 
 ```@example patches
 Random.seed!(11)
@@ -168,19 +154,14 @@ axislegend(ax_obs; position = :lt)
 fig_obs
 ```
 
-That is the whole model.
-A shared, partially pooled process, a one-directional mixing matrix, and a
-negative-binomial stream per patch.
+The model is a shared, partially pooled process, a one-directional mixing matrix, and a negative-binomial stream per patch.
 
 ## Fitting it
 
 Everything above ran forward.
-Fitting the same model to the counts it produced asks what the forward runs
-cannot.
+Fitting the same model to the counts it produced asks what the forward runs cannot.
 Is a coupled, partially pooled patch process identifiable from data?
-We draw two chains in parallel with `MCMCThreads()` and differentiate with
-[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend
-for this package (see [Automatic differentiation backend](@ref ad-backends)).
+We draw two chains in parallel with `MCMCThreads()` and differentiate with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for this package (see [Automatic differentiation backend](@ref ad-backends)).
 
 ```@example patches
 using Turing, Mooncake
@@ -194,8 +175,7 @@ chain = sample(
 nothing # hide
 ```
 
-`Z_t` is a generated quantity, so the fitted `R_t` path is read back per draw
-and turned into credible bands.
+`Z_t` is a generated quantity, so the fitted `R_t` path is read back per draw and turned into credible bands.
 
 ```@example patches
 draws = vec(returned(posterior, chain))
@@ -227,16 +207,13 @@ fig_fit
 ```
 
 Read the dashed line against the band.
-Where the truth sits inside the band the process is recovered at this
-signal-to-noise level, and where it leaves the band it is not.
+Where the truth sits inside the band the process is recovered at this signal-to-noise level, and where it leaves the band it is not.
 
 ## Other couplings
 
 `K` above was a matrix written down by hand.
-[`Gravity`](@ref) builds one instead from population sizes and pairwise
-distances, with the three exponents drawn rather than fixed.
-[`gravity`](@ref) is the same calculation as a function, so the shape a set of
-exponents implies can be seen without fitting anything.
+[`Gravity`](@ref) builds one instead from population sizes and pairwise distances, with the three exponents drawn rather than fixed.
+[`gravity`](@ref) is the same calculation as a function, so the shape a set of exponents implies can be seen without fitting anything.
 
 ```@example patches
 pop = [1.0e5, 5.0e4, 2.0e5]
@@ -258,13 +235,10 @@ fig_grav
 ```
 
 A larger distance exponent concentrates each patch's force on itself.
-`gravity` works in units of the mean population and returns rows summing to one,
-so `K` says only where a patch's force comes from and `R_t` carries its size.
-Without that split the two are confounded, since any overall scale on `K` does
-what scaling `R_t` does.
+`gravity` works in units of the mean population and returns rows summing to one, so `K` says only where a patch's force comes from and `R_t` carries its size.
+Without that split the two are confounded, since any overall scale on `K` does what scaling `R_t` does.
 
-Handing the model rather than the matrix draws the exponents alongside
-everything else.
+Handing the model rather than the matrix draws the exponents alongside everything else.
 
 ```@example patches
 Random.seed!(11)
@@ -277,18 +251,13 @@ patch_lines(sim_grav.I_t; ylabel = "Iₜ",
     title = "Gravity coupling, exponents drawn from their priors")
 ```
 
-The exponents are namespaced under `mixing` in the chain, so a fixed and an
-inferred coupling differ there and nowhere else.
-`within` sets how much of a patch's force is its own, and has to be non-zero for
-`α` to be identifiable.
-Three patches give only three off-diagonal entries to learn from, and the two
-population exponents trade off against each other over that little data, so a
-real application needs more patches or one exponent held fixed.
+The exponents are namespaced under `mixing` in the chain, so a fixed and an inferred coupling differ there and nowhere else.
+`within` sets how much of a patch's force is its own, and has to be non-zero for `α` to be identifiable.
+Three patches give only three off-diagonal entries to learn from, and the two population exponents trade off against each other over that little data, so a real application needs more patches or one exponent held fixed.
 
 Infections can also arrive from outside the modelled system altogether.
 [`ImportedCases`](@ref) with a stratified rate covers that.
-The rate is drawn before the scan, never depletes a susceptible pool, and comes
-from no patch's own transmission chain.
+The rate is drawn before the scan, never depletes a susceptible pool, and comes from no patch's own transmission chain.
 
 ```@example patches
 Random.seed!(11)
@@ -303,9 +272,7 @@ patch_lines(sim_exo.I_t ./ sim_coupled.I_t;
 
 ## Writing a coupling
 
-A coupling is a method of [`renewal_pressure`](@ref) taking the convolved
-incidence window and returning the pressure on each patch.
-Adding one is the whole extension.
+A coupling is a method of [`renewal_pressure`](@ref) taking the convolved incidence window and returning the pressure on each patch.
 Here the patches sit on a ring, and each takes a share of its two neighbours.
 
 ```@example patches
@@ -335,8 +302,5 @@ patch_lines(sim_ring.I_t ./ sim_pooled.I_t;
     title = "A coupling written from one method")
 ```
 
-Every patch lifts, because on a ring every patch has two neighbours, and the
-lift compounds because imported infections then transmit onward.
-Nothing else changed.
-The same process, the same seeding, the same observation model, and no change
-anywhere in the renewal recursion.
+Every patch lifts, because on a ring every patch has two neighbours, and the lift compounds because imported infections then transmit onward.
+The process, the seeding, the observation model and the renewal recursion are all unchanged.

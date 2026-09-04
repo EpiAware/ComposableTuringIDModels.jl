@@ -47,11 +47,11 @@ struct Replicate{M <: PriorLike} <: AbstractPriorModel
     model::M
 
     function Replicate(model)
-        # A length-`n_time` PATH slot, so a bare `Distribution` is wrapped in
-        # an `Intercept` (a constant path per stratum). The wrapping lives in
-        # an inner constructor because the default outer one would be more
-        # specific than a plain `Replicate(model) = ...` method and so would
-        # win, leaving the slot unwrapped.
+        # A length-`n_time` path slot, so a bare `Distribution` is wrapped in an
+        # `Intercept`.
+        # The wrapping lives in an inner constructor because the default outer
+        # one would be more specific than a plain `Replicate(model) = ...`
+        # method, and so would win and leave the slot unwrapped.
         wrapped = path_prior(model)
         return new{typeof(wrapped)}(wrapped)
     end

@@ -1,36 +1,24 @@
 # [Overview](@id overview)
 
-`ComposableTuringIDModels` builds an epidemiological model by assembling small parts
-rather than writing one bespoke model.
-Each part plays one of three roles — a **latent** process, an **infection**
-process, or an **observation** process — and each part becomes a
-[Turing](https://turinglang.org) / `DynamicPPL` model through a single generic
-constructor, [`as_turing_model`](@ref).
-Because every part speaks that one interface, parts nest inside one another and
-a whole model is *composed* from the pieces.
+`ComposableTuringIDModels` builds an epidemiological model by assembling small parts rather than writing one bespoke model.
+Each part becomes a [Turing](https://turinglang.org) / `DynamicPPL` model through a single generic constructor, [`as_turing_model`](@ref).
+Because every part speaks that one interface, parts nest inside one another and a whole model is *composed* from the pieces.
 
 ## Three roles, one interface
 
 A model is put together from parts filling three roles.
 
-  - A **latent** process describes an unobserved series ``Z_t`` over time, e.g.
-    a log reproduction number or a growth rate.
-  - An **infection** process turns that latent series into unobserved infections
-    ``I_t`` (directly, through exponential growth, or through the renewal
-    equation). It takes the latent process as a slot and draws it while building
-    the infections.
-  - An **observation** process turns infections into the observed data ``y_t``,
-    adding reporting delays, ascertainment, day-of-week effects,
-    right-truncation, and count noise.
+  - A **latent** process describes an unobserved series ``Z_t`` over time, such as a log reproduction number or a growth rate.
+  - An **infection** process turns that latent series into unobserved infections ``I_t`` (directly, through exponential growth, or through the renewal equation).
+    It takes the latent process as a slot and draws it while building the infections.
+  - An **observation** process turns infections into the observed data ``y_t``, adding reporting delays, ascertainment, day-of-week effects, right-truncation, and count noise.
 
-Each part is a plain struct with a single method of
-[`as_turing_model`](@ref), which returns a `DynamicPPL.Model`.
-There is no deep type hierarchy: a part is identified by the method it
-implements, not by its place in a tree.
-A part that contains another part builds the inner model and samples it as a
-submodel, so the parts nest through the same interface they expose.
+Each part is a plain struct with a single method of [`as_turing_model`](@ref), which returns a `DynamicPPL.Model`.
+There is no deep type hierarchy.
+A part is identified by the method it implements, not by its place in a tree.
+A part that contains another part builds the inner model and samples it as a submodel.
 
-The three roles feed one another and plug into that single interface:
+The three roles feed one another and plug into that single interface.
 
 ```@raw html
 <figure style="margin:1.5rem 0">
@@ -87,8 +75,7 @@ The three roles feed one another and plug into that single interface:
 
 ## Swap a part to change an assumption
 
-Because the parts share one interface, you compare modelling assumptions by
-swapping one struct for another and leaving the rest untouched.
+Because the parts share one interface, you compare modelling assumptions by swapping one struct for another and leaving the rest untouched.
 
 One latent process: an ARIMA-style differenced AR.
 
@@ -97,7 +84,7 @@ using ComposableTuringIDModels, Distributions
 latent = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
 ```
 
-Fold it into a direct-infections process, then swap only the observation model. Everything else stays the same.
+Fold it into a direct-infections process, then swap only the observation model.
 
 ```@example overview
 poisson_model = IDModel(
@@ -109,7 +96,8 @@ negbin_model = IDModel(
     NegativeBinomialError())
 ```
 
-Each assembly is turned into one Turing model. `missing` data simulates from the prior; the composed model exposes its generated quantities.
+Each assembly is turned into one Turing model.
+`missing` data simulates from the prior and exposes the generated quantities.
 
 ```@example overview
 turing_model = as_turing_model(poisson_model, missing, 20)
@@ -119,8 +107,6 @@ length(generated_y_t), length(I_t), length(Z_t)
 
 ## Where to go next
 
-  - [Composable design](@ref) explains the `as_turing_model` protocol and how
-    parts nest as submodels in more detail.
-  - The [tutorials](@ref tutorials-overview) build complete models and fit
-    them to real surveillance data, from a renewal model to a compartmental SIR.
+  - [Composable design](@ref) explains the `as_turing_model` protocol and how parts nest as submodels in more detail.
+  - The [tutorials](@ref tutorials-overview) build complete models and fit them to real surveillance data, from a renewal model to a compartmental SIR.
   - The [Public API](@ref public-api) lists every component you can compose.

@@ -5,17 +5,12 @@ A Gaussian process (GP) is a prior over functions, so it lets the data pick the 
 Reach for one when the roughness of the path should be learned rather than fixed in advance.
 [`AR`](@ref) and [`RandomWalk`](@ref) are cheaper and usually enough for local smoothing.
 
-The package ships two GP latent models built on the same
-[KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/)
-kernels.
+The package ships two GP latent models built on the same [KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/) kernels.
 
   - [`ExactGP`](@ref) forms the full ``n \times n`` covariance and factorises it.
-    Accurate, but ``O(n^3)`` per log-density evaluation, so use it on short
-    series and as the accuracy reference.
-  - [`HilbertSpaceGP`](@ref) is the basis-function approximation of
-    [riutortmayol2023practical](@citet), building on [solin2020hilbert](@citep).
-    A fixed basis makes each evaluation an ``n \times m`` matrix–vector product,
-    so use it for anything longer.
+    It is accurate but ``O(n^3)`` per log-density evaluation, so use it on short series and as the accuracy reference.
+  - [`HilbertSpaceGP`](@ref) is the basis-function approximation of [riutortmayol2023practical](@citet), building on [solin2020hilbert](@citep).
+    A fixed basis makes each evaluation an ``n \times m`` matrix–vector product, so use it for anything longer.
 
 ## Two GP latent models
 
@@ -43,8 +38,7 @@ The exact GP rebuilds and differentiates its covariance and Cholesky factor on e
 A kernel enters [`ExactGP`](@ref) through its Gram matrix and [`HilbertSpaceGP`](@ref) only through its spectral density, so either model takes `SqExponentialKernel` (the default), `Matern32Kernel` or `Matern52Kernel`, in order from smoothest paths to roughest.
 
 Both models are linear in a vector of standard-normal weights, so unit vectors at fixed hyperparameters trace out that map and the Gram matrix of the result is the model's implied prior covariance.
-The check below compares it against the same kernel in
-[AbstractGPs.jl](https://juliagaussianprocesses.github.io/AbstractGPs.jl/).
+The check below compares it against the same kernel in [AbstractGPs.jl](https://juliagaussianprocesses.github.io/AbstractGPs.jl/).
 
 ```@example gp
 using LinearAlgebra
@@ -98,7 +92,8 @@ The generation interval is a ``\mathrm{Gamma}(6.5, 0.62)`` serial interval discr
 
 Passing `missing` observations makes the composed model a prior simulator, `fix` pins the GP hyperparameters to a known length scale, and one seeded draw gives the data.
 The returned quantities include the reported cases `generated_y_t` and the GP path `Z_t`, which is ``\log R_t``.
-Seeding at around fifty infections keeps the early counts informative about ``R_t``; from a handful, both fits would sit on the prior for the first fortnight and the comparison would measure the seed size.
+Seeding at around fifty infections keeps the early counts informative about ``R_t``.
+From a handful, both fits would sit on the prior for the first fortnight and the comparison would measure the seed size.
 
 ```@example gp
 si = Gamma(6.5, 0.62)
@@ -137,8 +132,7 @@ fig_sim
 
 ## Fit both GPs and compare
 
-Conditioning on the counts and sampling with NUTS recovers the posterior, differentiated with
-[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for this package.
+Conditioning on the counts and sampling with NUTS recovers the posterior, differentiated with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for this package.
 The helper below fits a chosen GP latent to the first `n_fit` days, times the run, recovers the per-draw ``\log R_t`` with [`generated_observables`](@ref) and scores the posterior mean against the truth.
 
 ```@example gp
@@ -244,10 +238,8 @@ fig
 ```
 
 !!! note "Illustrative run"
-    This example uses a short sampler run and simulated data to stay fast to
-    build. For a real analysis you would use more iterations, check convergence
-    diagnostics, tune the number of basis functions `m` to the expected
-    smoothness, and supply observed data.
+    This example uses a short sampler run and simulated data to stay fast to build.
+    For a real analysis you would use more iterations, check convergence diagnostics, tune the number of basis functions `m` to the expected smoothness, and supply observed data.
 
 ## References
 

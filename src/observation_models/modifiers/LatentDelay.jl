@@ -86,11 +86,11 @@ struct LatentDelay{M <: AbstractObservationModel, D} <: AbstractObservationModel
     end
 end
 
-# A `LatentDelay` stores its PMF reversed for the convolution. Handing the
-# stored fields back to the public constructor reverses it a second time, and
-# says nothing, because a reversed PMF is still a valid one. Rebuild through the
-# raw constructor instead, which takes the fields exactly as stored. `Accessors`
-# reads this too, so `@set obs.model = ...` is safe on a delay.
+# A `LatentDelay` stores its PMF reversed for the convolution.
+# Handing the stored fields back to the public constructor reverses it a second
+# time and says nothing, because a reversed PMF is still a valid one.
+# Rebuild through the raw constructor instead, which takes the fields exactly as
+# stored.
 ConstructionBase.constructorof(::Type{<:LatentDelay}) = _rebuild_latent_delay
 
 function _rebuild_latent_delay(model, delay)
@@ -115,9 +115,10 @@ function LatentDelay(
     return LatentDelay(model, pmf)
 end
 
-# Deterministic time-varying delay: a per-time sequence of delay PMFs (one PMF per
-# time point, all the same length). Each is validated and the sequence is stored
-# forward (reversed per step in the `@model` for the `TimeVaryingLDStep`).
+# A deterministic time-varying delay is one PMF per time point, all the same
+# length.
+# Each is validated and the sequence is stored forward, then reversed per step in
+# the `@model` for the `TimeVaryingLDStep`.
 function LatentDelay(
         model::AbstractObservationModel,
         pmfs::AbstractVector{<:AbstractVector{<:Real}}
@@ -221,11 +222,9 @@ function UncertainDelay(family, params::AbstractVector; D, Δd = 1.0)
     )
 end
 
-# All-constant delay (every parameter a `Distribution`): a single time-invariant
-# pmf. Sample the parameters through the priors seam (the AR damp/init pattern: a
-# vector of per-parameter priors drawn as one `θ` slot), then rebuild and
-# discretise the delay per draw. This is the path `Renewal` (inferred generation
-# interval) and the time-invariant `LatentDelay` use.
+# An all-constant delay gives a single time-invariant pmf.
+# The parameters are sampled through the priors seam as one `θ` slot, then the
+# delay is rebuilt and discretised per draw.
 @model function as_turing_model(u::UncertainDelay{P, F, T, false}) where {P, F, T}
     θ ~ as_turing_submodel(u.params, length(u.params))
     return _discretised_pmf(u.family(θ...); Δd = u.Δd, D = u.D)
@@ -279,12 +278,10 @@ keeps every pmf the same length.
         P, F, T,
     }
     np = length(u.params)
-    # Draw each parameter through the seam: a `Distribution` gives a scalar
-    # (constant), a process gives a length-`n` path. Each parameter's submodel is
-    # drawn under its own explicit prefix (the `Split` idiom) so a single `~` LHS
-    # holds the return, collected into a plain local vector; `at` reads each per
-    # time point. `as_turing_model(prior, n)` is used directly (not the seam's
-    # scalar short-circuit) so a constant parameter is a prefixable submodel too.
+    # Each parameter's submodel is drawn under its own explicit prefix so a
+    # single `~` left-hand side holds the return.
+    # `as_turing_model(prior, n)` is used directly rather than through the seam's
+    # scalar short-circuit, so a constant parameter is a prefixable submodel too.
     params = Vector{Any}(undef, np)
     for i in 1:np
         drawn ~ to_submodel(
@@ -292,13 +289,12 @@ keeps every pmf the same length.
         )
         params[i] = drawn
     end
-    # Freeze into a `Tuple`: a `Vector{Any}` keeps every element boxed, so the
-    # draws reach `at` as `Base.RefValue`s it cannot index. A tuple fixes the
-    # element types to concrete `Number`/`Vector`.
+    # Freeze into a `Tuple`, because a `Vector{Any}` keeps every element boxed
+    # and the draws then reach `at` as `Base.RefValue`s it cannot index.
     params_t = Tuple(params)
     return map(1:n) do t
-        # `_at_all` reads each element at a static position. Indexing a
-        # heterogeneous tuple with a runtime `i` would return a `Union`, which
+        # `_at_all` reads each element at a static position, because indexing a
+        # heterogeneous tuple with a runtime `i` would return a `Union` that
         # Enzyme's type analysis rejects.
         θs = _at_all(params_t, t)
         _discretised_pmf(u.family(θs...); Δd = u.Δd, D = u.D)
@@ -311,11 +307,9 @@ function _at_all(params::Tuple, t)
     return (at(first(params), t), _at_all(Base.tail(params), t)...)
 end
 
-# Whether a `delay` field yields per-time kernels (time-varying) or a single
-# time-invariant pmf. Dispatched on the field type so the `LatentDelay`
-# convolution branch is type-stable (no runtime `isa` on sampled values): a stored
-# reversed pmf vector and a generic prior model are time-invariant, a per-time pmf
-# sequence is time-varying, and an `UncertainDelay` carries its `TV` flag.
+# Whether a `delay` field yields per-time kernels or a single time-invariant pmf.
+# Dispatched on the field type so the `LatentDelay` convolution branch is
+# type-stable, with no runtime `isa` on sampled values.
 _delay_timevarying(::AbstractVector{<:Real}) = false
 _delay_timevarying(::AbstractVector{<:AbstractVector{<:Real}}) = true
 _delay_timevarying(::AbstractPriorModel) = false
@@ -323,30 +317,26 @@ _delay_timevarying(::UncertainDelay{P, F, T, TV}) where {P, F, T, TV} = TV
 
 @model function as_turing_model(obs_model::LatentDelay, y_t, Y_t)
     # A `missing` series is passed down as it is, so the component that scores
-    # it sizes it from the CONVOLVED series it actually reads. Sizing it here
-    # instead would simulate a series as long as the input, with the lead-in at
-    # its head coming back as `missing` rather than not coming back at all.
+    # it sizes it from the convolved series it actually reads.
+    # Sizing it here instead would simulate a series as long as the input, with
+    # the lead-in at its head coming back as `missing` rather than not coming
+    # back at all.
     #
-    # An aggregation is the exception. Its reporting windows are fixed calendar
-    # objects read off the length of `y_t`, and it right-aligns a shorter `Y_t`
-    # against them, so it needs the series on the INPUT calendar rather than the
-    # convolved one. Sizing it here is what supplies that calendar.
+    # An aggregation is the exception, because its reporting windows are read off
+    # the length of `y_t` and it right-aligns a shorter `Y_t` against them.
+    # It needs the series on the input calendar, which sizing it here supplies.
     if ismissing(y_t) && _needs_input_calendar(obs_model.model)
         y_t = Vector{Missing}(missing, length(Y_t))
     end
     spec = obs_model.delay
     n = length(Y_t)
 
-    # The delay slot yields the reversed delay kernel(s) the convolution consumes.
     # `_delay_timevarying` is a compile-time-constant trait on the `delay` field
     # type, so this branch is type-stable and the fast time-invariant path is
     # untouched.
     if _delay_timevarying(spec)
-        # Time-varying: a reversed kernel per time drives `TimeVaryingLDStep`. A
-        # process-parameter `UncertainDelay` samples per-time (forward) pmfs
-        # through the priors seam; a deterministic per-time pmf sequence is used
-        # directly. Both are reversed and threaded through the scan input, the
-        # kernel at time `t` applied to the window ending at `t`.
+        # A reversed kernel per time drives `TimeVaryingLDStep`, with the kernel
+        # at time `t` applied to the window ending at `t`.
         if spec isa AbstractPriorModel
             delay ~ as_turing_submodel(spec, n; prefix = true)
             pmfs = delay
@@ -363,10 +353,10 @@ _delay_timevarying(::UncertainDelay{P, F, T, TV}) where {P, F, T, TV} = TV
             collect(zip(vcat(Y_t[(d + 1):end], 0.0), rev_pmfs[d:end]))
         )
     else
-        # Time-invariant: a single reversed pmf drives `LDStep` (the fast path). A
-        # fixed PMF vector is already stored reversed and used directly; an
-        # all-constant uncertain-delay samples its parameters through the priors
-        # seam and builds the (forward) PMF per draw, which is then reversed.
+        # A single reversed pmf drives `LDStep`, which is the fast path.
+        # A fixed PMF vector is already stored reversed and used directly.
+        # An all-constant uncertain delay builds its forward PMF per draw, which
+        # is then reversed.
         if spec isa AbstractPriorModel
             delay ~ as_turing_submodel(spec; prefix = true)
             rev_pmf = reverse(delay)

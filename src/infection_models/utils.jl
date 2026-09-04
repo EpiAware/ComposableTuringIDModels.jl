@@ -61,8 +61,9 @@ function R_to_r(R₀, w::AbstractVector{T}; newton_steps = 2, Δd = 1.0) where {
 end
 
 # The fixed generation interval of a `Renewal`, or a clear error when it is
-# inferred: an uncertain interval (a pmf-producing prior model) varies per draw,
-# so there is no single interval for these deterministic summaries to use.
+# inferred.
+# An uncertain interval varies per draw, so there is no single interval for these
+# deterministic summaries to use.
 function _fixed_gen_int(infection::Renewal)
     infection.gen_int isa AbstractVector && return infection.gen_int
     throw(
@@ -144,12 +145,12 @@ end
 _steps(Rt::AbstractVector) = Rt
 _steps(Rt::AbstractMatrix) = collect.(eachcol(Rt))
 
-# The initial-infections seed: one value for a single series, one per stratum
-# otherwise. A bare `Distribution` in the slot draws one scalar; a `Number` (or a
-# length-1 vector) is returned unchanged, so it also covers the `n::Int` case
-# directly. Broadcast against `n::Dims{2}` gives the same seed to every stratum.
-# The slot is a LEVEL, so a draw of any other length is an error rather than a
-# silently collapsed path; `SeedingPath` is the way to estimate a seeding window.
+# The initial-infections seed is one value for a single series and one per
+# stratum otherwise.
+# Broadcast against `n::Dims{2}` gives the same seed to every stratum.
+# The slot is a level, so a draw of any other length is an error rather than a
+# silently collapsed path, and `SeedingPath` is the way to estimate a seeding
+# window.
 function _seed(x, ::Int)
     length(x) == 1 || throw(
         ArgumentError(
@@ -167,10 +168,9 @@ function _seed(x::AbstractVector, n::Dims{2})
     return x
 end
 
-# The implied initial growth rate from a seed `R_t` and generation interval,
-# widened to a per-stratum `R_t` and/or a per-stratum generation interval: a
-# shared interval broadcasts across strata (`Ref(w)`), a per-stratum interval
-# (one row per stratum) is read row by row.
+# The implied initial growth rate from a seed `R_t` and generation interval.
+# A shared interval broadcasts across strata with `Ref(w)`, and a per-stratum
+# interval is read row by row.
 _init_rate(Rt₀::Real, w::AbstractVector) = R_to_r(Rt₀, w)
 _init_rate(Rt₀::AbstractVector, w::AbstractVector) = R_to_r.(Rt₀, Ref(w))
 function _init_rate(Rt₀::AbstractVector, w::AbstractMatrix)

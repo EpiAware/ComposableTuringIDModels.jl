@@ -1,32 +1,22 @@
 # [Partial pooling across groups in a composed model](@id tutorial-hierarchy)
 
-A multi-group epidemic is a panel: one shared infection process seen by several
-groups, each reporting it at its own level.
+A multi-group epidemic is a panel, one shared infection process seen by several groups, each reporting it at its own level.
 [`Stratify`](@ref) expresses this panel directly.
-A shared process is drawn once over time, and a per-group deviation is drawn
-once over the group axis.
+A shared process is drawn once over time, and a per-group deviation is drawn once over the group axis.
 The two combine into one `groups × time` latent matrix.
-[`Split`](@ref) then observes every group through the same observation model,
-namespaced by group.
+[`Split`](@ref) then observes every group through the same observation model, namespaced by group.
 See the [Composable design](@ref) page for how the two compose.
 
-This page drives a per-group reporting level with a [`Hierarchy`](@ref) inside
-a [`Stratify`](@ref).
-It simulates from that model and fits it end-to-end under NUTS, recovering
-the per-group levels.
-The group dimension threads from the data and the group prior is namespaced by
-the component, so the panel composes with no hand-orchestration.
+This page drives a per-group reporting level with a [`Hierarchy`](@ref) inside a [`Stratify`](@ref).
+It simulates from that model and fits it end-to-end under NUTS, recovering the per-group levels.
+The group dimension threads from the data and the group prior is namespaced by the component, so the panel composes with no hand-orchestration.
 
 ## The composed model
 
-The shared epidemic is a [`DirectInfections`](@ref) process carrying a
-[`RandomWalk`](@ref) latent, observed with a [`PoissonError`](@ref).
+The shared epidemic is a [`DirectInfections`](@ref) process carrying a [`RandomWalk`](@ref) latent, observed with a [`PoissonError`](@ref).
 [`Stratify`](@ref) puts a per-group level on that latent.
-Every group shares the same random walk, offset by its own log-level
-``\ell_g``, so each group's infection curve is the shared curve scaled by
-``e^{\ell_g}``.
-Those per-group levels are partially pooled with a [`Hierarchy`](@ref),
-supplied as `Stratify`'s `across` slot.
+Every group shares the same random walk, offset by its own log-level ``\ell_g``, so each group's infection curve is the shared curve scaled by ``e^{\ell_g}``.
+Those per-group levels are partially pooled with a [`Hierarchy`](@ref), supplied as `Stratify`'s `across` slot.
 
 ```@example hier
 using ComposableTuringIDModels, Distributions, Turing, Random, Statistics
@@ -41,31 +31,19 @@ model = IDModel(
 ```
 
 The grouping dimension is **not** a field of any component.
-Passing `as_turing_model(model, Y)` reads `n_groups` and `n_time` from the
-shape of the data matrix `Y` (rows are groups, columns are time) and passes
-`n_groups` to the [`Hierarchy`](@ref) (through `Stratify`'s `across` slot) and
-`n_time` to the shared random walk, the same way a series length is passed to
-`as_turing_model(latent, n)`.
+Passing `as_turing_model(model, Y)` reads `n_groups` and `n_time` from the shape of the data matrix `Y`, where rows are groups and columns are time.
+`n_groups` goes to the [`Hierarchy`](@ref) through `Stratify`'s `across` slot, and `n_time` to the shared random walk, the same way a series length is passed to `as_turing_model(latent, n)`.
 
-The group prior carries its own innovations (the [`IID`](@ref) `across` process
-samples an `ϵ_t`), which under the prefix-off submodel convention would collide
-with the infection [`RandomWalk`](@ref)'s own `ϵ_t`.
-[`Stratify`](@ref) prefixes its `across` slot automatically so the two never
-collide, and [`Split`](@ref) prefixes each group's observation with
-`group<g>`.
-`Stratify`'s `combine` argument maps a group's level and the shared path onto
-that group's row of the latent matrix.
-By default this is additive: ``Z_{g,t} = \text{shared}_t + \ell_g``.
-After the model's `exp` transformation, each group's curve is the shared
-curve scaled by ``e^{\ell_g}``.
-Swap `combine` for a different mapping the way [`Ascertainment`](@ref) swaps its
-`transform`.
+The group prior carries its own innovations (the [`IID`](@ref) `across` process samples an `ϵ_t`), which under the prefix-off submodel convention would collide with the infection [`RandomWalk`](@ref)'s own `ϵ_t`.
+[`Stratify`](@ref) prefixes its `across` slot automatically so the two never collide, and [`Split`](@ref) prefixes each group's observation with `group<g>`.
+`Stratify`'s `combine` argument maps a group's level and the shared path onto that group's row of the latent matrix.
+By default this is additive, ``Z_{g,t} = \text{shared}_t + \ell_g``.
+Swap `combine` for a different mapping the way [`Ascertainment`](@ref) swaps its `transform`.
 
 ## Simulate
 
-Passing an all-`missing` matrix makes the model a prior simulator; the group
-dimension threads from its row count.
-We simulate eight groups over 24 time steps:
+Passing an all-`missing` matrix makes the model a prior simulator.
+We simulate eight groups over 24 time steps.
 
 ```@example hier
 n_time, n_groups = 24, 8
@@ -84,18 +62,12 @@ true_levels = group_level(sim.Z_t)
     true_levels = round.(true_levels, digits = 2))
 ```
 
-The shared infection curve is common to all groups; the rows of `Ydata` differ
-only through the per-group level and Poisson noise.
+The rows of `Ydata` differ only through the per-group level and Poisson noise.
 
 ## Fit
 
-Conditioning on the simulated counts and sampling with NUTS recovers the
-posterior end-to-end.
-`n_groups` again threads from the data matrix, so nothing about the group
-dimension is hard-coded in the components.
-We draw two chains in parallel with `MCMCThreads()` and differentiate with
-[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend
-for this package (see [Automatic differentiation backend](@ref ad-backends)).
+Conditioning on the simulated counts and sampling with NUTS recovers the posterior end-to-end.
+We draw two chains in parallel with `MCMCThreads()` and differentiate with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for this package (see [Automatic differentiation backend](@ref ad-backends)).
 
 ```@example hier
 using Mooncake
@@ -108,8 +80,7 @@ chain = sample(
 size(chain, 1)
 ```
 
-The relative per-group levels are recovered per draw from the generated `Z_t`
-with `returned`, then compared with the simulated truth:
+The relative per-group levels are recovered per draw from the generated `Z_t` with `returned`, then compared with the simulated truth.
 
 ```@example hier
 level_draws = reduce(hcat,
@@ -121,8 +92,6 @@ post_mean = vec(mean(level_draws; dims = 2))
 ```
 
 The posterior per-group levels line up with the simulated truth.
-A plot with 80% credible intervals against the ``y = x`` line makes the recovery
-visible:
 
 ```@example hier
 using CairoMakie
@@ -141,18 +110,9 @@ scatter!(ax, true_levels, md; color = :seagreen, markersize = 12)
 fig
 ```
 
-Each group's credible interval covers the ``y = x`` line, so the partially
-pooled per-group levels are recovered inside a full composed panel.
-[`Stratify`](@ref) supplied the panel structure, the [`Hierarchy`](@ref)
-supplied the per-group levels, and the group dimension threaded from the data
-with the group prior namespaced by the component.
-Swapping `across = RandomWalk()` in the [`Hierarchy`](@ref) would instead pool
-*neighbouring* groups (correlated ordered strata).
-Swapping `Stratify`'s `across` slot for a bare [`IID`](@ref) or a
-`Distribution` would drop the shared level for independent per-group levels,
-each with no other change.
+Each group's credible interval covers the ``y = x`` line, so the partially pooled per-group levels are recovered inside a full composed panel.
+Swapping `across = RandomWalk()` in the [`Hierarchy`](@ref) would instead pool *neighbouring* groups (correlated ordered strata).
+Swapping `Stratify`'s `across` slot for a bare [`IID`](@ref) or a `Distribution` would drop the shared level for independent per-group levels, each with no other change.
 
-When the groups are genuinely **separate** infection processes rather than one
-shared curve — several distinct regions, say, each with its own latent — see
-[`CombineInfections`](@ref) instead, described on the [Multiple observation
-streams](@ref tutorial-split) page.
+When the groups are genuinely **separate** infection processes rather than one shared curve, several distinct regions each with its own latent, see [`CombineInfections`](@ref) instead.
+That is described on the [Multiple observation streams](@ref tutorial-split) page.

@@ -1,15 +1,12 @@
-# Per-role interface contracts. Each role's members must implement the
-# `as_turing_model` signature fixed by its supertype:
+# The `as_turing_model` signature each role fixes for its members.
 #
 #   latent       as_turing_model(m, n)        ⇒ a DynamicPPL.Model
 #   infection    as_turing_model(m, n)        ⇒ a DynamicPPL.Model returning at
 #                                              least `I_t` and `Z_t`
 #   observation  as_turing_model(m, y_t, Y_t) ⇒ a DynamicPPL.Model
 #
-# The helpers below encode those contracts in a form usable from tests: each
-# returns `true` when `model` is in the given role *and* its role-specific
-# `as_turing_model` call returns a `DynamicPPL.Model`. They construct the model
-# but do not sample it, so they are cheap conformance checks.
+# The helpers below construct the model but do not sample it, so they are cheap
+# conformance checks.
 
 @doc raw"
 Check that `model` satisfies the [`AbstractPriorModel`](@ref) interface: it is a
