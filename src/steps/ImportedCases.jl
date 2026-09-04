@@ -24,9 +24,14 @@ incidence, and behind reintroduction after local elimination.
 
 For infection arriving from another *modelled* stratum, rather than from
 outside the system altogether, use the renewal `mixing` slot instead (see
-[`renewal_pressure`](@ref)); handing this modifier a [`Stratify`](@ref) rate
-gives a `strata × time` importation rate, one exogenous stream per stratum,
-read per step with [`at`](@ref) exactly as a shared rate is.
+[`renewal_pressure`](@ref)).
+
+On a stratified renewal the rate is read per step with [`at`](@ref) whatever
+shape it has, and the two shapes mean different things.
+A bare `Distribution` is one constant shared across strata, which lifts every
+stratum by the same amount at each step.
+A [`Stratify`](@ref) or [`Replicate`](@ref) rate is a `strata × time` rate, one
+exogenous stream per stratum.
 
 `importation_rate` is a per-step parameter slot holding the **unconstrained**
 rate ``\tilde\iota_t``, read at step ``t`` with [`at`](@ref): a bare
