@@ -1,8 +1,7 @@
 # PACKAGE-OWNED — not part of the scaffold template.
 #
-# Per-backend NUTS sampling smoke tests. A backend can return a correct, fast
-# gradient and still kill the process once it is driven through a sampler, so a
-# gradient check on its own does not qualify a backend for inference.
+# Per-backend NUTS sampling smoke tests, the sampling half of the qualification
+# the AD backend comparison page describes.
 #
 # Everything about a scenario comes from the same `ADFixtures` registry the
 # gradient items use: the models, the sampler budget, and the per-backend
@@ -16,10 +15,13 @@
 
     const CHILD = joinpath(@__DIR__, "sampling_child.jl")
 
-    # Wall-clock cap on one child. Seven per-backend jobs share one CI time
-    # limit, so a hung sampler is reported as a failure rather than left to
-    # spend the budget.
-    const CHILD_TIMEOUT = 900
+    # Wall-clock cap on a single scenario, and how often the child's progress
+    # is checked against it. Seven per-backend jobs share one CI time limit, so
+    # a hung sampler is reported as a failure rather than left to spend the
+    # budget. The cap is per scenario, not per child, so a slow first-use
+    # compile cannot leave a healthy second scenario with no time.
+    const SCENARIO_TIMEOUT = 900
+    const POLL_INTERVAL = 5
 
     # The status a scenario carries when it never ran.
     const SKIPPED = "skipped by the registry"
@@ -32,10 +34,19 @@
             --startup-file=no $CHILD $backend_name $names`
         path, io = mktemp()
         proc = run(pipeline(cmd; stdout = io, stderr = io), wait = false)
-        timer = Timer(
-            _ -> process_running(proc) && kill(proc, Base.SIGKILL),
-            CHILD_TIMEOUT
-        )
+        # Each result the child flushes restarts the clock, so the cap applies
+        # to whichever scenario is currently running.
+        deadline = Ref(time() + SCENARIO_TIMEOUT)
+        reported = Ref(0)
+        timer = Timer(POLL_INTERVAL; interval = POLL_INTERVAL) do _
+            done = length(child_results(read(path, String)))
+            if done > reported[]
+                reported[] = done
+                deadline[] = time() + SCENARIO_TIMEOUT
+            end
+            time() > deadline[] && process_running(proc) &&
+                kill(proc, Base.SIGKILL)
+        end
         try
             wait(proc)
         finally

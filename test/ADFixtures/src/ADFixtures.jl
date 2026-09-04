@@ -650,11 +650,13 @@ const _SAMPLING_ENSEMBLES = (
     ("MCMCSerial", MCMCSerial()), ("MCMCThreads", MCMCThreads()),
 )
 
-# `NUTSampler` settings shared by every sampling scenario. The budget is tiny
-# and `max_depth` is capped because the question is whether the sampler loop
-# survives the backend, not whether it recovers anything. Adaptation is the
-# larger half: it is where the step size is still moving, so it drives the
-# sampler through the widest range of the target.
+# `NUTSampler` settings shared by every sampling scenario. `ndraws` is the
+# total across chains, so each chain keeps ten draws after twenty-five
+# adaptation iterations. The budget is small and `max_depth` is capped because
+# the question is whether the sampler loop survives the backend, not whether it
+# recovers anything. Adaptation is the longer phase because the step size is
+# still moving there, so it drives the sampler over the widest range of the
+# target.
 const _SAMPLING_KWARGS = (;
     nchains = 2, ndraws = 20, nadapts = 25, max_depth = 4,
 )
