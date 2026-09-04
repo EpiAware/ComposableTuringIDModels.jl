@@ -1,5 +1,6 @@
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
+AMD = "14f7f29c-3bd6-536c-9a0b-7339e30b5a3e"
 Accessors = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
@@ -35,6 +36,14 @@ ComposableTuringIDModels = {path = ".."}
 
 [compat]
 ADTypes = "1.23.0"
+# AMD is not used here directly. It is a direct dependency only so this bound
+# can exist: `SparseColumnPivotedQR` declares no compat for it, so the resolver
+# is free to take 0.5.4, which removed `SS_Int`. Its AMD extension still reads
+# that name, and `LinearSolve` calls `scpqr` at load time, so the whole SciML
+# stack fails to precompile. See EpiAware/ComposableTuringIDModels.jl#379 and
+# SciML/SparseColumnPivotedQR.jl#72.
+# Drop the dep and this bound once SparseColumnPivotedQR#71 lands.
+AMD = "0.5.1 - 0.5.3"
 Aqua = "0.8.16"
 BenchmarkTools = "1.8.0"
 Catalyst = "16.2.3"
