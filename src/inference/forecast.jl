@@ -145,20 +145,33 @@ end
 #
 # This reaches into the FlexiChains storage `predict` consumes; a public
 # length-extension API there would replace it.
+
+# One prior draw of the forecast model, keyed by `VarName` so a chain entry can
+# be looked up directly.
+function _prior_draw(rng::AbstractRNG, fc_model)
+    return Dict(vn => val for (vn, val) in pairs(rand(rng, fc_model)))
+end
+
 function _extend_latent_draws(rng::AbstractRNG, fc_model, chain)
     extended = deepcopy(chain)
     data = extended._data
+    # A `:=` generated quantity is stored as a parameter but is recomputed by
+    # `predict`, so it is not a model input and a prior draw never yields one.
+    # Absence from `probe` is what tells the two apart. The same draw is the
+    # first of the batch `_assert_factorised` needs, so the guard costs no
+    # extra model evaluation.
+    probe = _prior_draw(rng, fc_model)
     resized = Dict{FlexiChains.Parameter, Int}()
     for key in keys(data)
-        key isa FlexiChains.Parameter || continue
+        key isa FlexiChains.Parameter && haskey(probe, key.name) || continue
         sample = data[key][1, 1]
         sample isa AbstractVector && (resized[key] = length(sample))
     end
     isempty(resized) && return extended
-    _assert_factorised(rng, fc_model, resized)
+    _assert_factorised(rng, fc_model, resized, probe)
     ni, nc = size(chain)
     for j in 1:nc, i in 1:ni
-        prior = Dict(vn => val for (vn, val) in pairs(rand(rng, fc_model)))
+        prior = _prior_draw(rng, fc_model)
         for (key, fit_len) in resized
             full = prior[key.name]
             length(full) > fit_len || continue
@@ -181,12 +194,9 @@ end
 # silently mis-forecast.
 const _FORECAST_INDEP_TOL = 0.5
 
-function _assert_factorised(rng::AbstractRNG, fc_model, resized)
+function _assert_factorised(rng::AbstractRNG, fc_model, resized, first_draw)
     n_probe = 256
-    draws = [
-        Dict(vn => val for (vn, val) in pairs(rand(rng, fc_model)))
-            for _ in 1:n_probe
-    ]
+    draws = [first_draw; [_prior_draw(rng, fc_model) for _ in 2:n_probe]]
     for (key, fit_len) in resized
         full_len = length(draws[1][key.name])
         full_len > fit_len || continue
