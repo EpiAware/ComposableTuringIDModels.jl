@@ -23,10 +23,23 @@ which is the reason to hold one rather than a conditioned `DynamicPPL.Model`:
 the latter renders as its full nested parametric type with the observations
 dumped inline.
 
-Construction checks the data against the model, so a set of streams that
-disagree with each other is refused here rather than at build time. Fitting the
-same model to a different series is a new problem, built with `Accessors`:
-`@set problem.data = y_new`.
+Construction rejects data the model cannot fit, but the check is narrow and
+worth knowing the shape of: it cannot see a length disagreement on a single
+series, nor across streams that imply their own strata, because in both the
+observation count is read from the same data it would be checked against. Ask
+properly with [`data_requirements`](@ref).
+
+There is no data-free `IDProblem`, because the pairing is what the type is;
+[`IDModel`](@ref) is the object for a model on its own. A problem whose
+observations have not arrived yet is one over a blank series, which fixes the
+shape and says how many observations are expected, and the data is attached the
+way anything else in a composition is respecified.
+
+```julia
+using Accessors
+problem = IDProblem(model, Vector{Missing}(missing, 20))  # shape fixed, none observed
+fitted = @set problem.data = y                            # observations attached
+```
 
 # Arguments
 

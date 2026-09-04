@@ -62,6 +62,37 @@ end
     ) isa IDProblem
 end
 
+@testitem "a blank series is a problem awaiting its observations" begin
+    using ComposableTuringIDModels, Distributions, Accessors, Random
+    using DynamicPPL: VarInfo
+    Random.seed!(73)
+    model = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal(log(20), 0.2)),
+        LatentDelay(PoissonError(), fill(1 / 5, 5))
+    )
+    # There is no data-free problem; a blank series is how a shape is fixed
+    # before the observations arrive. It carries a length, so it simulates.
+    waiting = IDProblem(model, Vector{Missing}(missing, 20))
+    @test length(as_turing_model(waiting)().generated_y_t) == 20
+    @test data_requirements(waiting).n == 20
+
+    # A scalar `missing` has no length, so it is not a way to express this.
+    @test_throws ArgumentError IDProblem(model, missing)
+
+    # Attaching the data gives what the constructor gives, field for field.
+    y = fill(5, 20)
+    attached = @set waiting.data = y
+    built = IDProblem(model, y)
+    @test all(
+        f -> isequal(getfield(attached, f), getfield(built, f)),
+        fieldnames(IDProblem)
+    )
+    @test keys(VarInfo(as_turing_model(attached))) ==
+        keys(VarInfo(as_turing_model(built)))
+    # The blank problem is unchanged, since `@set` builds rather than mutates.
+    @test isequal(waiting.data, Vector{Missing}(missing, 20))
+end
+
 @testitem "IDProblem refuses a bare length in place of its data" begin
     using ComposableTuringIDModels, Distributions
     problem = IDProblem(
