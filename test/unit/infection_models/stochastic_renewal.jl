@@ -226,11 +226,13 @@ end
             RenewalStep(ConstantRenewalStep(rev), (SusceptibleDepletion(1000.0),)),
         )
         state = renewal_init_state(step, 10.0, 0.1, 3)
-        inc, subs = _propose(step, state, 1.4)
+        inc, expectation, subs = _propose(step, state, 1.4)
         got = _commit(step, state, inc, subs)
         want = step(state, 1.4)
         @test got.val ≈ want.val
         @test got.window ≈ want.window
+        # Nothing here draws, so the proposal is its own expectation.
+        @test expectation == inc
     end
 end
 

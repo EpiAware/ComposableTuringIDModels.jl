@@ -333,3 +333,17 @@ end
     I_t = accumulate_scan(setup.scan_step, setup.init, setup.Rts)
     return (; I_t, Z_t = setup.Z_t, I_seed = setup.init.window)
 end
+
+# The scan runs on a `RecordingRenewalStep`, whose state keeps each step's
+# expectation, so both series come off one scan. `accumulate_scan` is unrolled
+# because the accumulated states it drops are what the second series is read
+# from.
+@model function with_expected_infections(infection::Renewal, n::ModelShape)
+    setup ~ to_submodel(_renewal_setup(infection, n), false)
+    step = RecordingRenewalStep(setup.scan_step)
+    init = _recording_state(setup.init)
+    states = accumulate(step, setup.Rts; init = init)
+    I_t = get_state(step, init, states)
+    exp_I_t = get_expected_state(step, init, states)
+    return (; I_t, Z_t = setup.Z_t, I_seed = setup.init.window, exp_I_t)
+end

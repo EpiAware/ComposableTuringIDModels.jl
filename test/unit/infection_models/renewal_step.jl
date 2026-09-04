@@ -260,3 +260,100 @@ end
         gi, exp, PoissonError(), Normal(), kw.recurrent_step, kw.mixing, ()
     )
 end
+
+@testitem "the scan's expectation stops at the first modifier that draws" begin
+    using ComposableTuringIDModels
+    using ComposableTuringIDModels: ConstantRenewalStep, RecordingRenewalStep,
+        RenewalStep, get_expected_state, renewal_foi, renewal_init_state
+
+    # A drawing modifier stubbed to a fixed doubling, so the three series it
+    # separates are exact: the bare force of infection, the incidence after
+    # depletion, and the committed draw.
+    struct Doubling <: ComposableTuringIDModels.AbstractRenewalModifier end
+    ComposableTuringIDModels.modifier_init_state(::Doubling, window) = nothing
+    function ComposableTuringIDModels.apply_modifier(::Doubling, incidence, s)
+        return 2 .* incidence, s
+    end
+    ComposableTuringIDModels.is_noise(::Doubling) = true
+
+    gen_int = [0.2, 0.3, 0.5]
+    N = 1000.0
+    core = ConstantRenewalStep(reverse(gen_int))
+    step = RecordingRenewalStep(
+        RenewalStep(core, (SusceptibleDepletion(N), Doubling()))
+    )
+    Rt = [1.6, 1.4, 1.2, 1.0, 0.9]
+    init = renewal_init_state(step, 5.0, 0.1, length(gen_int))
+    states = accumulate(step, Rt; init = init)
+
+    # The reference recurrence, keeping all three series apart.
+    window, S = init.window, N
+    fois, expectations, committed = Float64[], Float64[], Float64[]
+    for R in Rt
+        foi = renewal_foi(core, window, R)
+        depleted = max(S / N, 1.0e-6) * foi
+        draw = 2 * depleted
+        S -= depleted
+        push!(fois, foi)
+        push!(expectations, depleted)
+        push!(committed, draw)
+        window = vcat(window[2:end], draw)
+    end
+
+    @test get_state(step, init, states) ≈ committed
+    @test get_expected_state(step, init, states) ≈ expectations
+    # Post-depletion and pre-noise: the same value as neither the committed
+    # draw nor the bare force of infection the depletion modifier received.
+    @test !isapprox(get_expected_state(step, init, states), committed)
+    @test !isapprox(get_expected_state(step, init, states), fois)
+end
+
+@testitem "a step with nothing drawing commits its own expectation" begin
+    using ComposableTuringIDModels
+    using ComposableTuringIDModels: ConstantRenewalStep, RecordingRenewalStep,
+        RenewalStep, accumulate_scan, get_expected_state, renewal_init_state
+    gen_int = [0.2, 0.3, 0.5]
+    core = ConstantRenewalStep(reverse(gen_int))
+    Rt = [1.6, 1.4, 1.2, 1.0, 0.9, 0.8]
+    inner = (
+        core, RenewalStep(core), RenewalStep(core, (SusceptibleDepletion(1.0e4),)),
+    )
+    for plain in inner
+        step = RecordingRenewalStep(plain)
+        init = renewal_init_state(step, 5.0, 0.1, length(gen_int))
+        states = accumulate(step, Rt; init = init)
+        # Exact equality, not approximate: nothing draws, so the expectation is
+        # the committed value itself. Recording changes neither series.
+        @test get_expected_state(step, init, states) ==
+            accumulate_scan(step, init, Rt)
+        @test get_state(step, init, states) ==
+            accumulate_scan(plain, renewal_init_state(plain, 5.0, 0.1, 3), Rt)
+    end
+end
+
+@testitem "recording leaves the committed state a step carries alone" begin
+    using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
+        SusceptibleDepletion, renewal_init_state
+    core = ConstantRenewalStep(reverse([0.2, 0.3, 0.5]))
+    # A quantity nobody has asked for is not carried, so the state a plain scan
+    # commits holds the value and the window and nothing else.
+    for step in (core, RenewalStep(core, (SusceptibleDepletion(1.0e4),)))
+        init = renewal_init_state(step, 5.0, 0.1, 3)
+        @test !(:exp_val in keys(init))
+        @test !(:exp_val in keys(step(init, 1.4)))
+        @test typeof(step(init, 1.4)) == typeof(init)
+    end
+end
+
+@testitem "get_expected_state names a step that has no expectation" begin
+    using ComposableTuringIDModels: ARStep, get_expected_state
+    # Only a recording step keeps an expectation, so a caller reaching this on
+    # another accumulation step gets the step named rather than a bare
+    # `MethodError`.
+    step = ARStep([0.5])
+    state = (; val = 1.0, window = [1.0])
+    @test_throws "ARStep" get_expected_state(step, state, [state])
+    @test_throws "has no noise-free expectation" get_expected_state(
+        step, state, [state]
+    )
+end

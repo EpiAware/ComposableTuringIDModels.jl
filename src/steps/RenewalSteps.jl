@@ -191,7 +191,7 @@ _reverse_lags(g::AbstractVector) = reverse(g)
 _reverse_lags(g::AbstractMatrix) = reverse(g; dims = 2)
 
 function (recurrent_step::ConstantRenewalStep)(state, Rt)
-    incidence, substates = _propose(recurrent_step, state, Rt)
+    incidence, _, substates = _propose(recurrent_step, state, Rt)
     return _commit(recurrent_step, state, incidence, substates)
 end
 
@@ -202,15 +202,17 @@ end
 # parameterisations run the same arithmetic.
 
 @doc raw"
-The incidence a renewal step proposes at `state`, and the modifier substates
-that go with it, as `(incidence, substates)`.
+The incidence a renewal step proposes at `state`, as
+`(incidence, expectation, substates)`.
 
 The first half of a step.
 [`accumulate_scan`](@ref) commits the proposal straight away, while a [`StochasticRenewal`](@ref) draws around it first.
+`expectation` is the last value along the modifier chain that is still a mean rather than a draw, marked by [`is_noise`](@ref); it equals `incidence` where nothing on the chain draws.
 The default method is the plain force of infection with no substates.
 "
 function _propose(step::AbstractConstantRenewalStep, state, Rt)
-    return renewal_foi(step, state.window, Rt), ()
+    foi = renewal_foi(step, state.window, Rt)
+    return foi, foi, ()
 end
 
 @doc raw"

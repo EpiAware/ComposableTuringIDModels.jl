@@ -107,7 +107,7 @@ export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
 # --- infection models ---
 export DirectInfections, ExpGrowthRate, Renewal, StochasticRenewal,
     SeedingPath, RenewalStep, SusceptibleDepletion, ImportedCases,
-    InfectionNoise,
+    InfectionNoise, RecordExpectedInfections,
     R_to_r, r_to_R, expected_Rt
 export CombineInfections
 
@@ -156,7 +156,7 @@ public ModelShape, across_shape, infection_strata,
     AbstractAccumulationStep, AbstractConstantRenewalStep,
     ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
     apply_modifier, is_noise, renewal_foi, renewal_init_state,
-    renewal_init_window,
+    renewal_init_window, with_expected_infections,
     MissingObservations,
     at, path_prior, prior_order, assert_prior_length,
     wrapped_models, observation_components, rewrap, swap
@@ -231,6 +231,7 @@ include("infection_models/StochasticRenewal.jl")
 # `utils.jl` defines the `R_to_r(::Renewal)` method, so it follows `Renewal`.
 include("infection_models/utils.jl")
 include("infection_models/CombineInfections.jl")
+include("infection_models/modifiers/RecordExpectedInfections.jl")
 
 # --- ODE compartmental models ---
 include("ode/SIRParams.jl")

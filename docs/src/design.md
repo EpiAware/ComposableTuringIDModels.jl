@@ -181,6 +181,26 @@ discretised = Renewal(Gamma(2, 1.5), SusceptibleDepletion(1000.0);
 
 See [Renewal modifiers](@ref renewal-modifiers) for what each contributes to a fitted model.
 
+## Recording the noise-free expectation
+
+A stochastic infection process draws infections around an expectation.
+That expectation is a quantity to report rather than one to sample, so it is opt-in.
+Wrapping an infection model in a [`RecordExpectedInfections`](@ref) tracks it as `exp_I_t`, next to [`RecordExpectedLatent`](@ref) for a latent path and [`RecordExpectedObs`](@ref) for expected observations.
+
+```@example design
+recording = RecordExpectedInfections(
+    Renewal(gen_int, SusceptibleDepletion(1000.0), InfectionNoise();
+        rt = RandomWalk()))
+as_turing_model(recording, 20)().exp_I_t[1:3]
+```
+
+Where the incidence stops being an expectation is set by the `is_noise` trait on each modifier.
+The recorded value is the one entering the first modifier that draws, so under `(SusceptibleDepletion, InfectionNoise)` it is after depletion and before the draw.
+A model whose chain draws nothing commits its own expectation, so wrapping a [`DirectInfections`](@ref) or a plain [`Renewal`](@ref) records `I_t` itself.
+
+Only the wrapper builds the series.
+It scans a step that keeps the expectation in its state, while an unwrapped model scans the step it always did and computes no expectation at all.
+
 ## The seeding window
 
 A renewal process needs infections before the modelled window starts.

@@ -150,11 +150,34 @@ end
     state = init
     I_t = Vector{typeof(init.val * first(Rts))}(undef, n)
     for t in 1:n
-        ι, substates = _propose(scan_step, state, Rts[t])
+        ι, _, substates = _propose(scan_step, state, Rts[t])
         I_t[t] ~ _noise_dist(infection.noise, ι, at(ξ, t))
         state = _commit(scan_step, state, I_t[t], substates)
     end
     return (; I_t, Z_t = setup.Z_t, I_seed = init.window)
+end
+
+# The recursion again, keeping each step's expectation. The loop is written
+# twice rather than always building the series and discarding it, so a model
+# nobody has wrapped in a `RecordExpectedInfections` allocates nothing for a
+# quantity it never reports.
+@model function with_expected_infections(infection::StochasticRenewal, n::Int)
+    setup ~ to_submodel(_renewal_setup(infection, n), false)
+    ξ ~ to_submodel(_noise_overdispersion(infection.noise, n), false)
+
+    scan_step, init, Rts = setup.scan_step, setup.init, setup.Rts
+
+    state = init
+    T = typeof(init.val * first(Rts))
+    I_t = Vector{T}(undef, n)
+    exp_I_t = Vector{T}(undef, n)
+    for t in 1:n
+        ι, _, substates = _propose(scan_step, state, Rts[t])
+        exp_I_t[t] = ι
+        I_t[t] ~ _noise_dist(infection.noise, ι, at(ξ, t))
+        state = _commit(scan_step, state, I_t[t], substates)
+    end
+    return (; I_t, Z_t = setup.Z_t, I_seed = init.window, exp_I_t)
 end
 
 # One draw per step, and a stratified renewal would need one per stratum per

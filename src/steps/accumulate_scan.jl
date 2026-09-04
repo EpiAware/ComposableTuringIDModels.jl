@@ -50,3 +50,47 @@ accumulate_scan(ComposableTuringIDModels.RWStep(), 0.0, [1.0, 2.0, 3.0])
 function get_state(acc_step::AbstractAccumulationStep, initial_state, state)
     return vcat(collect(initial_state), last.(state))
 end
+
+@doc raw"
+Assemble the noise-free expectation series from the raw output of
+[`accumulate_scan`](@ref), mirroring [`get_state`](@ref).
+
+The expectation is the last value a step computes that is still a mean rather
+than a draw: the force of infection after every deterministic modifier has
+transformed it, and before the first modifier marked by [`is_noise`](@ref)
+replaces it with a draw. A step whose chain draws nothing commits its own
+expectation, so the two series are identical there.
+
+Only a step that keeps the expectation in its state has one to report, which
+is what `RecordingRenewalStep` is for. Any other
+[`AbstractAccumulationStep`](@ref) has none, and the default method says so
+rather than failing with a bare `MethodError`.
+
+# Arguments
+
+  - `acc_step`: the [`AbstractAccumulationStep`](@ref) used in the scan.
+  - `initial_state`: the seed state used by [`accumulate_scan`](@ref).
+  - `state`: the raw accumulated output produced by `accumulate`.
+
+# Examples
+```@example get_expected_state
+using ComposableTuringIDModels
+core = ComposableTuringIDModels.ConstantRenewalStep(reverse([0.2, 0.3, 0.5]))
+step = ComposableTuringIDModels.RecordingRenewalStep(
+    RenewalStep(core, (SusceptibleDepletion(100.0),))
+)
+init = ComposableTuringIDModels.renewal_init_state(step, 1.0, 0.0, 3)
+states = accumulate(step, [1.0, 2.0, 3.0]; init = init)
+ComposableTuringIDModels.get_expected_state(step, init, states)
+```
+"
+function get_expected_state(
+        acc_step::AbstractAccumulationStep, initial_state, state
+    )
+    return error(
+        "$(typeof(acc_step)) has no noise-free expectation. " *
+            "`get_expected_state` is defined for the renewal steps, where " *
+            "the expectation is the force of infection before any modifier " *
+            "draws from it. A step that has one must implement it."
+    )
+end

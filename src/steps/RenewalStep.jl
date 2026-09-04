@@ -224,19 +224,23 @@ function get_state(step::_PlainRenewalStep, initial_state, state)
 end
 
 # Thread the proposed incidence through the modifier tuple, collecting each
-# modifier's updated substate. Recursive over the tuple to stay type-stable and
-# AD-friendly (no mutation of tracked state).
-_thread_modifiers(::Tuple{}, incidence, ::Tuple{}) = (incidence, ())
+# modifier's updated substate and the incidence entering the first modifier
+# that draws. Recursive over the tuple to stay type-stable and AD-friendly (no
+# mutation of tracked state). `is_noise` is a method on the modifier's type, so
+# the branch picking the expectation is a compile-time constant and a tuple
+# with nothing noisy in it returns the committed incidence unchanged.
+_thread_modifiers(::Tuple{}, incidence, ::Tuple{}) = (incidence, incidence, ())
 function _thread_modifiers(mods::Tuple, incidence, substates::Tuple)
-    inc, s = apply_modifier(first(mods), incidence, first(substates))
-    rest_inc, rest_states = _thread_modifiers(
+    mod = first(mods)
+    inc, s = apply_modifier(mod, incidence, first(substates))
+    rest_inc, rest_exp, rest_states = _thread_modifiers(
         Base.tail(mods), inc, Base.tail(substates)
     )
-    return rest_inc, (s, rest_states...)
+    return rest_inc, (is_noise(mod) ? incidence : rest_exp), (s, rest_states...)
 end
 
 function (step::RenewalStep)(state, Rt)
-    incidence, substates = _propose(step, state, Rt)
+    incidence, _, substates = _propose(step, state, Rt)
     return _commit(step, state, incidence, substates)
 end
 
@@ -269,6 +273,55 @@ end
 
 function get_state(::RenewalStep, initial_state, state)
     return _series(state .|> x -> x.val)
+end
+
+# --- recording the expectation ----------------------------------------------
+
+@doc raw"
+A renewal step that keeps each step's noise-free expectation in its state, so a
+scan can report the series alongside the committed one.
+
+A new step type rather than a field on the state every renewal carries: the
+expectation is a reporting-only quantity, and a step that nobody has asked for
+it commits the state it always did. [`with_expected_infections`](@ref) wraps the
+step it scans in one of these, and nothing else builds one.
+
+Its state is the wrapped step's with an `exp_val` appended, so `get_state`
+reads through to the wrapped step unchanged and `get_expected_state` reads the
+extra field. It is a plain [`AbstractAccumulationStep`](@ref) rather than a
+renewal core, because it delegates the whole recurrence and implements no part
+of the core interface itself.
+"
+struct RecordingRenewalStep{S <: AbstractConstantRenewalStep} <:
+    AbstractAccumulationStep
+    step::S
+end
+
+# A seed state has committed nothing, so its expectation is its own value.
+_recording_state(state) = (; state..., exp_val = state.val)
+
+function renewal_init_state(step::RecordingRenewalStep, I₀, r_approx, len_gen_int)
+    return _recording_state(
+        renewal_init_state(step.step, I₀, r_approx, len_gen_int)
+    )
+end
+
+function renewal_init_state(step::RecordingRenewalStep, window::AbstractArray)
+    return _recording_state(renewal_init_state(step.step, window))
+end
+
+function (step::RecordingRenewalStep)(state, Rt)
+    incidence, expectation, substates = _propose(step.step, state, Rt)
+    committed = _commit(step.step, state, incidence, substates)
+    return (; committed..., exp_val = expectation)
+end
+
+function get_state(step::RecordingRenewalStep, initial_state, state)
+    return get_state(step.step, initial_state, state)
+end
+
+function get_expected_state(::RecordingRenewalStep, initial_state, state)
+    return _series(state .|> x -> x.exp_val)
 end
 
 # --- the pre-scan seam ------------------------------------------------------
