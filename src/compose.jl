@@ -170,14 +170,14 @@ Convenience 2-argument form: read the infection process's shape from the data.
 The observation model and the data together fix the shape of the infection
 process, so nothing about it needs to be supplied explicitly or stored on the
 model. `as_turing_model(model, y_t)` is `as_turing_model(model, y_t, shape)`
-with `shape` read from `y_t`: its time length, paired (when the data is
-stratified) with the number of infection strata the observation model consumes,
+with `shape` read from `y_t`. That is the data's time length, and for
+stratified data the number of infection strata the observation model consumes,
 resolved via [`infection_strata`](@ref).
 
 The data may be a plain vector of observations, a `strata x time` matrix, or a
 `NamedTuple` of per-stream series. Three age strata observed as one
-hospitalisation stream is `Split(NegativeBinomialError(), [1.0 1.0 1.0])`; a
-`1 x T` data matrix then builds a 3-stratum infection process.
+hospitalisation stream is `Split(NegativeBinomialError(), [1.0 1.0 1.0])`, and
+a `1 x T` data matrix then builds a 3-stratum infection process.
 
 A scalar `missing` has no length to read, so simulating from the prior at a
 chosen length is either `as_turing_model(model, missing, n)` or the two-argument
@@ -202,19 +202,13 @@ function as_turing_model(model::IDModel, y_t)
     return as_turing_model(model, y_t, _data_shape(model, y_t))
 end
 
-# The `ModelShape` a model and a data value imply, over the data's own time
-# length.
 _data_shape(model::IDModel, y_t) = _obs_data_shape(
     model.observation_model, y_t, _series_time_length(y_t)
 )
 
-# A data value's length along the time axis.
-# A `NamedTuple` of streams shares one time length, read off its first stream.
 # The two-argument `as_turing_model` is public, so a value with no time axis is
-# refused by name rather than by a `MethodError` from whichever private helper
-# reaches it first.
-# A scalar `missing` gets its own message, because passing it is the one mistake
-# with an obvious intent behind it.
+# refused by name rather than by a `MethodError` from a private helper.
+# A `NamedTuple` of streams shares one time length, read off its first stream.
 function _series_time_length(y_t)
     throw(
         ArgumentError(
@@ -241,8 +235,8 @@ _series_time_length(y_t::NamedTuple) = _series_time_length(first(y_t))
 # The infection process's `ModelShape` implied by an observation model and a
 # data value, shared by the two-argument `as_turing_model`, `IDProblem` and
 # `forecast` so all three read a data-driven model's shape the same way.
-# Data with no stream axis to read leaves the shape to the observation model
-# alone: a scalar `missing`, and a blank series holding nothing but `missing`.
+# A scalar `missing` and a blank series have no stream axis to read, so the
+# shape falls back to the observation model alone.
 _obs_data_shape(obs, y_t, time_steps) = time_steps
 _obs_data_shape(obs, y_t::Missing, time_steps) = _obs_data_shape_missing(
     obs, time_steps
@@ -263,7 +257,6 @@ function _obs_data_shape_missing(s::Split, time_steps)
     s.names === nothing || return (length(s.names), time_steps)
     return time_steps
 end
-
 
 @doc raw"
 The number of infection strata an observation model consumes.

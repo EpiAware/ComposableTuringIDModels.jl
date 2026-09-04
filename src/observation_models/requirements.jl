@@ -589,8 +589,8 @@ end
 # is scored at the end.
 # The one exception is a shortfall of exactly the chain's lead-in.
 #
-# This walks the chain rather than building a `DataRequirements`, because it runs
-# once per model build and must not allocate.
+# This walks the chain rather than building a `DataRequirements`, since the
+# report would be built only to be discarded.
 function _check_observation_count(model, y_t, n::ModelShape)
     chain = _observation_chain(model)
     lead_in = observation_lead_in(chain)

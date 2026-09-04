@@ -70,11 +70,16 @@ end
         DirectInfections(; Z = RandomWalk(), initialisation = Normal(log(20), 0.2)),
         LatentDelay(PoissonError(), fill(1 / 5, 5))
     )
-    # There is no data-free problem; a blank series is how a shape is fixed
-    # before the observations arrive. It carries a length, so it simulates.
+    # A blank series is how a shape is fixed before the observations arrive.
+    # It carries a length, so it simulates.
     waiting = IDProblem(model, Vector{Missing}(missing, 20))
     @test length(as_turing_model(waiting)().generated_y_t) == 20
     @test data_requirements(waiting).n == 20
+    # `n_supplied` counts positions in the series, as it does for a series with
+    # gaps in it, so a blank series reports its length rather than `nothing`.
+    # How much was observed is the display's question, not the report's.
+    @test data_requirements(waiting)[1].n_supplied == 20
+    @test data_fits(data_requirements(waiting))
 
     # A scalar `missing` has no length, so it is not a way to express this.
     @test_throws ArgumentError IDProblem(model, missing)

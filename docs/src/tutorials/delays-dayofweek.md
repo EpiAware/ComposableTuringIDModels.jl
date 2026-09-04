@@ -99,7 +99,8 @@ Two stacked delays therefore need the infection process to start that many days 
 observation_lead_in(observation)
 ```
 
-The number of observations is the number of reports we have, and the infection process runs over the extra lead-in days to support them, derived from the chain (see [What data a model needs](@ref lead-in)).
+The number of observations is the number of reports we have.
+The infection process runs over the extra lead-in days needed to support them, derived from the chain (see [What data a model needs](@ref lead-in)).
 [`data_requirements`](@ref) says what a chain needs before it is sampled.
 
 ## The data
@@ -119,7 +120,8 @@ y_obs = italy.confirm[1:n]
 ## Assemble and fit
 
 [`IDProblem`](@ref) holds the model and the data it is fitted to as one object.
-Printing it shows the whole composition and a summary of the data, which is the reason to hold one rather than the `DynamicPPL.Model` [`as_turing_model`](@ref) returns: the latter prints as its full nested parametric type with the observations dumped inline.
+Printing it shows the whole composition and a summary of the data.
+That is the reason to hold one rather than the `DynamicPPL.Model` [`as_turing_model`](@ref) returns, which prints as its full nested parametric type with the observations dumped inline.
 
 ```@example delays
 problem = IDProblem(renewal, observation, y_obs)
@@ -133,7 +135,8 @@ Passing a blank series in place of the reports, `Vector{Missing}(missing, n)`, w
 data_requirements(problem)
 ```
 
-Fitting the same model to a different series is a new problem rather than a different call, so it is built the way every other part of a composition is respecified, with [Accessors](https://juliaobjects.github.io/Accessors.jl/).
+Fitting the same model to a different series is a new problem rather than a different call.
+It is built the way every other part of a composition is respecified, with [Accessors](https://juliaobjects.github.io/Accessors.jl/).
 
 ```@example delays
 using Accessors
@@ -222,7 +225,8 @@ end
 gens = vec(returned(posterior, chain))
 Rt = credible_bands(reduce(hcat, (exp.(g.Z_t) for g in gens)))
 
-pred = predict(as_turing_model(problem, Vector{Missing}(missing, n)), chain)
+blank = @set problem.data = Vector{Missing}(missing, n)
+pred = predict(as_turing_model(blank), chain)
 yt = predictive_bands(pred, n)
 
 fig = Figure(; size = (760, 620))
