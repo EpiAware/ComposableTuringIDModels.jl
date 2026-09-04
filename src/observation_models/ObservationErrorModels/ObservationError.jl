@@ -63,9 +63,9 @@ struct ObservationError{D, S <: PriorLike} <: AbstractObservationErrorModel
     "Whether the spread scales with the expected value."
     relative::Bool
 
-    # Inner constructor so no default one is generated: the family has to
-    # reach the field as `Type{F}` rather than as a `UnionAll` (see
-    # `_family_type`).
+    # An inner constructor so no default one is generated. The family has to
+    # reach the field as `Type{F}` rather than as a `UnionAll`, see
+    # `_family_type`.
     function ObservationError(dist, sd::PriorLike, relative::Bool)
         return new{_family_type(dist), typeof(sd)}(dist, sd, relative)
     end

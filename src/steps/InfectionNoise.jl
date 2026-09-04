@@ -76,10 +76,9 @@ struct InfectionNoise{D, X, C} <: AbstractRenewalModifier
     "Sharpness of the soft limit."
     cv_sharpness::C
 
-    # Inner constructor so no default one is generated: the family has to
-    # reach the field as `Type{F}` rather than as a `UnionAll` (see
-    # `_family_type`), or every draw resolves its family at run time and the
-    # incidence it returns infers as `Any` through the whole recursion.
+    # An inner constructor so no default one is generated. The family has to
+    # reach the field as `Type{F}` rather than as a `UnionAll`, see
+    # `_family_type`.
     function InfectionNoise(
             dist, overdispersion, cv_cap::C, cv_sharpness::C
         ) where {C}
@@ -167,9 +166,6 @@ struct InfectionNoiseDraws{V, N, X} <: AbstractRenewalModifier
     overdispersion::X
 end
 
-# The substate is the step counter. A scan step has no clock of its own, so a
-# per-time modifier carries the index it has reached. The window is unused,
-# because a step counter has no shape of its own to match.
 modifier_init_state(::InfectionNoiseDraws, window) = 0
 
 function apply_modifier(mod::InfectionNoiseDraws, incidence, t)
