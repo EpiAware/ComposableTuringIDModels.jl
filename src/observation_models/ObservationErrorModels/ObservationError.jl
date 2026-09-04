@@ -91,7 +91,7 @@ end
 @doc raw"
 A log-normal observation-error model with an inferred coefficient of variation.
 
-The noise is **relative**: the distribution's real-space mean is the expected
+The noise is **relative**. The distribution's real-space mean is the expected
 value and its real-space standard deviation is proportional to it, so
 ``\sigma`` is a coefficient of variation rather than an absolute scale.
 

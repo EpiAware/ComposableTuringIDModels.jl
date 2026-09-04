@@ -47,7 +47,7 @@ Base.minimum(::_NoDraw) = 0.0
 Base.maximum(::_NoDraw) = Inf
 Distributions.insupport(::_NoDraw, ::Real) = true
 
-# A bare `Float64` `-Inf` is deliberate: giving it the input's type makes AD
+# A bare `Float64` `-Inf` is deliberate. Giving it the input's type makes AD
 # return `NaN` where it should return the gradient it already had.
 Distributions.logpdf(::_NoDraw, ::Real) = -Inf
 Distributions.pdf(::_NoDraw, ::Real) = 0.0
