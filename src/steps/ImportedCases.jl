@@ -145,8 +145,11 @@ end
 # The window is unused, because a step counter has no shape to match.
 modifier_init_state(::ImportedRate, window) = 0
 
+# Broadcast, so a shared constant rate lifts every stratum of a stratified
+# renewal rather than failing on a scalar added to a vector.
+# A single series adds two scalars and allocates nothing.
 function apply_modifier(mod::ImportedRate, incidence, t)
-    return incidence + at(mod.rate, t + 1), t + 1
+    return incidence .+ at(mod.rate, t + 1), t + 1
 end
 
 @doc raw"

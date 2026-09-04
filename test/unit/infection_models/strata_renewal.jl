@@ -1,7 +1,8 @@
 # Tests for a stratified `Renewal`: one recursion per stratum sharing a
 # window contract with the single-series case, per-stratum generation
-# intervals, and the two modifiers that widen to a strata axis
-# (`SusceptibleDepletion`'s pool, `ImportedCases`' exogenous rate).
+# intervals, and the three modifiers that widen to a strata axis
+# (`SusceptibleDepletion`'s pool, `ImportedCases`' exogenous rate,
+# `InfectionNoise`' per-stratum draws).
 
 @testitem "the uncoupled path is unchanged by adding a strata axis" begin
     using ComposableTuringIDModels, Distributions, Random
@@ -227,4 +228,132 @@ end
     # so it lifts every stratum's incidence at every step.
     @test all(I_imported .>= I_plain .- 1.0e-8)
     @test all(I_imported[:, end] .> I_plain[:, end])
+end
+
+@testitem "InfectionNoise on a stratified renewal, expectation before the draw" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: DynamicPPL
+
+    # The case #370 could not express at all: noise on a stratified renewal.
+    # `SusceptibleDepletion` sits before it, so the recorded expectation is
+    # the depleted incidence rather than the bare force of infection.
+    gen_int = [0.2, 0.3, 0.5]
+    pop = [800.0, 1200.0]
+    log_R = log(1.4)
+    n_strata, n_time = 2, 12
+    model = Renewal(
+        gen_int, SusceptibleDepletion(pop), InfectionNoise();
+        rt = Replicate(FixedIntercept(log_R)),
+        initialisation = Normal(log(100.0), 0.0)
+    )
+    out = as_turing_model(
+        RecordExpectedInfections(model), (n_strata, n_time)
+    )(Xoshiro(11))
+
+    @test size(out.I_t) == (n_strata, n_time)
+    @test size(out.exp_I_t) == (n_strata, n_time)
+    @test size(out.I_seed) == (n_strata, length(gen_int))
+    @test all(isfinite, out.I_t)
+
+    # The draws follow `Replicate`'s naming, one block per stratum, so a
+    # stratified fit reads them per stratum rather than as one flat vector.
+    names = string.(
+        keys(
+            DynamicPPL.VarInfo(
+                as_turing_model(model, (n_strata, n_time))
+            )
+        )
+    )
+    @test any(contains("I_raw.stratum1"), names)
+    @test any(contains("I_raw.stratum2"), names)
+
+    # The reference recurrence, one per stratum because nothing couples them.
+    # Bound in a function so the loop cannot shadow these into new locals.
+    function reference(seed, I_t, gen_int, pop, R)
+        strata, times = size(I_t)
+        fois = zeros(strata, times)
+        expectations = zeros(strata, times)
+        for g in 1:strata
+            window = collect(seed[g, :])
+            S = pop[g]
+            for t in 1:times
+                foi = R * (
+                    gen_int[1] * window[3] + gen_int[2] * window[2] +
+                        gen_int[3] * window[1]
+                )
+                depleted = max(S / pop[g], 1.0e-6) * foi
+                fois[g, t] = foi
+                expectations[g, t] = depleted
+                S -= depleted
+                window = [window[2], window[3], I_t[g, t]]
+            end
+        end
+        return fois, expectations
+    end
+    fois, expectations = reference(
+        out.I_seed, out.I_t, gen_int, pop, exp(log_R)
+    )
+
+    @test out.exp_I_t ≈ expectations
+    # Post-depletion and pre-noise, so neither the committed draw nor the
+    # force of infection the depletion modifier received.
+    @test !isapprox(out.exp_I_t, out.I_t)
+    @test !isapprox(out.exp_I_t, fois)
+end
+
+@testitem "stratified infection noise draws once per stratum" begin
+    using ComposableTuringIDModels, Distributions, Random
+
+    # Two strata identical in every input, so the deterministic half of the
+    # step matches exactly and only the noise can separate them.
+    # A draw broadcast from one standard normal, rather than read per stratum,
+    # would leave the two rows equal and is the quiet way this breaks.
+    gen_int = [0.2, 0.3, 0.5]
+    n_strata, n_time = 2, 15
+    twin = Renewal(
+        gen_int, SusceptibleDepletion([1000.0, 1000.0]), InfectionNoise();
+        rt = Replicate(FixedIntercept(log(1.3))),
+        initialisation = Normal(log(50.0), 0.0)
+    )
+    out = as_turing_model(
+        RecordExpectedInfections(twin), (n_strata, n_time)
+    )(Xoshiro(3))
+
+    # The first step has no drawn history behind it, so its expectation is
+    # the same in both strata whatever the noise does.
+    @test out.exp_I_t[1, 1] ≈ out.exp_I_t[2, 1]
+    @test out.I_t[1, 1] != out.I_t[2, 1]
+    @test all(out.I_t[1, :] .!= out.I_t[2, :])
+end
+
+@testitem "a shared ImportedCases rate lifts every stratum" begin
+    using ComposableTuringIDModels, Distributions, Random
+
+    # A bare `Distribution` rate is one constant shared across strata, which
+    # the scan adds to a vector of incidences.
+    # Before #370 that was a scalar added to a vector and raised a
+    # `MethodError`, so only a per-stratum rate reached a stratified renewal.
+    # Everything here is deterministic, so the two runs differ only by the
+    # rate.
+    gen_int = [0.2, 0.3, 0.5]
+    n_strata, n_time = 2, 20
+    rt = Replicate(FixedIntercept(log(1.0)))
+    seeds = Normal(log(1.0), 0.0)
+    rate = 0.5
+
+    plain = Renewal(gen_int; rt = rt, initialisation = seeds)
+    shared = Renewal(
+        gen_int, ImportedCases(Dirac(log(rate)));
+        rt = rt, initialisation = seeds
+    )
+
+    I_plain = as_turing_model(plain, (n_strata, n_time))(Xoshiro(5)).I_t
+    I_shared = as_turing_model(shared, (n_strata, n_time))(Xoshiro(5)).I_t
+
+    @test size(I_shared) == (n_strata, n_time)
+    @test all(I_shared .> I_plain)
+    # The first step has no imported history behind it, so the whole lift is
+    # the rate itself, the same in each stratum.
+    @test I_shared[1, 1] - I_plain[1, 1] ≈ rate
+    @test I_shared[2, 1] - I_plain[2, 1] ≈ rate
 end

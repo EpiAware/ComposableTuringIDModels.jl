@@ -158,12 +158,13 @@ from its pre-scan `as_turing_model` seam, following the [`ImportedCases`](@ref)
 
 ## Fields
 
-  - `raw`: the standard normal draws ``\tilde I_t``, one per time.
+  - `raw`: the standard normal draws ``\tilde I_t``, one per time, or a
+    `strata x time` block for a stratified renewal.
   - `noise`: the [`InfectionNoise`](@ref) specification.
   - `overdispersion`: the resolved ``\xi``.
 "
 struct InfectionNoiseDraws{V, N, X} <: AbstractRenewalModifier
-    "The standard normal draws, one per time."
+    "The standard normal draws, one per time, or per stratum per time."
     raw::V
     "The noise specification: the family and the soft cap."
     noise::N
@@ -177,10 +178,21 @@ end
 modifier_init_state(::InfectionNoiseDraws, window) = 0
 
 function apply_modifier(mod::InfectionNoiseDraws, incidence, t)
-    drawn = _noise_draw(
-        mod.noise, incidence, at(mod.overdispersion, t + 1), mod.raw[t + 1]
+    drawn = _noise_step(
+        mod.noise, incidence, at(mod.overdispersion, t + 1), at(mod.raw, t + 1)
     )
     return drawn, t + 1
+end
+
+# The step's draw, for one series or for one per stratum.
+# `at` reads a per-time draw as a scalar and a `strata x time` draw as that
+# step's column, so the two shapes differ only in whether the moment solve is
+# broadcast.
+# The scalar method keeps a single series free of any broadcast machinery.
+_noise_step(noise, ι::Real, ξ, z) = _noise_draw(noise, ι, ξ, z)
+
+function _noise_step(noise, ι::AbstractVector, ξ, z)
+    return _noise_draw.(Ref(noise), ι, ξ, z)
 end
 
 # The incidence entering this modifier is the last point at which it is still
@@ -188,12 +200,25 @@ end
 is_noise(::InfectionNoise) = true
 is_noise(::InfectionNoiseDraws) = true
 
+# The standard normals the scan reads, asked for at the shape given.
+# A single series draws them through `IID`.
+# A stratified one wraps that in a `Replicate`, which is the answer the shape
+# guard gives any path model asked for a strata axis, so every stratum draws its
+# own block instead of sharing one.
+_noise_raw(::Int) = IID(Normal())
+_noise_raw(::Dims{2}) = Replicate(IID(Normal()))
+
 @doc raw"
 Sample the **non-centred** infection noise ahead of the scan.
 
 Draws `n` standard normals through the [`IID`](@ref) seam and resolves the overdispersion slot, returning the [`InfectionNoiseDraws`](@ref) the scan uses.
 A fixed scalar `overdispersion` costs no parameter.
 The draws are named `I_raw`, prefixed by the modifier's position in the renewal step's modifier tuple.
+
+A `Dims{2}` shape wraps the [`IID`](@ref) seam in a [`Replicate`](@ref), giving a `strata x time` block of standard normals, one per stratum per step, which the scan reads a column at a time with [`at`](@ref).
+Each stratum therefore gets its own noise about its own expectation, in the same way a [`Stratify`](@ref) or [`Replicate`](@ref) rate gives [`ImportedCases`](@ref) one exogenous stream per stratum.
+The draws are then named `I_raw.stratum<g>.ϵ_t` under the modifier's position, following `Replicate`'s own naming.
+A process-valued `overdispersion` still draws one path, so wrap it to vary that across strata too.
 
 The parameterisation is non-centred because the modifier seam gives it no choice.
 `apply_modifier` is deterministic and a modifier's priors resolve before the scan, so the sampled quantity has to be the standard normal ``\tilde I_t``, with the location and scale applied against ``\iota_t`` inside the scan.
@@ -203,6 +228,7 @@ The parameterisation is non-centred because the modifier seam gives it no choice
     The cost shows up as maximum tree depth rather than as a wrong answer.
     [`StochasticRenewal`](@ref) draws the same noise centred and is what to reach for.
     Use this modifier when a non-centred draw is wanted, or for a stratified renewal, which the centred loop does not cover.
+    A stratified renewal is the one case with no alternative here.
 
 # Arguments
 
@@ -220,7 +246,7 @@ as_turing_model(r, 8)(Xoshiro(1)).I_t
 ```
 "
 @model function as_turing_model(mod::InfectionNoise, n)
-    I_raw ~ as_turing_submodel(IID(Normal()), n; prefix = true)
+    I_raw ~ as_turing_submodel(_noise_raw(n), n; prefix = true)
     ξ ~ to_submodel(_noise_overdispersion(mod, n), false)
     return InfectionNoiseDraws(I_raw, mod, ξ)
 end
