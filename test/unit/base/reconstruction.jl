@@ -8,21 +8,10 @@
     using OrdinaryDiffEq: AutoVern7, Rodas5P
     using Accessors: Accessors
 
-    # Two properties, which together are the whole contract for a component
-    # that transforms or derives a field at construction.
-    #
-    # 1. Rebuilt from its own stored fields it does not change. `rewrap` and
-    #    `swap` replace one field and rebuild, so anything else the component
-    #    holds has to survive the trip.
-    # 2. With a field set to a user-facing value it equals the component built
-    #    with that value from the start. Deriving one model from another relies
-    #    on this, and it is where a stale derived field shows up.
-    #
-    # They pull against each other: the second wants the derivation re-applied,
-    # the first wants that to be a no-op. Both hold when the derivation is
-    # idempotent and lives in the constructor taking the fields in declaration
-    # order, which is the one `ConstructionBase.constructorof` calls by default.
-    # A component that satisfies neither needs no machinery, only that shape.
+    # Both properties `rewrap`'s docstring asks of a derived field. Rebuilt
+    # from its own stored fields a component does not change, and with a field
+    # set to a user-facing value it equals the one built that way from the
+    # start.
 
     # `==` on these structs falls back to `===`, which is false for any two
     # separately built arrays, so the comparison has to be structural.
@@ -303,13 +292,12 @@ end
     using ComposableTuringIDModels: AbstractComposableModel
     using InteractiveUtils: subtypes
 
-    # The cases above are written out, so without this a component added later
-    # could carry a non-idempotent construction-time transform and never be
-    # asked about it. Requiring every concrete component to appear makes the
-    # omission fail rather than pass quietly.
-    # A test item elsewhere in the suite can define its own component, and
-    # `subtypes` sees every one loaded in the process, so the walk is restricted
-    # to the package's own types.
+    # The cases above are written out, so a component added later could carry a
+    # non-idempotent construction-time transform and never be asked about it.
+    # Requiring every concrete component to appear makes the omission fail.
+    # A test item elsewhere can define its own component, and `subtypes` sees
+    # every one loaded in the process, so the walk is restricted to the
+    # package's own types.
     function leaves(T, acc = Set{Any}())
         for S in subtypes(T)
             isabstracttype(S) && (leaves(S, acc); continue)

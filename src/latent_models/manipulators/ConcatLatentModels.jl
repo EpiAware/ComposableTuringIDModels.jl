@@ -46,9 +46,8 @@ struct ConcatLatentModels{
             F <: Function, P <: AbstractVector{<:String},
         }
         @assert length(models) > 1 "At least two models are required"
-        # The count is what `models` implies, so it is read off it rather than
-        # taken, which keeps every construction path, the field-wise rebuild
-        # included, agreeing on it.
+        # The count is read off `models` rather than taken, which keeps every
+        # construction path agreeing on it. See `rewrap`'s docstring.
         no_models = length(models)
         check_dim = dimension_adaptor(no_models, no_models)
         @assert typeof(check_dim) <: AbstractVector{Int} "Output of dimension_adaptor must be a vector of integers"

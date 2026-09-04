@@ -55,9 +55,9 @@ struct DiffLatentModel{M <: PriorLike, P <: PriorLike} <: AbstractLatentModel
     d::Int
 
     function DiffLatentModel(model, init, _d)
-        # The differencing order is what the initial-conditions prior implies,
-        # so it is read off `init` here rather than taken, which keeps every
-        # construction path agreeing on it; see `rewrap`'s docstring.
+        # The differencing order is read off `init` rather than taken, which
+        # keeps every construction path agreeing on it. See `rewrap`'s
+        # docstring.
         d = _slot_order(init)
         @assert d > 0 "d must be greater than 0"
         # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in

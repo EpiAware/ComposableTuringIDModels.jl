@@ -288,19 +288,21 @@ one_swapped = rewrap(obs, (updated_split,))
 Several components derive a field from the others on construction.
 [`Ascertainment`](@ref) stores its prior already wrapped in a [`PrefixLatentModel`](@ref), [`Aggregate`](@ref) derives its presence mask from its window lengths, and [`Renewal`](@ref) bakes its accumulation step from the generation interval, the coupling operator and the modifiers.
 None of them declares a `ConstructionBase.constructorof`.
-Two properties make that unnecessary, and together they are the whole of it.
+Two properties make that unnecessary.
 
-1. The derivation is **idempotent**: applying it to its own output changes nothing.
+1. The derivation is **idempotent**, so applying it to its own output changes nothing.
 2. It runs in the constructor taking the fields in **declaration order**, which is the one a rebuild calls.
 
-A rebuild from the stored fields then re-derives and lands back where it started, and the same constructor gives a field set with `Accessors.@set` the component the derivation implies.
-That is what makes deriving one model from another safe.
+A rebuild from the stored fields then re-derives and lands back where it started.
+The same constructor gives a field set with `Accessors.@set` the component the derivation implies.
 Setting an ascertainment prior re-applies the prefixing, and setting a generation interval, a coupling operator or a modifier re-bakes the step.
-The package already relied on this for `path_prior`, which widens a bare `Distribution` in a path slot; the same reasoning covers every other derived field.
+The package already relies on this for `path_prior`, which widens a bare `Distribution` in a path slot.
+The same reasoning covers every other derived field.
 
-A derived field that is not needed at all is better still.
-[`HierarchicalNormal`](@ref) used to store a flag saying whether its `mean` was worth adding, read off `mean` at construction; the flag is gone and the test is made where it is used, because a field that is not stored cannot disagree with the field it came from.
+A field that is not stored is better still.
+[`HierarchicalNormal`](@ref) adds its `mean` only when it is non-zero and makes that test where it is used, so no stored flag can disagree with `mean`.
 
 A modifier defined outside the package inherits both functions as long as it holds what it wraps in its own field.
 One that holds it somewhere the field walk cannot see, such as inside a container, must define `wrapped_models` and `rewrap` for itself.
-One that derives a field needs only the two properties above; a constructor that cannot accept its own stored fields back is the thing to fix, not to work around.
+One that derives a field needs only the two properties above.
+A constructor that cannot accept its own stored fields back is the thing to fix, not to work around.

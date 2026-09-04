@@ -31,9 +31,9 @@ using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
 using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
-# `ConstructionBase.constructorof` is what `Accessors` and `rewrap` rebuild a
-# component through. No component here declares one; `rewrap`'s docstring says
-# what a derived field needs instead.
+# `Accessors` and `rewrap` rebuild a component through
+# `ConstructionBase.constructorof`. No component here declares one. `rewrap`'s
+# docstring says what a derived field needs instead.
 using ConstructionBase: ConstructionBase
 using LinearAlgebra: dot, cholesky, Symmetric, I, UniformScaling
 using LogExpFunctions: softmax, xexpy, log1pexp

@@ -80,10 +80,9 @@ struct Aggregate{
     end
 end
 
-# `present` is a pure function of `aggregation`, so this form derives it too
-# rather than taking it; see `rewrap`'s docstring.
-# Without this method a field-wise rebuild has nothing to call at all, because
-# the public constructor takes fewer arguments than the struct has fields.
+# The form a field-wise rebuild supplies, which the public constructor has no
+# signature for because it takes fewer arguments than the struct has fields.
+# `present` is derived here too rather than taken. See `rewrap`'s docstring.
 Aggregate(model, aggregation, _present) = Aggregate(model, aggregation)
 
 function Aggregate(; model::M, aggregation::A) where {

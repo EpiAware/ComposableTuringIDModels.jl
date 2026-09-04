@@ -25,11 +25,9 @@ mdl = as_turing_model(hn, 10)
 rand(mdl)
 ```
 "
-# `mean` is added only when it is non-zero, which was a stored flag read off
-# `mean` at construction.
-# A stored flag goes stale the moment `mean` is set, so the test is made where
-# it is used instead: a field that is not stored cannot disagree with the field
-# it came from.
+# `mean` is added only when it is non-zero. The test is made where it is used
+# rather than stored as a flag, because a field that is not stored cannot go
+# stale against the field it came from.
 struct HierarchicalNormal{R <: Real, S <: PriorLike} <: AbstractLatentModel
     "Mean of the normal distribution."
     mean::R

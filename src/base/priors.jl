@@ -245,11 +245,9 @@ prior_order(::AbstractPriorModel) = 1
 
 const _prior_order = prior_order
 
-# The order of a slot that may not hold a prior at all.
-# A component in the wrong role has no order to read, and raising that here
-# would hide the slot's own `PriorLike` bound behind a `MethodError` about
-# reading an order. It is passed through to that bound instead, which rejects it
-# by role and says so.
+# The order of a slot that may not hold a prior at all. A non-prior is passed
+# through to the slot's own `PriorLike` bound, which rejects it by role, rather
+# than raising a `MethodError` about reading an order it never had.
 _slot_order(p::PriorLike) = prior_order(p)
 _slot_order(_) = 1
 

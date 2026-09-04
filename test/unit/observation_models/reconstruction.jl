@@ -88,11 +88,9 @@ end
     using Accessors: @set
     using DynamicPPL: VarInfo
 
-    # What losing the prefix wrapper costs: the ascertainment's prior is
-    # namespaced by it, so a chain derived from another by setting the prior
-    # sampled a differently named variable from the chain it appears to copy.
-    # Nothing throws, and the difference shows only in the variable names, so
-    # they are what is pinned here.
+    # The ascertainment's prior is namespaced by its prefix wrapper. Losing the
+    # wrapper renames the sampled variable and throws nothing, so the variable
+    # names are what is pinned here.
     chain(prior, delay) = LatentDelay(
         Ascertainment(
             NegativeBinomialError(; cluster_factor = HalfNormal(0.1)), prior

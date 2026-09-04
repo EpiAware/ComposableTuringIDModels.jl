@@ -149,11 +149,11 @@ component that holds what it wraps somewhere the field walk cannot see it (a
 alongside its [`wrapped_models`](@ref).
 
 A component that transforms or derives a field at construction needs no `rewrap`
-method either, and no `ConstructionBase.constructorof`. It needs two things of
-the derivation: that it is **idempotent**, and that it runs in the constructor
-taking the fields in declaration order, which is the one a rebuild calls. Then
-the rebuild re-derives, idempotence makes it a fixed point, and the same
-constructor gives `Accessors.@set` the component the derivation implies.
+method either, and no `ConstructionBase.constructorof`. It needs the derivation
+to be **idempotent**, and to run in the constructor taking the fields in
+declaration order, which is the one a rebuild calls. The rebuild then
+re-derives, idempotence makes it a fixed point, and the same constructor gives
+`Accessors.@set` the component the derivation implies.
 [`Ascertainment`](@ref) prefixes its prior that way, [`Aggregate`](@ref) derives
 its presence mask, and [`Renewal`](@ref) bakes its accumulation step.
 

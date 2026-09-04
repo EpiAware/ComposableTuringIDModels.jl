@@ -87,11 +87,9 @@ struct LatentDelay{M <: AbstractObservationModel, D} <: AbstractObservationModel
     end
 end
 
-# Fixed PMF: validate and store it as given, reversed for the `LDStep`
-# convolution when the model is built.
-# A reversed PMF is still a valid one, so storing it reversed would leave the
-# field's stored and given forms indistinguishable and a PMF set into the slot
-# would be convolved backwards with nothing to say so.
+# Fixed PMF: validated and stored as given. A reversed PMF is still a valid
+# one, so storing it reversed would make a PMF set into the slot convolve
+# backwards with nothing to say so.
 function LatentDelay(model::AbstractObservationModel, pmf::AbstractVector{<:Real})
     @assert all(>=(0), pmf) "Delay PMF must be non-negative"
     @assert isapprox(sum(pmf), 1) "Delay PMF must sum to 1"
@@ -200,9 +198,9 @@ struct UncertainDelay{P <: AbstractVector, F, T <: Real, TV} <: AbstractPriorMod
     Δd::T
 
     # The fields in declaration order, which is the form a field-wise rebuild
-    # supplies and which the keyword constructor below has no signature for.
-    # `TV` is read off `params` here rather than taken, so it cannot come to
-    # describe parameters the delay no longer holds.
+    # supplies and the keyword constructor below has no signature for.
+    # `TV` is read off `params` rather than taken, so it cannot come to describe
+    # parameters the delay no longer holds.
     function UncertainDelay(params::AbstractVector, family, D, Δd)
         @assert !isnothing(D) "UncertainDelay needs a fixed horizon `D` so the delay PMF length is constant across draws"
         @assert Δd > 0.0 "Δd must be positive"
@@ -316,9 +314,8 @@ _delay_timevarying(::AbstractVector{<:AbstractVector{<:Real}}) = true
 _delay_timevarying(::AbstractPriorModel) = false
 _delay_timevarying(::UncertainDelay{P, F, T, TV}) where {P, F, T, TV} = TV
 
-# A fixed PMF is stored as it was given and the convolution wants it reversed,
-# so it is reversed here, once when the model is built, rather than in the
-# `@model` body where it would land on the differentiated path.
+# The convolution wants the fixed PMF reversed, done here once per model build
+# rather than in the `@model` body, which is on the differentiated path.
 # The other specifications build their PMFs per draw and reverse them there.
 _reversed_fixed_delay(spec::AbstractVector{<:Real}) = reverse(spec)
 _reversed_fixed_delay(spec) = spec

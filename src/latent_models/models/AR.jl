@@ -70,11 +70,10 @@ struct AR{
     transform::F
 
     function AR(damp, init, _p, ϵ_t, transform)
-        # The order is what the damping prior implies, so it is read off `damp`
-        # rather than taken, and the order-`p` slots are sized to it. Deriving
-        # here rather than in the keyword constructor is what makes every
-        # construction path agree; see `rewrap`'s docstring for why that is all
-        # a derived field needs.
+        # The order is read off `damp` rather than taken, and the order-`p`
+        # slots are sized to it. Deriving here rather than in the keyword
+        # constructor is what makes every construction path agree. See
+        # `rewrap`'s docstring.
         p = _slot_order(damp)
         @assert p > 0 "p must be greater than 0"
         init = (p > 1 && init isa Distribution) ? fill(init, p) : init
