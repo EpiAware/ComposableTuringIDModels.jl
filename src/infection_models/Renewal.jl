@@ -198,9 +198,7 @@ struct Renewal{
         # The step is a pure function of the interval, the coupling operator and
         # the modifiers, so it is baked from them rather than taken.
         # Both run here rather than in the keyword constructor so the positional
-        # form cannot bypass them, and both are idempotent, so rebuilding a
-        # `Renewal` from its own fields is a fixed point and no
-        # `ConstructionBase.constructorof` is needed.
+        # form cannot bypass them; see `rewrap`'s docstring.
         path = path_prior(rt)
         interval = _renewal_interval(gen_int)
         step = _renewal_step_for(interval, mixing, modifiers)

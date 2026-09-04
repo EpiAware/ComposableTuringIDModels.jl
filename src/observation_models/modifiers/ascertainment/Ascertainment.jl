@@ -78,9 +78,7 @@ struct Ascertainment{
         # `PrefixLatentModel` namespaces it under `latent_prefix` so the
         # ascertainment variables stay distinct, and an empty prefix opts out.
         # Wrapping here rather than in the keyword constructor is what makes
-        # every construction path agree.
-        # `_prefixed_path` is idempotent, so rebuilding from stored fields is a
-        # fixed point and no `ConstructionBase.constructorof` is needed.
+        # every construction path agree; see `rewrap`'s docstring.
         prior = _prefixed_path(latent_model, latent_prefix)
         return new{M, typeof(prior), F, P}(
             model, prior, transform, latent_prefix

@@ -80,12 +80,10 @@ struct Aggregate{
     end
 end
 
-# `present` is a pure function of `aggregation`, so deriving it on the
-# all-fields form as well is what makes every construction path agree.
-# It is idempotent, so rebuilding from stored fields is a fixed point and no
-# `ConstructionBase.constructorof` is needed. Without this method a field-wise
-# rebuild has nothing to call, because the public constructor takes fewer
-# arguments than the struct has fields.
+# `present` is a pure function of `aggregation`, so this form derives it too
+# rather than taking it; see `rewrap`'s docstring.
+# Without this method a field-wise rebuild has nothing to call at all, because
+# the public constructor takes fewer arguments than the struct has fields.
 Aggregate(model, aggregation, _present) = Aggregate(model, aggregation)
 
 function Aggregate(; model::M, aggregation::A) where {

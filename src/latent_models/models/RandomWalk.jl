@@ -40,7 +40,7 @@ struct RandomWalk{D <: PriorLike, E <: PriorLike} <: AbstractLatentModel
         # Widening here rather than in the keyword constructor is what makes
         # every construction path agree.
         # `path_prior` is idempotent, so rebuilding from stored fields is a fixed
-        # point and no `ConstructionBase.constructorof` is needed.
+        # point; see `rewrap`'s docstring.
         wrapped = path_prior(ϵ_t)
         return new{typeof(init), typeof(wrapped)}(init, wrapped)
     end

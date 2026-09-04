@@ -40,9 +40,10 @@ struct MA{C <: PriorLike, Q <: Int, E <: PriorLike} <: AbstractLatentModel
 
     function MA(θ, _q, ϵ_t)
         # The order is what the coefficient prior implies, so it is read off `θ`
-        # here rather than taken, which keeps every construction path, the
-        # field-wise rebuild included, agreeing on it.
+        # here rather than taken, which keeps every construction path agreeing
+        # on it; see `rewrap`'s docstring.
         q = _slot_order(θ)
+        @assert q > 0 "q must be greater than 0"
         # `ϵ_t` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
         # an `Intercept` (a constant innovation path), never left as a scalar.
         wrapped = path_prior(ϵ_t)

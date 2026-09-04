@@ -71,12 +71,12 @@ struct AR{
 
     function AR(damp, init, _p, ϵ_t, transform)
         # The order is what the damping prior implies, so it is read off `damp`
-        # rather than taken, and the order-`p` initial-conditions slot is sized
-        # to it.
-        # Both run here rather than in the keyword constructor so the positional
-        # form cannot bypass them, and both are idempotent, so rebuilding an
-        # `AR` from its own fields is a fixed point.
+        # rather than taken, and the order-`p` slots are sized to it. Deriving
+        # here rather than in the keyword constructor is what makes every
+        # construction path agree; see `rewrap`'s docstring for why that is all
+        # a derived field needs.
         p = _slot_order(damp)
+        @assert p > 0 "p must be greater than 0"
         init = (p > 1 && init isa Distribution) ? fill(init, p) : init
         assert_prior_length(init, p, "init")
         # `ϵ_t` is a length-`n` path slot, so a bare `Distribution` is wrapped
