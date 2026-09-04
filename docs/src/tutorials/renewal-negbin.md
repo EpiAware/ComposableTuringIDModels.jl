@@ -54,7 +54,7 @@ Double interval censoring is not the same as evaluating the continuous density a
 It accounts for both the primary and secondary events falling anywhere within their days, which shifts and spreads the mass relative to the underlying ``\mathrm{Gamma}`` [charniga2024best](@citep).
 
 ```@example renewal
-sum(renewal.gen_int), length(renewal.gen_int)
+sum(renewal.gen_int)
 ```
 
 ## The infection process in isolation

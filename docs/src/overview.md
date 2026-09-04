@@ -84,25 +84,29 @@ using ComposableTuringIDModels, Distributions
 latent = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
 ```
 
-Fold it into a direct-infections process, then swap only the observation model.
+Fold it into a direct-infections process observed with Poisson noise.
 
 ```@example overview
 poisson_model = IDModel(
     DirectInfections(; Z = latent, initialisation = Normal()),
     PoissonError())
+```
 
-negbin_model = IDModel(
-    DirectInfections(; Z = latent, initialisation = Normal()),
-    NegativeBinomialError())
+[`swap`](@ref) then changes the count noise and leaves the rest of the model untouched.
+
+```@example overview
+using ComposableTuringIDModels: swap
+negbin_model = swap(
+    err -> err isa PoissonError ? NegativeBinomialError() : err, poisson_model)
 ```
 
 Each assembly is turned into one Turing model.
-`missing` data simulates from the prior and exposes the generated quantities.
+`missing` data simulates from the prior and exposes the generated quantities, here the latent path driving the simulated counts.
 
 ```@example overview
 turing_model = as_turing_model(poisson_model, missing, 20)
 (; generated_y_t, I_t, Z_t) = turing_model()
-length(generated_y_t), length(I_t), length(Z_t)
+Z_t
 ```
 
 ## Where to go next

@@ -91,36 +91,16 @@ So `as_turing_model` for an infection model takes only a series length and retur
 Only [`Renewal`](@ref) needs a generation interval, so it alone takes one.
 The others take a `transformation` directly.
 
-## Swap-in, swap-out
-
-The parts share an interface, so you change a modelling assumption by swapping one struct for another and leaving the rest untouched.
-
-```@example design
-using ComposableTuringIDModels, Distributions
-
-# An ARIMA-style latent process: a differenced AR.
-latent = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
-
-# Fold the latent into a direct-infections process, then swap the observation
-# model without touching the rest.
-poisson_model = IDModel(
-    DirectInfections(; Z = latent, initialisation = Normal()),
-    PoissonError())
-
-negbin_model = IDModel(
-    DirectInfections(; Z = latent, initialisation = Normal()),
-    NegativeBinomialError())
-```
-
 ## Composing accumulation steps
 
 The recurrences that drive the time series are expressed as [`accumulate_scan`](@ref) steps.
 Within the renewal family these steps compose.
 A [`RenewalStep`](@ref) is a force-of-infection core plus an ordered tuple of modifiers that share one incidence window.
-The first modifier, [`SusceptibleDepletion`](@ref), scales the proposed incidence by the available susceptible fraction and depletes the pool, turning the renewal process into one with a fixed population.
-[`Renewal`](@ref) is a step-composing helper, so passing the modifier composes it onto the step.
+As a demonstration, a [`SusceptibleDepletion`](@ref) modifier is composed onto the renewal step.
+See [Renewal modifiers](@ref renewal-modifiers) for what each modifier contributes to a fitted model.
 
 ```@example design
+using ComposableTuringIDModels, Distributions
 gen_int = [0.2, 0.3, 0.5]
 
 depleting = Renewal(gen_int, SusceptibleDepletion(1000.0); rt = RandomWalk())
@@ -143,8 +123,6 @@ The discretisation keywords stay available alongside the modifiers, which keeps 
 discretised = Renewal(Gamma(2, 1.5), SusceptibleDepletion(1000.0);
     D_gen = 15.0, rt = RandomWalk())
 ```
-
-See [Renewal modifiers](@ref renewal-modifiers) for what each contributes to a fitted model.
 
 ## The seeding window
 
@@ -170,8 +148,9 @@ We set the automatic-differentiation backend explicitly with `NUTS(; adtype = ..
 ```julia
 using Turing, Mooncake
 using ADTypes: AutoMooncake
-y = as_turing_model(poisson_model, fill(missing, 30), 30)().generated_y_t
-posterior = as_turing_model(poisson_model, y, 30)
+model = IDModel(depleting, PoissonError())
+y = as_turing_model(model, fill(missing, 30), 30)().generated_y_t
+posterior = as_turing_model(model, y, 30)
 chain = sample(posterior, NUTS(; adtype = AutoMooncake(; config = nothing)),
     MCMCThreads(), 1_000, 2)
 ```
@@ -259,7 +238,7 @@ Locating a component is a `filter` over the walk instead of a field path.
 ```@example traversal
 using ComposableTuringIDModels: observation_components
 delays = filter(x -> x isa LatentDelay, observation_components(obs))
-length(delays), first(delays).delay
+only(delays).delay
 ```
 
 A quantity accumulated over a chain is a `sum` over the same walk.

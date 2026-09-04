@@ -43,7 +43,7 @@ The coefficient is transformed where it is drawn, so the recursion reads the map
 Built with `as_turing_model(m, n)` it returns the numeric length-`n` path, as every other latent model does, and tracks the coefficient path ``\rho_t`` as a generated quantity `ρ`.
 
 ```@example tvdamp
-length(as_turing_model(tv, 8)())
+as_turing_model(tv, 8)()
 ```
 
 It returns a plain path, so it drops straight into any latent slot.
@@ -55,7 +55,7 @@ nested = IDModel(
     Renewal(; generation_time = gen_int, rt = AR(; damp = RandomWalk()),
         initialisation = Normal()),
     PoissonError())
-length(as_turing_model(nested, missing, 12)().generated_y_t)
+as_turing_model(nested, missing, 12)().generated_y_t
 ```
 
 We simulate one series whose true damping ramps from strong positive persistence through zero to mild anti-persistence, then recover it.
@@ -93,7 +93,6 @@ Random.seed!(180)
 fit = sample(
     posterior, NUTS(0.85; adtype = AutoMooncake(; config = nothing)),
     MCMCThreads(), 300, 2; progress = false)
-# ρ is tracked as a generated quantity: `fit[:ρ]` is a per-draw coefficient path
 ρ_draws = reduce(hcat, vec(fit[:ρ]))     # (n-1) × draws
 ρ_mean = vec(mean(ρ_draws; dims = 2))
 (correlation_with_truth = round(cor(ρ_mean, ρ_true), digits = 2),)
