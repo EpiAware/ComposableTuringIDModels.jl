@@ -465,6 +465,120 @@ _data_contract(::BinomialError) = (shape = :series, fields = (:y, :N))
 # further time points.
 _data_contract(::ReportTriangle) = (shape = :triangle, fields = ())
 
+# --- the shape the infection process is built at -----------------------------
+
+# The infection strata a chain fixes for itself, before it sees any data.
+# `nothing` leaves the count to the data, and a strata template replicated once
+# per data stream is the only case where the data gets to decide.
+_declared_strata(model::AbstractObservationModel) = _declared_strata(
+    _wrapped_model(model)
+)
+_declared_strata(::Nothing) = nothing
+
+# A weight map fixes the count outright, named streams fix one stratum per
+# stream, and a strata template fixes neither because its streams arrive with the
+# data.
+function _declared_strata(m::Split)
+    m.map === nothing || return infection_strata(m, size(m.map, 1))
+    m.streams isa NamedTuple || return nothing
+    return infection_strata(m, length(m.streams))
+end
+
+@doc raw"
+The number of observation streams a data value holds for a model, or `nothing`
+when it holds a single series.
+
+The seam a component uses to say how its data is laid out, so nothing has to be
+guessed from whichever array dimensions the data happens to have. The count is
+what stratifies the infection process an [`IDProblem`](@ref) builds, mapped
+through [`infection_strata`](@ref).
+
+The default reads a stream axis off the value itself. A matrix is a panel with
+one row per stream, a `NamedTuple` is one entry per stream, and anything else is
+one series. A component whose data means something else says so with a method of
+its own. [`ReportTriangle`](@ref) has one, because its matrix is reference days
+by reporting delay and names no streams. A model taking named fields counts only
+the field holding the observations, so a [`BinomialError`](@ref)'s `(y, N)` is
+one stream and a trials covariate rather than two streams.
+
+Returning `nothing` rather than `1` is deliberate. A single series and a one-row
+panel build different infection processes and name their variables differently,
+so a value with no stream axis leaves the shape a plain length.
+
+## Arguments
+
+  - `model`: an observation model, an [`IDModel`](@ref) or an [`IDProblem`](@ref).
+  - `y_t`: the data supplied for it.
+
+# Examples
+```@example observation_streams
+using ComposableTuringIDModels
+using ComposableTuringIDModels: observation_streams
+obs = ReportTriangle(PoissonError(), [0.5, 0.3, 0.2])
+observation_streams(PoissonError(), fill(5.0, 2, 10)),
+observation_streams(obs, [10 5 2; 12 6 3])
+```
+"
+function observation_streams(model::AbstractObservationModel, y_t)
+    return _wrapped_streams(_wrapped_model(model), y_t)
+end
+
+# A composed model's streams are its observation chain's.
+observation_streams(model, y_t) = observation_streams(
+    _observation_chain(model), y_t
+)
+
+# The walk stops at the first component that reads the raw data rather than the
+# expected series: a `Split` slices it into per-stream values, and otherwise it
+# reaches whatever consumes the series.
+_wrapped_streams(::Nothing, y_t) = _stream_axis_size(y_t)
+_wrapped_streams(inner, y_t) = observation_streams(inner, y_t)
+
+observation_streams(::Split, y_t) = _stream_axis_size(y_t)
+
+# A reporting triangle's axes are reference days and reporting delays, so its
+# matrix names no streams however it is supplied.
+observation_streams(::ReportTriangle, y_t) = nothing
+
+# A stream supplied as named fields carries its observations in the first field
+# its contract names; the rest are per-time-point covariates.
+function observation_streams(model::AbstractObservationErrorModel, y_t::NamedTuple)
+    return _stream_axis_size(_named_stream_axis(_data_contract(model).fields, y_t))
+end
+
+_named_stream_axis(::Tuple{}, y_t) = y_t
+_named_stream_axis(fields::Tuple, y_t) = getproperty(y_t, first(fields))
+
+# The size of a data value's stream axis, or `nothing` when it has none.
+_stream_axis_size(y::AbstractMatrix) = size(y, 1)
+_stream_axis_size(y::NamedTuple) = length(y)
+_stream_axis_size(::Any) = nothing
+
+# The infection process's `ModelShape` implied by an observation model and a data
+# value, shared by `IDProblem` and `forecast` so the two build a data-driven
+# model's shape the same way.
+# The chain states what it can before any data is seen, and only what it leaves
+# open is read off the data — and then only along the axis the component
+# consuming that data calls a stream axis, so a value whose array dimensions mean
+# something else does not shape the infection process.
+_obs_data_shape(obs, y_t, time_steps) = _shape_from_strata(
+    _resolved_strata(obs, y_t), time_steps
+)
+
+_shape_from_strata(::Nothing, time_steps) = time_steps
+_shape_from_strata(strata::Int, time_steps) = (strata, time_steps)
+
+# The infection strata an observation model and its data imply, or `nothing` for
+# a single unstratified series.
+function _resolved_strata(obs, y_t)
+    declared = _declared_strata(obs)
+    declared === nothing || return declared
+    return _supplied_strata(obs, observation_streams(obs, y_t))
+end
+
+_supplied_strata(obs, ::Nothing) = nothing
+_supplied_strata(obs, n_streams::Int) = infection_strata(obs, n_streams)
+
 # How many of a stream's `n` supplied entries enter the likelihood.
 # One per time point everywhere except an `Aggregate`, which hands the error
 # model one value per reporting window and never scores the days its presence

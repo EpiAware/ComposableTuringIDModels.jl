@@ -170,9 +170,10 @@ Convenience 2-argument form: read the infection process's shape from the data.
 The observation model and the data together fix the shape of the infection
 process, so nothing about it needs to be supplied explicitly or stored on the
 model. `as_turing_model(model, Y)` is `as_turing_model(model, Y, shape)` with
-`shape` resolved via [`infection_strata`](@ref): the number of infection
-strata the observation model consumes given the data's row count, paired with
-the data's time length.
+`shape` resolved the same way [`IDProblem`](@ref) resolves it: the observation
+model states what it can of its own stratum count (see
+[`infection_strata`](@ref)), and the data's row count is read only where the
+model leaves that count open.
 
 Three age strata observed as one hospitalisation stream is
 `Split(NegativeBinomialError(), [1.0 1.0 1.0])`; a `1 x T` data matrix then
@@ -198,7 +199,7 @@ function as_turing_model(model::IDModel, Y::AbstractMatrix)
 end
 
 function _shape(model::IDModel, Y::AbstractMatrix)
-    return (infection_strata(model.observation_model, size(Y, 1)), size(Y, 2))
+    return _obs_data_shape(model.observation_model, Y, size(Y, 2))
 end
 
 @doc raw"

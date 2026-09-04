@@ -7,11 +7,15 @@ model, so it is not a separate slot here.
 
 `as_turing_model(problem, data)` assembles the corresponding [`IDModel`](@ref)
 over `tspan` and conditions it on `data.y_t`. The infection process's shape is
-read from the observation model and `data.y_t` at build time (see
-[`infection_strata`](@ref)), not stored on the problem: a plain vector (or
-`missing`) gives a single-series infection process, exactly as today, while a
-data matrix or a `NamedTuple` of streams gives a stratified infection process
-with one row per stratum.
+fixed at build time rather than stored on the problem. The observation model
+states what it can of its own stratum count (see [`infection_strata`](@ref)), and
+`data.y_t` is read only where the model leaves that count open, along the axis
+the component consuming the data calls a stream axis. A plain vector (or
+`missing`) gives a single-series infection process, while a data matrix or a
+`NamedTuple` of streams gives one infection stratum per stream. Data whose array
+dimensions mean something else does not stratify anything: a
+[`ReportTriangle`](@ref)'s rows are reference days, and a [`BinomialError`](@ref)'s
+`N` field is a trials covariate rather than a second stream.
 
 # Arguments
 
@@ -44,29 +48,6 @@ rand(as_turing_model(problem, (; y_t = missing)))
     observation_model::O
     "The `(first, last)` time span of the observations."
     tspan::Tuple{Int, Int}
-end
-
-# The infection process's `ModelShape` implied by an observation model and a
-# data value, shared by `IDProblem` and `forecast` so the two build a
-# data-driven model's shape the same way.
-# With `y_t === missing` there is no data to read a stream count from, so the
-# shape falls back to the observation model alone.
-_obs_data_shape(obs, y_t, time_steps) = time_steps
-_obs_data_shape(obs, y_t::Missing, time_steps) = _obs_data_shape_missing(
-    obs, time_steps
-)
-function _obs_data_shape(obs, y_t::AbstractMatrix, time_steps)
-    return (infection_strata(obs, size(y_t, 1)), time_steps)
-end
-function _obs_data_shape(obs, y_t::NamedTuple, time_steps)
-    return (infection_strata(obs, length(y_t)), time_steps)
-end
-
-_obs_data_shape_missing(obs, time_steps) = time_steps
-function _obs_data_shape_missing(s::Split, time_steps)
-    s.map === nothing || return (size(s.map, 2), time_steps)
-    s.names === nothing || return (length(s.names), time_steps)
-    return time_steps
 end
 
 # The problem's lead-in is its observation model's, and `tspan` is the span of
