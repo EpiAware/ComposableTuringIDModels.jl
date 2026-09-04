@@ -14,7 +14,7 @@ end
 
 @testitem "_obs_data_shape resolves stratified shapes from data or Split" begin
     using ComposableTuringIDModels, Distributions
-    using ComposableTuringIDModels: _obs_data_shape, _obs_data_shape_missing
+    using ComposableTuringIDModels: _obs_data_shape
     # `IDProblem` and `forecast` share this helper, so every branch it can
     # take is exercised directly here rather than only through the callers.
     plain = PoissonError()
@@ -27,16 +27,134 @@ end
     y_nt = (a = fill(5.0, 10), b = fill(3.0, 10))
     @test _obs_data_shape(named, y_nt, 10) == (2, 10)   # NamedTuple y_t
 
-    # `y_t === missing` falls back to `_obs_data_shape_missing`; its three
-    # `Split` branches (map / names / neither) are each checked in turn.
+    # A `Split` that fixes its own stratum count resolves the same shape with
+    # or without data.
     @test _obs_data_shape(plain, missing, 10) == 10
-    @test _obs_data_shape_missing(mapped, 10) == (3, 10)   # map branch
-    @test _obs_data_shape_missing(named, 10) == (2, 10)    # names branch
-    # Data-driven strata mode: no map, no names (both set at data time), so
-    # with `y_t = missing` there is nothing to read a stratum count from and
-    # the shape falls back to a single series.
+    @test _obs_data_shape(mapped, missing, 10) == (3, 10)
+    @test _obs_data_shape(named, missing, 10) == (2, 10)
+
+    # A strata template takes its stream names from the data, so with
+    # `y_t = missing` there is nothing to read a stratum count from and the
+    # shape falls back to a single series.
     strata_template = Split(PoissonError())
-    @test _obs_data_shape_missing(strata_template, 10) == 10   # neither branch
+    @test _obs_data_shape(strata_template, missing, 10) == 10
+    @test _obs_data_shape(strata_template, y_nt, 10) == (2, 10)
+end
+
+@testitem "a data axis stratifies only where the component says it is streams" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: _obs_data_shape
+    # A reporting triangle's rows are reference days and its columns reporting
+    # delays, so neither axis is a stream axis.
+    # The dense matrix and the built carrier are two spellings of one dataset
+    # and must give the same shape.
+    tri = ReportTriangle(PoissonError(), [0.5, 0.3, 0.2])
+    N = [10 5 2; 12 6 3; 14 7 4]
+    carrier = define_y_t(tri, N, fill(20.0, 3))
+    @test _obs_data_shape(tri, N, 3) == 3
+    @test _obs_data_shape(tri, carrier, 3) == 3
+    @test _obs_data_shape(tri, missing, 3) == 3
+    # A modifier in front of the triangle does not change what its data means.
+    @test _obs_data_shape(LatentDelay(tri, [0.5, 0.5]), N, 3) == 3
+
+    # `BinomialError` takes its trials beside its counts, so the two fields are
+    # one stream rather than two, and a panel keeps its stream axis.
+    binom = BinomialError()
+    @test _obs_data_shape(binom, (y = fill(5, 10), N = fill(20, 10)), 10) == 10
+    @test _obs_data_shape(
+        binom, (y = fill(5, 2, 10), N = fill(20, 2, 10)), 10
+    ) == (2, 10)
+
+    # Every error family takes its observations in `y`, so wrapping a series in
+    # a `NamedTuple` must not change the model it builds.
+    plain = PoissonError()
+    @test _obs_data_shape(plain, (y = fill(5, 10),), 10) ==
+        _obs_data_shape(plain, fill(5, 10), 10)
+    @test _obs_data_shape(plain, (y = fill(5, 2, 10),), 10) ==
+        _obs_data_shape(plain, fill(5, 2, 10), 10)
+end
+
+@testitem "a nested Split's weight map fixes the stratum count" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: _obs_data_shape
+    # The map states the model's stratum count, so a modifier wrapped round the
+    # `Split` does not hide it and the count holds with no data to read.
+    nested = LatentDelay(Split(PoissonError(), [1.0 1.0 1.0]), [0.5, 0.3, 0.2])
+    @test _obs_data_shape(nested, fill(5.0, 1, 10), 10) == (3, 10)
+    @test _obs_data_shape(nested, missing, 10) == (3, 10)
+end
+
+@testitem "the resolved shape is inferred rather than a union" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: _obs_data_shape
+    # The shape is built in a `@model` body, so a union return type would make
+    # every downstream variable in the model unpredictable to the compiler.
+    tri = ReportTriangle(PoissonError(), [0.5, 0.3, 0.2])
+    cases = [
+        (PoissonError(), fill(5.0, 12)),
+        (PoissonError(), fill(5.0, 2, 12)),
+        (BinomialError(), (y = fill(5, 12), N = fill(20, 12))),
+        (tri, [10 5 2; 12 6 3; 14 7 4]),
+        (tri, missing),
+        (
+            LatentDelay(Split(PoissonError(), [1.0 1.0 1.0]), [0.5, 0.5]),
+            fill(5.0, 1, 12),
+        ),
+        (
+            Split((a = PoissonError(), b = PoissonError())),
+            (a = fill(5.0, 12), b = fill(5.0, 12)),
+        ),
+    ]
+    for (obs, y_t) in cases
+        types = Base.return_types(
+            _obs_data_shape, Tuple{typeof(obs), typeof(y_t), Int}
+        )
+        @test length(types) == 1
+        @test isconcretetype(only(types))
+    end
+end
+
+@testitem "IDProblem builds a single-series model for a BinomialError" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: VarInfo
+    Random.seed!(246)
+    # `(y, N)` is one stream's counts and its trials, so the infection process
+    # is a single unstratified series.
+    problem = IDProblem(
+        infection = DirectInfections(;
+            Z = RandomWalk(), initialisation = Normal(log(50), 0.2)
+        ),
+        observation_model = BinomialError(),
+        tspan = (1, 10)
+    )
+    m = as_turing_model(problem, (; y_t = (y = fill(5, 10), N = fill(20, 10))))
+    @test Set(string.(keys(VarInfo(m)))) ==
+        Set(["init", "std", "ϵ_t", "init_incidence"])
+    @test length(m().Z_t) == 10
+end
+
+@testitem "IDProblem builds one series for a reporting triangle either way" begin
+    using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: VarInfo
+    Random.seed!(2460)
+    # A dense count matrix and the carrier built from it are the same dataset,
+    # so they must build the same model.
+    obs = ReportTriangle(PoissonError(), [0.5, 0.3, 0.2])
+    N = [10 5 2; 12 6 3; 14 7 4]
+    problem = IDProblem(
+        infection = DirectInfections(;
+            Z = RandomWalk(), initialisation = Normal(log(50), 0.2)
+        ),
+        observation_model = obs,
+        tspan = (1, 3)
+    )
+    from_matrix = as_turing_model(problem, (; y_t = N))
+    from_carrier = as_turing_model(
+        problem, (; y_t = define_y_t(obs, N, fill(20.0, 3)))
+    )
+    @test keys(VarInfo(from_matrix)) == keys(VarInfo(from_carrier))
+    @test Set(string.(keys(VarInfo(from_matrix)))) ==
+        Set(["init", "std", "ϵ_t", "init_incidence"])
 end
 
 @testitem "IDProblem resolves a stratified infection process via Split" begin
