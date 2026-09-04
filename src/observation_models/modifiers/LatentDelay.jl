@@ -42,9 +42,10 @@ delay composes exactly like a prior anywhere else in the model.
 
   - `model`: the wrapped observation model the delayed expected observations are
     passed to.
-  - `delay`: the delay specification — the **reversed** fixed delay PMF (a
-    vector), a per-time sequence of PMFs, or an [`UncertainDelay`](@ref) component
-    that samples the delay parameters and builds the PMF(s) per draw.
+  - `delay`: the delay specification — the fixed delay PMF (a vector), a
+    per-time sequence of PMFs, or an [`UncertainDelay`](@ref) component that
+    samples the delay parameters and builds the PMF(s) per draw. It is held as
+    it was given and reversed for the convolution when the model is built.
 
 # Examples
 
@@ -86,24 +87,17 @@ struct LatentDelay{M <: AbstractObservationModel, D} <: AbstractObservationModel
     end
 end
 
-# A `LatentDelay` stores its PMF reversed for the convolution.
-# Handing the stored fields back to the public constructor reverses it a second
-# time and says nothing, because a reversed PMF is still a valid one.
-# Rebuild through the raw constructor instead, which takes the fields exactly as
-# stored.
-ConstructionBase.constructorof(::Type{<:LatentDelay}) = _rebuild_latent_delay
-
-function _rebuild_latent_delay(model, delay)
-    return LatentDelay{typeof(model), typeof(delay)}(model, delay)
-end
-
-# Fixed PMF: validate and store it reversed for the `LDStep` convolution (the
-# fixed path is behaviourally unchanged from the original modifier).
+# Fixed PMF: validate and store it as given, reversed for the `LDStep`
+# convolution when the model is built.
+# A reversed PMF is still a valid one, so storing it reversed would leave the
+# field's stored and given forms indistinguishable and a PMF set into the slot
+# with `Accessors.@set` would be convolved backwards with nothing to say so.
+# Storing the given form instead means the public constructor takes its own
+# fields back, so `Accessors` and `rewrap` need no `constructorof` here.
 function LatentDelay(model::AbstractObservationModel, pmf::AbstractVector{<:Real})
     @assert all(>=(0), pmf) "Delay PMF must be non-negative"
     @assert isapprox(sum(pmf), 1) "Delay PMF must sum to 1"
-    rev_pmf = reverse(pmf)
-    return LatentDelay{typeof(model), typeof(rev_pmf)}(model, rev_pmf)
+    return LatentDelay{typeof(model), typeof(pmf)}(model, pmf)
 end
 
 # Fixed continuous distribution: discretise once at construction.
@@ -220,6 +214,17 @@ function UncertainDelay(family, params::AbstractVector; D, Δd = 1.0)
     return UncertainDelay{typeof(params), typeof(family), typeof(Dp), tv}(
         params, family, Dp, Δdp
     )
+end
+
+# An `UncertainDelay`'s only constructor takes its horizon and bin width as
+# keywords and its family before its parameters, so a rebuild from its fields in
+# declaration order has no method to land on and throws.
+# Point `ConstructionBase`, and so `Accessors`, at a rebuild that reorders them,
+# which also re-derives the time-varying type parameter from the parameters.
+ConstructionBase.constructorof(::Type{<:UncertainDelay}) = _rebuild_uncertain_delay
+
+function _rebuild_uncertain_delay(params, family, D, Δd)
+    return UncertainDelay(family, params; D = D, Δd = Δd)
 end
 
 # An all-constant delay gives a single time-invariant pmf.
@@ -354,14 +359,13 @@ _delay_timevarying(::UncertainDelay{P, F, T, TV}) where {P, F, T, TV} = TV
         )
     else
         # A single reversed pmf drives `LDStep`, which is the fast path.
-        # A fixed PMF vector is already stored reversed and used directly.
-        # An all-constant uncertain delay builds its forward PMF per draw, which
-        # is then reversed.
+        # A fixed PMF vector is stored forward, and an all-constant uncertain
+        # delay builds its forward PMF per draw, so both are reversed here.
         if spec isa AbstractPriorModel
             delay ~ as_turing_submodel(spec; prefix = true)
             rev_pmf = reverse(delay)
         else
-            rev_pmf = spec
+            rev_pmf = reverse(spec)
         end
         d = length(rev_pmf)
         @assert d <= n "The delay PMF must be no longer than the observation vector"

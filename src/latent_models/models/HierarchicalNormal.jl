@@ -16,8 +16,8 @@ A non-centred hierarchical normal latent process.
     time-varying, scale). Drawn through the single [`as_turing_submodel`](@ref)
     seam and broadcast over the innovations, so a process makes the scale
     time-varying (stochastic volatility) with no other change.
-  - `add_mean`: flag controlling whether `mean` is added (false when
-    `mean == 0`).
+  - `add_mean`: flag controlling whether `mean` is added, read off `mean` (false
+    when `mean == 0`).
 
 # Examples
 ```@example HierarchicalNormal
@@ -33,19 +33,30 @@ struct HierarchicalNormal{R <: Real, S <: PriorLike, M <: Bool} <:
     mean::R
     "Prior for the standard deviation."
     std::S
-    "Flag controlling whether `mean` is added (false when `mean == 0`)."
+    "Flag controlling whether `mean` is added, read off `mean`."
     add_mean::M
 end
 
 function HierarchicalNormal(;
-        mean::Real = 0.0,
-        std = truncated(Normal(0, 0.1), 0, Inf), add_mean::Bool = mean != 0
+        mean::Real = 0.0, std = truncated(Normal(0, 0.1), 0, Inf)
     )
-    return HierarchicalNormal(mean, std, add_mean)
+    return HierarchicalNormal(mean, std, mean != 0)
 end
 HierarchicalNormal(std::PriorLike) = HierarchicalNormal(; std = std)
 function HierarchicalNormal(mean::Real, std::PriorLike)
     return HierarchicalNormal(; mean = mean, std = std)
+end
+
+# `add_mean` says only whether `mean` is worth adding, so it is read off `mean`
+# rather than taken.
+# Point `ConstructionBase`, and so `Accessors`, at a rebuild that re-reads it:
+# a rebuild from the stored fields gets the same flag back, while setting `mean`
+# gets one that matches rather than a model that quietly drops the new mean.
+ConstructionBase.constructorof(::Type{<:HierarchicalNormal}) =
+    _rebuild_hierarchical_normal
+
+function _rebuild_hierarchical_normal(mean, std, _add_mean)
+    return HierarchicalNormal(mean, std, mean != 0)
 end
 
 @model function as_turing_model(model::HierarchicalNormal, n::Int)

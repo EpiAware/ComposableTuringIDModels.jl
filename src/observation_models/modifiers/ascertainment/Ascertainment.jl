@@ -17,6 +17,12 @@ observation by `exp(x)`. The prior is prefixed with `latent_prefix` (a latent
 model via [`PrefixLatentModel`](@ref), a distribution via its sampled-variable
 name) unless the prefix is the empty string.
 
+The slot holds the prefixed prior, and setting it with `Accessors.@set` applies
+the same prefixing, so a raw prior set into it gives the model the constructor
+would have built. `latent_prefix` is the single place the ascertainment's
+variables are named, so a [`PrefixLatentModel`](@ref) put in the slot is
+re-prefixed to it rather than nested under it.
+
 # Arguments
 
   - `obs_model`: the [`Ascertainment`](@ref) model.
@@ -71,9 +77,7 @@ struct Ascertainment{
         # factor drawn once and broadcast.
         # `PrefixLatentModel` namespaces it under `latent_prefix` so the
         # ascertainment variables stay distinct, and an empty prefix opts out.
-        coerced = _ascertainment_prior(latent_model)
-        prior = latent_prefix == "" ? coerced :
-            PrefixLatentModel(coerced, latent_prefix)
+        prior = _prefixed_path(latent_model, latent_prefix)
         return new{M, typeof(prior), F, P}(
             model, prior, transform, latent_prefix
         )
@@ -82,7 +86,8 @@ struct Ascertainment{
     # The raw constructor, taking the fields exactly as stored with the prior
     # already coerced and prefixed.
     # Rebuilding goes through this rather than through the constructor above,
-    # which would prefix a second time.
+    # whose `hasmethod` check is runtime reflection an AD backend cannot see
+    # through when the component is built inside a model.
     function Ascertainment{M, L, F, P}(
             model, latent_model, transform, latent_prefix
         ) where {M, L, F, P}
@@ -90,21 +95,20 @@ struct Ascertainment{
     end
 end
 
-# An `Ascertainment` stores its prior already wrapped in a `PrefixLatentModel`,
-# so a rebuild through the public constructor wraps it again and nothing throws.
-# Point `ConstructionBase`, and so `Accessors`, at the raw constructor.
+# An `Ascertainment` stores its prior already wrapped in a `PrefixLatentModel`.
+# Point `ConstructionBase`, and so `Accessors`, at a rebuild that re-applies the
+# same idempotent wrapping: the stored wrapped prior comes back unchanged, while
+# a raw prior set into the slot is wrapped as the public constructor would.
 ConstructionBase.constructorof(::Type{<:Ascertainment}) = _rebuild_ascertainment
 
 function _rebuild_ascertainment(model, latent_model, transform, latent_prefix)
+    prior = _prefixed_path(latent_model, latent_prefix)
     T = Ascertainment{
-        typeof(model), typeof(latent_model), typeof(transform),
+        typeof(model), typeof(prior), typeof(transform),
         typeof(latent_prefix),
     }
-    return T(model, latent_model, transform, latent_prefix)
+    return T(model, prior, transform, latent_prefix)
 end
-
-_ascertainment_prior(latent_model::AbstractPriorModel) = latent_model
-_ascertainment_prior(dist::Distribution) = Intercept(dist)
 
 function Ascertainment(
         model::AbstractObservationModel, latent_model;

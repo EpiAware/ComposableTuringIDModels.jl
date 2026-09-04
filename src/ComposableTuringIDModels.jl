@@ -31,9 +31,10 @@ using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
 using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
-# Several wrappers transform an argument before storing it, so they point
-# `constructorof` at a raw constructor rather than at the public one.
-# That keeps `Accessors` and `rewrap` from applying the transform a second time.
+# Several wrappers derive a field from the others at construction, so they point
+# `constructorof` at a rebuild that re-derives it.
+# That keeps `Accessors` and `rewrap` from carrying a derived field across to
+# fields it no longer describes.
 using ConstructionBase: ConstructionBase
 using LinearAlgebra: dot, cholesky, Symmetric, I, UniformScaling
 using LogExpFunctions: softmax, xexpy, log1pexp

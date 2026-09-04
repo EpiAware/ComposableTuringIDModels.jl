@@ -47,3 +47,21 @@ end
 end
 as_turing_model(model::PrefixLatentModel, n::Int) = _prefix_latent(model, n)
 as_turing_model(model::PrefixLatentModel, n::Dims{2}) = _prefix_latent(model, n)
+
+# Widen a raw prior into a path and namespace it under `prefix`, for the
+# components that own a prefix slot and store the prior already wrapped.
+# Applying it twice gives the same object, which is what lets the same call sit
+# in the public constructor and in the `ConstructionBase.constructorof` rebuild:
+# a raw prior set into the slot is wrapped, and the stored wrapped prior is left
+# alone.
+# The slot's prefix is the single place its name is set, so a
+# `PrefixLatentModel` put in the slot is re-prefixed to it rather than nested
+# under it.
+_prefixed_path(model, prefix::AbstractString) =
+    prefix == "" ? path_prior(model) : PrefixLatentModel(path_prior(model), prefix)
+
+function _prefixed_path(model::PrefixLatentModel, prefix::AbstractString)
+    prefix == "" && return model.model
+    prefix == model.prefix && return model
+    return PrefixLatentModel(model.model, prefix)
+end

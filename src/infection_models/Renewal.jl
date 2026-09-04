@@ -203,6 +203,24 @@ struct Renewal{
     end
 end
 
+# A `Renewal` bakes its accumulation step from the generation interval, the
+# coupling operator and the modifiers, so a rebuild from its stored fields would
+# keep a step describing the interval and coupling it no longer holds.
+# Point `ConstructionBase`, and so `Accessors`, at a rebuild that re-bakes it:
+# the stored fields give the same step back, while setting any of the three
+# gives one that matches. The step given is what the other three imply, so it is
+# discarded rather than kept beside fields it no longer describes.
+ConstructionBase.constructorof(::Type{<:Renewal}) = _rebuild_renewal
+
+function _rebuild_renewal(
+        gen_int, transformation, rt, initialisation, _step, mixing, modifiers
+    )
+    interval, step = _renewal_fields(gen_int, mixing, modifiers)
+    return Renewal(
+        interval, transformation, rt, initialisation, step, mixing, modifiers
+    )
+end
+
 function Renewal(;
         generation_time, modifiers = (), rt = RandomWalk(),
         initialisation = Normal(), transformation::Function = exp,

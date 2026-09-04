@@ -80,8 +80,6 @@ struct Aggregate{
     end
 
     # The raw constructor, taking the derived presence mask as stored.
-    # Rebuilding a component goes through this, because the public constructor
-    # takes only the two underived arguments.
     function Aggregate{M, A, P}(model, aggregation, present) where {M, A, P}
         return new{M, A, P}(model, aggregation, present)
     end
@@ -90,13 +88,14 @@ end
 # An `Aggregate` derives its presence mask from its window lengths, so its public
 # constructor takes fewer arguments than it has fields and a generic rebuild
 # fails outright.
-# Point `ConstructionBase`, and so `Accessors`, at the raw constructor.
+# Point `ConstructionBase`, and so `Accessors`, at a rebuild that re-derives the
+# mask: a rebuild from the stored fields gets the same mask back, while setting
+# the window lengths gets one that matches them rather than the old windows.
+# The mask given is what the window lengths imply, so it is discarded rather
+# than kept beside an `aggregation` it no longer describes.
 ConstructionBase.constructorof(::Type{<:Aggregate}) = _rebuild_aggregate
 
-function _rebuild_aggregate(model, aggregation, present)
-    T = Aggregate{typeof(model), typeof(aggregation), typeof(present)}
-    return T(model, aggregation, present)
-end
+_rebuild_aggregate(model, aggregation, _present) = Aggregate(model, aggregation)
 
 function Aggregate(; model::M, aggregation::A) where {
         M <: AbstractObservationModel, A <: AbstractVector{<:Int},

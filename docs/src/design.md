@@ -285,9 +285,12 @@ updated_split = rewrap(
 one_swapped = rewrap(obs, (updated_split,))
 ```
 
-Several components transform or derive a field on construction.
-[`LatentDelay`](@ref) stores its delay PMF reversed for the convolution, [`Ascertainment`](@ref) stores its prior already wrapped in a [`PrefixLatentModel`](@ref), and [`Aggregate`](@ref) derives its presence mask from its window lengths.
-Each declares a `ConstructionBase.constructorof` that takes its fields as stored, so `rewrap` and `Accessors.@set` both rebuild them correctly.
+Several components derive a field from the others on construction.
+[`Ascertainment`](@ref) stores its prior already wrapped in a [`PrefixLatentModel`](@ref), [`Aggregate`](@ref) derives its presence mask from its window lengths, and [`Renewal`](@ref) bakes its accumulation step from the generation interval and the coupling operator.
+Each declares a `ConstructionBase.constructorof` that re-derives the field, so a rebuild from the stored fields gets the same component back and a field set with `Accessors.@set` gets the one the constructor would have built.
+
+That is what makes deriving one model from another with `Accessors.@set` safe.
+Setting an ascertainment prior re-applies the prefixing, and setting a generation interval re-bakes the step.
 
 A modifier defined outside the package inherits both functions as long as it holds what it wraps in its own field.
 One that holds it somewhere the field walk cannot see, such as inside a container, must define `wrapped_models` and `rewrap` for itself.

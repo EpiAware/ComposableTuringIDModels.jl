@@ -151,8 +151,9 @@ alongside its [`wrapped_models`](@ref).
 A component whose *public* constructor transforms or derives a field, so that it
 cannot accept its own stored fields back, needs no `rewrap` method: it defines
 `ConstructionBase.constructorof` instead, which fixes `Accessors` on the type at
-the same time. [`LatentDelay`](@ref), [`Ascertainment`](@ref) and
-[`Aggregate`](@ref) all do.
+the same time. [`Ascertainment`](@ref) and [`Aggregate`](@ref) both do, and each
+re-applies the derivation there, so a rebuild from the stored fields and a field
+set with `Accessors.@set` give the same component.
 
 ## Arguments
 
