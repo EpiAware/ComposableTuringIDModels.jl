@@ -127,7 +127,7 @@ That is the reason to hold one rather than the `DynamicPPL.Model` [`as_turing_mo
 problem = IDProblem(renewal, observation, y_obs)
 ```
 
-The problem carries its own length, so nothing about the series is restated and [`data_requirements`](@ref) reads straight off it.
+The problem carries its own length, so [`data_requirements`](@ref) reads straight off it.
 Construction checks the data against the model, so streams that disagree with each other are refused here rather than at build time.
 Passing a blank series in place of the reports, `Vector{Missing}(missing, n)`, would instead simulate from the prior.
 
