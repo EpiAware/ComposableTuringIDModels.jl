@@ -5,6 +5,7 @@ authors = ["Sam Abbott"]
 license = "Apache-2.0"
 
 [deps]
+AMD = "14f7f29c-3bd6-536c-9a0b-7339e30b5a3e"
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
 AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
 AdvancedHMC = "0bf59076-c3b1-5ca4-86bd-e02cd72cde3d"
@@ -35,6 +36,16 @@ ComposableTuringIDModelsCatalystExt = ["Catalyst", "ModelingToolkit"]
 ComposableTuringIDModelsEnzymeExt = "Enzyme"
 
 [compat]
+# AMD is not used by this package. It is a dependency only so this bound
+# can exist here, where every environment that resolves the package
+# inherits it — including the scaffold-managed `test/jet` one.
+# `SparseColumnPivotedQR` declares no compat for AMD, so the resolver is
+# free to take 0.5.4, which removed `SS_Int`. Its AMD extension still reads
+# that name and `LinearSolve` calls `scpqr` at load time, so `OrdinaryDiffEq`
+# fails to precompile. See #379 and SciML/SparseColumnPivotedQR.jl#72.
+# Drop the dep, this bound and the Aqua `stale_deps` ignore together once
+# SparseColumnPivotedQR#71 lands.
+AMD = "0.5.1 - 0.5.3"
 ADTypes = "1.22.1"
 AbstractMCMC = "5.15.1"
 AdvancedHMC = "0.8.5"

@@ -19,7 +19,10 @@ const QA_CONFIG = (
     # this module's namespace; those names are documented in their home
     # packages, not here, so the in-namespace undocumented-names check is not
     # meaningful for a reexporting package.
-    aqua = (; undocumented_names = false),
+    # `AMD` is a dependency only to carry a compat bound against a broken
+    # upstream resolution, so it is never loaded. Remove this ignore with
+    # the dependency itself (see `Project.toml` and #379).
+    aqua = (; undocumented_names = false, stale_deps = (; ignore = [:AMD])),
 
     # ExplicitImports `ignore`: symbols an extension legitimately imports
     # non-publicly. Tuple of Symbols, e.g. (:_internal_helper,).
