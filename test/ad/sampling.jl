@@ -33,14 +33,17 @@
         # scenario currently running.
         deadline = Ref(time() + SCENARIO_TIMEOUT)
         reported = Ref(0)
+        timed_out = Ref(false)
         timer = Timer(POLL_INTERVAL; interval = POLL_INTERVAL) do _
             done = length(child_results(read(path, String)))
             if done > reported[]
                 reported[] = done
                 deadline[] = time() + SCENARIO_TIMEOUT
             end
-            time() > deadline[] && process_running(proc) &&
+            if time() > deadline[] && process_running(proc)
+                timed_out[] = true
                 kill(proc, Base.SIGKILL)
+            end
         end
         try
             wait(proc)
@@ -48,9 +51,15 @@
             close(timer)
             close(io)
         end
-        how = proc.termsignal != 0 ?
-            "killed by signal " * string(proc.termsignal) :
+        # The cap and an out-of-memory kill both arrive as SIGKILL, so name the
+        # one we sent.
+        how = if timed_out[]
+            "timed out after " * string(SCENARIO_TIMEOUT) * "s"
+        elseif proc.termsignal != 0
+            "killed by signal " * string(proc.termsignal)
+        else
             "exit code " * string(proc.exitcode)
+        end
         out = read(path, String)
         rm(path; force = true)
         return out, how
