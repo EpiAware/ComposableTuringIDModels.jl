@@ -45,7 +45,8 @@ Swap `combine` for a different mapping the way [`Ascertainment`](@ref) swaps its
 Passing an all-`missing` matrix makes the model a prior simulator.
 We simulate eight groups over 24 time steps.
 Only the *relative* group levels are identified.
-Adding a constant to every group's level and subtracting it from the shared path gives the same ``Z_t``, so the two are confounded, and the comparison below is between relative levels.
+Adding a constant to every group's level and subtracting it from the shared path gives the same ``Z_t``, so the two are confounded.
+The comparison below is between relative levels.
 
 ```@example hier
 n_time, n_groups = 24, 8

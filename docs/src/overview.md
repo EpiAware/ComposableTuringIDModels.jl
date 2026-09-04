@@ -101,7 +101,7 @@ negbin_model = swap(
 ```
 
 Each assembly is turned into one Turing model.
-`missing` data simulates from the prior and exposes the generated quantities, here the latent path driving the simulated counts.
+`missing` data simulates from the prior and exposes the generated quantities.
 
 ```@example overview
 turing_model = as_turing_model(poisson_model, missing, 20)

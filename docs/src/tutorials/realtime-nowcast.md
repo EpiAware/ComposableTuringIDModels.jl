@@ -140,7 +140,8 @@ tri_obs = ReportTriangle(error, delay_pmf)
 tri_model = @set naive_model.observation_model = tri_obs
 ```
 
-A fit is a model and the data it is scored against, so the four are a table of pairs and the sampler call is written once.
+A fit is a model and the data it is scored against.
+The four are a table of pairs, so the sampler call is written once.
 
 ```@example nowcast
 specs = (

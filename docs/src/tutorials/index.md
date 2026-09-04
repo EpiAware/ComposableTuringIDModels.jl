@@ -11,10 +11,12 @@ Each one is self-contained and runs when the documentation is built, so the numb
     That is enough to demonstrate the models and produce stable figures.
     A real analysis would use more draws and check convergence diagnostics carefully.
 
-Most readers arrive with a task rather than a concept, so start with [Renewal model with negative-binomial reporting](@ref tutorial-renewal) if you want to fit a renewal model to reported cases, and follow it with [Reporting delays and day-of-week effects](@ref tutorial-delays) for a realistic observation process.
+To fit a renewal model to reported cases, start with [Renewal model with negative-binomial reporting](@ref tutorial-renewal).
+Follow it with [Reporting delays and day-of-week effects](@ref tutorial-delays) for a realistic observation process.
 
-The table groups the pages by theme once the vocabulary is familiar.
-The infection, observation, and latent themes are the package's three component roles, the same names used on the [Composable design](@ref) page and in the [Public API](@ref public-api).
+The table groups the pages by theme.
+The infection, observation, and latent themes are the package's three component roles.
+Those names are also used on the [Composable design](@ref) page and in the [Public API](@ref public-api).
 A page covering more than one theme appears under each.
 
 | Theme | Tutorials |

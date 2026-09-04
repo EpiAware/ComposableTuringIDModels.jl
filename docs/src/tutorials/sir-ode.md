@@ -239,7 +239,6 @@ stochastic_obs = TransformObservationModel(
 stochastic_model = @set model.observation_model = stochastic_obs
 ```
 
-The infection process is carried over untouched, so only the observation branch differs.
 The ascertainment process adds latent parameters, so we raise the NUTS target acceptance rate a little to keep the sampler stable through the ODE solve.
 
 ```@example sir

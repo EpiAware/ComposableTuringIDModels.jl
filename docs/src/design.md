@@ -95,7 +95,7 @@ The others take a `transformation` directly.
 
 A modelling assumption changes by replacing a part, not by rewriting the model.
 Which tool to reach for depends on how many parts you are aiming at.
-The [overview](@ref overview) shows the plainest case, rebuilding the assembly with one argument different.
+Rebuilding the assembly with one argument different is the plainest case.
 That is the right thing when the two models share little.
 When they share almost everything, derive one from the other.
 
@@ -107,7 +107,7 @@ base = IDModel(
 ```
 
 [`swap`](@ref) replaces **every** component matching a predicate.
-It is the type-driven tool, so reach for it when the target is "the error model, wherever it is" rather than a known address.
+Reach for it when the target is "the error model, wherever it is" rather than a known address.
 
 ```@example design
 using ComposableTuringIDModels: swap
@@ -138,8 +138,6 @@ split_obs = LatentDelay(
     Split((cases = PoissonError(), deaths = PoissonError())), [0.5, 0.3, 0.2])
 deaths_negbin = @set split_obs.model.streams.deaths = NegativeBinomialError()
 ```
-
-The [`LatentDelay`](@ref) survives with its delay intact, so only the named stream changes.
 
 Both tools rest on a seam a component *author* implements rather than one a user calls.
 `swap` walks a chain with `ComposableTuringIDModels.wrapped_models` and rebuilds it with `ComposableTuringIDModels.rewrap`.
