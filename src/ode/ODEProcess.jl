@@ -7,7 +7,7 @@ parameters `p`.
 
 This is the single seam through which `ODEProcess` re-instantiates its problem on
 every sample. The default applies the plain-vector `remake(prob; u0, p)` that the
-hand-coded [`SIRParams`](@ref) / [`SEIRParams`](@ref) problems expect.
+hand-coded [`SIRParams`](@ref) problem expects.
 
 Parameter models whose problem stores parameters differently — e.g. a
 `ModelingToolkit`/`Catalyst`-built problem carrying a structured `MTKParameters`
@@ -27,10 +27,31 @@ backend-agnostic.
 remake_ode_problem(params::AbstractLatentModel, prob, u0, p) = remake(prob; u0 = u0, p = p)
 
 @doc raw"
+Present an ODE solution to an `ODEProcess`'s `sol2infs` link.
+
+The second seam through which a parameter model adapts `ODEProcess` to its own
+problem. The default hands the solution over untouched, which is what the
+hand-coded [`SIRParams`](@ref) problem wants: its compartments are indexed by
+position.
+
+A parameter model whose users index compartments by name specialises this to
+wrap the solution in something that resolves those names. The Catalyst extension
+does, because a reverse-mode solve returns a solution that has lost its symbolic
+index provider, so `sol[rn.I, :]` falls through to array indexing and throws.
+
+# Arguments
+
+  - `params`: the ODE parameter model (the `ODEProcess`'s `params` field).
+  - `sol`: the solution returned by `solve`.
+"
+ode_solution_view(params::AbstractLatentModel, sol) = sol
+
+@doc raw"
 An infection process defined by solving an ODE.
 
 `ODEProcess` combines a parameter struct (`params`, e.g. [`SIRParams`](@ref) or
-[`SEIRParams`](@ref), whose `as_turing_model` samples `(u0, p)`) with a `solver`,
+[`CatalystODEParams`](@ref), whose `as_turing_model` samples `(u0, p)`) with a
+`solver`,
 extra `solver_options`, and a `sol2infs` link mapping the ODE solution to a
 latent-infection series. The compartmental dynamics are fully determined by the
 sampled ODE parameters, so the model carries no separate latent ``R_t`` process:
@@ -63,8 +84,8 @@ as_turing_model(sir_process, nothing)()
 ## Fields
 
   - `params`: the ODE parameter model (an [`AbstractLatentModel`](@ref), e.g.
-    [`SIRParams`](@ref) / [`SEIRParams`](@ref), whose `as_turing_model` samples
-    `(u0, p)`).
+    [`SIRParams`](@ref) / [`CatalystODEParams`](@ref), whose `as_turing_model`
+    samples `(u0, p)`).
   - `solver`: the ODE solver (default `AutoVern7(Rodas5P())`).
   - `sol2infs`: link mapping the ODE solution to an infection series.
   - `solver_options`: extra options passed to `solve` (a `Dict` or `NamedTuple`).
@@ -98,6 +119,6 @@ end
 @model function as_turing_model(infection::ODEProcess, n)
     n_steps = isnothing(n) ? 0 : n
     sol ~ to_submodel(_generate_ode_solution(infection, n_steps), false)
-    I_t = infection.sol2infs(sol)
+    I_t = infection.sol2infs(ode_solution_view(infection.params, sol))
     return (; I_t, Z_t = nothing)
 end

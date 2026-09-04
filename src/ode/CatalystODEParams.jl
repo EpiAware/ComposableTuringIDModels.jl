@@ -8,7 +8,7 @@
 @doc raw"
 Declarative, model-agnostic ODE parameter component built from **any** `Catalyst`
 `ReactionSystem`, usable as the parameter component of an [`ODEProcess`](@ref) in
-place of the hand-coded [`SIRParams`](@ref) / [`SEIRParams`](@ref).
+place of the hand-coded [`SIRParams`](@ref).
 
 You declare a reaction network and give priors for its initial conditions and
 rate parameters; `Catalyst` + `ModelingToolkit` generate the ODE system **and a
@@ -17,13 +17,19 @@ Jacobian to keep in sync, and nothing here is specialised to a particular
 compartmental model. Construct it for an SIR network, an SEIR network, or any
 other network the same way — only the reactions change.
 
-Sampling and problem rebuilding are **symbolic**: `as_turing_model` samples each
-supplied prior into a flat Turing variable named after its species / parameter
-symbol (e.g. `β`, `S`) and returns symbolic `symbol => value` maps, which
-`remake` places into the problem by name. There is no positional-index
-bookkeeping, so species / parameter ordering inside the compiled problem is never
-assumed. Index the resulting solution symbolically too, with the network's own
-handles: `sol2infs = sol -> sol[rn.I, :]`.
+Sampling is symbolic at the surface and positional underneath.
+`as_turing_model` samples each supplied prior into a flat Turing variable named
+after its species / parameter symbol (e.g. `β`, `S`) and returns plain
+vectors ordered the way the compiled problem stores them, an ordering resolved
+once at construction rather than assumed. Symbolic `symbol => value` maps drag
+the symbolic stack and the problem's initialisation system onto the AD tape and
+are not reverse-mode differentiable, which is why the plain vectors are what
+reverse-mode inference needs.
+
+Index the resulting solution with the network's own handles all the same,
+`sol2infs = sol -> sol[rn.I, :]`. The stored ordering resolves the handle, so the
+link keeps working on a reverse-mode solution, which comes back without the
+symbolic index provider that would otherwise serve it.
 
 !!! note \"Optional extension\"
     The constructor and sampling logic load only when `Catalyst` and
@@ -53,6 +59,8 @@ handles: `sol2infs = sol -> sol[rn.I, :]`.
   - `prob`: the `ODEProblem` built from `rn` (auto symbolic Jacobian).
   - `u0_specs`: per-species specs (symbolic handle, flat name, prior-or-fixed).
   - `p_specs`: per-parameter specs (symbolic handle, flat name, prior-or-fixed).
+  - `layout`: the compiled problem's own species and parameter ordering, and the
+    slot each species name occupies in a solution.
 
 # Examples
 ```julia
@@ -68,13 +76,15 @@ params = CatalystODEParams(sir;
 process = ODEProcess(params = params, sol2infs = sol -> sol[sir.I, :])
 ```
 "
-struct CatalystODEParams{P, U, R} <: AbstractLatentModel
+struct CatalystODEParams{P, U, R, L} <: AbstractLatentModel
     "The `ODEProblem` built from the reaction network (auto symbolic Jacobian)."
     prob::P
     "Per-species specs (symbolic handle, flat name, prior-or-fixed)."
     u0_specs::U
     "Per-parameter specs (symbolic handle, flat name, prior-or-fixed)."
     p_specs::R
+    "The compiled problem's species and parameter ordering, resolved once."
+    layout::L
 end
 
 # Fallback constructor: the real `ReactionSystem` method lives in the Catalyst
