@@ -148,7 +148,8 @@ All three parameters collapse from broad priors onto tight, correlated posterior
 ## Posterior trajectories
 
 A compartmental model has no time-varying ``R_t``, so the infection signal is the infectious proportion ``I(t)`` solved from the ODE.
-[`generated_observables`](@ref) recovers ``I_t`` per draw, and the posterior-predictive in-bed counts come from `predict` on the model with the observations set to `missing`.
+`returned` re-runs the fitted model over the chain to recover ``I_t`` per draw.
+The posterior-predictive in-bed counts come from `predict` on the model with the observations set to `missing`.
 Two small helpers reduce the per-draw trajectories to credible bands.
 
 ```@setup sir
@@ -185,7 +186,7 @@ end
 ```
 
 ```@example sir
-gens = vec(generated_observables(posterior, y_obs, chain).generated)
+gens = vec(returned(posterior, chain))
 It = credible_bands(reduce(hcat, (g.I_t for g in gens)))
 
 pred = predict(as_turing_model(model, fill(missing, n), n), chain)

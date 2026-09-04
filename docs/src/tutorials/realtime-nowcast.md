@@ -167,7 +167,7 @@ nothing # hide
 
 ## Recent Rt
 
-``R_t = \exp(Z_t)`` is a generated quantity, recovered per draw by re-running the fitted model over the chain with [`generated_observables`](@ref).
+``R_t = \exp(Z_t)`` is a generated quantity, recovered per draw by re-running the fitted model over the chain with `returned`.
 Averaging it over the most recent window shows the bias and its removal.
 Right-truncation biases the naive recent ``R_t`` *downward*, so the naive value sits below the two corrections, which lift it back up towards the complete-data reference.
 The exact numbers carry Monte Carlo noise on this short run, but the direction repeats.
@@ -176,7 +176,7 @@ The exact numbers carry Monte Carlo noise on this short run, but the direction r
 using Statistics
 
 function recent_Rt(post, chain; window = 7)
-    gens = vec(generated_observables(post, nothing, chain).generated)
+    gens = vec(returned(post, chain))
     Rt_mean = mean(exp.(g.Z_t) for g in gens)
     round(mean(Rt_mean[(end - window + 1):end]), digits = 2)
 end
@@ -215,7 +215,7 @@ end
 
 # generated-quantity bands: stack f(draw) over the chain
 function gen_bands(post, chain, f)
-    gens = vec(generated_observables(post, nothing, chain).generated)
+    gens = vec(returned(post, chain))
     credible_bands(reduce(hcat, (f(g) for g in gens)))
 end
 
