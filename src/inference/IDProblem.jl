@@ -58,6 +58,10 @@ end
 
 _observation_chain(idproblem::IDProblem) = idproblem.observation_model
 
+function observation_streams(idproblem::IDProblem, y_t)
+    return observation_streams(idproblem.observation_model, y_t)
+end
+
 data_requirements(idproblem::IDProblem, data) = data_requirements(
     idproblem, data.y_t, _tspan_length(idproblem)
 )

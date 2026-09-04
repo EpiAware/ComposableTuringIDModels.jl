@@ -635,9 +635,10 @@ end
     @test observation_streams(PoissonError(), fill(5.0, 2, 10)) == 2
     @test observation_streams(PoissonError(), fill(5.0, 10)) === nothing
     @test observation_streams(PoissonError(), missing) === nothing
-    @test observation_streams(
-        PoissonError(), (a = fill(5.0, 10), b = fill(5.0, 10))
-    ) == 2
+    # An error family's `NamedTuple` is one stream's observations in `y` beside
+    # its covariates, so the count comes off `y`'s own axis.
+    @test observation_streams(PoissonError(), (y = fill(5.0, 10),)) === nothing
+    @test observation_streams(PoissonError(), (y = fill(5.0, 2, 10),)) == 2
 
     # A modifier passes the question down to whatever consumes the series.
     delayed = LatentDelay(PoissonError(), fill(1 / 4, 4))

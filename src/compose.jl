@@ -63,6 +63,9 @@ end
 # requirements report is read off.
 observation_lead_in(model::IDModel) = observation_lead_in(model.observation_model)
 _observation_chain(model::IDModel) = model.observation_model
+observation_streams(model::IDModel, y_t) = observation_streams(
+    model.observation_model, y_t
+)
 
 @doc raw"
 Narrow a data argument to a concrete element type before conditioning a model

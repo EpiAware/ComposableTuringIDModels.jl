@@ -63,6 +63,14 @@ end
     @test _obs_data_shape(
         binom, (y = fill(5, 2, 10), N = fill(20, 2, 10)), 10
     ) == (2, 10)
+
+    # Every error family takes its observations in `y`, so wrapping a series in
+    # a `NamedTuple` must not change the model it builds.
+    plain = PoissonError()
+    @test _obs_data_shape(plain, (y = fill(5, 10),), 10) ==
+        _obs_data_shape(plain, fill(5, 10), 10)
+    @test _obs_data_shape(plain, (y = fill(5, 2, 10),), 10) ==
+        _obs_data_shape(plain, fill(5, 2, 10), 10)
 end
 
 @testitem "a nested Split's weight map fixes the stratum count" begin
