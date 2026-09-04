@@ -91,9 +91,7 @@ end
 # convolution when the model is built.
 # A reversed PMF is still a valid one, so storing it reversed would leave the
 # field's stored and given forms indistinguishable and a PMF set into the slot
-# with `Accessors.@set` would be convolved backwards with nothing to say so.
-# Storing the given form instead means the public constructor takes its own
-# fields back, so `Accessors` and `rewrap` need no `constructorof` here.
+# would be convolved backwards with nothing to say so.
 function LatentDelay(model::AbstractObservationModel, pmf::AbstractVector{<:Real})
     @assert all(>=(0), pmf) "Delay PMF must be non-negative"
     @assert isapprox(sum(pmf), 1) "Delay PMF must sum to 1"
@@ -219,8 +217,6 @@ end
 # An `UncertainDelay`'s only constructor takes its horizon and bin width as
 # keywords and its family before its parameters, so a rebuild from its fields in
 # declaration order has no method to land on and throws.
-# Point `ConstructionBase`, and so `Accessors`, at a rebuild that reorders them,
-# which also re-derives the time-varying type parameter from the parameters.
 ConstructionBase.constructorof(::Type{<:UncertainDelay}) = _rebuild_uncertain_delay
 
 function _rebuild_uncertain_delay(params, family, D, Δd)

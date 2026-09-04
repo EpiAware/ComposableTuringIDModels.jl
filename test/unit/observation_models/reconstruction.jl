@@ -136,6 +136,13 @@ end
             (err2, Normal(1.0, 0.2), "Reporting"),
         ),
         (
+            "Ascertainment, a prefixed bare prior re-prefixed",
+            (m, l, p) -> Ascertainment(m, l; latent_prefix = p),
+            (:model, :latent_model, :latent_prefix),
+            (err, PrefixLatentModel(Normal(0.0, 0.1), "own"), "Ascertainment"),
+            (err2, PrefixLatentModel(Normal(1.0, 0.2), "own"), ""),
+        ),
+        (
             "Aggregate", (m, a) -> Aggregate(m, a), (:model, :aggregation),
             (err, [0, 0, 3]), (err2, [0, 7, 0]),
         ),
@@ -298,4 +305,19 @@ end
     @test Symbol("Ascertainment.intercept") in Symbol.(varnames(built))
     @test derived.model.latent_model isa PrefixLatentModel
     @test derived.delay == built.delay
+end
+
+@testitem "a prior slot widens whatever the prefix leaves behind" begin
+    using ComposableTuringIDModels, Distributions
+
+    # A `PrefixLatentModel` holds a `PriorLike`, so re-prefixing one to an empty
+    # prefix unwraps it and can uncover a bare `Distribution`. The slot still has
+    # to widen that into a constant path, which its declared field type would
+    # otherwise reject at construction.
+    wrapped = PrefixLatentModel(Normal(0.0, 0.1), "own")
+    asc = Ascertainment(PoissonError(), wrapped; latent_prefix = "")
+    @test asc.latent_model isa Intercept
+
+    combined = CombineLatentModels([wrapped, Normal()], ["", "b"])
+    @test combined.models[1] isa Intercept
 end

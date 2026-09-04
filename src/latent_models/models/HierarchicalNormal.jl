@@ -47,11 +47,8 @@ function HierarchicalNormal(mean::Real, std::PriorLike)
     return HierarchicalNormal(; mean = mean, std = std)
 end
 
-# `add_mean` says only whether `mean` is worth adding, so it is read off `mean`
-# rather than taken.
-# Point `ConstructionBase`, and so `Accessors`, at a rebuild that re-reads it:
-# a rebuild from the stored fields gets the same flag back, while setting `mean`
-# gets one that matches rather than a model that quietly drops the new mean.
+# `add_mean` says only whether `mean` is worth adding, so a rebuild reads it off
+# `mean` rather than taking it and quietly dropping a new mean.
 ConstructionBase.constructorof(::Type{<:HierarchicalNormal}) =
     _rebuild_hierarchical_normal
 

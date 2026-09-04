@@ -95,10 +95,8 @@ struct Ascertainment{
     end
 end
 
-# An `Ascertainment` stores its prior already wrapped in a `PrefixLatentModel`.
-# Point `ConstructionBase`, and so `Accessors`, at a rebuild that re-applies the
-# same idempotent wrapping: the stored wrapped prior comes back unchanged, while
-# a raw prior set into the slot is wrapped as the public constructor would.
+# An `Ascertainment` stores its prior already wrapped in a `PrefixLatentModel`,
+# so its rebuild re-applies the same idempotent wrapping.
 ConstructionBase.constructorof(::Type{<:Ascertainment}) = _rebuild_ascertainment
 
 function _rebuild_ascertainment(model, latent_model, transform, latent_prefix)

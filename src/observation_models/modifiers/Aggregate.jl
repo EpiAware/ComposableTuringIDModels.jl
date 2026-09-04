@@ -88,11 +88,8 @@ end
 # An `Aggregate` derives its presence mask from its window lengths, so its public
 # constructor takes fewer arguments than it has fields and a generic rebuild
 # fails outright.
-# Point `ConstructionBase`, and so `Accessors`, at a rebuild that re-derives the
-# mask: a rebuild from the stored fields gets the same mask back, while setting
-# the window lengths gets one that matches them rather than the old windows.
-# The mask given is what the window lengths imply, so it is discarded rather
-# than kept beside an `aggregation` it no longer describes.
+# The mask given to the rebuild is what the window lengths imply, so it is
+# discarded rather than kept beside an `aggregation` it no longer describes.
 ConstructionBase.constructorof(::Type{<:Aggregate}) = _rebuild_aggregate
 
 _rebuild_aggregate(model, aggregation, _present) = Aggregate(model, aggregation)

@@ -286,7 +286,7 @@ one_swapped = rewrap(obs, (updated_split,))
 ```
 
 Several components derive a field from the others on construction.
-[`Ascertainment`](@ref) stores its prior already wrapped in a [`PrefixLatentModel`](@ref), [`Aggregate`](@ref) derives its presence mask from its window lengths, and [`Renewal`](@ref) bakes its accumulation step from the generation interval and the coupling operator.
+[`Ascertainment`](@ref) stores its prior already wrapped in a [`PrefixLatentModel`](@ref), [`Aggregate`](@ref) derives its presence mask from its window lengths, [`Renewal`](@ref) bakes its accumulation step from the generation interval and the coupling operator, and [`HierarchicalNormal`](@ref) reads its `add_mean` flag off its `mean`.
 Each declares a `ConstructionBase.constructorof` that re-derives the field, so a rebuild from the stored fields gets the same component back and a field set with `Accessors.@set` gets the one the constructor would have built.
 
 That is what makes deriving one model from another with `Accessors.@set` safe.

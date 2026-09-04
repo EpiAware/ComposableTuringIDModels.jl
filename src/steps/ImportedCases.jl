@@ -125,8 +125,6 @@ end
 
 # `ImportedCases` takes its transformation as a keyword, so a rebuild from its
 # fields in declaration order has no method to land on and throws.
-# Point `ConstructionBase`, and so `Accessors`, at a rebuild that passes it as
-# one.
 ConstructionBase.constructorof(::Type{<:ImportedCases}) = _rebuild_imported_cases
 
 function _rebuild_imported_cases(importation_rate, transformation)
