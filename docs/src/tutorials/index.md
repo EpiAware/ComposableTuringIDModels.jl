@@ -35,8 +35,8 @@ They progress from a single renewal model to a layered observation process, a me
   - [Coupled patch models](@ref tutorial-patches).
     Several patches over one time axis, built a layer at a time, from independent patches to a shared partially pooled process to a mixing matrix that moves infection pressure between them.
     The finished model is fit to data simulated from itself, and the coupling is then swapped for a [`Gravity`](@ref) model and for one written as a single method.
-  - [Renewal modifiers: depletion and importation](@ref renewal-modifiers).
-    One delayed renewal process compared against the same process extended with [`SusceptibleDepletion`](@ref) and [`ImportedCases`](@ref), so each modifier's contribution is visible against a shared baseline.
+  - [Renewal modifiers](@ref renewal-modifiers).
+    One delayed renewal process compared against the same process extended with [`SusceptibleDepletion`](@ref), [`ImportedCases`](@ref) and [`InfectionNoise`](@ref), so each modifier's contribution is visible against a shared baseline, and both stochastic parameterisations are fitted back to simulated data.
 
 Every example uses the same recipe.
 Assemble components into a model, call [`as_turing_model`](@ref) (directly or through [`IDModel`](@ref) / [`IDProblem`](@ref)), simulate by passing `missing` data, and fit by passing observed data and sampling.

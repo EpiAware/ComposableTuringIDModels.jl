@@ -59,11 +59,15 @@ using Tables: rowtable
 using Distributions: Distributions, Distribution, Sampleable,
     UnivariateDistribution,
     ContinuousUnivariateDistribution, ContinuousDistribution,
-    Normal, Poisson, NegativeBinomial, Binomial, Gamma, truncated,
+    Normal, LogNormal, Poisson, NegativeBinomial, Binomial, Gamma, truncated,
     cdf, ccdf, logcdf, logccdf, invlogcdf, pdf, logpdf, quantile,
     params, mean, var, std, mode, skewness, kurtosis,
     product_distribution
 using Statistics: Statistics
+
+# `reparameterise` solves a `(mean, sd)` pair for a family's native parameters,
+# and `valid_moments` is the per-family predicate that says whether it can.
+using ReparameterisedDistributions: reparameterise, valid_moments
 
 # --- core architecture ---
 export AbstractComposableModel, as_turing_model
@@ -97,8 +101,9 @@ export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
     Stratify, Replicate
 
 # --- infection models ---
-export DirectInfections, ExpGrowthRate, Renewal, SeedingPath,
-    RenewalStep, SusceptibleDepletion, ImportedCases,
+export DirectInfections, ExpGrowthRate, Renewal, StochasticRenewal,
+    SeedingPath, RenewalStep, SusceptibleDepletion, ImportedCases,
+    InfectionNoise, RecordExpectedInfections,
     R_to_r, r_to_R, expected_Rt
 export CombineInfections
 
@@ -110,7 +115,8 @@ export renewal_pressure, pairwise_gen_int, AbstractMixingModel, MixingStep,
 export SIRParams, SEIRParams, ODEProcess, CatalystODEParams
 
 # --- observation models ---
-export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDelay,
+export PoissonError, NegativeBinomialError, NormalError, LogNormalError,
+    ObservationError, BinomialError, LatentDelay,
     UncertainDelay, observation_error, generate_observation_error_priors,
     define_y_t
 
@@ -142,7 +148,8 @@ export IDProblem, NUTSampler, DirectSample,
 public ModelShape, across_shape, infection_strata,
     AbstractAccumulationStep, AbstractConstantRenewalStep,
     ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
-    apply_modifier, renewal_foi, renewal_init_state, renewal_init_window,
+    apply_modifier, is_noise, renewal_foi, renewal_init_state,
+    renewal_init_window, with_expected_infections,
     MissingObservations,
     at, path_prior, prior_order, assert_prior_length,
     wrapped_models, observation_components, rewrap, swap
@@ -153,6 +160,7 @@ include("base/roles.jl")
 include("base/shapes.jl")
 include("base/interfaces.jl")
 include("base/priors.jl")
+include("base/moments.jl")
 include("base/prettyprinting.jl")
 
 # --- accumulation steps ---
@@ -171,6 +179,7 @@ include("steps/RenewalStep.jl")
 include("steps/MixingStep.jl")
 include("steps/Gravity.jl")
 include("steps/ImportedCases.jl")
+include("steps/InfectionNoise.jl")
 
 # --- utilities and distributions ---
 include("utils/HalfNormal.jl")
@@ -210,9 +219,11 @@ include("infection_models/DirectInfections.jl")
 include("infection_models/ExpGrowthRate.jl")
 include("infection_models/SeedingPath.jl")
 include("infection_models/Renewal.jl")
+include("infection_models/StochasticRenewal.jl")
 # `utils.jl` defines the `R_to_r(::Renewal)` method, so it follows `Renewal`.
 include("infection_models/utils.jl")
 include("infection_models/CombineInfections.jl")
+include("infection_models/modifiers/RecordExpectedInfections.jl")
 
 # --- ODE compartmental models ---
 include("ode/SIRParams.jl")
@@ -225,6 +236,7 @@ include("observation_models/ObservationErrorModels/methods.jl")
 include("observation_models/ObservationErrorModels/PoissonError.jl")
 include("observation_models/ObservationErrorModels/NegativeBinomialError.jl")
 include("observation_models/ObservationErrorModels/NormalError.jl")
+include("observation_models/ObservationErrorModels/ObservationError.jl")
 include("observation_models/ObservationErrorModels/BinomialError.jl")
 include("observation_models/modifiers/LatentDelay.jl")
 include("observation_models/modifiers/ascertainment/Ascertainment.jl")

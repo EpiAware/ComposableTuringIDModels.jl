@@ -325,61 +325,19 @@ function _make_renewal_init(step::AbstractConstantRenewalStep, gen_int, I₀, Rt
 end
 
 @model function as_turing_model(infection::Renewal, n::ModelShape)
-    Z_t ~ as_turing_submodel(infection.rt, n)
-    Rt = infection.transformation.(Z_t)
+    setup ~ to_submodel(_renewal_setup(infection, n), false)
+    I_t = accumulate_scan(setup.scan_step, setup.init, setup.Rts)
+    return (; I_t, Z_t = setup.Z_t, I_seed = setup.init.window)
+end
 
-    # An inferred generation interval is sampled through the single seam, with
-    # the lag-0 bin dropped and the remainder renormalised per draw.
-    # The step is rebuilt per draw so the gradient flows through the
-    # discretisation.
-    if infection.gen_int isa AbstractPriorModel
-        gen ~ as_turing_submodel(
-            infection.gen_int, _gen_int_shape(n)...; prefix = true
-        )
-        gen_int = _drop_lag_zero(gen)
-        step = _bake_step(
-            _renewal_step(gen_int, infection.mixing), infection.modifiers
-        )
-    else
-        gen_int = infection.gen_int
-        step = infection.recurrent_step
-    end
-
-    # The `initialisation` slot is either a level at ``t_0`` or a whole seeding
-    # path drawn at the incidence window's own shape.
-    # Both branches are decided by the slot's type, so nothing is chosen at run
-    # time.
-    if infection.initialisation isa SeedingPath
-        init_incidence ~ as_turing_submodel(
-            infection.initialisation.model,
-            _seeding_shape(n, _n_lags(gen_int)); prefix = true
-        )
-    else
-        init_incidence ~ as_turing_submodel(
-            infection.initialisation, _n_strata(n); prefix = true
-        )
-    end
-
-    # Resolve the step before scanning, so a modifier or a `mixing` model
-    # carrying priors draws them here and hands back what the scan uses.
-    # A purely deterministic step returns itself, so nothing here branches on
-    # what the step holds.
-    scan_step ~ as_turing_submodel(step, n)
-
-    Rts = _steps(Rt)
-    # A seeding path is the incidence window itself; a level is decayed into one
-    # at the growth rate implied by ``\mathcal R_1``.
-    if infection.initialisation isa SeedingPath
-        seed_window = infection.transformation.(init_incidence)
-        n_seed = _n_lags(seed_window)
-        @assert n_seed == _n_lags(gen_int) "a `SeedingPath` must draw one " *
-            "value per generation-interval lag, but it drew $(n_seed) for " *
-            "$(_n_lags(gen_int)) lags"
-        init = renewal_init_state(scan_step, seed_window)
-    else
-        I₀ = infection.transformation.(_seed(init_incidence, n))
-        init = _make_renewal_init(scan_step, gen_int, I₀, first(Rts))
-    end
-    I_t = accumulate_scan(scan_step, init, Rts)
-    return (; I_t, Z_t, I_seed = init.window)
+# `accumulate_scan` is unrolled here because the accumulated states it drops
+# are what the expectation series is read from.
+@model function with_expected_infections(infection::Renewal, n::ModelShape)
+    setup ~ to_submodel(_renewal_setup(infection, n), false)
+    step = RecordingRenewalStep(setup.scan_step)
+    init = _recording_state(setup.init)
+    states = accumulate(step, setup.Rts; init = init)
+    I_t = get_state(step, init, states)
+    exp_I_t = get_expected_state(step, init, states)
+    return (; I_t, Z_t = setup.Z_t, I_seed = setup.init.window, exp_I_t)
 end
