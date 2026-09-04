@@ -149,8 +149,8 @@ They are the seam a component *author* implements so that `swap` and `@set` work
 The recurrences that drive the time series are expressed as [`accumulate_scan`](@ref) steps.
 Within the renewal family these steps compose.
 A [`RenewalStep`](@ref) is a force-of-infection core plus an ordered tuple of modifiers that share one incidence window.
-As a demonstration, a [`SusceptibleDepletion`](@ref) modifier is composed onto the renewal step.
-See [Renewal modifiers](@ref renewal-modifiers) for what each modifier contributes to a fitted model.
+The first modifier, [`SusceptibleDepletion`](@ref), scales the proposed incidence by the available susceptible fraction and depletes the pool, turning the renewal process into one with a fixed population.
+[`Renewal`](@ref) is a step-composing helper, so passing the modifier composes it onto the step.
 
 ```@example design
 gen_int = [0.2, 0.3, 0.5]
@@ -175,6 +175,8 @@ The discretisation keywords stay available alongside the modifiers, which keeps 
 discretised = Renewal(Gamma(2, 1.5), SusceptibleDepletion(1000.0);
     D_gen = 15.0, rt = RandomWalk())
 ```
+
+See [Renewal modifiers](@ref renewal-modifiers) for what each contributes to a fitted model.
 
 ## The seeding window
 
