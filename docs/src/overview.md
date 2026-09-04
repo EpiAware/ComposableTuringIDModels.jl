@@ -92,7 +92,7 @@ poisson_model = IDModel(
     PoissonError())
 ```
 
-[`swap`](@ref) then changes the count noise and leaves the rest of the model untouched.
+[`swap`](@ref) then changes the count noise.
 
 ```@example overview
 using ComposableTuringIDModels: swap
