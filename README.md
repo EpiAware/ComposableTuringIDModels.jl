@@ -127,8 +127,9 @@ open-source, Apache-2.0 licensed `EpiAware` package
 ported from the fork [seabbs/Rt-without-renewal](https://github.com/seabbs/Rt-without-renewal)).
 ComposableTuringIDModels is a modified, derived work: it has been renamed, re-architected
 around the generic `as_turing_model` constructor, and upgraded to build against
-the latest Turing.jl. See the [`NOTICE`](NOTICE) file for full attribution and a
-summary of the changes, and [`LICENSE`](LICENSE) for the Apache-2.0 terms.
+the latest Turing.jl. See [`NOTICE`](NOTICE) for attribution and
+[`LICENSE`](LICENSE) for the Apache-2.0 terms. The commit history is the record
+of what changed.
 
 <!-- standard-sections:start -->
 <!-- MANAGED by EpiAwarePackageTools.scaffold — do not edit between the
