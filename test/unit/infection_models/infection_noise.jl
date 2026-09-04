@@ -221,7 +221,7 @@ end
 
     # The soft cap is smooth, and smoothness costs it an absolute offset.
     # Below that offset it returns zero or less, which is no coefficient of
-    # variation at all — reachable at a few million infections with a small
+    # variation at all, reachable at a few million infections with a small
     # overdispersion, which is an ordinary national-scale model. The cap is a
     # limit, so it is not allowed to annihilate the value it limits.
     noise = InfectionNoise(; overdispersion = 0.0)

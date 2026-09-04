@@ -8,11 +8,8 @@ The seam [`RecordExpectedInfections`](@ref) reads through. An infection model
 implements a method here when it has a noise layer, so that the expectation is
 the value entering that layer rather than the drawn series. The default method
 returns the committed `I_t`, which is the honest answer for a model that draws
-no infections: a [`DirectInfections`](@ref) path, or a [`Renewal`](@ref) with
+no infections. A [`DirectInfections`](@ref) path, or a [`Renewal`](@ref) with
 no [`is_noise`](@ref) modifier, is its own expectation.
-
-The expectation is built only on this path, so a model evaluated through
-[`as_turing_model`](@ref) never pays for it.
 
 # Arguments
 
@@ -40,14 +37,13 @@ quantity (`exp_I_t`).
 
 The wrapped model runs unchanged, keeping its own variable names, and the
 expectation is tracked with `:=` so a chain recovers it as `chain[:exp_I_t]`.
-Where the wrapped model draws infections — a [`StochasticRenewal`](@ref), or a
-[`Renewal`](@ref) carrying an [`InfectionNoise`](@ref) modifier — `exp_I_t` is
-the incidence entering the draw, so it is post-[`SusceptibleDepletion`](@ref)
-and pre-noise. Where the model draws none it is the committed series itself.
+Where the wrapped model draws infections, as a [`StochasticRenewal`](@ref) does
+and as a [`Renewal`](@ref) carrying an [`InfectionNoise`](@ref) modifier does,
+`exp_I_t` is the incidence entering the draw, so it is
+post-[`SusceptibleDepletion`](@ref) and pre-noise. Where the model draws none it
+is the committed series itself.
 
-Wrapping is what costs the extra series. A model used unwrapped computes no
-expectation at all, so nothing here is paid for by a model that does not report
-it.
+A model used unwrapped computes no expectation at all.
 
 # Arguments
 

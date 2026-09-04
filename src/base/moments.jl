@@ -2,16 +2,13 @@
 # a distribution family, shared by the observation-error models and by the
 # stochastic renewal.
 
-# The field type a family is stored under. `typeof(LogNormal)` is `UnionAll`,
-# which says nothing about which family it is, so every dispatch on the family
-# would resolve at run time and whatever the moment core returns would infer as
-# `Any`. That propagates through everything downstream, a renewal recursion
-# included. `Type{LogNormal}` has one instance, so the family stays in the type
-# domain and the caller stays concretely typed.
+# The field type a family is stored under. `typeof(LogNormal)` is `UnionAll`, so
+# a family stored under it dispatches at run time and the moment core's return
+# infers as `Any` through everything downstream, a renewal recursion included.
+# `Type{LogNormal}` has one instance, which keeps the family in the type domain.
 #
-# A component storing a family calls this from its inner constructor. That is
-# also where an instance handed in place of the family is caught, rather than
-# deep inside the moment solve.
+# Components call this from their inner constructor, so an instance handed in
+# place of the family is caught there rather than inside the moment solve.
 _family_type(::Type{F}) where {F} = Type{F}
 
 function _family_type(dist)
@@ -24,14 +21,12 @@ function _family_type(dist)
     )
 end
 
-# What an invalid moment pair routes to. Scoring and sampling want opposite
-# things from it, and this is the one place that can tell them apart.
+# What an invalid moment pair routes to.
 #
-# Scoring is the sampler's hot path and a diverging proposal is routine, so
-# `logpdf` is `-Inf`: silent, cheap, and the proposal is rejected. Sampling has
-# no proposal to reject. A `rand` that returned a number would put an `Inf`
-# into a simulated series and tell nobody, so it raises instead, naming the
-# moments that have no distribution.
+# `logpdf` is `-Inf`, so a diverging proposal is rejected silently on the
+# sampler's hot path.
+# `rand` has no proposal to reject, and a number returned there would put an
+# `Inf` into a simulated series unannounced, so it raises instead.
 #
 # The support matches the family it stands in for, so the bijector a linked
 # `VarInfo` derives does not change with the validity of the moments.
@@ -77,14 +72,10 @@ Distributions.quantile(d::_NoDraw, ::Real) = _no_draw(d)
 
 _moment_reject(::Type{F}, mean, sd) where {F} = _NoDraw{F}(mean, sd)
 
-# Whether a `(mean, sd)` pair describes a member of the family.
-#
-# The two closed-form families answer for themselves, in the coordinates their
-# own conversion uses. `LogNormal` squares `sd / mean`, which overflows to `Inf`
-# once the ratio passes `sqrt(floatmax)` and then reaches the constructor
-# looking valid. `Normal` takes the mean as its location, so it accepts any
-# finite one. Every other family defers to the registered `valid_moments`
-# predicate, with a finiteness check on top.
+# Whether a `(mean, sd)` pair describes a member of the family, checked in the
+# coordinates each conversion uses. `LogNormal` squares `sd / mean`, which
+# overflows to `Inf` once the ratio passes `sqrt(floatmax)` and then reaches the
+# constructor looking valid.
 function _moment_valid(::Type{Normal}, mean, sd)
     return isfinite(mean) && isfinite(sd) && sd >= 0
 end

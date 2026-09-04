@@ -60,10 +60,8 @@ function R_to_r(R₀, w::AbstractVector{T}; newton_steps = 2, Δd = 1.0) where {
     return r_approx
 end
 
-# The two renewal infection models, which are the ones carrying a generation
-# interval.
-# The deterministic scan and the centred stochastic loop take the same
-# arguments, so the deterministic summaries below serve both.
+# The two models carrying a generation interval. They take the same arguments,
+# so the deterministic summaries below serve both.
 const _RenewalModel = Union{Renewal, StochasticRenewal}
 
 # The fixed generation interval of a renewal model, or a clear error when it is
@@ -185,9 +183,6 @@ function _init_rate(Rt₀::AbstractVector, w::AbstractMatrix)
 end
 
 # Everything both renewal models do before their recursions diverge.
-# That is the `R_t` path, the generation interval and the step it bakes, the
-# seeding window and the initial state.
-# `Renewal` scans it and `StochasticRenewal` loops over it drawing as it goes.
 #
 # Called through `to_submodel(..., false)`, which keeps `Z_t`, `gen`,
 # `init_incidence` and `scan_step` at the names they carry when drawn inline.

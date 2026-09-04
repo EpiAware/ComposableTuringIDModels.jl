@@ -56,15 +56,14 @@ Assemble the noise-free expectation series from the raw output of
 [`accumulate_scan`](@ref), mirroring [`get_state`](@ref).
 
 The expectation is the last value a step computes that is still a mean rather
-than a draw: the force of infection after every deterministic modifier has
-transformed it, and before the first modifier marked by [`is_noise`](@ref)
+than a draw. That is the force of infection after every deterministic modifier
+has transformed it, and before the first modifier marked by [`is_noise`](@ref)
 replaces it with a draw. A step whose chain draws nothing commits its own
 expectation, so the two series are identical there.
 
-Only a step that keeps the expectation in its state has one to report, which
-is what `RecordingRenewalStep` is for. Any other
-[`AbstractAccumulationStep`](@ref) has none, and the default method says so
-rather than failing with a bare `MethodError`.
+Only a step that keeps the expectation in its state has one to report, which is
+what `RecordingRenewalStep` is for. The default method errors rather than
+leaving a bare `MethodError`.
 
 # Arguments
 

@@ -97,22 +97,17 @@ function InfectionNoise(;
     return InfectionNoise(dist, overdispersion, cap, sharp)
 end
 
-# The standard deviation the negative-binomial moments imply at expectation
-# `ι`, under the soft cap: `sqrt(iota (1 + iota ξ²))`, written as `c_t ι` so
-# the cap applies to the coefficient of variation.
+# The negative-binomial standard deviation `sqrt(iota (1 + iota ξ²))`, written
+# as `c_t ι` so the cap applies to the coefficient of variation.
 #
-# A non-positive expectation has no such moment pair, so it returns `NaN`. The
-# moment core's guards turn that into a `-Inf` score (centred) or a `NaN` draw
-# (non-centred) rather than an error.
+# A non-positive expectation has no such moment pair, so it returns `NaN`, which
+# the moment core's guards turn into a `-Inf` score or a `NaN` draw.
 #
-# An upper limit must not change a value that is already below it, and the
-# smooth one does. It costs an offset of `log1p(exp(-k(u - c)))/k`, which is
-# 6.7e-4 at the defaults. A small `ξ` and an expectation past a few million make
-# the raw coefficient of variation smaller than that offset, so the cap returns
-# zero or less, which is no distribution at all at an incidence a national-scale
-# model reaches. The capped value is therefore used only while it is positive.
-# Below that the cap is nowhere near binding, 0.5 against 6.7e-4, and the exact
-# value stands.
+# The smooth cap costs an offset of `log1p(exp(-k(u - c)))/k`, 6.7e-4 at the
+# defaults, and a small `ξ` past a few million infections makes the raw
+# coefficient of variation smaller than that. The capped value is therefore used
+# only while it is positive, and below that a cap of 0.5 is nowhere near
+# binding.
 function _noise_sd(noise::InfectionNoise, ι, ξ)
     ι > 0 || return convert(typeof(float(ι * ξ * noise.cv_cap)), NaN)
     raw = sqrt(inv(ι) + ξ^2)
@@ -184,11 +179,10 @@ function apply_modifier(mod::InfectionNoiseDraws, incidence, t)
     return drawn, t + 1
 end
 
-# The step's draw, for one series or for one per stratum.
 # `at` reads a per-time draw as a scalar and a `strata x time` draw as that
 # step's column, so the two shapes differ only in whether the moment solve is
-# broadcast.
-# The scalar method keeps a single series free of any broadcast machinery.
+# broadcast. The scalar method keeps a single series free of broadcast
+# machinery.
 _noise_step(noise, ι::Real, ξ, z) = _noise_draw(noise, ι, ξ, z)
 
 function _noise_step(noise, ι::AbstractVector, ξ, z)
@@ -200,11 +194,9 @@ end
 is_noise(::InfectionNoise) = true
 is_noise(::InfectionNoiseDraws) = true
 
-# The standard normals the scan reads, asked for at the shape given.
-# A single series draws them through `IID`.
-# A stratified one wraps that in a `Replicate`, which is the answer the shape
-# guard gives any path model asked for a strata axis, so every stratum draws its
-# own block instead of sharing one.
+# A stratified shape wraps the `IID` in a `Replicate`, which is the answer the
+# shape guard gives any path model asked for a strata axis, so every stratum
+# draws its own block instead of sharing one.
 _noise_raw(::Int) = IID(Normal())
 _noise_raw(::Dims{2}) = Replicate(IID(Normal()))
 
@@ -228,7 +220,6 @@ The parameterisation is non-centred because the modifier seam gives it no choice
     The cost shows up as maximum tree depth rather than as a wrong answer.
     [`StochasticRenewal`](@ref) draws the same noise centred and is what to reach for.
     Use this modifier when a non-centred draw is wanted, or for a stratified renewal, which the centred loop does not cover.
-    A stratified renewal is the one case with no alternative here.
 
 # Arguments
 

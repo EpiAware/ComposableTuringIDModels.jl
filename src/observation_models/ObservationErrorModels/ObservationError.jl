@@ -1,12 +1,9 @@
-# The generic moment-parameterised observation-error model, and the two
-# location-scale families that are common enough to keep a name of their own.
+# The generic moment-parameterised observation-error model.
 #
-# One type per family makes every new family a new type, and those types differ
-# only in which family they name and in whether the spread is absolute or
-# relative to the expected value. `ObservationError` takes both as arguments.
-# `NormalError` and `LogNormalError` stay as named components, because a name is
-# worth having for the two families most models reach for, and both are the same
-# two lines over the shared moment core.
+# One type per family would differ only in which family it names and in whether
+# the spread is absolute or relative, so `ObservationError` takes both as
+# arguments. `NormalError` and `LogNormalError` stay as named components,
+# because a name is worth having for the two families most models reach for.
 
 @doc raw"
 An observation-error model parameterised by the moments of any family.
@@ -110,10 +107,8 @@ converted to its native parameters:
 s^2 = \log(1 + \sigma^2), \qquad \mu_t = \log Y_t - s^2 / 2
 ```
 
-``s`` does not depend on ``Y_t``.
-A constant coefficient of variation is a constant variance on the log scale, which is what makes this the relative-noise family.
-It is the natural error model for a strictly positive continuous measurement, such as a concentration or a prevalence, where the spread grows with the level.
-[`NormalError`](@ref) cannot express that.
+``s`` does not depend on ``Y_t``, so a constant coefficient of variation is a constant variance on the log scale.
+Reach for it where the spread grows with the level, which [`NormalError`](@ref) cannot express.
 
 `cv` sets the prior for ``\sigma``, drawn through the single
 [`as_turing_submodel`](@ref) seam and read per time point via `at`, so a

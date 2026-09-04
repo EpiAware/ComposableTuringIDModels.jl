@@ -141,9 +141,8 @@ function _extend_latent_draws(rng::AbstractRNG, fc_model, chain)
     data = extended._data
     # A `:=` generated quantity is stored as a parameter but is recomputed by
     # `predict`, so it is not a model input and a prior draw never yields one.
-    # Absence from `probe` is what tells the two apart. The same draw is the
-    # first of the batch `_assert_factorised` needs, so the guard costs no
-    # extra model evaluation.
+    # The same draw is the first of the batch `_assert_factorised` needs, so
+    # the guard costs no extra model evaluation.
     probe = _prior_draw(rng, fc_model)
     resized = Dict{FlexiChains.Parameter, Int}()
     for key in keys(data)

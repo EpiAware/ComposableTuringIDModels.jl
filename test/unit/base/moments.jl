@@ -68,7 +68,7 @@ end
     end
 
     # The log-scale conversion squares `sd / mean`, which overflows to `Inf`
-    # once the ratio passes `sqrt(floatmax)` — and `Inf` then reaches the
+    # once the ratio passes `sqrt(floatmax)`, and `Inf` then reaches the
     # constructor looking like a valid argument.
     big = sqrt(floatmax(Float64))
     @test isinf((10 * big)^2)

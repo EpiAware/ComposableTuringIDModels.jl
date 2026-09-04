@@ -207,7 +207,8 @@ The incidence a renewal step proposes at `state`, as
 
 The first half of a step.
 [`accumulate_scan`](@ref) commits the proposal straight away, while a [`StochasticRenewal`](@ref) draws around it first.
-`expectation` is the last value along the modifier chain that is still a mean rather than a draw, marked by [`is_noise`](@ref); it equals `incidence` where nothing on the chain draws.
+`expectation` is the last value along the modifier chain that is still a mean rather than a draw, marked by [`is_noise`](@ref).
+It equals `incidence` where nothing on the chain draws.
 The default method is the plain force of infection with no substates.
 "
 function _propose(step::AbstractConstantRenewalStep, state, Rt)

@@ -40,7 +40,7 @@ end
 
     # A process-valued prior makes the spread time-varying, with no other
     # change: one `σ` per time point rather than one constant. The process
-    # has to keep the spread positive, as any spread prior does — an
+    # has to keep the spread positive, as any spread prior does. An
     # unconstrained one draws a negative standard deviation, which is no
     # distribution and simulating from it says so.
     tv = ObservationError(

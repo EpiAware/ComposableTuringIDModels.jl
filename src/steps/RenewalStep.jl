@@ -216,14 +216,11 @@ function get_state(step::_PlainRenewalStep, initial_state, state)
     return get_state(step.core, initial_state, state)
 end
 
-# Thread the proposed incidence through the modifier tuple, collecting each
-# modifier's updated substate and the incidence entering the first modifier
-# that draws.
+# Thread the proposed incidence through the modifier tuple.
 # Recursive over the tuple to stay type-stable and free of mutation of tracked
 # state.
 # `is_noise` is a method on the modifier's type, so the branch picking the
-# expectation is a compile-time constant and a tuple with nothing noisy in it
-# returns the committed incidence unchanged.
+# expectation folds at compile time.
 _thread_modifiers(::Tuple{}, incidence, ::Tuple{}) = (incidence, incidence, ())
 function _thread_modifiers(mods::Tuple, incidence, substates::Tuple)
     mod = first(mods)
@@ -239,10 +236,6 @@ function (step::RenewalStep)(state, Rt)
     return _commit(step, state, incidence, substates)
 end
 
-# The proposal is the core's force of infection threaded through the
-# modifiers, each transforming it and advancing its own substate; the commit
-# advances the one shared window. See `_propose` in `RenewalSteps.jl` for why
-# the two are separable.
 function _propose(step::RenewalStep, state, Rt)
     foi = renewal_foi(step.core, state.window, Rt)
     return _thread_modifiers(step.modifiers, foi, state.substates)
@@ -276,10 +269,10 @@ end
 A renewal step that keeps each step's noise-free expectation in its state, so a
 scan can report the series alongside the committed one.
 
-A new step type rather than a field on the state every renewal carries: the
-expectation is a reporting-only quantity, and a step that nobody has asked for
-it commits the state it always did. [`with_expected_infections`](@ref) wraps the
-step it scans in one of these, and nothing else builds one.
+The expectation is a reporting-only quantity, so it is a new step type rather
+than a field on the state every renewal carries.
+[`with_expected_infections`](@ref) wraps the step it scans in one of these, and
+nothing else builds one.
 
 Its state is the wrapped step's with an `exp_val` appended, so `get_state`
 reads through to the wrapped step unchanged and `get_expected_state` reads the

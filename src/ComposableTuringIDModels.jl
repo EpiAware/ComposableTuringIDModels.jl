@@ -65,9 +65,8 @@ using Distributions: Distributions, Distribution, Sampleable,
     product_distribution
 using Statistics: Statistics
 
-# Moment parameterisations of the Distributions.jl families: `reparameterise`
-# solves a `(mean, sd)` pair for a family's native parameters, and
-# `valid_moments` is the per-family predicate that says whether it can.
+# `reparameterise` solves a `(mean, sd)` pair for a family's native parameters,
+# and `valid_moments` is the per-family predicate that says whether it can.
 using ReparameterisedDistributions: reparameterise, valid_moments
 
 # --- core architecture ---

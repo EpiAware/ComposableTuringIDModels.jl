@@ -234,9 +234,9 @@ end
     using ComposableTuringIDModels, Distributions, Random
     using DynamicPPL: DynamicPPL
 
-    # The case #370 could not express at all: noise on a stratified renewal.
-    # `SusceptibleDepletion` sits before it, so the recorded expectation is
-    # the depleted incidence rather than the bare force of infection.
+    # Noise on a stratified renewal, with `SusceptibleDepletion` before it, so
+    # the recorded expectation is the depleted incidence rather than the bare
+    # force of infection.
     gen_int = [0.2, 0.3, 0.5]
     pop = [800.0, 1200.0]
     log_R = log(1.4)
@@ -330,9 +330,9 @@ end
     using ComposableTuringIDModels, Distributions, Random
 
     # A bare `Distribution` rate is one constant shared across strata, which
-    # the scan adds to a vector of incidences.
-    # Before #370 that was a scalar added to a vector and raised a
-    # `MethodError`, so only a per-stratum rate reached a stratified renewal.
+    # the scan adds to a vector of incidences. The addition is broadcast, so a
+    # scalar rate reaches a stratified renewal rather than raising a
+    # `MethodError`.
     # Everything here is deterministic, so the two runs differ only by the
     # rate.
     gen_int = [0.2, 0.3, 0.5]

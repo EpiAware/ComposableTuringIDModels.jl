@@ -1,9 +1,6 @@
-# The centred stochastic renewal process.
-#
 # A centred draw needs `I_t ~ dist(ι_t, …)` with `ι_t` known during the
-# recursion, and a scan step is a deterministic function. So this is an
-# infection model rather than a renewal modifier. It runs the recursion as a
-# `@model` loop over the propose/commit halves of a step, drawing in between.
+# recursion, and a scan step is a deterministic function, so this is an
+# infection model rather than a renewal modifier.
 
 @doc raw"
 A renewal process whose infections are drawn around the renewal expectation
@@ -157,10 +154,9 @@ end
     return (; I_t, Z_t = setup.Z_t, I_seed = init.window)
 end
 
-# The recursion again, keeping each step's expectation. The loop is written
-# twice rather than always building the series and discarding it, so a model
-# nobody has wrapped in a `RecordExpectedInfections` allocates nothing for a
-# quantity it never reports.
+# The loop is written twice rather than always building the expectation and
+# discarding it, so a model nobody has wrapped in a `RecordExpectedInfections`
+# allocates nothing for a quantity it never reports.
 @model function with_expected_infections(infection::StochasticRenewal, n::Int)
     setup ~ to_submodel(_renewal_setup(infection, n), false)
     ξ ~ to_submodel(_noise_overdispersion(infection.noise, n), false)
@@ -180,8 +176,8 @@ end
     return (; I_t, Z_t = setup.Z_t, I_seed = init.window, exp_I_t)
 end
 
-# One draw per step, and a stratified renewal would need one per stratum per
-# step. Say so rather than seeding a strata axis the loop cannot fill.
+# The loop draws once per step, so a strata axis it cannot fill is refused
+# rather than seeded.
 function as_turing_model(infection::StochasticRenewal, n::Dims{2})
     return error(
         "`StochasticRenewal` runs one series. A stratified renewal needs " *

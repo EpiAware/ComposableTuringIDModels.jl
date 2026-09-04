@@ -180,8 +180,7 @@ fig2
 md"""
 ## Stochastic infections
 
-Both modifiers so far are deterministic.
-Each transforms the incidence the renewal equation implies, and the result is still one number per day.
+Both modifiers so far transform the incidence the renewal equation implies, and the result is still one number per day.
 [`InfectionNoise`](@ref) instead gives infections a distribution of their own, matched to the first two moments of a negative binomial about the renewal expectation ``\iota_t``.
 It composes positionally like the others, so a noisy, depleting, seeded renewal is one more argument.
 """
@@ -318,8 +317,7 @@ md"""
 
 Nothing about the fit changes when the infections are stochastic.
 The model is passed to `sample` the same way, and the noise specification is the one used to simulate.
-The difference is in what comes back.
-Infections are no longer a deterministic function of the other parameters, so they carry a posterior of their own and are recovered by name from the chain.
+What changes is that infections are no longer a deterministic function of the other parameters, so they carry a posterior of their own and are recovered by name from the chain.
 """
 
 y_stochastic = sim_stochastic.generated_y_t
@@ -355,7 +353,7 @@ axislegend(ax6; position = :lt)
 fig5
 
 md"""
-The simulated path sits inside the 90% interval on most days, which is what a calibrated fit to one series looks like.
+The simulated path sits inside the 90% interval on most days.
 """
 
 covered = count(

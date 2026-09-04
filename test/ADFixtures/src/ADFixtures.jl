@@ -797,7 +797,7 @@ function backend_broken_scenarios()
         # step inside the scan, and Enzyme reverse fails to find a shadow for
         # it (`EnzymeNoShadowError`). Every other backend, Enzyme forward
         # included, agrees with the reference gradient, and the centred
-        # `StochasticRenewal` scenario passes on all seven — so the fault is
+        # `StochasticRenewal` scenario passes on all seven, so the fault is
         # in the backend rather than the model.
         "Enzyme reverse" => union(
             reverse_only,

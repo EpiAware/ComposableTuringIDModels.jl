@@ -34,12 +34,11 @@ end
     # coefficient of variation.
     @test _noise_sd(capped, ι, ξ) / ι ≈ 0.5 atol = 1.0e-6
     @test _noise_sd(capped, ι, ξ) < 0.01 * _noise_sd(uncapped, ι, ξ)
-    # At an expectation where the cap does not bite the two are close, but
-    # the smooth limit still costs an absolute offset of
-    # `log1p(exp(-k(u - c)))/k` — the price of it being smooth. That offset
-    # approaches `log1p(exp(-k u))/k` as the coefficient of variation falls,
-    # so with `overdispersion = 0` and a large enough expectation it takes it
-    # to zero. `cv_cap = Inf` is the way out.
+    # At an expectation where the cap does not bite the two are close, but the
+    # smooth limit still costs an absolute offset of `log1p(exp(-k(u - c)))/k`.
+    # That offset approaches `log1p(exp(-k u))/k` as the coefficient of
+    # variation falls, so with `overdispersion = 0` and a large enough
+    # expectation it takes it to zero. `cv_cap = Inf` is the way out.
     u, k = 0.5, 10.0
     c = sqrt(1 / 1.0e4 + ξ^2)
     @test _noise_sd(capped, 1.0e4, ξ) ≈ (c - log1p(exp(-k * (u - c))) / k) * 1.0e4
