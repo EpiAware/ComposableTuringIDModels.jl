@@ -228,6 +228,7 @@ ax2 = Axis(fig[2, 1]; xlabel = "Day, numbered from the first report",
     ylabel = "Confirmed cases")
 ci_ribbon!(ax2, 1:n, yt; color = :teal, label = "posterior predictive")
 scatter!(ax2, 1:n, y_obs; color = :black, markersize = 7, label = "observed")
+vlines!(ax2, [0.5]; color = :grey, linestyle = :dot)
 axislegend(ax2; position = :lt)
 linkxaxes!(ax1, ax2)
 hidexdecorations!(ax1; grid = false)
@@ -235,7 +236,7 @@ fig
 ```
 
 Both panels are drawn on one calendar, numbered so that day 1 is the first Italian report.
-The ``R_t`` panel runs to the left of day 1 as well, over the lead-in the two delays consume, and the dotted line marks where the reports begin.
+The ``R_t`` panel runs to the left of day 1 as well, over the lead-in the two delays consume, and the dotted line on both panels marks where the reports begin.
 Reading a reproduction number off the top panel against a report count below it therefore compares the same day.
 Nothing is observed on the lead-in days themselves.
 They are estimated from the reports they feed into through the two convolutions, so the band is at its widest there and narrows once the data starts.
