@@ -121,7 +121,6 @@ y_obs = italy.confirm[1:n]
 
 [`IDProblem`](@ref) holds the model and the data it is fitted to as one object.
 Printing it shows the whole composition and a summary of the data.
-That is the reason to hold one rather than the `DynamicPPL.Model` [`as_turing_model`](@ref) returns, which prints as its full nested parametric type with the observations dumped inline.
 
 ```@example delays
 problem = IDProblem(renewal, observation, y_obs)
