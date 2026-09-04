@@ -186,21 +186,17 @@ using Statistics
 const CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
 
 function credible_bands(mat; qs = CI_QS)
-    reduce(hcat, (map(eachrow(mat)) do row
-        vals = collect(skipmissing(row))
-        isempty(vals) ? missing : quantile(vals, q)
-    end for q in qs))
+    reduce(hcat, (map(row -> quantile(row, q), eachrow(mat)) for q in qs))
 end
 
 function ci_ribbon!(ax, ts, bands; color, label)
-    keep = findall(!ismissing, view(bands, :, 3))
-    x, b = ts[keep], Float64.(bands[keep, :])
-    band!(ax, x, b[:, 1], b[:, 5]; color = (color, 0.15))
-    band!(ax, x, b[:, 2], b[:, 4]; color = (color, 0.3))
-    lines!(ax, x, b[:, 3]; color = color, linewidth = 2, label = label)
+    band!(ax, ts, bands[:, 1], bands[:, 5]; color = (color, 0.15))
+    band!(ax, ts, bands[:, 2], bands[:, 4]; color = (color, 0.3))
+    lines!(ax, ts, bands[:, 3]; color = color, linewidth = 2, label = label)
 end
 
-# every reference day is scored, so every predictive entry is there
+# Every report is scored, so every predictive entry is there and no draw needs
+# filling in.
 function predictive_bands(pred, n)
     rows = map(1:n) do i
         permutedims(vec(pred[@varname(y_t[i])]))
@@ -216,22 +212,37 @@ Rt = credible_bands(reduce(hcat, (exp.(g.Z_t) for g in gens)))
 pred = predict(as_turing_model(problem, (y_t = fill(missing, n),)), chain)
 yt = predictive_bands(pred, n)
 
+# Day 1 is the first report, so the lead-in days the infection process runs
+# over before it are numbered backwards from there.
+lead_in = observation_lead_in(observation)
+infection_days = (1 - lead_in):n
+
 fig = Figure(; size = (760, 620))
 ax1 = Axis(fig[1, 1]; ylabel = "Reproduction number Rₜ")
-ci_ribbon!(ax1, 1:size(Rt, 1), Rt; color = :purple, label = "posterior median")
+ci_ribbon!(ax1, infection_days, Rt; color = :purple,
+    label = "posterior median")
 hlines!(ax1, [1.0]; color = :grey, linestyle = :dash)
+vlines!(ax1, [0.5]; color = :grey, linestyle = :dot)
 axislegend(ax1; position = :rt)
-ax2 = Axis(fig[2, 1]; xlabel = "Day", ylabel = "Confirmed cases")
-ci_ribbon!(ax2, 1:size(yt, 1), yt; color = :teal,
-    label = "posterior predictive")
+ax2 = Axis(fig[2, 1]; xlabel = "Day, numbered from the first report",
+    ylabel = "Confirmed cases")
+ci_ribbon!(ax2, 1:n, yt; color = :teal, label = "posterior predictive")
 scatter!(ax2, 1:n, y_obs; color = :black, markersize = 7, label = "observed")
 axislegend(ax2; position = :lt)
+linkxaxes!(ax1, ax2)
+hidexdecorations!(ax1; grid = false)
 fig
 ```
 
+Both panels are drawn on one calendar, numbered so that day 1 is the first Italian report.
+The ``R_t`` panel runs to the left of day 1 as well, over the lead-in the two delays consume, and the dotted line marks where the reports begin.
+Reading a reproduction number off the top panel against a report count below it therefore compares the same day.
+Nothing is observed on the lead-in days themselves.
+They are estimated from the reports they feed into through the two convolutions, so the band is at its widest there and narrows once the data starts.
+
 The weekly ``R_t`` is piecewise-constant by construction, stepping down through one as the first wave turns over.
-The ``R_t`` panel runs longer than the reports panel, because the infection process covers the delays' lead-in before the first report.
-The posterior-predictive band tracks the observed Italian reports, the layered observation model having absorbed the reporting pattern rather than the infection signal.
+The posterior-predictive band covers all 42 reports, because the infection process is run long enough to support every one of them.
+It tracks the observed Italian reports, the layered observation model having absorbed the reporting pattern rather than the infection signal.
 
 ## A time-varying reporting pattern
 
