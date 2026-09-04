@@ -169,14 +169,19 @@ Convenience 2-argument form: read the infection process's shape from the data.
 
 The observation model and the data together fix the shape of the infection
 process, so nothing about it needs to be supplied explicitly or stored on the
-model. `as_turing_model(model, Y)` is `as_turing_model(model, Y, shape)` with
-`shape` resolved via [`infection_strata`](@ref): the number of infection
-strata the observation model consumes given the data's row count, paired with
-the data's time length.
+model. `as_turing_model(model, y_t)` is `as_turing_model(model, y_t, shape)`
+with `shape` read from `y_t`: its time length, paired (when the data is
+stratified) with the number of infection strata the observation model consumes,
+resolved via [`infection_strata`](@ref).
 
-Three age strata observed as one hospitalisation stream is
-`Split(NegativeBinomialError(), [1.0 1.0 1.0])`; a `1 x T` data matrix then
-builds a 3-stratum infection process.
+The data may be a plain vector of observations, a `strata x time` matrix, or a
+`NamedTuple` of per-stream series. Three age strata observed as one
+hospitalisation stream is `Split(NegativeBinomialError(), [1.0 1.0 1.0])`; a
+`1 x T` data matrix then builds a 3-stratum infection process.
+
+A scalar `missing` has no length to read, so simulating from the prior at a
+chosen length is either `as_turing_model(model, missing, n)` or the two-argument
+form over a blank series of that length.
 
 # Examples
 ```@example IDModel_shape
@@ -193,13 +198,59 @@ sim = as_turing_model(model, Ymiss)()
 size(sim.I_t)
 ```
 "
-function as_turing_model(model::IDModel, Y::AbstractMatrix)
-    return as_turing_model(model, Y, _shape(model, Y))
+function as_turing_model(model::IDModel, y_t)
+    return as_turing_model(model, y_t, _data_shape(model, y_t))
 end
 
-function _shape(model::IDModel, Y::AbstractMatrix)
-    return (infection_strata(model.observation_model, size(Y, 1)), size(Y, 2))
+# The `ModelShape` a model and a data value imply, over the data's own time
+# length.
+_data_shape(model::IDModel, y_t) = _obs_data_shape(
+    model.observation_model, y_t, _series_time_length(y_t)
+)
+
+# A data value's length along the time axis.
+# A `NamedTuple` of streams shares one time length, read off its first stream.
+# A scalar `missing` has no axis to read, and saying so beats a `MethodError`
+# from whichever helper reaches it first.
+function _series_time_length(::Missing)
+    throw(
+        ArgumentError(
+            "a scalar `missing` carries no length to read a model shape from; \
+            pass the number of observations, as `as_turing_model(model, missing, n)`, \
+            or simulate over a blank series such as `Vector{Missing}(missing, n)`"
+        )
+    )
 end
+_series_time_length(y_t::AbstractVector) = length(y_t)
+_series_time_length(y_t::AbstractMatrix) = size(y_t, 2)
+_series_time_length(y_t::NamedTuple) = _series_time_length(first(y_t))
+
+# The infection process's `ModelShape` implied by an observation model and a
+# data value, shared by the two-argument `as_turing_model`, `IDProblem` and
+# `forecast` so all three read a data-driven model's shape the same way.
+# Data with no stream axis to read leaves the shape to the observation model
+# alone: a scalar `missing`, and a blank series holding nothing but `missing`.
+_obs_data_shape(obs, y_t, time_steps) = time_steps
+_obs_data_shape(obs, y_t::Missing, time_steps) = _obs_data_shape_missing(
+    obs, time_steps
+)
+function _obs_data_shape(obs, y_t::AbstractVector{Missing}, time_steps)
+    return _obs_data_shape_missing(obs, time_steps)
+end
+function _obs_data_shape(obs, y_t::AbstractMatrix, time_steps)
+    return (infection_strata(obs, size(y_t, 1)), time_steps)
+end
+function _obs_data_shape(obs, y_t::NamedTuple, time_steps)
+    return (infection_strata(obs, length(y_t)), time_steps)
+end
+
+_obs_data_shape_missing(obs, time_steps) = time_steps
+function _obs_data_shape_missing(s::Split, time_steps)
+    s.map === nothing || return (size(s.map, 2), time_steps)
+    s.names === nothing || return (length(s.names), time_steps)
+    return time_steps
+end
+
 
 @doc raw"
 The number of infection strata an observation model consumes.

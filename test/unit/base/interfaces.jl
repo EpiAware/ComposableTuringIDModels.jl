@@ -95,10 +95,8 @@ end
     # A latent model is not an infection model, so it cannot fill the infection
     # slot either.
     @test_throws MethodError IDModel(latent, obs)
-    # IDProblem enforces the same role slots (keyword struct → TypeError).
-    @test_throws Union{MethodError, TypeError} IDProblem(
-        infection = obs, observation_model = obs, tspan = (1, 10)
-    )
+    # IDProblem enforces the same role slots when it composes the pair itself.
+    @test_throws MethodError IDProblem(obs, obs, fill(5, 10))
     # A latent manipulator cannot wrap an observation model (slot is latent;
     # keyword constructor → TypeError).
     @test_throws Union{MethodError, TypeError} DiffLatentModel(;

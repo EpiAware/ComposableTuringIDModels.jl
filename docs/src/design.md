@@ -206,7 +206,7 @@ It asks whether every observation supplied would be scored, so more data than th
 data_fits(delayed, y, length(y)), data_fits(delayed, vcat(y, y), length(y))
 ```
 
-An [`IDProblem`](@ref)'s `tspan` is the span of the observations for the same reason, and [`forecast`](@ref) extends the observations by the horizon and derives the rest.
+An [`IDProblem`](@ref) holds a model and its data together, so [`data_requirements`](@ref) reads the observation count off the data rather than being told it, and [`forecast`](@ref) extends the observations by the horizon and derives the rest.
 
 Length-preserving modifiers ([`Ascertainment`](@ref), [`RightTruncate`](@ref), [`ReportTriangle`](@ref), a [`Split`](@ref)'s streams) consume nothing of their own, so the lead-in comes from the delays alone.
 A [`Split`](@ref)'s streams run in parallel, so their lead-ins do not add up and the series covers the deepest of them.

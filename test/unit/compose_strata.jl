@@ -107,3 +107,31 @@ end
     @test e.young ≈ 0.7 .* vec(sim.I_t)
     @test e.old ≈ 0.3 .* vec(sim.I_t)
 end
+
+@testitem "two-argument as_turing_model reads the shape from any data form" begin
+    using ComposableTuringIDModels, Distributions, DynamicPPL, Random
+    Random.seed!(806)
+    infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal())
+
+    # A vector of observations gives its own length, so nothing is restated.
+    model = IDModel(infection, PoissonError())
+    y = fill(5, 14)
+    @test keys(VarInfo(as_turing_model(model, y))) ==
+        keys(VarInfo(as_turing_model(model, y, length(y))))
+    @test length(as_turing_model(model, Vector{Missing}(missing, 14))().Z_t) == 14
+
+    # A `NamedTuple` of streams gives the stream count and the shared time
+    # length.
+    split = IDModel(
+        DirectInfections(;
+            Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
+            initialisation = IID(Normal(log(20), 0.2))
+        ),
+        Split((a = PoissonError(), b = PoissonError()))
+    )
+    sim = as_turing_model(split, (a = fill(5, 12), b = fill(3, 12)))()
+    @test size(sim.I_t) == (2, 12)
+
+    # A scalar `missing` carries no length, and says so.
+    @test_throws ArgumentError as_turing_model(model, missing)
+end

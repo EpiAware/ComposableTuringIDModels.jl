@@ -436,7 +436,7 @@ end
         posterior, NUTS(0.9), ndraws;
         initial_params = InitFromPrior(), progress = false
     )
-    gen = vec(generated_observables(posterior, y_obs, chain).generated)
+    gen = vec(returned(posterior, chain))
     @test length(gen) == ndraws
     @test all(g -> length(g.Z_t) == n && all(isfinite, g.Z_t), gen)
     # A degenerate fit (σ initialised far out in the prior tail, step size
@@ -611,7 +611,7 @@ end
         posterior, NUTS(0.9), ndraws;
         initial_params = InitFromPrior(), progress = false
     )
-    gen = vec(generated_observables(posterior, y_obs, chain).generated)
+    gen = vec(returned(posterior, chain))
     @test length(gen) == ndraws
     @test all(g -> length(g.Z_t) == n && all(isfinite, g.Z_t), gen)
     Z_mean = vec(mean(reduce(hcat, (g.Z_t for g in gen)); dims = 2))

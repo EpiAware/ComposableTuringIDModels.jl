@@ -16,7 +16,7 @@ uncertainty.
 single-series case), a `strata x T` matrix (extended by `horizon` further
 columns), or a `NamedTuple` of per-stream series (each stream extended in
 turn). The strata count, when there is one, is read from the observation model
-and `y` exactly as [`IDProblem`](@ref) reads it at build time.
+and `y` exactly as [`as_turing_model`](@ref) reads it at build time.
 
 This works because the package's latent processes are non-centred: a
 [`RandomWalk`](@ref), [`AR`](@ref) or [`MA`](@ref) accumulates an i.i.d. sequence
@@ -38,8 +38,8 @@ The result is a chain of the same shape as the input holding the predicted
 observations, indexable per time point as `y_t[T+1] … y_t[T+h]`. The in-sample
 points are generated too, so the same chain carries the in-sample posterior
 predictive; the fitted latent path is unchanged either way, because `y_t` never
-feeds back into it. Pass the chain to [`generated_observables`](@ref) or
-`returned` to recover the extended latent trajectories per draw.
+feeds back into it. Pass the chain to `DynamicPPL.returned` to recover the
+extended latent trajectories per draw.
 
 The extension is exact for the package's non-centred processes because their
 future innovations are independent of the fitted history. A latent whose *stored*
@@ -90,11 +90,6 @@ function forecast(
     return predict(rng, fc_model, extended)
 end
 
-# A `NamedTuple` of streams shares one time length, read off its first stream.
-_series_time_length(y::AbstractVector) = length(y)
-_series_time_length(y::AbstractMatrix) = size(y, 2)
-_series_time_length(y::NamedTuple) = _series_time_length(first(y))
-
 # A wholly unobserved series shaped like `y`.
 # The stream names of a `NamedTuple` are what tells a data-driven `Split` which
 # streams to build, so they are preserved.
@@ -106,15 +101,14 @@ _blank_series(y::NamedTuple, n_time) = map(v -> _blank_series(v, n_time), y)
 
 @doc raw"
 Forecast from a fitted [`IDProblem`](@ref); see [`forecast`](@ref) for the model
-method. The observation model and infection process are taken from the problem,
-and the horizon extends the problem's `tspan`.
+method. The problem holds the series it was fitted to, so only the chain and the
+horizon are needed.
 "
 function forecast(
-        problem::IDProblem, y, chain, horizon::Integer;
+        problem::IDProblem, chain, horizon::Integer;
         rng::AbstractRNG = default_rng()
     )
-    model = IDModel(problem.infection, problem.observation_model)
-    return forecast(model, y, chain, horizon; rng = rng)
+    return forecast(problem.model, problem.data, chain, horizon; rng = rng)
 end
 
 # Extend the latent innovation streams in `chain` to the length `fc_model`

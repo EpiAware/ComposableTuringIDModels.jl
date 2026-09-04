@@ -355,7 +355,8 @@ that builds its own prompts from them.
   - `y_t`: (optional) the data, to report what was supplied alongside what is
     required.
   - `n`: the number of observations (an `Int`, or the `(n_strata, n_time)` shape
-    of a stratified model). An [`IDProblem`](@ref) reads it from `tspan`.
+    of a stratified model). An [`IDProblem`](@ref) already holds its data, so
+    `data_requirements(problem)` needs neither.
 
 # Examples
 ```@example data_requirements
@@ -588,9 +589,8 @@ end
 # is scored at the end.
 # The one exception is a shortfall of exactly the chain's lead-in.
 #
-# This walks the chain rather than building a `DataRequirements`.
-# An `IDProblem`'s model body reassembles its `IDModel` on every evaluation, so
-# the check runs per evaluation and must not allocate.
+# This walks the chain rather than building a `DataRequirements`, because it runs
+# once per model build and must not allocate.
 function _check_observation_count(model, y_t, n::ModelShape)
     chain = _observation_chain(model)
     lead_in = observation_lead_in(chain)

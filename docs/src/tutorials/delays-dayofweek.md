@@ -99,8 +99,7 @@ Two stacked delays therefore need the infection process to start that many days 
 observation_lead_in(observation)
 ```
 
-An [`IDProblem`](@ref)'s `tspan` is the span of the *observations*, so `tspan = (1, length(y))` fits every report we have.
-The infection process runs over the extra lead-in days to support them, derived from the chain (see [What data a model needs](@ref lead-in)).
+The number of observations is the number of reports we have, and the infection process runs over the extra lead-in days to support them, derived from the chain (see [What data a model needs](@ref lead-in)).
 [`data_requirements`](@ref) says what a chain needs before it is sampled.
 
 ## The data
@@ -119,23 +118,25 @@ y_obs = italy.confirm[1:n]
 
 ## Assemble and fit
 
-[`IDProblem`](@ref) ties the latent, infection, and observation models to a time span.
-Its [`as_turing_model`](@ref) method takes data as a named tuple with a `y_t` field.
-Passing `missing` values would instead simulate from the prior.
+[`IDProblem`](@ref) holds the model and the data it is fitted to as one object.
+Printing it shows the whole composition and a summary of the data, which is the reason to hold one rather than the `DynamicPPL.Model` [`as_turing_model`](@ref) returns: the latter prints as its full nested parametric type with the observations dumped inline.
 
 ```@example delays
-problem = IDProblem(
-    infection = renewal,
-    observation_model = observation,
-    tspan = (1, n))
-nothing # hide
+problem = IDProblem(renewal, observation, y_obs)
+```
+
+The problem carries its own length, so nothing about the series is restated and [`data_requirements`](@ref) reads straight off it.
+Passing a blank series in place of the reports, `Vector{Missing}(missing, n)`, would instead simulate from the prior.
+
+```@example delays
+data_requirements(problem)
 ```
 
 Fitting conditions on the observed reports, differentiating with the recommended [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) backend, described under [Automatic differentiation backend](@ref ad-backends).
 We draw two chains in parallel with `MCMCThreads()`, which gives a cross-chain ``\hat R``.
 
 ```@example delays
-posterior = as_turing_model(problem, (y_t = y_obs,))
+posterior = as_turing_model(problem)
 chain = sample(
     posterior, NUTS(0.95; adtype = AutoMooncake(; config = nothing)),
     MCMCThreads(), 250, 2; progress = false)
@@ -176,7 +177,7 @@ The autoregressive damping (`diff.damp`) and moving-average (`diff.θ`) coeffici
 
 ## Posterior trajectories
 
-``R_t = \exp(Z_t)`` and the infections ``I_t`` are generated quantities recovered per draw with [`generated_observables`](@ref).
+``R_t = \exp(Z_t)`` and the infections ``I_t`` are generated quantities recovered per draw with `returned`.
 The reports ``y_t`` are scored element-wise, so their posterior-predictive distribution comes from `predict` on the model with the observations set to `missing`.
 Two small helpers reduce the per-draw trajectories to credible bands.
 
@@ -210,10 +211,10 @@ end
 ```
 
 ```@example delays
-gens = vec(generated_observables(posterior, (y_t = y_obs,), chain).generated)
+gens = vec(returned(posterior, chain))
 Rt = credible_bands(reduce(hcat, (exp.(g.Z_t) for g in gens)))
 
-pred = predict(as_turing_model(problem, (y_t = fill(missing, n),)), chain)
+pred = predict(as_turing_model(problem, Vector{Missing}(missing, n)), chain)
 yt = predictive_bands(pred, n)
 
 fig = Figure(; size = (760, 620))

@@ -74,9 +74,7 @@ end
     # An IDModel and an IDProblem delegate to their observation model.
     infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal())
     @test observation_lead_in(IDModel(infection, stacked)) == 7
-    problem = IDProblem(
-        infection = infection, observation_model = stacked, tspan = (1, 30)
-    )
+    problem = IDProblem(infection, stacked, fill(10, 30))
     @test observation_lead_in(problem) == 7
 end
 
@@ -317,14 +315,12 @@ end
     @test data_fits(model, fill(10, 59), 60)
     @test data_fits(model, missing, 60)
 
-    # An `IDProblem` reads the observation count from its `tspan`.
-    problem = IDProblem(
-        infection = model.infection_model, observation_model = obs,
-        tspan = (1, 60)
-    )
+    # An `IDProblem` reads the observation count from the data it holds, so its
+    # report is the model's over that data.
+    problem = IDProblem(model.infection_model, obs, fill(10, 60))
     @test data_requirements(problem).series_length == 103
-    @test data_fits(data_requirements(problem, (; y_t = fill(10, 60))))
-    @test !data_fits(data_requirements(problem, (; y_t = fill(10, 61))))
+    report(x...) = sprint(show, MIME"text/plain"(), data_requirements(x...))
+    @test report(problem) == report(model, fill(10, 60), 60)
 end
 
 @testitem "data_requirements reads each data shape's contract" begin
@@ -516,16 +512,11 @@ end
     fc = forecast(model, y, chain, h)
     @test size(fc, 1) == 20
 
-    # An `IDProblem`'s `tspan` is the span of the observations.
-    problem = IDProblem(
-        infection = model.infection_model, observation_model = obs,
-        tspan = (1, length(y))
-    )
-    @test data_fits(data_requirements(problem, (; y_t = y)))
-    pchain = sample(
-        as_turing_model(problem, (; y_t = y)), Prior(), 20; progress = false
-    )
-    pfc = forecast(problem, y, pchain, h)
+    # An `IDProblem` holds the series, so it needs no length of its own.
+    problem = IDProblem(model.infection_model, obs, y)
+    @test data_requirements(problem).n == length(y)
+    pchain = sample(as_turing_model(problem), Prior(), 20; progress = false)
+    pfc = forecast(problem, pchain, h)
     @test size(pfc, 1) == 20
 end
 

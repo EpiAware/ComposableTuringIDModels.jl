@@ -167,7 +167,7 @@ The autoregressive damping ``\rho`` (`damp`), the cluster factor and the initial
 ## Posterior trajectories
 
 The reproduction number ``R_t = \exp(Z_t)`` is a *generated quantity* rather than a sampled parameter.
-[`generated_observables`](@ref) re-runs the fitted model over the chain to recover the latent ``Z_t`` and infection ``I_t`` trajectories per draw.
+`returned` re-runs the fitted model over the chain to recover the latent ``Z_t`` and infection ``I_t`` trajectories per draw.
 The reported counts ``y_t`` are scored element-wise, so their posterior *predictive* distribution comes from `predict` on the same model with the observations set to `missing`.
 
 A couple of small helpers reduce the per-draw trajectories to credible bands and draw a median line with 50% and 95% ribbons.
@@ -212,7 +212,7 @@ end
 Stack the per-draw ``Z_t`` into an ``R_t`` band, draw the posterior-predictive ``y_t`` from the unconditioned model, and plot both against the observed series.
 
 ```@example renewal
-gens = vec(generated_observables(posterior, y_obs, chain).generated)
+gens = vec(returned(posterior, chain))
 Rt = credible_bands(reduce(hcat, (exp.(g.Z_t) for g in gens)))
 
 pred = predict(as_turing_model(model, fill(missing, n), n), chain)
