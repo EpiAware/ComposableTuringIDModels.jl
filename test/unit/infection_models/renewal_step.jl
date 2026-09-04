@@ -286,18 +286,21 @@ end
     init = renewal_init_state(step, 5.0, 0.1, length(gen_int))
     states = accumulate(step, Rt; init = init)
 
-    # The reference recurrence, keeping all three series apart.
-    window, S = init.window, N
+    # The reference recurrence, keeping all three series apart. The `let` is
+    # load-bearing: assigning to `window` and `S` inside the loop would make
+    # them new locals under soft scope, so the first read would be unbound.
     fois, expectations, committed = Float64[], Float64[], Float64[]
-    for R in Rt
-        foi = renewal_foi(core, window, R)
-        depleted = max(S / N, 1.0e-6) * foi
-        draw = 2 * depleted
-        S -= depleted
-        push!(fois, foi)
-        push!(expectations, depleted)
-        push!(committed, draw)
-        window = vcat(window[2:end], draw)
+    let window = init.window, S = N
+        for R in Rt
+            foi = renewal_foi(core, window, R)
+            depleted = max(S / N, 1.0e-6) * foi
+            draw = 2 * depleted
+            S -= depleted
+            push!(fois, foi)
+            push!(expectations, depleted)
+            push!(committed, draw)
+            window = vcat(window[2:end], draw)
+        end
     end
 
     @test get_state(step, init, states) ≈ committed
