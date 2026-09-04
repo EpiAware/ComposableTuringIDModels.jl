@@ -39,7 +39,6 @@ arma21 = arma(
     ϵ_t = HierarchicalNormal(std = HalfNormal(0.1)))
 
 arima211 = DiffLatentModel(; model = arma21, init = [Normal(0.3, 0.3)])
-nothing # hide
 ```
 
 [`broadcast_weekly`](@ref) makes the process piecewise-constant by week, drawing a new value each week and holding it for seven days.
@@ -47,7 +46,6 @@ This models ``R_t`` as changing weekly rather than daily, which regularises the 
 
 ```@example delays
 weekly_latent = broadcast_weekly(arima211)
-nothing # hide
 ```
 
 ## The infection process
@@ -70,7 +68,6 @@ We start from the [`NegativeBinomialError`](@ref) link and build outward.
 negbin = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 dayofweek_negbin = ascertainment_dayofweek(
     negbin; latent_model = HierarchicalNormal(std = HalfNormal(1.0)))
-nothing # hide
 ```
 
 [`LatentDelay`](@ref) convolves the expected observations with a delay distribution discretised by double interval censoring.
@@ -85,11 +82,7 @@ reporting = UncertainDelay(         # symptom onset -> report (inferred)
     D = 8.0)
 
 observation = LatentDelay(LatentDelay(dayofweek_negbin, incubation), reporting)
-nothing # hide
 ```
-
-That single `observation` object now carries, from the inside out, a negative binomial link, a day-of-week ascertainment modifier, a fixed incubation-delay convolution, and an inferred reporting-delay convolution.
-The reporting-delay parameters flow through the same priors seam as every other parameter, so inferring the delay needs no change to the rest of the model.
 
 Each convolution shortens the expected series by `length(pmf) - 1`.
 Two stacked delays therefore need the infection process to start that many days before the first report.
@@ -142,7 +135,6 @@ chain = sample(
 nothing # hide
 ```
 
-`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which `summarystats` summarises directly.
 `DayofWeek.std` is the scale of the partially pooled weekday multipliers, namespaced because the ascertainment modifier introduces a named sub-process.
 `cluster_factor` is the negative-binomial overdispersion, and `delay.θ` are the inferred reporting-delay parameters, the `LogNormal` log-mean and log-sd.
 
@@ -158,7 +150,6 @@ Any of them can be swapped, fixed, or removed by editing one line of the composi
 
 Sampling the same model with [`Prior`](https://turinglang.org/) gives a prior draw over the same parameters.
 Overlaying it on the posterior with [PairPlots.jl](https://sefffal.github.io/PairPlots.jl/) shows which parameters the six weeks of Italian data moved.
-The FlexiChains extension turns each chain, subset to a few keys, into a `PairPlots.Series`.
 
 ```@example delays
 using CairoMakie, PairPlots
@@ -258,10 +249,8 @@ drifting = UncertainDelay(
     LogNormal, [RandomWalk(), truncated(Normal(0.47, 0.2), 0, Inf)]; D = 8.0)
 tv_observation = LatentDelay(
     LatentDelay(dayofweek_negbin, incubation), drifting)
-nothing # hide
 ```
 
-Only which prior fills the delay's log-mean slot changes, leaving the infection process, the ``R_t`` prior and the fitting code identical.
 As with the weekday profile we flag rather than fit it here, because a delay that drifts day to day asks more of six weeks of data than they can answer.
 
 ## References

@@ -44,6 +44,9 @@ Swap `combine` for a different mapping the way [`Ascertainment`](@ref) swaps its
 
 Passing an all-`missing` matrix makes the model a prior simulator.
 We simulate eight groups over 24 time steps.
+Only the *relative* group levels are identified.
+Adding a constant to every group's level and subtracting it from the shared path gives the same ``Z_t``, so the two are confounded.
+The comparison below is between relative levels.
 
 ```@example hier
 n_time, n_groups = 24, 8
@@ -51,14 +54,9 @@ Ymiss = Matrix{Union{Missing, Float64}}(missing, n_groups, n_time)
 sim = as_turing_model(model, Ymiss)()
 Ydata = Float64.(reduce(vcat,
     [permutedims(sim.generated_y_t[Symbol(:group, g)]) for g in 1:n_groups]))
-# Z_t[g, :] is the shared random walk plus group g's pooled level. Averaging
-# over time and subtracting the grand mean cancels the shared component and
-# leaves each group's level relative to the others. Only that relative level
-# is identified: a constant added to every group's level and subtracted from
-# the shared path gives the same Z_t, so the two are confounded.
 group_level(Z) = vec(mean(Z; dims = 2)) .- mean(Z)
 true_levels = group_level(sim.Z_t)
-(n_time = n_time, n_groups = n_groups, data_size = size(Ydata),
+(n_time = n_time, n_groups = n_groups,
     true_levels = round.(true_levels, digits = 2))
 ```
 
@@ -77,7 +75,7 @@ posterior = as_turing_model(model, Ydata)
 chain = sample(
     posterior, NUTS(0.85; adtype = AutoMooncake(; config = nothing)),
     MCMCThreads(), 300, 2; progress = false)
-size(chain, 1)
+nothing # hide
 ```
 
 The relative per-group levels are recovered per draw from the generated `Z_t` with `returned`, then compared with the simulated truth.
