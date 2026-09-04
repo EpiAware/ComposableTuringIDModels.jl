@@ -207,8 +207,10 @@ What a single observation stream requires of the data supplied for it.
   - `fields`: the fields the scoring model reads when it needs more than the
     counts, e.g. `(:y, :N)` for [`BinomialError`](@ref); empty when a plain
     series is enough.
-  - `n_supplied`: how much data was actually supplied, or `nothing` when the
-    requirements were asked for without data.
+  - `n_supplied`: the length of the supplied series, or `nothing` when the
+    requirements were asked for without data. It counts positions in the
+    series, so one that is wholly `missing` reports its length rather than
+    `nothing`.
 "
 struct StreamRequirement
     "The stream's name, or `:y_t` for a single series."
@@ -227,7 +229,7 @@ struct StreamRequirement
     alignment::Symbol
     "The fields the scoring model reads, when it needs more than the counts."
     fields::Tuple{Vararg{Symbol}}
-    "How much data was supplied, or `nothing` if none was."
+    "The length of the supplied series, or `nothing` when asked for without data."
     n_supplied::Union{Int, Nothing}
 end
 
