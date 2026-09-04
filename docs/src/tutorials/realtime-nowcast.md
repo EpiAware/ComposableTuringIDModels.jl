@@ -1,36 +1,23 @@
 # [Real-time nowcasting: right-truncation vs the reporting triangle](@id tutorial-nowcast)
 
 In real time the most recent days of a surveillance series are **incomplete**.
-A case with reference day ``t`` is only counted after a reporting delay, so on
-day ``\text{now}`` we have seen a fraction of the cases that will eventually be
-attributed to recent days.
-Fitting a renewal model to this *right-truncated* tail without correction
-produces the familiar artefact of real-time estimation, an apparent late
-down-turn in ``R_t`` that is really the not-yet-reported counts
-[abbott2020estimating](@citep).
+A case with reference day ``t`` is only counted after a reporting delay, so on day ``\text{now}`` we have seen a fraction of the cases that will eventually be attributed to recent days.
+Fitting a renewal model to this *right-truncated* tail without correction produces the familiar artefact of real-time estimation, an apparent late down-turn in ``R_t`` that is really the not-yet-reported counts [abbott2020estimating](@citep).
 
-This package corrects right-truncation two ways, and this tutorial fits and
-compares both on the same simulated data.
+This package corrects right-truncation two ways, and this tutorial fits and compares both on the same simulated data.
 [`RightTruncate`](@ref) is the **marginal** correction.
-It keeps only each reference day's observed-so-far *total* and scales the
-expected count by the reporting-delay CDF, the EpiNow2-style CDF-scaling nowcast.
+It keeps only each reference day's observed-so-far *total* and scales the expected count by the reporting-delay CDF, the EpiNow2-style CDF-scaling nowcast.
 [`ReportTriangle`](@ref) is the **joint** correction.
-It keeps the full reference-day × reporting-delay triangle and scores it cell by
-cell, the epinowcast-style nowcast.
-The two share one reporting-delay kernel, so the triangle's observed row-sums are
-exactly the observed-so-far totals the marginal correction conditions on.
-Both leave the renewal infection process and its latent ``R_t`` untouched, and
-both keep the model's ``Y_t`` as the eventual total, so the nowcast is just
-``Y_t`` read back out.
+It keeps the full reference-day × reporting-delay triangle and scores it cell by cell, the epinowcast-style nowcast.
+The two share one reporting-delay kernel, so the triangle's observed row-sums are exactly the observed-so-far totals the marginal correction conditions on.
+Both leave the renewal infection process and its latent ``R_t`` untouched.
+Both keep the model's ``Y_t`` as the eventual total, so the nowcast is ``Y_t`` read back out.
 
 ## The two corrections
 
-The infection pipeline produces ``Y_t = \mu_t``, the expected *eventual* total for
-reference day ``t``.
-Write ``p`` for the reporting-delay PMF (delay ``d = 0, 1, \dots``) and
-``F[a+1] = \sum_{d=0}^{a} p[d+1]`` for its CDF.
-A reference day of age ``a = \text{now} - t`` has reported a fraction ``F[a+1]``
-of its eventual total.
+The infection pipeline produces ``Y_t = \mu_t``, the expected *eventual* total for reference day ``t``.
+Write ``p`` for the reporting-delay PMF (delay ``d = 0, 1, \dots``) and ``F[a+1] = \sum_{d=0}^{a} p[d+1]`` for its CDF.
+A reference day of age ``a = \text{now} - t`` has reported a fraction ``F[a+1]`` of its eventual total.
 
 ```math
 \begin{aligned}
@@ -41,16 +28,12 @@ I_t &= R_t \sum_{s \ge 1} g_s\, I_{t-s}, & Y_t &= I_t, \\[2pt]
 \end{aligned}
 ```
 
-Summing the joint model's observed cells over ``d`` recovers the marginal mean
-``Y_t\, F[(\text{now}-t)+1]``, so the two are consistent by construction.
+Summing the joint model's observed cells over ``d`` recovers the marginal mean ``Y_t\, F[(\text{now}-t)+1]``, so the two are consistent by construction.
 A naive fit drops the delay factor (equivalently ``F \equiv 1``).
 
 ## The renewal model
 
-Both corrections wrap the same composed renewal model as the
-[renewal tutorial](@ref tutorial-renewal), an autoregressive ``\log R_t``
-process folded into a [`Renewal`](@ref) infection process observed with a
-[`NegativeBinomialError`](@ref).
+Both corrections wrap the same composed renewal model as the [renewal tutorial](@ref tutorial-renewal), an autoregressive ``\log R_t`` process folded into a [`Renewal`](@ref) infection process observed with a [`NegativeBinomialError`](@ref).
 
 ```@example nowcast
 using ComposableTuringIDModels, Distributions, Random, Turing, Mooncake
@@ -72,12 +55,8 @@ nothing # hide
 
 ## Simulate a reporting triangle
 
-We take the fully-reported Italy confirmed-case series as the *eventual* totals,
-split each day's total across reporting delays with the delay PMF, then mask the
-cells not yet reported at ``\text{now} = n``.
-[`ReportingPMF`](@ref) discretises the reporting delay with the same
-[CensoredDistributions.jl](https://github.com/EpiAware/CensoredDistributions.jl)
-path the rest of the package uses.
+We take the fully-reported Italy confirmed-case series as the *eventual* totals, split each day's total across reporting delays with the delay PMF, then mask the cells not yet reported at ``\text{now} = n``.
+[`ReportingPMF`](@ref) discretises the reporting delay with the same [CensoredDistributions.jl](https://github.com/EpiAware/CensoredDistributions.jl) path the rest of the package uses.
 
 ```@example nowcast
 datapath = joinpath(pkgdir(ComposableTuringIDModels),
@@ -93,10 +72,8 @@ Dmax = length(pmf) - 1
 nothing # hide
 ```
 
-Split each reference day's eventual total across delays with a multinomial draw,
-then keep only the cells reported by ``\text{now} = n`` (``t + d \le n``).
-The observed-so-far total per reference day is the row-sum of the reported cells,
-the marginal the CDF-scaling correction sees.
+Split each reference day's eventual total across delays with a multinomial draw, then keep only the cells reported by ``\text{now} = n`` (``t + d \le n``).
+The observed-so-far total per reference day is the row-sum of the reported cells, the marginal the CDF-scaling correction sees.
 
 ```@example nowcast
 full_triangle = reduce(vcat,
@@ -108,14 +85,12 @@ observed_so_far = vec(sum(reported_triangle, dims = 2))
     truncated_tail = observed_so_far[(end - 4):end])
 ```
 
-The recent days are visibly thinned, the most recent day showing only a fraction
-of its eventual count.
+The recent days are visibly thinned, the most recent day showing only a fraction of its eventual count.
 
 ## Visualise the data
 
 The reporting triangle is the native data object.
-Plotting it with [AlgebraOfGraphics](https://aog.makie.org), the not-yet-reported
-cells blanked, shows the staircase of missing counts in the recent corner.
+Plotting it with [AlgebraOfGraphics](https://aog.makie.org), the not-yet-reported cells blanked, shows the staircase of missing counts in the recent corner.
 
 ```@example nowcast
 using AlgebraOfGraphics, CairoMakie, DataFrames
@@ -132,8 +107,7 @@ draw(data(tri_df) *
     axis = (xlabel = "Reference day", ylabel = "Reporting delay (days)"))
 ```
 
-The same truncation reads as a shortfall in the tail when the observed-so-far
-row-sums are drawn against the eventual totals.
+The same truncation reads as a shortfall in the tail when the observed-so-far row-sums are drawn against the eventual totals.
 
 ```@example nowcast
 comp_df = DataFrame(
@@ -147,16 +121,10 @@ draw(data(comp_df) * mapping(:reference, :count, color = :series) *
 
 ## Three fits
 
-We fit the plain renewal model three ways with NUTS, drawing **two chains**
-with **1000 warmup** iterations each so the cross-chain ``\hat R`` diagnostic is
-available, differentiating with
-[Mooncake](https://chalk-lab.github.io/Mooncake.jl/) (see
-[Automatic differentiation backend](@ref ad-backends)).
+We fit the plain renewal model three ways with NUTS, drawing **two chains** with **1000 warmup** iterations each so the cross-chain ``\hat R`` diagnostic is available, differentiating with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) (see [Automatic differentiation backend](@ref ad-backends)).
 The naive fit treats the truncated totals as complete, and motivates the problem.
-[`RightTruncate`](@ref) applies the marginal correction to the same observed-so-far
-totals.
-[`ReportTriangle`](@ref) applies the joint correction to the reporting triangle,
-built through the shared [`define_y_t`](@ref) hook.
+[`RightTruncate`](@ref) applies the marginal correction to the same observed-so-far totals.
+[`ReportTriangle`](@ref) applies the joint correction to the reporting triangle, built through the shared [`define_y_t`](@ref) hook.
 
 ```@example nowcast
 naive_model = IDModel(renewal, error)
@@ -182,8 +150,7 @@ tri_chain = sample(
 nothing # hide
 ```
 
-As a reference we also fit the plain model to the **complete** (untruncated)
-series, what the analyst would eventually see.
+As a reference we also fit the plain model to the **complete** (untruncated) series, what the analyst would eventually see.
 
 ```@example nowcast
 complete_post = as_turing_model(naive_model, eventual, n)
@@ -195,14 +162,10 @@ nothing # hide
 
 ## Recent Rt
 
-``R_t = \exp(Z_t)`` is a generated quantity, recovered per draw by re-running the
-fitted model over the chain with [`generated_observables`](@ref).
+``R_t = \exp(Z_t)`` is a generated quantity, recovered per draw by re-running the fitted model over the chain with [`generated_observables`](@ref).
 Averaging it over the most recent window shows the bias and its removal.
-Right-truncation biases the naive recent ``R_t`` *downward*, so the naive value
-sits below the two corrections, which lift it back up towards the complete-data
-reference.
-The exact numbers carry Monte Carlo noise on this short run, but the direction is
-the robust, repeatable signal.
+Right-truncation biases the naive recent ``R_t`` *downward*, so the naive value sits below the two corrections, which lift it back up towards the complete-data reference.
+The exact numbers carry Monte Carlo noise on this short run, but the direction repeats.
 
 ```@example nowcast
 using Statistics
@@ -221,15 +184,10 @@ end
 
 ## Posterior prediction, nowcast, and Rt
 
-Three views of the fits share the reference-day axis with the recent window
-shaded.
+Three views of the fits share the reference-day axis with the recent window shaded.
 The **``R_t``** panel plots the ``\exp(Z_t)`` bands of all four fits.
-The **nowcast** panel plots the reconstructed eventual totals ``Y_t = I_t`` for
-the two corrections against the true eventual totals and the truncated
-observed-so-far.
-The **posterior prediction** panel plots the [`RightTruncate`](@ref) model's
-posterior-predictive observed-so-far, recovered with `predict` on the same model
-with the observations set to `missing`, against the data it was fit to.
+The **nowcast** panel plots the reconstructed eventual totals ``Y_t = I_t`` for the two corrections against the true eventual totals and the truncated observed-so-far.
+The **posterior prediction** panel plots the [`RightTruncate`](@ref) model's posterior-predictive observed-so-far, recovered with `predict` on the same model with the observations set to `missing`, against the data it was fit to.
 
 ```@setup nowcast
 using Statistics
@@ -315,24 +273,14 @@ axislegend(ax3; position = :lt)
 fig
 ```
 
-In the shaded recent window the naive ``R_t`` (crimson) dips below the
-complete-data reference (black), while the two corrections lift the recent
-``R_t`` back up off that spurious decline.
-The nowcast panel shows the same story on the count scale, the corrections lifting
-the reconstructed eventual totals above the truncated observed-so-far towards the
-true eventual line.
-The posterior-predictive panel confirms the [`RightTruncate`](@ref) fit reproduces
-the observed-so-far series it saw.
+In the shaded recent window the naive ``R_t`` (crimson) dips below the complete-data reference (black), while the two corrections lift the recent ``R_t`` back up off that spurious decline.
+The nowcast panel shows the same story on the count scale, the corrections lifting the reconstructed eventual totals above the truncated observed-so-far towards the true eventual line.
+The posterior-predictive panel confirms the [`RightTruncate`](@ref) fit reproduces the observed-so-far series it saw.
 
 ## Shared parameters
 
-Neither correction touches the renewal process, so both recover the *same* shared
-parameters, the autoregressive damping ``\rho`` (`damp[1]`), the innovation
-scale ``\sigma`` (`std`), the observation overdispersion (`cluster_factor`) and
-the initial infections (`init_incidence`).
-`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
-chain that `summarystats` summarises directly, giving point estimates and their
-uncertainty alongside the effective sample size and ``\hat R``.
+Neither correction touches the renewal process, so both recover the *same* shared parameters, the autoregressive damping ``\rho`` (`damp[1]`), the innovation scale ``\sigma`` (`std`), the observation overdispersion (`cluster_factor`) and the initial infections (`init_incidence`).
+`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain that `summarystats` summarises directly, giving point estimates and their uncertainty alongside the effective sample size and ``\hat R``.
 
 ```@example nowcast
 using MCMCChains
@@ -341,10 +289,7 @@ summarystats(tri_chain)
 
 ## Prior versus posterior
 
-Sampling the reporting-triangle model with [`Prior`](https://turinglang.org/) and
-overlaying it on the posterior with
-[PairPlots.jl](https://sefffal.github.io/PairPlots.jl/) confirms the joint
-correction still identifies the shared parameters from the thinned triangle.
+Sampling the reporting-triangle model with [`Prior`](https://turinglang.org/) and overlaying it on the posterior with [PairPlots.jl](https://sefffal.github.io/PairPlots.jl/) confirms the joint correction still identifies the shared parameters from the thinned triangle.
 
 ```@example nowcast
 using PairPlots

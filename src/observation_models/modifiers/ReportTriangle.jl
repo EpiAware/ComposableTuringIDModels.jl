@@ -54,8 +54,8 @@ struct ReportingTriangle{A <: AbstractMatrix, M <: AbstractMatrix{Bool}}
 end
 
 # A `ReportingTriangle` keeps its counts in a struct field, which DynamicPPL
-# cannot see into, so narrow that field with the rest of the data — before the
-# triangle is stored on the model — rather than on every evaluation.
+# cannot see into, so that field is narrowed with the rest of the data before the
+# triangle is stored on the model.
 function concrete_observations(y::ReportingTriangle)
     counts = concrete_observations(y.counts)
     counts === y.counts && return y
@@ -223,9 +223,9 @@ function ReportTriangle(
     return ReportTriangle(error_model, ReportingPMF(distribution; D = D, Δd = Δd))
 end
 
-# The maximum reporting delay carried by the model (delays `0 … Dmax`). Read
-# statically from the delay submodel so `define_y_t` can size the triangle before
-# the PMF is sampled.
+# The maximum reporting delay carried by the model, covering delays `0 … Dmax`.
+# Read statically from the delay submodel so `define_y_t` can size the triangle
+# before the PMF is sampled.
 _triangle_Dmax(o::ReportTriangle) = _pmf_Dmax(o.delay_model)
 
 @doc raw"
@@ -316,15 +316,14 @@ function define_y_t(
     return define_y_t(obs_model, N, Y_t; now = now)
 end
 
-# The reporting triangle is assembled — and its count matrix narrowed — before
-# the model is built, not inside the model body. Everything the body needs is
-# then one of its own arguments. DynamicPPL owns any copying the count matrix
-# needs — it deepcopies an argument that still holds a `missing` — so a
-# ready-built `ReportingTriangle` handed in by a caller is never written to,
-# and no unpacking or narrowing runs per evaluation. Doing
-# any of it in the body also puts a run-time type computation on the AD path,
-# which crashes Mooncake's compiler ("Unreachable reached") when the count
-# matrix's element type is not known at inference time.
+# The reporting triangle is assembled, and its count matrix narrowed, before the
+# model is built rather than inside the model body.
+# Everything the body needs is then one of its own arguments, and DynamicPPL
+# deepcopies an argument that still holds a `missing`, so a ready-built
+# `ReportingTriangle` handed in by a caller is never written to.
+# Doing any of it in the body also puts a run-time type computation on the AD
+# path, which crashes Mooncake's compiler with "Unreachable reached" when the
+# count matrix's element type is not known at inference time.
 function as_turing_model(obs_model::ReportTriangle, y_t, Y_t)
     tri = define_y_t(obs_model, y_t, Y_t)
     n = length(Y_t)
@@ -335,11 +334,10 @@ function as_turing_model(obs_model::ReportTriangle, y_t, Y_t)
     )
 end
 
-# The scored half of `as_turing_model(::ReportTriangle, …)`. `y_t` is the bare
-# count matrix so that the tilde below scores `y_t[t, d + 1]` — a model
-# ARGUMENT — and DynamicPPL treats concrete cells as conditioned observations
-# (not latent variables to link) and `missing` ones as predictive draws to fill
-# in (widening/rebinding `y_t`).
+# `y_t` is the bare count matrix so the tilde below scores `y_t[t, d + 1]`, a
+# model argument.
+# DynamicPPL then treats concrete cells as conditioned observations rather than
+# latent variables to link, and `missing` ones as predictive draws to fill in.
 @model function _report_triangle_model(obs_model, y_t, observed, Dmax, Y_t)
     n = length(Y_t)
 

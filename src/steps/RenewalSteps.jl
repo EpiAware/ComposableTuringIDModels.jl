@@ -62,9 +62,9 @@ function renewal_pressure end
 
 renewal_pressure(::UniformScaling, g, window::AbstractVector) = dot(window, g)
 
-# Row-wise reductions rather than `window * g` and `K * v`: Enzyme forward has
-# no runtime-activity `gemv`. The vector case above is a `dot`, which it does
-# support.
+# Row-wise reductions rather than `window * g` and `K * v`, because Enzyme
+# forward has no runtime-activity `gemv`.
+# The vector case above is a `dot`, which it does support.
 function renewal_pressure(::UniformScaling, g, window::AbstractMatrix)
     return vec(sum(window .* reshape(g, 1, :); dims = 2))
 end
@@ -83,10 +83,11 @@ function renewal_pressure(K::AbstractMatrix, g, window::AbstractMatrix)
     return vec(sum(K .* reshape(renewal_pressure(I, g, window), 1, :); dims = 2))
 end
 
-# A per-pair generation interval, `K[g, h, i]` being the weight stratum `h`
-# puts on stratum `g` at lag `i`. The window runs oldest to newest, so lag `i`
-# is column `end - i + 1`; the reversed generation interval `g` is unused,
-# because the array carries the intervals itself.
+# A per-pair generation interval, `K[g, h, i]` being the weight stratum `h` puts
+# on stratum `g` at lag `i`.
+# The window runs oldest to newest, so lag `i` is column `end - i + 1`.
+# The reversed generation interval `g` is unused, because the array carries the
+# intervals itself.
 function renewal_pressure(
         K::AbstractArray{<:Any, 3}, g, window::AbstractMatrix
     )
@@ -162,10 +163,9 @@ ConstantRenewalStep(rev_gen_int) = ConstantRenewalStep(rev_gen_int, I)
 
 # --- window arithmetic ------------------------------------------------------
 #
-# One incidence window serves both shapes. A single series is a vector of the
-# last `lags` incidences. Several strata are a `strata × lags` matrix, one row
-# per stratum. Each helper has one method per shape, so the recursion, the
-# state assembly and the seeding are written once.
+# One incidence window serves both shapes.
+# A single series is a vector of the last `lags` incidences, and several strata
+# are a `strata × lags` matrix with one row per stratum.
 
 # The newest entry of the window is the incidence just committed.
 _newest(window::AbstractVector) = last(window)
@@ -226,9 +226,10 @@ function _commit(::AbstractConstantRenewalStep, state, incidence, substates)
     return (; val = incidence, window = _advance(state.window, incidence))
 end
 
-# One series: a window decaying at the implied rate. Several strata: one row
-# each, at that stratum's own seed and implied rate. `r` broadcasts, so it is a
-# scalar for a shared generation interval and a vector for per-stratum ones.
+# A single series is a window decaying at the implied rate, and several strata
+# are one such row each at that stratum's own seed and rate.
+# `r` broadcasts, so it is a scalar for a shared generation interval and a vector
+# for per-stratum ones.
 @doc raw"
 The incidence window a renewal scan starts from: `len_gen_int` values decaying
 at the rate `r` implied by ``R_0``, seeded at `I₀`. A vector for one series, a
@@ -307,6 +308,6 @@ function get_state(::ConstantRenewalStep, initial_state, state)
     return _series(state .|> x -> x.val)
 end
 
-# `ConstantRenewalStep` is the force-of-infection primitive. The renewal step
-# users build through the [`Renewal`](@ref) helper is `RenewalStep` (see
-# `RenewalStep.jl`), which wraps this core and composes modifiers on top.
+# `ConstantRenewalStep` is the force-of-infection primitive.
+# `RenewalStep` wraps it and composes modifiers on top, and is what the
+# [`Renewal`](@ref) helper builds.

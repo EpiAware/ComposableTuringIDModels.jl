@@ -38,10 +38,10 @@ struct CombineLatentModels{M <: AbstractVector, P <: AbstractVector{<:String}} <
         ) where {P <: AbstractVector{<:String}}
         @assert length(models) > 1 "At least two models are required"
         @assert length(models) == length(prefixes) "The number of models and prefixes must be equal"
-        # Each member is a length-`n` PATH slot, so a bare `Distribution` is
-        # wrapped in an `Intercept` (a constant path) before it is namespaced;
-        # then non-empty prefixes get a `PrefixLatentModel` so variables stay
-        # distinct. A process / `IID` / vector member passes through unchanged.
+        # Each member is a length-`n` path slot, so a bare `Distribution` is
+        # wrapped in an `Intercept` before it is namespaced.
+        # Non-empty prefixes then get a `PrefixLatentModel` so variables stay
+        # distinct.
         prefix_models = [
             prefixes[i] == "" ? path_prior(models[i]) :
                 PrefixLatentModel(path_prior(models[i]), prefixes[i])
@@ -59,10 +59,9 @@ function CombineLatentModels(models::AbstractVector)
 end
 
 # `CombineLatentModels` wraps whatever its member models return, so it serves
-# both a length-`n` path and an `(n_strata, n_time)` shape (`fill(0.0, n)`
-# builds a zero of either shape). The two methods below delegate to one shared
-# `@model`, which avoids both the duplication and a dispatch ambiguity against
-# the `AbstractPriorModel`/`Dims{2}` guard.
+# both a length-`n` path and an `(n_strata, n_time)` shape.
+# The two methods below delegate to one shared `@model`, which avoids a dispatch
+# ambiguity against the `AbstractPriorModel`/`Dims{2}` guard.
 @model function _combine_latents(latent_models::CombineLatentModels, n)
     final_latent ~ to_submodel(
         _accumulate_latents(

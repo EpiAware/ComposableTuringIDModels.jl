@@ -1,12 +1,5 @@
-# Exact Gaussian-process latent model.
-#
-# The exact counterpart of [`HilbertSpaceGP`](@ref): rather than the fixed
-# basis-function approximation, this forms the full covariance matrix from the
-# same ecosystem-standard [KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/)
-# kernel and factorises it. It is the reference an approximation is judged
-# against — accurate but ``O(n^3)`` per evaluation. The two share the standardised
-# input grid (`standardised_index`), so a given length scale means the same
-# thing for both.
+# This and [`HilbertSpaceGP`](@ref) share the standardised input grid
+# (`standardised_index`), so a given length scale means the same thing for both.
 
 @doc raw"
 An **exact Gaussian-process** latent process.
@@ -142,11 +135,9 @@ function ExactGP(;
     return ExactGP(length_scale, marginal_std, kernel, jitter)
 end
 
-# Inner Turing model over a PREBUILT input grid. The grid depends only on `n`,
-# so it is computed once in `as_turing_model` below rather than on every
-# log-density / gradient evaluation, exactly as `HilbertSpaceGP` does with its
-# basis. What is left inside the differentiated path is the part that genuinely
-# depends on the sampled parameters: the covariance and its Cholesky factor.
+# Inner Turing model over a prebuilt input grid.
+# The grid depends only on `n`, so it is computed once in `as_turing_model`
+# rather than on every log-density and gradient evaluation.
 @model function _exact_gp_model(
         kernel::Kernel, x, jitter,
         length_scale, marginal_std
@@ -154,31 +145,30 @@ end
     ℓ ~ length_scale
     σ ~ marginal_std
     z ~ filldist(Normal(), length(x))
-    # Scale the Gram matrix, not the kernel: `σ^2 * kernel` builds a
-    # KernelFunctions `ScaledKernel`, which asserts σ² > 0 at construction.
-    # NUTS can sample σ = 0.0 exactly (the prior floor, or an underflowed
-    # extreme excursion), so scaling the matrix keeps that a valid, if
-    # degenerate, draw instead of throwing mid-chain.
+    # Scale the Gram matrix rather than the kernel, because `σ^2 * kernel`
+    # builds a KernelFunctions `ScaledKernel` that asserts σ² > 0 at
+    # construction.
+    # NUTS can sample σ = 0.0 exactly, so scaling the matrix keeps that a valid
+    # if degenerate draw instead of throwing mid-chain.
     K = σ^2 .* kernelmatrix(with_lengthscale(kernel, ℓ), x)
-    # The nugget tracks the diagonal of K, which is σ². A fixed absolute
-    # nugget is swamped once σ is large and the factorisation then fails on a
-    # matrix that is only numerically indefinite, ending the chain. A nugget
-    # with a floor of `jitter` instead swamps the covariance when σ is small:
-    # at σ = 1e-3 a `jitter * (σ² + 1)` nugget inflates the variance by 100%.
-    # The absolute floor here is `jitter * eps()`, far below σ² for any
-    # representable σ, and only keeps the factorisation defined at σ = 0
-    # exactly, where K itself vanishes.
+    # The nugget tracks the diagonal of K, which is σ².
+    # A fixed absolute nugget is swamped once σ is large, and the factorisation
+    # then fails on a matrix that is only numerically indefinite, ending the
+    # chain.
+    # A nugget with a floor of `jitter` instead swamps the covariance when σ is
+    # small, inflating the variance by 100% at σ = 1e-3.
+    # The absolute floor of `jitter * eps()` is far below σ² for any
+    # representable σ and only keeps the factorisation defined at σ = 0, where K
+    # itself vanishes.
     L = cholesky(Symmetric(K + (jitter * (σ^2 + eps())) * I)).L
-    # Densify `L`: the triangular BLAS path (`trmv`) has no Enzyme forward
-    # rule, a plain `gemv` does. Same maths to within a rounding order, and an
-    # O(n^2) copy against the O(n^3) factorisation already paid.
+    # Densify `L` because the triangular BLAS path (`trmv`) has no Enzyme
+    # forward rule and a plain `gemv` does.
     gp = Matrix(L) * z
     return gp
 end
 
-# See the architecture note in HilbertSpaceGP.jl: `as_turing_model` is a plain
-# function that hoists the parameter-independent work and delegates to a single
-# inner `@model`, keeping the one `as_turing_model(model, n)` entry point.
+# A plain function, as in HilbertSpaceGP.jl, so the parameter-independent work
+# is hoisted out of the inner `@model`.
 function as_turing_model(model::ExactGP, n::Int)
     @assert n > 1 "n must be greater than 1"
     x = standardised_index(n)

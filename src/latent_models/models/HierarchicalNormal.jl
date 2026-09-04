@@ -49,8 +49,8 @@ function HierarchicalNormal(mean::Real, std::PriorLike)
 end
 
 @model function as_turing_model(model::HierarchicalNormal, n::Int)
-    # Draw the scale through the single seam: a `Distribution` gives one scalar
-    # (constant ``σ``); a process gives a length-`n` path (time-varying scale).
+    # The scale is drawn through the single seam, so it is a scalar or a
+    # length-`n` path.
     # Broadcasting `std .* ϵ_t` consumes both uniformly.
     std ~ as_turing_submodel(model.std, n; prefix = true)
     ϵ_t ~ as_turing_submodel(IID(Normal()), n)

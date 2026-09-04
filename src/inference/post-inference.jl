@@ -16,10 +16,9 @@ nothing
 "
 function spread_draws(chn::Chains)
     df = DataFrame(chn)
-    # `DataFrame(::Chains)` emits the bookkeeping columns as `.iteration` and
-    # `.chain` (current MCMCChains); normalise them and add a sequential `draw`
-    # index in tidybayes style. Older MCMCChains used undotted names, so accept
-    # either.
+    # Current MCMCChains emits the bookkeeping columns as `.iteration` and
+    # `.chain`, and older versions used undotted names, so accept either.
+    # A sequential `draw` index is added in tidybayes style.
     for (dotted, plain) in ((".iteration", "iteration"), (".chain", "chain"))
         if dotted in names(df)
             @rename!(df, $(plain) = $(dotted))

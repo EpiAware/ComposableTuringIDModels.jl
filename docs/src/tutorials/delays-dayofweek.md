@@ -1,21 +1,13 @@
 # [Reporting delays and day-of-week effects](@id tutorial-delays)
 
-Real surveillance data is rarely a clean count of infections on the day they
-occur. Cases are reported after a delay — an incubation period followed by a
-reporting lag — and the number reported depends on the day of the week. Tools
-for real-time estimation such as those of [abbott2020estimating](@citet) build
-these features into the observation model so that the latent infection signal is
-estimated free of reporting artefacts.
+Real surveillance data is rarely a clean count of infections on the day they occur.
+Cases are reported after a delay, an incubation period followed by a reporting lag, and the number reported depends on the day of the week.
+Tools for real-time estimation such as those of [abbott2020estimating](@citet) build these features into the observation model so the latent infection signal is estimated free of reporting artefacts.
 
-This tutorial keeps the renewal infection core of the
-[previous example](@ref tutorial-renewal) but replaces the simple observation
-model with a layered one: infections are convolved through two delay
-distributions and then modulated by a day-of-week reporting pattern. It also
-shows the latent process as an ARIMA-style differenced process broadcast to a
-weekly timescale, and assembles everything with [`IDProblem`](@ref). The model
-follows the configuration of the [EpiNow2](https://epiforecasts.io/EpiNow2/)
-package [abbott2020estimating](@citep) and is fit to daily confirmed COVID-19
-cases from Italy's first wave in 2020.
+This tutorial keeps the renewal infection core of the [previous example](@ref tutorial-renewal) but replaces the simple observation model with a layered one.
+Infections are convolved through two delay distributions and then modulated by a day-of-week reporting pattern.
+It also shows the latent process as an ARIMA-style differenced process broadcast to a weekly timescale, and assembles everything with [`IDProblem`](@ref).
+The model follows the configuration of the [EpiNow2](https://epiforecasts.io/EpiNow2/) package [abbott2020estimating](@citep) and is fit to daily confirmed COVID-19 cases from Italy's first wave in 2020.
 
 ## The model
 
@@ -28,15 +20,12 @@ y_t &\sim \mathrm{NegBinomial}\big(\omega_{t \bmod 7}\, D_t, \phi\big),
 \end{aligned}
 ```
 
-where ``\eta`` is the incubation-period pmf, ``\xi`` the reporting-delay pmf,
-and ``\omega`` a day-of-week reporting multiplier.
+where ``\eta`` is the incubation-period pmf, ``\xi`` the reporting-delay pmf, and ``\omega`` a day-of-week reporting multiplier.
 
 ## A weekly latent process
 
-The latent process is an ARIMA(2,1,1): an [`AR`](@ref)/[`MA`](@ref) combination
-([`arma`](@ref)) wrapped in a [`DiffLatentModel`](@ref) to difference it once.
-Differencing makes the level a random walk rather than mean-reverting, which
-suits a reproduction number that can drift.
+The latent process is an ARIMA(2,1,1), an [`AR`](@ref) and [`MA`](@ref) combination ([`arma`](@ref)) wrapped in a [`DiffLatentModel`](@ref) to difference it once.
+Differencing makes the level a random walk rather than mean-reverting, which suits a reproduction number that can drift.
 
 ```@example delays
 using ComposableTuringIDModels, Distributions, Random, Turing, Mooncake
@@ -53,10 +42,8 @@ arima211 = DiffLatentModel(; model = arma21, init = [Normal(0.3, 0.3)])
 nothing # hide
 ```
 
-[`broadcast_weekly`](@ref) makes the process piecewise-constant by week: a new
-value is drawn each week and held for seven days. This models ``R_t`` as
-changing weekly rather than daily, which both regularises the estimate and cuts
-the number of latent parameters.
+[`broadcast_weekly`](@ref) makes the process piecewise-constant by week, drawing a new value each week and holding it for seven days.
+This models ``R_t`` as changing weekly rather than daily, which regularises the estimate and cuts the number of latent parameters.
 
 ```@example delays
 weekly_latent = broadcast_weekly(arima211)
@@ -65,10 +52,8 @@ nothing # hide
 
 ## The infection process
 
-As before, a [`Renewal`](@ref) process driven by a discretised generation
-interval. Here we use a ``\mathrm{Gamma}(1.4, 1/0.38)`` generation time. The
-weekly ``\log R_t`` process built above is folded into the renewal model's `rt`
-slot.
+As before, a [`Renewal`](@ref) process is driven by a discretised generation interval, here a ``\mathrm{Gamma}(1.4, 1/0.38)`` generation time.
+The weekly ``\log R_t`` process built above is folded into the renewal model's `rt` slot.
 
 ```@example delays
 renewal = Renewal(; generation_time = Gamma(1.4, 1 / 0.38),
@@ -79,9 +64,7 @@ nothing # hide
 ## A layered observation model
 
 We start from the [`NegativeBinomialError`](@ref) link and build outward.
-[`ascertainment_dayofweek`](@ref) wraps it with a partially pooled day-of-week
-multiplier, so reporting can be systematically higher or lower on particular
-weekdays.
+[`ascertainment_dayofweek`](@ref) wraps it with a partially pooled day-of-week multiplier, so reporting can be systematically higher or lower on particular weekdays.
 
 ```@example delays
 negbin = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
@@ -90,14 +73,10 @@ dayofweek_negbin = ascertainment_dayofweek(
 nothing # hide
 ```
 
-[`LatentDelay`](@ref) convolves the expected observations with a delay
-distribution (discretised by double interval censoring). Two layers compose
-sequentially: a fixed incubation period from infection to symptom onset, then a
-reporting delay from onset to report whose parameters are *inferred*. The
-reporting delay is an [`UncertainDelay`](@ref): its `LogNormal` log-scale mean and
-standard deviation carry priors, so the delay is rediscretised each draw and
-estimated jointly with the reproduction number rather than fixed from external
-data.
+[`LatentDelay`](@ref) convolves the expected observations with a delay distribution discretised by double interval censoring.
+Two layers compose sequentially, a fixed incubation period from infection to symptom onset and then a reporting delay from onset to report whose parameters are *inferred*.
+The reporting delay is an [`UncertainDelay`](@ref), whose `LogNormal` log-scale mean and standard deviation carry priors.
+The delay is therefore rediscretised each draw and estimated jointly with the reproduction number rather than fixed from external data.
 
 ```@example delays
 incubation = LogNormal(1.6, 0.42)   # infection -> symptom onset (fixed)
@@ -109,12 +88,8 @@ observation = LatentDelay(LatentDelay(dayofweek_negbin, incubation), reporting)
 nothing # hide
 ```
 
-That single `observation` object now carries, from the inside out: a negative
-binomial link, a day-of-week ascertainment modifier, a fixed incubation-delay
-convolution, and an inferred reporting-delay convolution — assembled entirely by
-composition. The reporting-delay parameters flow through the same priors seam as
-every other parameter, so inferring the delay needs no change to the rest of the
-model.
+That single `observation` object now carries, from the inside out, a negative binomial link, a day-of-week ascertainment modifier, a fixed incubation-delay convolution, and an inferred reporting-delay convolution.
+The reporting-delay parameters flow through the same priors seam as every other parameter, so inferring the delay needs no change to the rest of the model.
 
 Each convolution shortens the expected series by `length(pmf) - 1`.
 Two stacked delays therefore need the infection process to start that many days before the first report.
@@ -130,8 +105,7 @@ The infection process runs over the extra lead-in days to support them, derived 
 
 ## The data
 
-We fit the model to the daily confirmed COVID-19 cases from Italy's first wave
-(the example series shipped with the EpiNow2 package), stored with the docs.
+We fit the model to the daily confirmed COVID-19 cases from Italy's first wave, the example series shipped with the EpiNow2 package and stored with the docs.
 
 ```@example delays
 using CSV, DataFrames
@@ -145,9 +119,9 @@ y_obs = italy.confirm[1:n]
 
 ## Assemble and fit
 
-[`IDProblem`](@ref) ties the latent, infection, and observation models to a
-time span. Its [`as_turing_model`](@ref) method takes data as a named tuple with
-a `y_t` field (passing `missing` values would instead simulate from the prior).
+[`IDProblem`](@ref) ties the latent, infection, and observation models to a time span.
+Its [`as_turing_model`](@ref) method takes data as a named tuple with a `y_t` field.
+Passing `missing` values would instead simulate from the prior.
 
 ```@example delays
 problem = IDProblem(
@@ -157,10 +131,8 @@ problem = IDProblem(
 nothing # hide
 ```
 
-Fitting conditions on the observed reports, differentiating with the recommended
-[Mooncake](https://chalk-lab.github.io/Mooncake.jl/) backend (see
-[Automatic differentiation backend](@ref ad-backends)). We draw two chains in
-parallel with `MCMCThreads()`, which gives a cross-chain ``\hat R``:
+Fitting conditions on the observed reports, differentiating with the recommended [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) backend, described under [Automatic differentiation backend](@ref ad-backends).
+We draw two chains in parallel with `MCMCThreads()`, which gives a cross-chain ``\hat R``.
 
 ```@example delays
 posterior = as_turing_model(problem, (y_t = y_obs,))
@@ -170,32 +142,23 @@ chain = sample(
 nothing # hide
 ```
 
-`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
-chain, which `summarystats` summarises directly — no conversion step. The
-day-of-week scale (`DayofWeek.std`), the negative-binomial overdispersion
-(`cluster_factor`) and the inferred reporting-delay parameters (`delay.θ`, the
-`LogNormal` log-mean and log-sd) appear alongside the latent-process parameters:
+`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which `summarystats` summarises directly.
+`DayofWeek.std` is the scale of the partially pooled weekday multipliers, namespaced because the ascertainment modifier introduces a named sub-process.
+`cluster_factor` is the negative-binomial overdispersion, and `delay.θ` are the inferred reporting-delay parameters, the `LogNormal` log-mean and log-sd.
 
 ```@example delays
 using MCMCChains
 summarystats(chain)
 ```
 
-`DayofWeek.std` is the scale of the partially
-pooled weekday multipliers (its own block, namespaced because the ascertainment
-modifier introduces a named sub-process); `cluster_factor` is the
-negative-binomial overdispersion; `delay.θ` are the inferred reporting-delay
-parameters. The day-of-week effect, the reporting delay, and the weekly
-reproduction number were all estimated jointly — and any of them can be swapped,
-fixed, or removed by editing one line of the composition above.
+The day-of-week effect, the reporting delay, and the weekly reproduction number were all estimated jointly.
+Any of them can be swapped, fixed, or removed by editing one line of the composition above.
 
 ## Prior versus posterior
 
-Sampling the same model with [`Prior`](https://turinglang.org/) gives a prior
-draw over the same parameters. Overlaying it on the posterior with
-[PairPlots.jl](https://sefffal.github.io/PairPlots.jl/) — the FlexiChains
-extension turns each chain, subset to a few keys, into a `PairPlots.Series` —
-shows which parameters the six weeks of Italian data moved.
+Sampling the same model with [`Prior`](https://turinglang.org/) gives a prior draw over the same parameters.
+Overlaying it on the posterior with [PairPlots.jl](https://sefffal.github.io/PairPlots.jl/) shows which parameters the six weeks of Italian data moved.
+The FlexiChains extension turns each chain, subset to a few keys, into a `PairPlots.Series`.
 
 ```@example delays
 using CairoMakie, PairPlots
@@ -208,20 +171,14 @@ pairplot(
     PairPlots.Series(prior_chain[pp_keys]; label = "prior"))
 ```
 
-The innovation scale ``\sigma`` (`diff.std`)
-and the negative-binomial overdispersion (`cluster_factor`) tighten under the
-data, while the autoregressive damping
-(`diff.damp`) and moving-average
-(`diff.θ`) coefficients of the ARIMA process stay
-close to their weakly informative priors.
+The innovation scale ``\sigma`` (`diff.std`) and the negative-binomial overdispersion (`cluster_factor`) tighten under the data.
+The autoregressive damping (`diff.damp`) and moving-average (`diff.θ`) coefficients of the ARIMA process stay close to their weakly informative priors.
 
 ## Posterior trajectories
 
-``R_t = \exp(Z_t)`` and the infections ``I_t`` are generated quantities recovered
-per draw with [`generated_observables`](@ref); the reports ``y_t`` are scored
-element-wise, so their posterior-predictive distribution comes from `predict` on
-the model with the observations set to `missing`. Two small helpers reduce the
-per-draw trajectories to credible bands.
+``R_t = \exp(Z_t)`` and the infections ``I_t`` are generated quantities recovered per draw with [`generated_observables`](@ref).
+The reports ``y_t`` are scored element-wise, so their posterior-predictive distribution comes from `predict` on the model with the observations set to `missing`.
+Two small helpers reduce the per-draw trajectories to credible bands.
 
 ```@setup delays
 using Statistics
@@ -278,24 +235,15 @@ The posterior-predictive band tracks the observed Italian reports, the layered o
 
 ## A time-varying reporting pattern
 
-The day-of-week multiplier above is *static*: one weekly profile held fixed
-across the series. Reporting behaviour can itself drift — testing capacity
-changes, weekend effects strengthen or weaken — and the same composition
-expresses that. Because the ascertainment modifier takes any latent model,
-replacing the pooled [`HierarchicalNormal`](@ref) weekday effect with a
-[`BroadcastLatentModel`](@ref) over a process that evolves week to week turns the
-fixed profile into a time-varying one, at the cost of more latent parameters. The
-structural change is again local to the observation model; the infection and
-latent ``R_t`` parts are untouched. We keep the static pattern here — it is
-identifiable from six weeks of data, where a fully time-varying weekday process
-would not be — and flag the richer variant rather than fit it.
+The day-of-week multiplier above is *static*, one weekly profile held fixed across the series.
+Reporting behaviour can itself drift as testing capacity changes or weekend effects strengthen, and the same composition expresses that.
+The ascertainment modifier takes any latent model, so replacing the pooled [`HierarchicalNormal`](@ref) weekday effect with a [`BroadcastLatentModel`](@ref) over a process that evolves week to week turns the fixed profile into a time-varying one, at the cost of more latent parameters.
+The change is again local to the observation model, leaving the infection and latent ``R_t`` parts untouched.
+We keep the static pattern here and flag the richer variant rather than fit it, because the static pattern is identifiable from six weeks of data and a fully time-varying weekday process would not be.
 
-The reporting *delay* can drift in the same way, through the same seam. An
-[`UncertainDelay`](@ref) parameter is a prior slot like any other, so replacing
-its constant log-mean prior with a process — a [`RandomWalk`](@ref) — makes the
-delay distribution itself time-varying: it is rediscretised at each time point and
-applied with a per-time convolution, while the log-scale spread keeps a constant
-prior.
+The reporting *delay* can drift in the same way, through the same seam.
+An [`UncertainDelay`](@ref) parameter is a prior slot like any other, so replacing its constant log-mean prior with a [`RandomWalk`](@ref) makes the delay distribution itself time-varying.
+It is then rediscretised at each time point and applied with a per-time convolution, while the log-scale spread keeps a constant prior.
 
 ```@example delays
 drifting = UncertainDelay(
@@ -305,10 +253,8 @@ tv_observation = LatentDelay(
 nothing # hide
 ```
 
-Nothing else changes: the infection process, the ``R_t`` prior, and the fitting
-code are identical — only which prior fills the delay's log-mean slot. As with the
-weekday profile we flag rather than fit it here, since a delay that drifts day to
-day asks more of six weeks of data than they can answer.
+Only which prior fills the delay's log-mean slot changes, leaving the infection process, the ``R_t`` prior and the fitting code identical.
+As with the weekday profile we flag rather than fit it here, because a delay that drifts day to day asks more of six weeks of data than they can answer.
 
 ## References
 

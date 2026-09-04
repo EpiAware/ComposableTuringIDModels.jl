@@ -1,20 +1,11 @@
 # [Renewal model with negative-binomial reporting](@id tutorial-renewal)
 
-The renewal equation is the workhorse of real-time epidemic estimation: it
-expresses new infections as a function of past infections weighted by the
-generation interval, scaled by a time-varying reproduction number ``R_t``
-[cori2013new](@citep). [mishra2020derivation](@citet) showed that this renewal
-construction follows from an age-dependent branching process and pairs naturally
-with a negative-binomial observation model to give a Bayesian hierarchical model
-for reported case counts.
+The renewal equation expresses new infections as a function of past infections weighted by the generation interval, scaled by a time-varying reproduction number ``R_t`` [cori2013new](@citep).
+[mishra2020derivation](@citet) showed that this construction follows from an age-dependent branching process and pairs with a negative-binomial observation model to give a Bayesian hierarchical model for reported case counts.
 
-This tutorial builds that model from two composed parts — a [`Renewal`](@ref)
-infection process that carries an autoregressive latent process for ``\log R_t``,
-and a [`NegativeBinomialError`](@ref) observation model — and fits it to the
-test-confirmed COVID-19 cases from South Korea that [mishra2020derivation](@citet)
-analysed. The latent ``\log R_t`` process is *folded into* the renewal model
-rather than supplied as a separate top-level component: the reproduction number
-is the renewal model's own parameter process.
+This tutorial builds that model from two composed parts and fits it to the test-confirmed COVID-19 cases from South Korea that [mishra2020derivation](@citet) analysed.
+The parts are a [`Renewal`](@ref) infection process carrying an autoregressive latent process for ``\log R_t``, and a [`NegativeBinomialError`](@ref) observation model.
+The latent ``\log R_t`` process is *folded into* the renewal model rather than supplied as a separate top-level component, because the reproduction number is the renewal model's own parameter process.
 
 ## The model
 
@@ -27,19 +18,12 @@ y_t &\sim \mathrm{NegBinomial}(I_t, \phi).
 \end{aligned}
 ```
 
-``g_s`` is the discretised generation interval, ``\rho`` the autoregressive
-damping, ``\sigma`` the innovation standard deviation, and ``\phi`` the
-observation overdispersion.
+``g_s`` is the discretised generation interval, ``\rho`` the autoregressive damping, ``\sigma`` the innovation standard deviation, and ``\phi`` the observation overdispersion.
 
 ## Components
 
-The latent process is a second-order autoregressive model on ``\log R_t`` with a
-[`HierarchicalNormal`](@ref) innovation term, matching [mishra2020derivation](@citet).
-Strong autocorrelation in the reproduction number is encoded by a first damping
-prior concentrated near one (``\rho_1 \sim \mathrm{Normal}(0.8, 0.05)`` on
-``[0,1]``) with a weaker second lag. This process is the renewal model's
-reproduction-number process — it is folded into the infection model below rather
-than composed separately.
+The latent process is a second-order autoregressive model on ``\log R_t`` with a [`HierarchicalNormal`](@ref) innovation term, matching [mishra2020derivation](@citet).
+Strong autocorrelation in the reproduction number is encoded by a first damping prior concentrated near one, ``\rho_1 \sim \mathrm{Normal}(0.8, 0.05)`` on ``[0,1]``, with a weaker second lag.
 
 ```@example renewal
 using ComposableTuringIDModels, Distributions, Random, Turing, Mooncake
@@ -53,15 +37,11 @@ latent = AR(
     ϵ_t = HierarchicalNormal(std = HalfNormal(0.1)))
 ```
 
-The infection process needs a discrete generation interval. [`Renewal`](@ref)
-takes a continuous distribution and discretises it with double interval
-censoring [charniga2024best](@citep), using
-[CensoredDistributions.jl](https://github.com/EpiAware/CensoredDistributions.jl).
-Following [mishra2020derivation](@citet) we use a ``\mathrm{Gamma}(6.5, 0.62)``
-serial interval as a proxy for the generation interval. [`Renewal`](@ref) is the
-only infection model that carries a generation interval, because it is the only
-one that uses one; it couples that interval to the latent ``\log R_t`` process
-(its `rt` slot) and a prior for the initial infections.
+The infection process needs a discrete generation interval.
+[`Renewal`](@ref) takes a continuous distribution and discretises it with double interval censoring [charniga2024best](@citep), using [CensoredDistributions.jl](https://github.com/EpiAware/CensoredDistributions.jl).
+Following [mishra2020derivation](@citet) we use a ``\mathrm{Gamma}(6.5, 0.62)`` serial interval as a proxy for the generation interval.
+[`Renewal`](@ref) is the only infection model that carries a generation interval, because it is the only one that uses one.
+It couples that interval to the latent ``\log R_t`` process in its `rt` slot and a prior for the initial infections.
 
 ```@example renewal
 renewal = Renewal(; generation_time = Gamma(6.5, 0.62),
@@ -69,12 +49,9 @@ renewal = Renewal(; generation_time = Gamma(6.5, 0.62),
 renewal.gen_int
 ```
 
-The stored `gen_int` is a probability vector — the continuous serial interval
-binned into daily weights that sum to one. Double interval censoring is not the
-same as evaluating the continuous density at integer days: it accounts for both
-the primary and secondary events falling anywhere within their days, which
-shifts and spreads the mass relative to the underlying ``\mathrm{Gamma}``
-[charniga2024best](@citep).
+The stored `gen_int` is a probability vector, the continuous serial interval binned into daily weights that sum to one.
+Double interval censoring is not the same as evaluating the continuous density at integer days.
+It accounts for both the primary and secondary events falling anywhere within their days, which shifts and spreads the mass relative to the underlying ``\mathrm{Gamma}`` [charniga2024best](@citep).
 
 ```@example renewal
 sum(renewal.gen_int), length(renewal.gen_int)
@@ -82,15 +59,10 @@ sum(renewal.gen_int), length(renewal.gen_int)
 
 ## The infection process in isolation
 
-Because the renewal model is a model in its own right, it can be exercised on its
-own — without an observation model — and we can isolate the contribution of the
-renewal equation by *pinning* its reproduction-number process to a known
-trajectory. With the latent folded in, the way to do that is to build a renewal
-model whose `rt` slot is a deterministic [`FixedIntercept`](@ref) latent, giving
-a constant ``\log R_t``, and to fix the initial-infections parameter. The same
-[`as_turing_model`](@ref) call that composes into the full model then runs the
-infection process standalone, returning its infections `I_t` and the internal
-latent draw `Z_t`.
+The renewal model is a model in its own right, so it can be exercised without an observation model.
+Pinning its reproduction-number process to a known trajectory isolates the contribution of the renewal equation.
+With the latent folded in, that means building a renewal model whose `rt` slot is a deterministic [`FixedIntercept`](@ref) latent, giving a constant ``\log R_t``, and fixing the initial-infections parameter.
+The same [`as_turing_model`](@ref) call that composes into the full model then runs the infection process standalone, returning its infections `I_t` and the internal latent draw `Z_t`.
 
 ```@example renewal
 fixed_logR = log(1.4)
@@ -101,42 +73,32 @@ demo = fix(as_turing_model(renewal_fixed, 60), (init_incidence = 0.0,))()
     grows = demo.I_t[end] > demo.I_t[1])
 ```
 
-A constant ``R_t > 1`` grows incidence; a ``\log R_t`` path that declined through
-zero would instead produce the textbook turn-over (incidence growing,
-decelerating as ``R_t \to 1``, and falling once ``R_t < 1``). Driving the renewal
-model with a richer fixed path is just a matter of swapping the
-[`FixedIntercept`](@ref) latent for a deterministic latent of the desired shape.
-Nothing here is conditioned on data; the component is inspected in isolation
-before it is assembled into the full model with its sampled ``R_t`` process.
+A constant ``R_t > 1`` grows incidence.
+A ``\log R_t`` path that declined through zero would instead produce the textbook turn-over, with incidence growing, decelerating as ``R_t \to 1``, and falling once ``R_t < 1``.
+Driving the renewal model with a richer fixed path means swapping the [`FixedIntercept`](@ref) latent for a deterministic latent of the desired shape.
 
-Reported cases are overdispersed counts of the latent infections. The prior is
-placed on the cluster factor ``\sqrt{1/\phi}``, which is roughly the coefficient
-of variation of the observation noise and so easier to reason about a priori.
+Reported cases are overdispersed counts of the latent infections.
+The prior is placed on the cluster factor ``\sqrt{1/\phi}``, which is roughly the coefficient of variation of the observation noise and so easier to reason about a priori.
 
 ```@example renewal
 obs = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 nothing # hide
 ```
 
-[`IDModel`](@ref) assembles the two parts — the renewal infection process
-(which already carries the latent ``R_t`` process) and the observation model —
-into one composed model.
+[`IDModel`](@ref) assembles the renewal infection process, which already carries the latent ``R_t`` process, and the observation model into one composed model.
 
 ```@example renewal
 model = IDModel(renewal, obs)
 ```
 
-Before fitting, the composed model is also a prior simulator: passing `missing`
-observations makes [`as_turing_model`](@ref) return generated quantities — the
-reported cases `generated_y_t`, the latent infections `I_t`, and the latent
-process `Z_t` — instead of conditioning on data. That is the mechanism used for
-the prior checks above; here we go straight to real data.
+The composed model is also a prior simulator.
+Passing `missing` observations makes [`as_turing_model`](@ref) return generated quantities instead of conditioning on data: the reported cases `generated_y_t`, the latent infections `I_t`, and the latent process `Z_t`.
+Here we go straight to real data.
 
 ## The data
 
-[mishra2020derivation](@citet) fit this model to daily test-confirmed COVID-19
-cases in South Korea over the first wave of 2020. The series is stored with the
-docs and read with [CSV](https://csv.juliadata.org)/[DataFrames](https://dataframes.juliadata.org).
+[mishra2020derivation](@citet) fit this model to daily test-confirmed COVID-19 cases in South Korea over the first wave of 2020.
+The series is stored with the docs and read with [CSV](https://csv.juliadata.org) and [DataFrames](https://dataframes.juliadata.org).
 
 ```@example renewal
 using CSV, DataFrames
@@ -146,9 +108,7 @@ south_korea = CSV.read(datapath, DataFrame)
 first(south_korea, 5)
 ```
 
-We fit the growth-and-decline window of the first wave, matching the span used by
-[mishra2020derivation](@citet), and take the reported cases over it as the
-observed series.
+We fit the growth-and-decline window of the first wave, matching the span used by [mishra2020derivation](@citet), and take the reported cases over it as the observed series.
 
 ```@example renewal
 tspan = (45, 80)
@@ -160,13 +120,10 @@ n = length(y_obs)
 
 ## Fit
 
-Conditioning on the observed counts and sampling with NUTS recovers the
-posterior. We draw two chains in parallel with `MCMCThreads()` so the posterior
-is well resolved and the cross-chain ``\hat R`` diagnostic is available; the
-slightly raised target acceptance rate keeps the sampler stable on the
-hierarchical innovation scale. We differentiate with
-[Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for
-this package (see [Automatic differentiation backend](@ref ad-backends)).
+Conditioning on the observed counts and sampling with NUTS recovers the posterior.
+We draw two chains in parallel with `MCMCThreads()` so the posterior is well resolved and the cross-chain ``\hat R`` diagnostic is available.
+The slightly raised target acceptance rate keeps the sampler stable on the hierarchical innovation scale.
+We differentiate with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for this package, described under [Automatic differentiation backend](@ref ad-backends).
 
 ```@example renewal
 posterior = as_turing_model(model, y_obs, n)
@@ -176,21 +133,10 @@ chain = sample(
 nothing # hide
 ```
 
-Sampling returns a chain whose parameter names are flat: composition does not
-namespace by default, so a component's own parameter keeps its plain name
-however deeply it is nested — `damp` and `std` below belong to the AR
-process folded into the renewal model.
-A few components deliberately prefix their children, and two components that
-would otherwise use the same name are separated by wrapping one in
-`PrefixLatentModel` or `PrefixObservationModel`.
-`sample` returns a
-[FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which
-`summarystats` summarises directly — no conversion step — giving point estimates
-*and* their uncertainty alongside the effective sample size and ``\hat{R}``
-convergence diagnostic. The autoregressive damping ``\rho``
-(`damp[1]`), the innovation scale ``\sigma`` (`std`), and the
-observation cluster factor ``\sqrt{1/\phi}`` (`cluster_factor`) are all
-identified from the observed South Korean series:
+Sampling returns a chain whose parameter names are flat.
+Composition does not namespace by default, so a component's own parameter keeps its plain name however deeply it is nested, and `damp` and `std` below belong to the AR process folded into the renewal model.
+A few components deliberately prefix their children, and two components that would otherwise use the same name are separated by wrapping one in `PrefixLatentModel` or `PrefixObservationModel`.
+`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which `summarystats` summarises directly, giving point estimates and their uncertainty alongside the effective sample size and ``\hat{R}`` convergence diagnostic.
 
 ```@example renewal
 using MCMCChains
@@ -199,14 +145,10 @@ summarystats(chain)
 
 ## Prior versus posterior
 
-Before reading the trajectories it is worth asking what the data taught us.
-Sampling the *same* model with [`Prior`](https://turinglang.org/) — ignoring the
-observations — gives a prior draw over the same parameters, and overlaying it on
-the posterior shows which parameters moved. We load a
-[Makie](https://docs.makie.org) backend and
-[PairPlots.jl](https://sefffal.github.io/PairPlots.jl/); the FlexiChains PairPlots
-extension turns a chain (subset to a few keys with `chain[[...]]`) into a
-`PairPlots.Series`, so prior and posterior overlay on one corner plot.
+Sampling the *same* model with [`Prior`](https://turinglang.org/), ignoring the observations, gives a prior draw over the same parameters.
+Overlaying it on the posterior shows which parameters moved.
+We load a [Makie](https://docs.makie.org) backend and [PairPlots.jl](https://sefffal.github.io/PairPlots.jl/).
+The FlexiChains PairPlots extension turns a chain subset to a few keys with `chain[[...]]` into a `PairPlots.Series`, so prior and posterior overlay on one corner plot.
 
 ```@example renewal
 using CairoMakie, PairPlots
@@ -219,22 +161,16 @@ pairplot(
     PairPlots.Series(prior_chain[pp_keys]; label = "prior"))
 ```
 
-The innovation scale ``\sigma`` (`std`) is sharply updated away from
-its prior — the data are informative about how much ``\log R_t`` wiggles — while
-the autoregressive damping ``\rho`` (`damp`), the cluster factor and the
-initial infections stay closer to their priors on this short window.
+The innovation scale ``\sigma`` (`std`) is sharply updated away from its prior, so the data are informative about how much ``\log R_t`` moves.
+The autoregressive damping ``\rho`` (`damp`), the cluster factor and the initial infections stay closer to their priors on this short window.
 
 ## Posterior trajectories
 
-The reproduction number ``R_t = \exp(Z_t)`` is a *generated quantity* rather than
-a sampled parameter. [`generated_observables`](@ref) re-runs the fitted model
-over the chain to recover the latent ``Z_t`` and infection ``I_t`` trajectories
-per draw. The reported counts ``y_t`` are scored element-wise, so their posterior
-*predictive* distribution — fresh counts drawn under each posterior parameter set
-— comes from `predict` on the same model with the observations set to `missing`.
+The reproduction number ``R_t = \exp(Z_t)`` is a *generated quantity* rather than a sampled parameter.
+[`generated_observables`](@ref) re-runs the fitted model over the chain to recover the latent ``Z_t`` and infection ``I_t`` trajectories per draw.
+The reported counts ``y_t`` are scored element-wise, so their posterior *predictive* distribution comes from `predict` on the same model with the observations set to `missing`.
 
-A couple of small helpers reduce the per-draw trajectories to credible bands and
-draw a median line with 50% and 95% ribbons.
+A couple of small helpers reduce the per-draw trajectories to credible bands and draw a median line with 50% and 95% ribbons.
 
 ```@setup renewal
 using Statistics
@@ -273,8 +209,7 @@ function predictive_bands(pred, n)
 end
 ```
 
-Stack the per-draw ``Z_t`` into an ``R_t`` band, draw the posterior-predictive
-``y_t`` from the unconditioned model, and plot both against the observed series:
+Stack the per-draw ``Z_t`` into an ``R_t`` band, draw the posterior-predictive ``y_t`` from the unconditioned model, and plot both against the observed series.
 
 ```@example renewal
 gens = vec(generated_observables(posterior, y_obs, chain).generated)
@@ -296,18 +231,14 @@ axislegend(ax2; position = :lt)
 fig
 ```
 
-The posterior-predictive band tracks the observed South Korean series closely,
-and the ``R_t`` path recovers the first-wave turn-over: an early rise well above
-one, a fall through ``R_t = 1`` as the wave peaks, and a decline below one as
-cases drop.
+The posterior-predictive band tracks the observed South Korean series closely.
+The ``R_t`` path recovers the first-wave turn-over, with an early rise well above one, a fall through ``R_t = 1`` as the wave peaks, and a decline below one as cases drop.
 
 ## Forecasting the next weeks
 
-The same fitted model forecasts out of sample in one call. Because the latent
-[`AR`](@ref) process is non-centred, [`forecast`](@ref) carries each posterior draw
-forward — holding the fitted parameters and the in-sample ``\log R_t`` path fixed,
-and continuing the process over the horizon with fresh prior innovations — then
-draws the future reported cases:
+The same fitted model forecasts out of sample in one call.
+The latent [`AR`](@ref) process is non-centred, so [`forecast`](@ref) carries each posterior draw forward and then draws the future reported cases.
+It holds the fitted parameters and the in-sample ``\log R_t`` path fixed, and continues the process over the horizon with fresh prior innovations.
 
 ```@example renewal
 h = 14
@@ -316,7 +247,6 @@ size(fc)
 ```
 
 The returned chain carries the predicted ``y_t`` over ``t = n+1, \dots, n+h``.
-We can then plot these forecasts:
 
 ```@example renewal
 # Multi-level CI band quantiles: 90%, 60%, 30% + median
@@ -367,8 +297,7 @@ fig_fc
 
 ## Swap a component
 
-Because the parts share one interface, an alternative observation assumption is
-a one-line change.
+The parts share one interface, so an alternative observation assumption is a one-line change.
 Swapping the negative-binomial reporting for a [`PoissonError`](@ref) leaves the renewal infection process and its latent ``R_t`` process untouched.
 
 ```@example renewal

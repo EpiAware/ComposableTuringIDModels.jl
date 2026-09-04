@@ -64,19 +64,18 @@ end
     q = model.q
     @assert n > q "n must be longer than the order of the moving average process"
     if q == 1
-        # Order 1: draw the coefficient through the single seam — a `Distribution`
-        # gives a scalar (constant), a process a length-`(n-1)` path. MA is not
-        # recursive, so one broadcast (`θ` scalar or path both broadcast over the
-        # lagged innovations) serves both: `Z_t = ϵ_t + θ_{t-1} ϵ_{t-1}`.
+        # Order 1 draws the coefficient through the single seam.
+        # MA is not recursive, so one broadcast over the lagged innovations
+        # serves both a scalar and a path, giving `Z_t = ϵ_t + θ_{t-1} ϵ_{t-1}`.
         θ ~ as_turing_submodel(_order1_prior(model.θ), n - 1; prefix = true)
         ϵ_t ~ as_turing_submodel(model.ϵ_t, n)
         return vcat(ϵ_t[1], ϵ_t[2:n] .+ θ .* ϵ_t[1:(n - 1)])
     end
     θ ~ as_turing_submodel(model.θ, q; prefix = true)
     ϵ_t ~ as_turing_submodel(model.ϵ_t, n)
-    # `MAStep`'s buffer is newest-first, so the seed must be reversed:
-    # `reverse(ϵ_t[1:q])` puts `ϵ_q` first, pairing `θ[1]` with the most recent
-    # innovation. `get_state` reverses the output back to natural order.
+    # `MAStep`'s buffer is newest-first, so `reverse(ϵ_t[1:q])` puts `ϵ_q` first
+    # and pairs `θ[1]` with the most recent innovation.
+    # `get_state` reverses the output back to natural order.
     ma = accumulate_scan(
         MAStep(θ), (; val = 0.0, state = reverse(ϵ_t[1:q])), ϵ_t[(q + 1):end]
     )

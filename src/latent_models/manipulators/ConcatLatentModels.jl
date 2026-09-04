@@ -51,11 +51,10 @@ struct ConcatLatentModels{
         @assert typeof(check_dim) <: AbstractVector{Int} "Output of dimension_adaptor must be a vector of integers"
         @assert length(check_dim) == no_models "The vector of dimensions must have the same length as the number of models"
         @assert length(prefixes) == no_models "The number of models and prefixes must be equal"
-        # Each member is a length-`n` (segment) PATH slot, so a bare
-        # `Distribution` is wrapped in an `Intercept` (a constant segment) before
-        # it is namespaced; then non-empty prefixes get a `PrefixLatentModel` so
-        # variables stay distinct. A process / `IID` / vector member passes
-        # through unchanged.
+        # Each member is a length-`n` segment path slot, so a bare
+        # `Distribution` is wrapped in an `Intercept` before it is namespaced.
+        # Non-empty prefixes then get a `PrefixLatentModel` so variables stay
+        # distinct.
         prefix_models = [
             prefixes[i] == "" ? path_prior(models[i]) :
                 PrefixLatentModel(path_prior(models[i]), prefixes[i])

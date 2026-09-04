@@ -1,6 +1,4 @@
-# Broadcasting of a shorter latent process to length `n`: the broadcast-rule
-# supertype, the generic `broadcast_n`/`broadcast_rule` interface, and the
-# `BroadcastLatentModel` wrapper.
+# Broadcasting of a shorter latent process to length `n`.
 
 @doc raw"
 Abstract supertype for broadcast rules used by [`BroadcastLatentModel`](@ref).
@@ -107,15 +105,14 @@ function BroadcastLatentModel(
     return BroadcastLatentModel(model, period, broadcast_rule)
 end
 
-# How a rule appears in a model tree. The default is the rule's name; a rule
-# carrying a field that distinguishes it from another of the same type overrides
-# this. Built here rather than from `show`, which module-qualifies the name
-# outside the package's own scope.
+# How a rule appears in a model tree.
+# Built here rather than from `show`, which module-qualifies the name outside the
+# package's own scope.
 _rule_label(rule::AbstractBroadcastRule) = string(nameof(typeof(rule)))
 
-# What a `BroadcastLatentModel` does is set by its rule, not by its own type, so
-# the tree label carries the rule. Without it a day-of-week effect and a
-# windowed effect print identically.
+# What a `BroadcastLatentModel` does is set by its rule rather than by its own
+# type, so the tree label carries the rule.
+# Without it a day-of-week effect and a windowed effect print identically.
 _node_label(m::BroadcastLatentModel) =
     string(nameof(typeof(m)), "(", _rule_label(m.broadcast_rule), ")")
 

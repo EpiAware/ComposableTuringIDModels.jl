@@ -1,6 +1,7 @@
 # What data an observation chain needs, and how much of the infection series its
-# delays consume before it scores anything. Structural accessors over an
-# assembled observation model: no sampling, and no data beyond its shape.
+# delays consume before it scores anything.
+# Structural accessors over an assembled observation model, with no sampling and
+# no data beyond its shape.
 
 @doc raw"
 The number of leading time points an observation model consumes before it scores
@@ -69,10 +70,11 @@ observation_lead_in(streams)
 function observation_lead_in end
 
 # The single observation model a component wraps, or `nothing` for one that
-# consumes the expected series itself. Read through the traversal seam, so a new
-# length-preserving modifier needs no accessor of its own. A `Split` wraps
-# several models in parallel rather than one; it is not a link in a chain, and
-# every walk below gives it its own method.
+# consumes the expected series itself.
+# Read through the traversal seam, so a new length-preserving modifier needs no
+# accessor of its own.
+# A `Split` is not a link in a chain, so every walk below gives it its own
+# method.
 _wrapped_model(model::AbstractObservationModel) = _single_wrapped(
     wrapped_models(model)
 )
@@ -88,9 +90,10 @@ function observation_lead_in(model::AbstractObservationModel)
     return inner === nothing ? 0 : observation_lead_in(inner)
 end
 
-# Add a component's own lead-in to the one it wraps. The wrapped side is a plain
-# count until a `Split` with unequal streams reports one per stream; from there
-# the surrounding chain's lead-in is added to every stream.
+# Add a component's own lead-in to the one it wraps.
+# The wrapped side is a plain count until a `Split` with unequal streams reports
+# one per stream, after which the surrounding chain's lead-in is added to every
+# stream.
 _add_lead_in(a::Int, b::Int) = a + b
 _add_lead_in(a::Int, b::NamedTuple) = map(x -> _add_lead_in(a, x), b)
 
@@ -101,19 +104,19 @@ function observation_lead_in(model::LatentDelay)
     )
 end
 
-# The lead-in of a delay specification: one less than the length of the PMF it
-# convolves with. Every supported specification fixes that length before any
-# parameter is drawn — a stored (reversed) PMF and a per-time sequence of PMFs
-# carry it directly, and an `UncertainDelay` fixes it with its horizon `D` and
-# bin width `Δd`, which is exactly why `D` is required.
+# The lead-in of a delay specification is one less than the length of the PMF it
+# convolves with.
+# Every supported specification fixes that length before any parameter is drawn.
+# An `UncertainDelay` fixes it with its horizon `D` and bin width `Δd`, which is
+# why `D` is required.
 _delay_lead_in(pmf::AbstractVector{<:Real}) = length(pmf) - 1
 _delay_lead_in(pmfs::AbstractVector{<:AbstractVector{<:Real}}) =
     _delay_lead_in(first(pmfs))
 _delay_lead_in(u::UncertainDelay) = length(0.0:(u.Δd):(u.D - u.Δd)) - 1
 
 # Anything else is a delay component whose PMF length is not knowable before it
-# is sampled. Say so rather than returning a zero that would silently drop
-# observations — the failure this accessor exists to prevent.
+# is sampled.
+# Say so rather than returning a zero that would silently drop observations.
 function _delay_lead_in(spec)
     throw(
         ArgumentError(
@@ -126,42 +129,45 @@ function _delay_lead_in(spec)
 end
 
 # A `Split`'s streams are parallel branches of one expected series, so they share
-# a lead-in rather than accumulating one. Streams that consume the same amount
-# report it once; streams that consume different amounts report one lead-in each,
-# because no single number describes them all. A strata template is one model
-# replicated across streams, so it reports its own.
+# a lead-in rather than accumulating one.
+# Streams that consume the same amount report it once.
+# Streams that consume different amounts report one lead-in each, because no
+# single number describes them all.
 function observation_lead_in(model::Split)
     model.streams isa NamedTuple || return observation_lead_in(model.streams)
     lead_ins = map(observation_lead_in, model.streams)
     return allequal(values(lead_ins)) ? first(values(lead_ins)) : lead_ins
 end
 
-# An aggregation moves the axis: what it wraps consumes reporting WINDOWS rather
-# than time points. Those windows are drawn from the series the aggregation was
-# already given, and the ones a nested delay consumes are simply left
-# unpredicted, so nothing about the infection series changes and the lead-in in
-# time points is zero. What does change is how many windows are scored, which
-# `_n_scored` reads off the same nesting. (A delay applied OUTSIDE an
-# aggregation is on the time axis and is the ordinary lengthening case.)
+# An aggregation moves the axis, so what it wraps consumes reporting windows
+# rather than time points.
+# Those windows come from the series the aggregation was already given, so
+# nothing about the infection series changes and the lead-in in time points is
+# zero.
+# What changes is how many windows are scored, which `_n_scored` reads off the
+# same nesting.
+# A delay applied outside an aggregation is on the time axis and is the ordinary
+# lengthening case.
 observation_lead_in(::Aggregate) = 0
 
-# The lead-in the infection series has to cover. A chain consumes its own lead-in
-# from the head of the series; a `Split`'s streams consume theirs in parallel, so
-# the series must be long enough for the deepest of them.
+# The lead-in the infection series has to cover.
+# A `Split`'s streams consume theirs in parallel, so the series must be long
+# enough for the deepest of them.
 _series_lead_in(model) = _max_lead_in(observation_lead_in(model))
 
 _max_lead_in(lead_in::Int) = lead_in
 _max_lead_in(lead_in::NamedTuple) = maximum(values(lead_in))
 
-# The observation chain a requirements report runs over. A bare observation
-# model is its own chain; the composed wrappers hand theirs over (their methods
-# sit with the types, in `compose.jl` and `IDProblem.jl`).
+# The observation chain a requirements report runs over.
+# A bare observation model is its own chain.
+# The composed wrappers hand theirs over, with their methods beside the types in
+# `compose.jl` and `IDProblem.jl`.
 _observation_chain(model::AbstractObservationModel) = model
 
 # The per-stream observation models a chain fans out to, or `nothing` when it
-# scores a single series. Follows the same structural path as
-# `observation_lead_in`, so a report is keyed by the same streams and each
-# stream's data is read through the model that actually scores it.
+# scores a single series.
+# Follows the same structural path as `observation_lead_in`, so a report is keyed
+# by the same streams.
 _stream_models(m::AbstractObservationModel) = _stream_models(_wrapped_model(m))
 
 # The walk reached the component that consumes the expected series without
@@ -225,11 +231,11 @@ struct StreamRequirement
     n_supplied::Union{Int, Nothing}
 end
 
-# A stream is satisfied when every observation supplied for it is scored. A
-# right-aligning stream scores the last `n_max` it is given, so anything up to
-# that is covered and more than that would drop the head. A stream that does not
-# right-align has to match exactly. Asking without data satisfies nothing and
-# fails nothing.
+# A stream is satisfied when every observation supplied for it is scored.
+# A right-aligning stream scores the last `n_max` it is given, so anything up to
+# that is covered and more than that would drop the head.
+# A stream that does not right-align has to match exactly.
+# Asking without data satisfies nothing and fails nothing.
 function _stream_fits(r::StreamRequirement)
     r.n_supplied === nothing && return true
     r.alignment === :exact && return r.n_supplied == r.n_max
@@ -404,21 +410,21 @@ function _stream_requirement(
 end
 
 # Whether a component reads its data on the calendar it was handed rather than
-# on the convolved series. Only an `Aggregate` does: its reporting windows are
-# indexed off `length(y_t)`, and it right-aligns a shorter expected series
-# against them. A `ReportTriangle` builds its triangle from the series it
-# actually reads, so it does not.
+# on the convolved series.
+# Only an `Aggregate` does, because its reporting windows are indexed off
+# `length(y_t)` and it right-aligns a shorter expected series against them.
+# A `ReportTriangle` builds its triangle from the series it actually reads.
 _needs_input_calendar(model::AbstractObservationModel) = _needs_input_calendar(
     _wrapped_model(model)
 )
 _needs_input_calendar(::Nothing) = false
 _needs_input_calendar(::Aggregate) = true
 
-# Whether a stream right-aligns its data against its expected series. The
-# per-time-point error families do, so a shorter series is scored at the end and
-# the earlier expected values are unobserved run-in. An `Aggregate` indexes its
-# data by a presence mask over the expected series, and a `ReportTriangle`
-# asserts its reference days, so neither tolerates a length that differs.
+# Whether a stream right-aligns its data against its expected series.
+# The per-time-point error families do, so a shorter series is scored at the end.
+# An `Aggregate` indexes its data by a presence mask over the expected series and
+# a `ReportTriangle` asserts its reference days, so neither tolerates a length
+# that differs.
 _alignment(model::AbstractObservationModel) = _alignment(_wrapped_model(model))
 _alignment(::Nothing) = :right
 _alignment(::Aggregate) = :exact
@@ -429,9 +435,10 @@ _alignment(::ReportTriangle) = :exact
 _stream(x::NamedTuple, k::Symbol) = x[k]
 _stream(x, ::Symbol) = x
 
-# The component that actually reads the data. The data reaches the end of a
-# chain untouched — a modifier reshapes the expected series, not the
-# observations — so the walk descends to whatever consumes it.
+# The component that actually reads the data.
+# A modifier reshapes the expected series rather than the observations, so the
+# data reaches the end of a chain untouched and the walk descends to whatever
+# consumes it.
 _consumer(model::AbstractObservationModel) = _descend_consumer(
     model, _wrapped_model(model)
 )
@@ -448,19 +455,20 @@ _consumer(model::ReportTriangle) = model
 _data_contract(::AbstractObservationModel) = (shape = :series, fields = ())
 
 # A model needing more than the counts takes them in the `y` field of a
-# `NamedTuple` (see `define_y_t`); the other fields are per-time-point
-# covariates, not observations.
+# `NamedTuple`.
+# The other fields are per-time-point covariates rather than observations.
 _data_contract(::BinomialError) = (shape = :series, fields = (:y, :N))
 
-# A reporting triangle is a reference-day × delay matrix, counted down the
-# reference days: the delay columns are one reference day's report split by
-# delay, not further time points.
+# A reporting triangle is a reference-day × delay matrix counted down the
+# reference days.
+# The delay columns are one reference day's report split by delay rather than
+# further time points.
 _data_contract(::ReportTriangle) = (shape = :triangle, fields = ())
 
-# How many of a stream's `n` supplied entries enter the likelihood. One per time
-# point everywhere except an `Aggregate`, which sums the series into reporting
-# windows and hands the error model one value per window; the days its presence
-# mask leaves out are never scored.
+# How many of a stream's `n` supplied entries enter the likelihood.
+# One per time point everywhere except an `Aggregate`, which hands the error
+# model one value per reporting window and never scores the days its presence
+# mask leaves out.
 _n_scored(model::AbstractObservationModel, n::Int) = _n_scored(
     _wrapped_model(model), n
 )
@@ -478,8 +486,9 @@ _present_mask(ag::Aggregate, n) =
     broadcast_rule(RepeatEach(), ag.present, n, length(ag.present))
 
 # How much data was supplied for a stream, on the axis its requirement is
-# counted along. `nothing` when there is nothing to count: a `missing` stream is
-# simulated at whatever length the chain produces, and so fits by construction.
+# counted along.
+# A `missing` stream is simulated at whatever length the chain produces and so
+# fits by construction, giving `nothing`.
 _n_supplied(shape::Symbol, y_t) = shape === :triangle ?
     _n_triangle_supplied(y_t) : _n_series_supplied(y_t)
 
@@ -507,10 +516,10 @@ _counts_time_axis(::Any) = false
 
 # A stratified model scores its expected series over `eachindex(Y_t)`, so a bare
 # error model sees one flat series of `n_strata * n_time` entries rather than a
-# matrix. Its length is a strata-major count, not a time-axis one, and comparing
-# it against a time-axis `n_max` reads `n_strata` times too many observations.
-# Put it back on the time axis first. `strata == 1` makes this a no-op for every
-# unstratified model.
+# matrix.
+# That length is a strata-major count, and comparing it against a time-axis
+# `n_max` reads `n_strata` times too many observations, so put it back on the
+# time axis first.
 function _supplied_on_time_axis(shape::Symbol, y_t, strata::Int)
     supplied = _n_supplied(shape, y_t)
     supplied === nothing && return nothing
@@ -540,9 +549,7 @@ function Base.show(io::IO, ::MIME"text/plain", s::StreamRequirement)
     return _show_stream(io, s)
 end
 
-# Compact forms, for a report nested inside something else (a tuple in a
-# docstring example, a vector of reports). The struct's own field dump says
-# nothing a reader wants.
+# Compact forms, for a report nested inside something else.
 function Base.show(io::IO, r::DataRequirements)
     print(io, "DataRequirements(", r.n, " observations, ")
     print(io, length(r.streams), " stream")
@@ -574,14 +581,15 @@ end
 
 # --- the check `as_turing_model` runs --------------------------------------
 
-# What `as_turing_model` refuses. More observations than a chain can score is an
-# error, because their head would never enter the likelihood. Fewer is not: the
-# data is right-aligned, so a series that starts later is scored at the end.
-# The one exception is a shortfall of exactly the chain's lead-in, which is the
-# old meaning of `n`.
+# What `as_turing_model` refuses.
+# More observations than a chain can score is an error, because their head would
+# never enter the likelihood.
+# Fewer is not, because the data is right-aligned and a series that starts later
+# is scored at the end.
+# The one exception is a shortfall of exactly the chain's lead-in.
 #
-# This walks the chain rather than building a `DataRequirements`: an
-# `IDProblem`'s model body reassembles its `IDModel` on every evaluation, so
+# This walks the chain rather than building a `DataRequirements`.
+# An `IDProblem`'s model body reassembles its `IDModel` on every evaluation, so
 # the check runs per evaluation and must not allocate.
 function _check_observation_count(model, y_t, n::ModelShape)
     chain = _observation_chain(model)
@@ -637,10 +645,10 @@ function _check_exact_length(::Val{:exact}, name, supplied, n_max)
     )
 end
 
-# A shortfall of exactly the chain's lead-in is the old meaning of `n`, where
+# A shortfall of exactly the chain's lead-in is the old meaning of `n`, where `n`
 # was the infection series length and the caller added the lead-in by hand.
-# Every observation would still be scored, but against a model run over a
-# longer series than the caller means, so name it.
+# Every observation would still be scored, but against a model run over a longer
+# series than the caller means, so name it.
 function _check_legacy_n_length(name, supplied, lead_in, n)
     (lead_in > 0 && n - supplied == lead_in) || return nothing
     throw(

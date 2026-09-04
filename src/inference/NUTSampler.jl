@@ -55,10 +55,10 @@ function _apply_nuts(model, method, prev_result; kwargs...)
         max_depth = method.max_depth, Δ_max = method.Δ_max,
         init_ϵ = method.init_ϵ, metricT = method.metricT
     )
-    # The AbstractMCMC keyword is `n_adapts`; the old `nadapts` was silently
-    # swallowed by `kwargs...`, so `NUTSampler.nadapts` never took effect and the
-    # default adaptation was always used. `nadapts == -1` is the sentinel for
-    # "use the Turing default", so only forward an explicit value.
+    # The AbstractMCMC keyword is `n_adapts`, and the old `nadapts` was silently
+    # swallowed by `kwargs...`, so `NUTSampler.nadapts` never took effect.
+    # `nadapts == -1` is the sentinel for the Turing default, so only an explicit
+    # value is forwarded.
     adapt_kwargs = method.nadapts == -1 ? (;) : (; n_adapts = method.nadapts)
     return sample(
         model, nuts,

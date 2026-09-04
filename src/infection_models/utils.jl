@@ -61,13 +61,15 @@ function R_to_r(R₀, w::AbstractVector{T}; newton_steps = 2, Δd = 1.0) where {
 end
 
 # The two renewal infection models, which are the ones carrying a generation
-# interval: the deterministic scan and the centred stochastic loop take the
-# same arguments, so the deterministic summaries below serve both.
+# interval.
+# The deterministic scan and the centred stochastic loop take the same
+# arguments, so the deterministic summaries below serve both.
 const _RenewalModel = Union{Renewal, StochasticRenewal}
 
 # The fixed generation interval of a renewal model, or a clear error when it is
-# inferred: an uncertain interval (a pmf-producing prior model) varies per draw,
-# so there is no single interval for these deterministic summaries to use.
+# inferred.
+# An uncertain interval varies per draw, so there is no single interval for these
+# deterministic summaries to use.
 function _fixed_gen_int(infection::_RenewalModel)
     infection.gen_int isa AbstractVector && return infection.gen_int
     throw(
@@ -150,12 +152,12 @@ end
 _steps(Rt::AbstractVector) = Rt
 _steps(Rt::AbstractMatrix) = collect.(eachcol(Rt))
 
-# The initial-infections seed: one value for a single series, one per stratum
-# otherwise. A bare `Distribution` in the slot draws one scalar; a `Number` (or a
-# length-1 vector) is returned unchanged, so it also covers the `n::Int` case
-# directly. Broadcast against `n::Dims{2}` gives the same seed to every stratum.
-# The slot is a LEVEL, so a draw of any other length is an error rather than a
-# silently collapsed path; `SeedingPath` is the way to estimate a seeding window.
+# The initial-infections seed is one value for a single series and one per
+# stratum otherwise.
+# Broadcast against `n::Dims{2}` gives the same seed to every stratum.
+# The slot is a level, so a draw of any other length is an error rather than a
+# silently collapsed path, and `SeedingPath` is the way to estimate a seeding
+# window.
 function _seed(x, ::Int)
     length(x) == 1 || throw(
         ArgumentError(
@@ -173,20 +175,19 @@ function _seed(x::AbstractVector, n::Dims{2})
     return x
 end
 
-# The implied initial growth rate from a seed `R_t` and generation interval,
-# widened to a per-stratum `R_t` and/or a per-stratum generation interval: a
-# shared interval broadcasts across strata (`Ref(w)`), a per-stratum interval
-# (one row per stratum) is read row by row.
+# The implied initial growth rate from a seed `R_t` and generation interval.
+# A shared interval broadcasts across strata with `Ref(w)`, and a per-stratum
+# interval is read row by row.
 _init_rate(Rt₀::Real, w::AbstractVector) = R_to_r(Rt₀, w)
 _init_rate(Rt₀::AbstractVector, w::AbstractVector) = R_to_r.(Rt₀, Ref(w))
 function _init_rate(Rt₀::AbstractVector, w::AbstractMatrix)
     return [R_to_r(Rt₀[g], view(w, g, :)) for g in eachindex(Rt₀)]
 end
 
-# Everything both renewal models do before their recursions diverge. That is the
-# `R_t` path, the generation interval and the step it bakes, the seeding window
-# and the initial state. `Renewal` scans it and `StochasticRenewal` loops over
-# it drawing as it goes.
+# Everything both renewal models do before their recursions diverge.
+# That is the `R_t` path, the generation interval and the step it bakes, the
+# seeding window and the initial state.
+# `Renewal` scans it and `StochasticRenewal` loops over it drawing as it goes.
 #
 # Called through `to_submodel(..., false)`, which keeps `Z_t`, `gen`,
 # `init_incidence` and `scan_step` at the names they carry when drawn inline.
@@ -194,12 +195,10 @@ end
     Z_t ~ as_turing_submodel(infection.rt, n)
     Rt = infection.transformation.(Z_t)
 
-    # The generation interval is either fixed (its baked renewal step used
-    # directly) or inferred: a pmf-producing prior model sampled through the
-    # single seam at the shape the renewal needs, with the lag-0 bin dropped
-    # and the remainder renormalised per draw. The step is rebuilt per draw so
-    # the gradient flows through the discretisation, with `mixing` and the
-    # modifiers folded in as the constructors fold them into the baked step.
+    # An inferred generation interval is sampled through the single seam, with
+    # the lag-0 bin dropped and the remainder renormalised per draw.
+    # The step is rebuilt per draw so the gradient flows through the
+    # discretisation.
     if infection.gen_int isa AbstractPriorModel
         gen ~ as_turing_submodel(
             infection.gen_int, _gen_int_shape(n)...; prefix = true
@@ -213,10 +212,10 @@ end
         step = infection.recurrent_step
     end
 
-    # The `initialisation` slot is either a level at ``t_0`` — one value, or one
-    # per stratum — or a whole seeding path, drawn at the incidence window's own
-    # shape. Both branches are decided by the slot's type, so nothing is chosen
-    # at run time.
+    # The `initialisation` slot is either a level at ``t_0`` or a whole seeding
+    # path drawn at the incidence window's own shape.
+    # Both branches are decided by the slot's type, so nothing is chosen at run
+    # time.
     if infection.initialisation isa SeedingPath
         init_incidence ~ as_turing_submodel(
             infection.initialisation.model,
@@ -228,11 +227,10 @@ end
         )
     end
 
-    # Resolve the step before the recursion: any modifier carrying priors (e.g.
-    # `ImportedCases`) draws them here and hands back the modifier the recursion
-    # uses, and a drawn `mixing` model (e.g. `Gravity`) draws its parameters and
-    # hands back a resolved core, while a purely deterministic step returns
-    # itself. One seam, no branch on what the step's modifiers or mixing are.
+    # Resolve the step before the recursion, so a modifier or a `mixing` model
+    # carrying priors draws them here and hands back what the recursion uses.
+    # A purely deterministic step returns itself, so nothing here branches on
+    # what the step holds.
     scan_step ~ as_turing_submodel(step, n)
 
     Rts = _steps(Rt)

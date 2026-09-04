@@ -1,7 +1,7 @@
-# Stack several (possibly different) infection processes into one
-# infection-strata x time `I_t` matrix. Complements `Split`/`StrataMap`, which
-# carry the observation-side mapping from an `inf_strata x time` matrix onto
-# observation streams.
+# Stack several infection processes into one `infection-strata × time` `I_t`
+# matrix.
+# `Split` and `StrataMap` carry the observation-side mapping from that matrix
+# onto observation streams.
 
 @doc raw"
 Combine several infection processes into one `n_strata x n_time` `I_t` matrix.

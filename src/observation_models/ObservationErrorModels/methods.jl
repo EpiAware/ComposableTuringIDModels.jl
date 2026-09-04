@@ -1,7 +1,3 @@
-# Shared observation-error-model machinery: the error supertype, the generic
-# `as_turing_model` loop, and the `observation_error` /
-# `generate_observation_error_priors` interface.
-
 @doc raw"
 Internal supertype shared by simple observation-error models (Poisson, negative
 binomial).
@@ -15,12 +11,8 @@ deeper hierarchy than this.
 "
 abstract type AbstractObservationErrorModel <: AbstractObservationModel end
 
-# The steps of `Y_t` that are scored. The observed and expected series end at
-# the same time point, so they are right-aligned and the head of whichever is
-# longer is left out: surplus observations are the chain's lead-in, and surplus
-# expected values are unobserved run-in. A `Split` produces the latter whenever
-# one branch's chain consumes a shorter lead-in than another's, since a single
-# series length has to serve every branch.
+# The two series end at the same time point, so the head of whichever is longer
+# goes unscored.
 _scored_steps(diff_t, Y_t) = max(1, 1 - diff_t):length(Y_t)
 
 @doc raw"
@@ -61,19 +53,15 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
             __model__.context, __varinfo__, y, diff_t, Y_t, dist
         )
     else
-        # The count series scored by this model (plain vector, or `missing`,
-        # replaced by a length-`Y_t` vector of `missing`). Rebinding `y_t`
-        # keeps DynamicPPL treating the entries as conditioned observations.
+        # Rebinding `y_t` keeps DynamicPPL treating the entries as
+        # conditioned observations.
         y_t = y
 
         diff_t = length(y_t) - length(Y_t)
 
-        # Every entry is scored, including a `missing` one, so the blanks are
-        # drawn. That is how a predictive draw is taken from a fully missing
-        # series, and how `forecast` fills a horizon appended to a matrix (a
-        # matrix is never split into a carrier). A partially-missing vector
-        # conditioned through `IDModel` arrives as a `MissingObservations`
-        # carrier above instead, which decides per entry.
+        # Every entry is scored, so a `missing` one is drawn.
+        # A partially-missing vector conditioned through `IDModel` arrives as a
+        # `MissingObservations` carrier above instead, which decides per entry.
         for i in _scored_steps(diff_t, Y_t)
             y_t[i + diff_t] ~ dist(i)
         end
@@ -81,28 +69,6 @@ lets a [`Split`](@ref) thread one stream's expectation into another.
     return (; y_t, expected = Y_t)
 end
 
-# Score the observed entries of a `MissingObservations` carrier against a
-# per-time-point distribution, without tilde-ing against a `Union{Missing,T}`
-# value.
-#
-# An absent entry is missing at random, so it drops out of the likelihood: it
-# is skipped, not sampled. There is nothing to infer at a point that carries
-# no likelihood term, and imputing one breaks a discrete stream outright — a
-# count distribution has no bijector for HMC to link it with — as well as
-# adding a dead gradient dimension to a continuous one. Predictive values at
-# the gaps come from replaying the posterior after fitting; `forecast` builds
-# its horizon that way.
-#
-# `y_t[i] ~ dist` decides sample-vs-observe by checking `y_t[i] === missing`
-# at run time, so it needs a value that can hold `missing` at that lens, and
-# building that array inside a model body is exactly what Enzyme's
-# reverse-mode type analysis cannot compile. Driving
-# `DynamicPPL.tilde_observe!!` off the carrier's own concrete `present` mask
-# needs no such value: every array the likelihood touches stays plainly
-# typed.
-#
-# Returns the scored series (the observed entries as given, the absent ones
-# `missing`) and the updated `VarInfo`.
 function (d::_ErrorDist)(i)
     return observation_error(
         d.obs_model, d.pad_Y_t[i], map(p -> at(p, i), values(d.priors))...
@@ -113,21 +79,29 @@ function (d::_TrialDist)(i)
     return observation_error(d.obs_model, d.p_t[i], d.N_t[i + d.n_diff])
 end
 
+# An absent entry is missing at random, so it drops out of the likelihood
+# rather than being sampled.
+# Imputing one breaks a discrete stream outright, because a count distribution
+# has no bijector for HMC to link it with, and adds a dead gradient dimension to
+# a continuous one.
+#
+# `y_t[i] ~ dist` decides sample-vs-observe by checking `y_t[i] === missing` at
+# run time, so it needs an array that can hold `missing`, and building one
+# inside a model body is what Enzyme's reverse-mode type analysis cannot
+# compile.
+# Driving `DynamicPPL.tilde_observe!!` off the carrier's own concrete `present`
+# mask needs no such array.
 function _score_missing_observations!!(
         context, varinfo, y::MissingObservations, diff_t, Y_t, dist
     )
     n = length(y.value)
-    # `scored` mixes the observed values with `missing` at the gaps, so it is
-    # untyped until every entry is in. Narrowing it with the final `identity.()`
-    # (the same idiom `concrete_observations` uses) keeps this step off the
-    # model's stored arguments — it runs after every tilde call has already
+    # `scored` is untyped until every entry is in.
+    # The final `identity.()` narrowing runs after every tilde call has
     # accumulated its log-probability, so it is not part of what Enzyme
     # differentiates.
     scored = Vector{Any}(undef, n)
     for i in _scored_steps(diff_t, Y_t)
         idx = i + diff_t
-        # A gap reaches no tilde at all, so it costs neither a `VarName` nor a
-        # `VarInfo` entry.
         y.present[idx] || continue
         vn = DynamicPPL.VarName{:y_t}(DynamicPPL.Index((idx,), NamedTuple()))
         val = y.value[idx]
@@ -136,9 +110,9 @@ function _score_missing_observations!!(
         )
         scored[idx] = val
     end
-    # Left unassigned above: every marginalised gap, and any entry outside the
-    # scored window (reached when `Y_t` is shorter than `y_t`, e.g. a delay
-    # convolution, and so never scored). Keep both as given.
+    # Left unassigned above are the marginalised gaps and any entry outside the
+    # scored window, reached when `Y_t` is shorter than `y_t`.
+    # Keep both as given.
     for idx in 1:n
         isassigned(scored, idx) && continue
         scored[idx] = y.present[idx] ? y.value[idx] : missing
@@ -177,31 +151,25 @@ define_y_t(PoissonError(), (y = [1, 2, 3],), fill(10.0, 3))
 ```
 "
 function define_y_t(::AbstractObservationErrorModel, y_t, Y_t)
-    # A NamedTuple carries the counts in its `y` field; a plain value is the
-    # counts directly. Either way, a `missing` count series becomes a length-`Y_t`
-    # vector of `missing` for predictive simulation.
     y = y_t isa NamedTuple ? y_t.y : y_t
     y = _restore_missing(y)
     return ismissing(y) ? Vector{Missing}(missing, length(Y_t)) : y
 end
 
 # Rebuild the ragged `Vector{Union{Missing,T}}` a `MissingObservations` carrier
-# stands in for, for standalone `define_y_t` calls that fall through to the
-# `~`-sugar loop above (the hot loop itself never takes this path — see
-# `_score_missing_observations!!`).
+# stands in for.
+# Only standalone `define_y_t` calls reach this.
+# The hot loop goes through `_score_missing_observations!!` instead.
 _restore_missing(y) = y
 _restore_missing(y::MissingObservations) = map((v, p) -> p ? v : missing, y.value, y.present)
 
-# The series an error model scores, detached from the caller's data.
-#
 # A series reached through a `NamedTuple` field is not a model argument, so
 # DynamicPPL neither copies nor promotes it and the `y_t[i] ~ …` sugar would
-# write a blank's draw straight back into the caller's array. Narrowing it with
-# [`concrete_observations`](@ref) (what an `IDModel` applies to its own `y_t`)
-# turns any blank into a [`MissingObservations`](@ref) carrier scored by
-# reading only. A series passed as the model's own `y_t` argument already has
-# DynamicPPL's copy, and an `IDModel`-narrowed series is already a carrier or
-# a concrete vector, so both pass through untouched.
+# write a blank's draw straight back into the caller's array.
+# Narrowing it with [`concrete_observations`](@ref) turns any blank into a
+# [`MissingObservations`](@ref) carrier that is scored by reading only.
+# A series passed as the model's own `y_t` argument already has DynamicPPL's
+# copy, so it passes through untouched.
 _scored_series(obs_model, y_t, Y_t) = define_y_t(obs_model, y_t, Y_t)
 _scored_series(obs_model, y_t::MissingObservations, Y_t) = y_t
 function _scored_series(obs_model, y_t::NamedTuple, Y_t)

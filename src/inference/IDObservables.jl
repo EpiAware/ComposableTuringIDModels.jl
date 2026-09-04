@@ -52,11 +52,11 @@ function generated_observables(model, data, solution)
     return IDObservables(model, data, solution, _generated_quantities(model, solution))
 end
 
-# Re-run the (conditioned) model over the posterior draws to recover its returned
-# generated quantities per draw. `solution` may be an `MCMCChains.Chains` or a
-# FlexiChains chain (Turing's sampler output), so we don't dispatch on a single
-# concrete chain type — we ask `returned` to consume it and treat anything it
-# cannot (an optimiser result, a prior draw, …) as "no generated quantities".
+# Re-run the conditioned model over the posterior draws to recover its returned
+# generated quantities per draw.
+# `solution` may be an `MCMCChains.Chains` or a FlexiChains chain, so rather than
+# dispatching on a concrete chain type this asks `returned` to consume it and
+# treats anything it cannot as having no generated quantities.
 _generated_quantities(model, solution) = missing
 function _generated_quantities(model::DynamicPPL.Model, solution)
     return try

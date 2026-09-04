@@ -98,16 +98,37 @@ nor sampled, and costing no parameter. Predictive values at those points come
 from replaying the posterior afterwards, not from carrying them through the fit
 (see [`forecast`](@ref)).
 
+The carrier reads like the ragged vector it replaces. It reports `length` and
+`size`. A scalar index gives `missing` at an absent entry, and a vector index
+gives a carrier of the selected entries. A component that subsets its data
+positionally, such as [`Aggregate`](@ref), therefore takes one unchanged.
+
 # Examples
 ```@example MissingObservations
 using ComposableTuringIDModels: MissingObservations
 carrier = MissingObservations([1.0, 0.0, 3.0], [true, false, true])
-carrier.value[carrier.present]
+carrier[2], carrier[[1, 3]].value
 ```
 "
 struct MissingObservations{V <: AbstractVector, M <: AbstractVector{Bool}}
     value::V
     present::M
+end
+
+# Deliberately not an `AbstractVector` subtype. The observation-error models
+# dispatch on the carrier to score it by reading only, and inheriting array
+# behaviour would let it fall back into the `y_t[i] ~ ...` sugar those methods
+# exist to avoid.
+Base.length(y::MissingObservations) = length(y.value)
+Base.size(y::MissingObservations) = size(y.value)
+function Base.eltype(::Type{MissingObservations{V, M}}) where {V, M}
+    return Union{Missing, eltype(V)}
+end
+function Base.getindex(y::MissingObservations, i::Integer)
+    return y.present[i] ? y.value[i] : missing
+end
+function Base.getindex(y::MissingObservations, idx::AbstractVector)
+    return MissingObservations(y.value[idx], y.present[idx])
 end
 
 # Per-time-point error distributions, as concrete callables. A closure defined
@@ -119,9 +140,8 @@ struct _ErrorDist{M, P, R}
     priors::R
 end
 
-# `n_diff` right-aligns the trials against the expected series, in the same
-# way the observations are aligned, so the trials vector may be given at either
-# length. See `_trial_dist`.
+# `n_diff` right-aligns the trials against the expected series the same way the
+# observations are aligned, so the trials vector may be given at either length.
 struct _TrialDist{M, P, N}
     obs_model::M
     p_t::P

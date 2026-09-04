@@ -64,10 +64,9 @@ struct Hierarchy{M <: PriorLike, A <: PriorLike} <: AbstractLatentModel
     across::A
 
     function Hierarchy(mean, across)
-        # `across` is a length-`n_groups` PATH slot (one deviation per group), so
-        # a bare `Distribution` is wrapped in an `Intercept` (a constant, shared
-        # deviation broadcast across groups), never left as a scalar. `mean` is a
-        # single shared level, so it stays a bare scalar prior.
+        # `across` is a length-`n_groups` path slot, so a bare `Distribution` is
+        # wrapped in an `Intercept` rather than left as a scalar.
+        # `mean` is a single shared level, so it stays a bare scalar prior.
         wrapped = path_prior(across)
         return new{typeof(mean), typeof(wrapped)}(mean, wrapped)
     end
@@ -79,9 +78,9 @@ end
 
 @model function as_turing_model(h::Hierarchy, n_groups::Int)
     @assert n_groups > 0 "n_groups must be greater than 0"
-    # One shared level μ (a single global draw), plus n_groups deviations from the
-    # cross-group prior: the latent parameterises the pooling (iid ⇒ exchangeable,
-    # RandomWalk ⇒ correlated neighbours). The result is a numeric per-group path.
+    # One shared level μ plus `n_groups` deviations from the cross-group prior.
+    # The latent parameterises the pooling, so `IID` gives exchangeable groups and
+    # a `RandomWalk` gives correlated neighbours.
     mean ~ as_turing_submodel(h.mean, 1; prefix = true)
     group_effects ~ as_turing_submodel(h.across, n_groups; prefix = true)
     return only(mean) .+ group_effects
