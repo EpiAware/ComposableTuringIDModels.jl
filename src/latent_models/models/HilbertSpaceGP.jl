@@ -1,13 +1,8 @@
-# Hilbert-space approximate Gaussian-process latent model.
-#
-# The covariance kernels are the ecosystem-standard types from
-# [KernelFunctions.jl](https://juliagaussianprocesses.github.io/KernelFunctions.jl/):
-# `SqExponentialKernel`, `Matern32Kernel` and `Matern52Kernel`. KernelFunctions
-# defines the kernels (and their Gram matrices, which the reconstruction tests use
-# as ground truth) but not the *spectral densities* the Hilbert-space
-# approximation needs, so this file adds a `spectral_density` method for each. New
-# kernels plug in by adding a `spectral_density(::MyKernel, ω, σ, ℓ)` method — no
-# other change to `HilbertSpaceGP` is required.
+# KernelFunctions.jl defines the kernels but not the spectral densities the
+# Hilbert-space approximation needs, so this file adds a `spectral_density`
+# method for each.
+# A new kernel plugs in by adding `spectral_density(::MyKernel, ω, σ, ℓ)` and
+# needs no other change.
 
 @doc raw"
 Spectral density ``S(\omega)`` of a [`HilbertSpaceGP`](@ref) covariance `kernel` at
@@ -65,26 +60,23 @@ function spectral_density(::Matern52Kernel, ω, σ, ℓ)
     return σ^2 * (16 / 3) * ν^5 ./ (ν^2 .+ ω .^ 2) .^ 3
 end
 
-# Shared guard for the `spectral_density` methods. A zero length scale makes the
-# Matérn densities NaN (ν = √(2p+1)/ℓ = Inf, then Inf^p/Inf^p), so reject it
-# with a diagnostic rather than let a NaN basis reach the sampler. The two GP
-# models reject a hyperprior that could reach here at construction (see
-# `_check_hyperprior_support`), so for them this is a backstop for a direct call
-# rather than something a chain can hit.
+# A zero length scale makes the Matérn densities NaN, through ν = √(2p+1)/ℓ =
+# Inf and then Inf^p/Inf^p, so it is rejected rather than left to reach the
+# sampler as a NaN basis.
+# `_check_hyperprior_support` already rejects a hyperprior that could get here,
+# so this is a backstop for a direct call.
 function _check_spectral_args(σ, ℓ)
     @assert ℓ > 0 "the length scale ℓ must be greater than 0"
     @assert σ >= 0 "the marginal standard deviation σ must not be negative"
     return nothing
 end
 
-# Shared construction-time guard for the two GP latent models. Both need
-# ℓ > 0 (no spectral density, and a singular covariance, at ℓ ≤ 0) and
-# σ ≥ 0. Checking the hyperprior's *support* at construction rejects
-# an unusable hyperprior (say `length_scale = Normal()`) up front rather than
-# letting the first negative proposal abort a chain far from its cause. The
-# bound is ≥ 0, not > 0, so a prior with an open lower limit at zero
-# (`Gamma`, `LogNormal`) is accepted; `_check_spectral_args` backstops the
-# measure-zero ℓ = 0 case.
+# Both GP models need ℓ > 0 and σ ≥ 0.
+# Checking the hyperprior's support at construction rejects an unusable
+# hyperprior up front rather than letting the first negative proposal abort a
+# chain far from its cause.
+# The bound is ≥ 0 rather than > 0 so a prior with an open lower limit at zero
+# is accepted, and `_check_spectral_args` backstops the measure-zero ℓ = 0 case.
 function _check_hyperprior_support(length_scale, marginal_std)
     ℓ_msg = "the length scale prior must not put mass on ℓ < 0"
     σ_msg = "the marginal standard deviation prior must not put mass on σ < 0"
@@ -258,9 +250,8 @@ struct HilbertSpaceGP{
         )
         @assert m > 0 "m (the number of basis functions) must be greater than 0"
         # Below c = 1.2 the boundary effect leaves an error floor no number of
-        # basis functions can clear (24% at c = 1.05, 6% at c = 1.2, measured as
-        # relative Frobenius error against the Gram matrix), so the constructor
-        # rejects it rather than accepting an unusable configuration.
+        # basis functions can clear, at 24% for c = 1.05 and 6% for c = 1.2 as
+        # relative Frobenius error against the Gram matrix.
         @assert c >= 1.2 "c (the boundary factor) must be at least 1.2"
         _check_hyperprior_support(length_scale, marginal_std)
         return new{typeof(length_scale), typeof(marginal_std), typeof(kernel)}(
@@ -269,11 +260,10 @@ struct HilbertSpaceGP{
     end
 end
 
-# Small positive floor on the default length scale. The prior is truncated at
-# `ℓ_floor` rather than 0 because the Matérn spectral density stiffens as ℓ→0
-# (ν = √(2p+1)/ℓ → ∞): a hard floor keeps ν finite and the sampler well-behaved.
-# In standardised input units 0.05 is short (well below the ~√3 half-range) yet
-# safely above the singular limit.
+# The default prior is truncated at this floor rather than 0 because the Matérn
+# spectral density stiffens as ℓ→0, through ν = √(2p+1)/ℓ → ∞.
+# In standardised input units 0.05 is well below the ~√3 half-range yet safely
+# above the singular limit.
 const _DEFAULT_LENGTH_SCALE_FLOOR = 0.05
 
 function HilbertSpaceGP(;
@@ -348,10 +338,9 @@ function hsgp_basis(n::Int, m::Int, c::Real)
     return Φ, vec(sqrt_λ)
 end
 
-# Inner Turing model over a PREBUILT basis. Keeping the basis out of the `@model`
-# body means it is computed once (in `as_turing_model` below) rather than on every
-# log-density / gradient evaluation: only `ℓ`, `σ`, `β` and the matrix–vector
-# product remain inside the differentiated path.
+# Inner Turing model over a prebuilt basis.
+# Keeping the basis out of the `@model` body computes it once rather than on
+# every log-density and gradient evaluation.
 @model function _hsgp_model(
         kernel::Kernel, Φ, sqrt_λ, m,
         length_scale, marginal_std
@@ -364,10 +353,8 @@ end
     return gp
 end
 
-# `as_turing_model` is deliberately a *plain* function: it builds the fixed
-# basis once, out of the differentiated per-evaluation path, and delegates to
-# the inner `@model _hsgp_model`. The `@model` is an implementation detail of
-# that one method, not a second public model per struct.
+# `as_turing_model` is deliberately a plain function so the fixed basis is built
+# out of the differentiated per-evaluation path.
 function as_turing_model(model::HilbertSpaceGP, n::Int)
     @assert n > 1 "n must be greater than 1"
     Φ, sqrt_λ = hsgp_basis(n, model.m, model.c)

@@ -63,18 +63,18 @@ struct BinomialError <: AbstractObservationErrorModel end
 define_y_t(::BinomialError, y_t, Y_t) = define_y_t(PoissonError(), y_t, Y_t)
 
 # Resolve the number of trials carried in the data to a per-time-point vector.
-# A scalar is broadcast across the expected series; a vector is taken as given
-# and aligned by `_trial_dist`.
+# A scalar is broadcast across the expected series, and a vector is taken as
+# given and aligned by `_trial_dist`.
 _binomial_trials(N::Integer, n) = fill(N, n)
 _binomial_trials(N::AbstractVector{<:Integer}, n) = N
 
-# Build the per-time-point trials distribution, right-aligning the trials
-# against the expected series exactly as the observations are aligned.
-# `n_diff` shifts the trials so their last entry pairs with the last expected
-# step. The two natural shapes — one entry per observation, or one per
-# expected value — then put the same trials on the same time points, and the
-# head of whichever runs longer goes unused. Trials that do not reach back to
-# the first scored step are rejected rather than quietly shifted.
+# The trials are right-aligned against the expected series exactly as the
+# observations are, with `n_diff` shifting them so their last entry pairs with
+# the last expected step.
+# One entry per observation and one per expected value then put the same trials
+# on the same time points.
+# Trials that do not reach back to the first scored step are rejected rather than
+# quietly shifted.
 function _trial_dist(obs_model, p_t, N, diff_t)
     n = length(p_t)
     N_t = _binomial_trials(N, n)
@@ -96,8 +96,9 @@ end
     p_t = clamp.(Y_t, 1.0e-6, 1 - 1.0e-6)
 
     # The successes always arrive in a `NamedTuple` field, so they are never a
-    # model argument DynamicPPL copies: `_scored_series` detaches them from the
-    # caller's data before anything is scored.
+    # model argument DynamicPPL copies.
+    # `_scored_series` detaches them from the caller's data before anything is
+    # scored.
     y = _scored_series(obs_model, y_t, Y_t)
     if y isa MissingObservations
         diff_t = length(y.value) - length(Y_t)

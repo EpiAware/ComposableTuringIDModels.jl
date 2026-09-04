@@ -50,9 +50,8 @@ struct ReportingCDF{T <: AbstractVector{<:Real}} <: AbstractLatentModel
     function ReportingCDF(cdf::T) where {T <: AbstractVector{<:Real}}
         @assert all(>=(0), cdf) "The reporting completeness must be non-negative"
         @assert all(<=(1 + 1.0e-8), cdf) "The reporting completeness must not exceed 1"
-        # No monotonicity check: a reporting-delay CDF is non-decreasing, but the
-        # correction is deliberately a free completeness curve so a user can supply
-        # a non-monotonic correction (e.g. over-/under-reporting that recovers).
+        # No monotonicity check, because the correction is deliberately a free
+        # completeness curve so a user can supply a non-monotonic one.
         return new{T}(cdf)
     end
 end
@@ -168,10 +167,10 @@ end
     completeness ~ as_turing_submodel(obs_model.cdf_model, n)
     @assert length(completeness) == n "The reporting-completeness curve must have length $n (the expected-observation series length); got $(length(completeness))"
 
-    # `completeness[a + 1]` is the completeness of a reference day of age `a`. The
-    # most recent reference day (`t = n`, age `0`) is least complete and the
-    # oldest (`t = 1`, age `n - 1`) most complete, so reverse the age-indexed
-    # completeness onto the reference-day axis: `scale[t] = completeness(age = n - t)`.
+    # `completeness[a + 1]` is the completeness of a reference day of age `a`.
+    # The most recent reference day is least complete and the oldest most
+    # complete, so the age-indexed completeness is reversed onto the
+    # reference-day axis as `scale[t] = completeness(age = n - t)`.
     scaled_Y_t = Y_t .* reverse(completeness)
 
     inner ~ as_turing_submodel(obs_model.model, y_t, scaled_Y_t)

@@ -1,6 +1,7 @@
-# Safe count distributions wrap `Distributions.Poisson` / `NegativeBinomial` to
-# avoid `InexactError` at very large means and declare a `SafeIntValued` support
-# so `eltype` stays integer-typed inside a Turing model.
+# Safe count distributions wrap `Distributions.Poisson` and `NegativeBinomial` to
+# avoid `InexactError` at very large means.
+# They declare a `SafeIntValued` support so `eltype` stays integer-typed inside a
+# Turing model.
 
 const SafeInt = Union{Int, BigInt}
 

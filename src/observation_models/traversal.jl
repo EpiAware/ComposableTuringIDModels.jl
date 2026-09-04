@@ -1,10 +1,7 @@
-# Structural traversal of an assembled observation chain. An observation model
-# is a nesting of modifiers around an error model, each holding what it wraps in
-# a field, and a `Split` branches that nesting into parallel streams. The three
-# functions here are the supported way to read and rewrite that structure:
+# Structural traversal of an assembled observation chain.
 # `wrapped_models` is the contract a component implements, `observation_components`
 # is the walk built on it, and `rewrap` puts a component back together around new
-# wrapped models. No sampling and no data are involved.
+# wrapped models.
 
 @doc raw"
 The observation models a component wraps directly, as a `Tuple`.
@@ -44,21 +41,21 @@ ComposableTuringIDModels.wrapped_models(obs)
 "
 function wrapped_models end
 
-# The default: the fields that are themselves observation models, in declaration
-# order. Read through `ntuple`/tuple recursion rather than a generator so the
-# result's type is inferred.
+# The default is the fields that are themselves observation models, in
+# declaration order.
+# Read through tuple recursion rather than a generator so the result's type is
+# inferred.
 function wrapped_models(model::AbstractObservationModel)
     n = fieldcount(typeof(model))
     return _observation_fields(ntuple(i -> getfield(model, i), Val(n)))
 end
 
 # Deliberately not the same walk as `_component_children` in
-# `base/prettyprinting.jl`, which also descends into `Vector`/`Tuple` fields.
-# That one builds a display list of everything beneath a node; this one is the
-# typed `Tuple` seam `rewrap` rebuilds against, so a component holding its
-# wrapped models in a container states its own `wrapped_models` rather than
-# having one inferred from field shapes. A container-held model is therefore
-# printed but not walked.
+# `base/prettyprinting.jl`, which also descends into `Vector` and `Tuple` fields.
+# This is the typed `Tuple` seam `rewrap` rebuilds against, so a component
+# holding its wrapped models in a container states its own `wrapped_models`
+# rather than having one inferred from field shapes.
+# A container-held model is therefore printed but not walked.
 _observation_fields(::Tuple{}) = ()
 function _observation_fields(values::Tuple)
     rest = _observation_fields(Base.tail(values))
@@ -67,13 +64,14 @@ function _observation_fields(values::Tuple)
 end
 
 # An error model consumes the expected series itself, so it is the end of a
-# chain. Stated rather than inferred: its prior slots are latent components, and
+# chain.
+# Stated rather than inferred, because its prior slots are latent components and
 # a future error family holding one must not be mistaken for a wrapper.
 wrapped_models(::AbstractObservationErrorModel) = ()
 
-# A `Split` branches: its streams run in parallel off one expected series, so all
-# of them are wrapped at once. In the data-driven strata mode `streams` is a
-# single template replicated per stream, which is one wrapped model.
+# A `Split`'s streams run in parallel off one expected series, so all of them are
+# wrapped at once.
+# In the data-driven strata mode `streams` is one template, so one wrapped model.
 function wrapped_models(model::Split)
     model.streams isa NamedTuple || return (model.streams,)
     return values(model.streams)
@@ -205,9 +203,9 @@ function _substitute_observations(values::Tuple, models::Tuple)
 end
 
 # A `Split` holds its streams in a `NamedTuple` rather than in fields of its own,
-# so put the replacements back under the same names. The stream names and the
-# weight map are the split's own state and are carried across. In the strata mode
-# `streams` is a single template.
+# so the replacements go back under the same names.
+# The stream names and the weight map are the split's own state and are carried
+# across.
 function rewrap(model::Split, models::Tuple)
     _check_rewrap_arity(model, models)
     model.streams isa NamedTuple ||

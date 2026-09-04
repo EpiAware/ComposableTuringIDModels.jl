@@ -140,9 +140,8 @@ struct _ErrorDist{M, P, R}
     priors::R
 end
 
-# `n_diff` right-aligns the trials against the expected series, in the same
-# way the observations are aligned, so the trials vector may be given at either
-# length. See `_trial_dist`.
+# `n_diff` right-aligns the trials against the expected series the same way the
+# observations are aligned, so the trials vector may be given at either length.
 struct _TrialDist{M, P, N}
     obs_model::M
     p_t::P

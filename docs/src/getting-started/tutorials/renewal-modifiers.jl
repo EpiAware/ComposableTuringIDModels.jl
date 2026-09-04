@@ -1,15 +1,11 @@
 md"""
 # [Renewal modifiers: susceptible depletion and importation](@id renewal-modifiers)
 
-A [`Renewal`](@ref) process can be extended by *modifiers* that change how the
-next incidence is formed.
-This page takes one delayed renewal process and adds two of them —
-[`SusceptibleDepletion`](@ref), which bounds the epidemic by a finite
-population, and [`ImportedCases`](@ref), which seeds infections from outside it
-— so the contribution of each is visible against the same baseline.
+A [`Renewal`](@ref) process can be extended by *modifiers* that change how the next incidence is formed.
+This page takes one delayed renewal process and adds two of them, so the contribution of each is visible against the same baseline.
+[`SusceptibleDepletion`](@ref) bounds the epidemic by a finite population, and [`ImportedCases`](@ref) seeds infections from outside it.
 
-Everything else is held fixed: the same generation interval, the same
-reproduction number, the same reporting delay, and the same initial incidence.
+Everything else is held fixed: the same generation interval, the same reproduction number, the same reporting delay, and the same initial incidence.
 Only the modifier list changes.
 """
 
@@ -25,11 +21,9 @@ nothing # hide
 md"""
 ## A delayed renewal process
 
-The infection process is a renewal equation with a discretised generation
-interval and a constant ``R_t = 1.3``.
-Fixing ``\log R_t`` with a [`FixedIntercept`](@ref) keeps the comparison clean:
-any difference between the runs below is the modifiers' doing, not a different
-draw of the reproduction number.
+The infection process is a renewal equation with a discretised generation interval and a constant ``R_t = 1.3``.
+Fixing ``\log R_t`` with a [`FixedIntercept`](@ref) keeps the comparison clean.
+Any difference between the runs below is the modifiers' doing rather than a different draw of the reproduction number.
 """
 
 gen_int = [0.2, 0.3, 0.3, 0.2]
@@ -45,9 +39,8 @@ end
 nothing # hide
 
 md"""
-Reported cases are the infections convolved with a reporting delay and observed
-with negative-binomial noise — a [`LatentDelay`](@ref) wrapped around a
-[`NegativeBinomialError`](@ref).
+Reported cases are the infections convolved with a reporting delay and observed with negative-binomial noise.
+That is a [`LatentDelay`](@ref) wrapped around a [`NegativeBinomialError`](@ref).
 """
 
 delay = [0.1, 0.4, 0.3, 0.2]
@@ -59,9 +52,8 @@ md"""
 ## Three models
 
 The three models differ only in the modifiers composed onto the renewal step.
-Modifiers apply in the order given, so importation here is added *after*
-depletion: imported infections are not scaled by the susceptible fraction and
-do not themselves deplete the pool.
+Modifiers apply in the order given, so importation here is added *after* depletion.
+Imported infections are therefore not scaled by the susceptible fraction and do not themselves deplete the pool.
 """
 
 models = (
@@ -78,8 +70,7 @@ models = (
 nothing # hide
 
 md"""
-Simulating from each model with `missing` observations and the same fixed
-initial incidence returns its infections and reported cases.
+Simulating from each model with `missing` observations and the same fixed initial incidence returns its infections and reported cases.
 """
 
 simulate(model) = fix(
@@ -93,10 +84,9 @@ nothing # hide
 md"""
 ## What each modifier does
 
-Both panels use a log scale; the reported counts in the lower panel are floored
-at one so that zero-report days stay visible.
-The reporting delay leaves the first `length(delay) - 1` days without a reported
-count, so the lower panel starts on day `length(delay)`.
+Both panels use a log scale.
+The reported counts in the lower panel are floored at one so zero-report days stay visible.
+The reporting delay leaves the first `length(delay) - 1` days without a reported count, so the lower panel starts on day `length(delay)`.
 `n` is the number of reports, and the infection process is run over the delay's lead-in on top of it, so the two panels share a day axis once that is added.
 """
 
@@ -127,11 +117,9 @@ fig
 
 md"""
 The plain renewal grows exponentially without bound.
-Susceptible depletion turns that growth over: as susceptibles are used up the
-effective reproduction number falls below one, so incidence peaks and declines.
-Importation keeps seeding the epidemic instead of leaving it to grow from the
-initial incidence alone, which front-loads it, so it peaks earlier and higher
-and spends the susceptible pool sooner.
+Susceptible depletion turns that growth over, because as susceptibles are used up the effective reproduction number falls below one and incidence peaks and declines.
+Importation keeps seeding the epidemic instead of leaving it to grow from the initial incidence alone.
+That front-loads it, so it peaks earlier and higher and spends the susceptible pool sooner.
 """
 
 function summarise(sim)
@@ -144,14 +132,10 @@ end
 map(summarise, (depleting = sims.depleting, seeded = sims.seeded))
 
 md"""
-Late incidence in the seeded run is therefore the lower of the two, its epidemic
-already past.
+Late incidence in the seeded run is therefore the lower of the two, its epidemic already past.
 
-Importation also stops a process from dying out altogether, which is the other
-thing it is for.
-With ``R_t = 0.8`` and no susceptible depletion the plain process decays away,
-while a seeded one levels off where importation and decay balance — at
-``\iota / (1 - R_t) = 10`` infections per day here.
+Importation also stops a process from dying out altogether.
+With ``R_t = 0.8`` and no susceptible depletion the plain process decays away, while a seeded one levels off where importation and decay balance, at ``\iota / (1 - R_t) = 10`` infections per day here.
 """
 
 function subcritical(modifiers...)
@@ -192,15 +176,12 @@ fig2
 md"""
 ## Fitting a model with modifiers
 
-Modifiers are part of the model, so a model carrying them is fitted exactly like
-any other.
-An [`ImportedCases`](@ref) rate is a prior slot, so it is *estimated* rather than
-assumed: here it is a single unknown constant on the log scale, drawn once
-before the renewal recursion runs.
+Modifiers are part of the model, so a model carrying them is fitted like any other.
+An [`ImportedCases`](@ref) rate is a prior slot, so it is *estimated* rather than assumed.
+Here it is a single unknown constant on the log scale, drawn once before the renewal recursion runs.
 We fit that model to the reported cases simulated above.
-The reproduction number is still held at its simulated value, so the importation
-rate is what is being learned; with ``R_t`` free as well the two compete to
-explain the same growth and the fit is much less sharp.
+The reproduction number is still held at its simulated value, so the importation rate is what is being learned.
+With ``R_t`` free as well the two compete to explain the same growth and the fit is much less sharp.
 Every simulated report is conditioned on.
 The model runs the infection process over the delay's lead-in itself, so nothing is dropped from the head.
 """
@@ -221,10 +202,8 @@ chain = sample(
 nothing # hide
 
 md"""
-The rate is namespaced by the modifier's position on the renewal step, so
-several modifiers carrying priors can never collide.
-Exponentiating the draws puts it back on the scale of infections per day, where
-the true value was two.
+The rate is namespaced by the modifier's position on the renewal step, so several modifiers carrying priors can never collide.
+Exponentiating the draws puts it back on the scale of infections per day, where the true value was two.
 """
 
 import_draws = exp.(vec(chain[@varname(modifier_2.import_rates)]))
@@ -235,13 +214,13 @@ import_draws = exp.(vec(chain[@varname(modifier_2.import_rates)]))
 
 md"""
 The posterior predictive then tracks the simulated series.
+`y_t` is indexed on the reported series, which runs `1:n`.
+`obs_days` puts those reports back on the infection process's day axis for the plot.
 """
 
 pred = predict(as_turing_model(model, fill(missing, n), n), chain)
 y_draws(i) = Float64.(vec(pred[@varname(y_t[i])]))
 quantiles(i) = quantile(y_draws(i), [0.05, 0.5, 0.95])
-## `y_t` is indexed on the reported series, which runs 1:n; `obs_days` puts
-## those reports back on the infection process's day axis for the plot.
 bands = reduce(hcat, map(quantiles, 1:n))
 
 fig3 = Figure(; size = (760, 300))
@@ -267,11 +246,8 @@ fig3
 md"""
 ## Summary
 
-Both extensions are one positional argument on [`Renewal`](@ref), and neither
-changes the observation model, the latent process, or the fitting code.
-Each draws whatever it does not know through the same seam every other component
-uses, so the importation rate can equally be a fixed constant, an unknown
-constant, or a time-varying process such as a [`RandomWalk`](@ref) — in every
-case the prior is on the log scale, like every other unknown positive quantity
-here.
+Both extensions are one positional argument on [`Renewal`](@ref), and neither changes the observation model, the latent process, or the fitting code.
+Each draws whatever it does not know through the same seam every other component uses.
+The importation rate can therefore be a fixed constant, an unknown constant, or a time-varying process such as a [`RandomWalk`](@ref).
+In every case the prior is on the log scale.
 """

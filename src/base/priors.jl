@@ -1,8 +1,6 @@
-# The composition seam. A component threads its sub-components and its prior
-# slots through Turing submodels; `as_turing_submodel` names that one pattern, and
-# `as_turing_model` gains `Distribution` / vector-of-`Distribution` methods so a
-# raw prior flows through the seam identically to a full model (priors as
-# length-`n` submodels).
+# The composition seam.
+# `as_turing_model` gains `Distribution` and vector-of-`Distribution` methods so
+# a raw prior flows through it identically to a full model.
 
 @doc raw"
 Compose a component as a Turing submodel: `to_submodel(as_turing_model(m,
@@ -70,9 +68,7 @@ end
 #
 # A bare `Distribution` returns the distribution itself, so a component's
 # `θ ~ as_turing_submodel(model.slot, n)` is a plain native scalar draw named
-# `θ` (no submodel overhead, no `.θ` namespace). A vector of distributions
-# returns the product distribution (a native, per-element draw). A process
-# returns a namespaced submodel via the generic method, the length-`n` path.
+# `θ` with no submodel overhead and no `.θ` namespace.
 # A component consumes whichever it gets with [`at`](@ref), so a `Distribution`
 # keeps its clean constant name while a process makes the parameter vary.
 
@@ -82,9 +78,9 @@ function as_turing_submodel(
         v::AbstractVector{<:Distribution}, n::Int; prefix::Bool = false
     )
     @assert length(v) == n "a length-$(length(v)) prior vector cannot produce a length-$n prior"
-    # `product_distribution` unconditionally: `arraydist`'s deprecated
-    # `Distributions.Product` path breaks Enzyme reverse, and choosing
-    # `filldist` at runtime returns a `Union` its type analysis rejects.
+    # `product_distribution` unconditionally, because `arraydist`'s deprecated
+    # `Distributions.Product` path breaks Enzyme reverse and choosing `filldist`
+    # at runtime returns a `Union` its type analysis rejects.
     return product_distribution(v)
 end
 
@@ -192,13 +188,9 @@ end
 
 # --- Time-varying-capable parameters ---------------------------------------
 #
-# The single seam above draws a parameter slot as EITHER a scalar (a bare
-# `Distribution` ⇒ one RV, a constant) OR a length-`n` path (an
-# `AbstractPriorModel` process ⇒ the process's own draw). A component reads
-# the result per step with `at`, so ONE recursion serves both the constant
-# and the time-varying (or hierarchical) case with no per-component
-# special-casing and no efficiency loss when the parameter is constant. See
-# [`AR`](@ref)'s damping for a worked example.
+# The seam above draws a parameter slot as either a scalar or a length-`n` path.
+# A component reads the result per step with `at`, so one recursion serves both
+# the constant and the time-varying case with no per-component special-casing.
 
 @doc raw"
 Read a possibly-time-varying parameter at step `t`.

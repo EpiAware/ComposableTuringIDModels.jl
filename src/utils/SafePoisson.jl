@@ -49,15 +49,15 @@ Base.minimum(d::SafePoisson) = 0
 Base.maximum(d::SafePoisson) = Inf
 Distributions.insupport(d::SafePoisson, x::Integer) = x >= 0
 
-# Poisson sampling that stays exact for arbitrarily large means. Small means use
-# inversion by exponential interarrivals; large means use the Ahrens-Dieter
-# normal-based method. Both floor to an integer via `_safe_int_floor`, which
-# promotes to `BigInt` rather than throwing `InexactError` when the mean exceeds
-# the `Int` range (which `Distributions.Poisson`'s own sampler does not handle).
+# Poisson sampling that stays exact for arbitrarily large means.
+# Both branches floor to an integer via `_safe_int_floor`, which promotes to
+# `BigInt` rather than throwing `InexactError` when the mean exceeds the `Int`
+# range, which `Distributions.Poisson`'s own sampler does not handle.
 #
 # Ahrens-Dieter (1982), "Computer Generation of Poisson Deviates from Modified
-# Normal Distributions", ACM TOMS 8(2):163-179. Ported from the original
-# `EpiAware` package, which adapted it from PoissonRandom.jl.
+# Normal Distributions", ACM TOMS 8(2):163-179.
+# Ported from the original `EpiAware` package, which adapted it from
+# PoissonRandom.jl.
 
 function _count_rand(rng::AbstractRNG, λ)
     n = 0

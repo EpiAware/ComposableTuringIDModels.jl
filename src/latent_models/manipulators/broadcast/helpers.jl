@@ -64,7 +64,7 @@ rand(as_turing_model(windowed, 40))
 "
 function broadcast_window(model, window::AbstractUnitRange{<:Integer})
     # `period` is meaningless for `InWindow`, which reads its length from the
-    # window, so it is fixed at the smallest value `BroadcastLatentModel`
-    # accepts rather than exposed as an argument.
+    # window, so it is fixed at the smallest value `BroadcastLatentModel` accepts
+    # rather than exposed as an argument.
     return BroadcastLatentModel(model, 1, InWindow(window))
 end

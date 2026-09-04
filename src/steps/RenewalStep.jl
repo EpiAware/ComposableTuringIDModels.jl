@@ -1,20 +1,9 @@
-# The renewal accumulation step.
-#
-# `RenewalStep` is *the* renewal step: a constant-generation-interval force of
-# infection with an ordered tuple of modifiers composing on top, sharing one
-# incidence window. With no modifiers it is a plain renewal process; a
-# `SusceptibleDepletion` modifier makes it a renewal with a fixed population, and
-# further renewal-family mechanisms (waning immunity, seasonality, …) compose the
-# same way. The plain force-of-infection core (`ConstantRenewalStep`) is an
-# internal primitive; users build `RenewalStep`s through the [`Renewal`](@ref)
-# helper.
-#
-# This deliberately avoids the naive `state = step(state, ϵ)` sequential-threading
-# composite: that double-advances time for steps whose call commits a new
-# value. The contract here separates the *contribution* to the new
-# incidence (each modifier transforms it) from the single shared-window *advance*
-# performed once per step. AR/MA step-fusion (a different, non-shared state
-# contract) is out of scope and stays as model nesting.
+# The modifiers share one incidence window rather than threading state through
+# each other as `state = step(state, ϵ)` would.
+# Sequential threading double-advances time for steps whose call commits a new
+# value.
+# Each modifier transforms the proposed incidence, and the shared window is
+# advanced once per step.
 
 @doc raw"
 Abstract supertype for renewal modifiers composed onto a [`RenewalStep`](@ref).
@@ -59,10 +48,11 @@ modifier therefore renames the variables of every modifier after it.
 "
 abstract type AbstractRenewalModifier end
 
-# A prior-carrying modifier resolves to a separate scan modifier and has no
-# scan interface of its own, so reaching the scan with one means the step was
-# never resolved. Name the modifier and point at the seam instead of failing
-# with a bare `MethodError` from inside the recursion.
+# A prior-carrying modifier resolves to a separate scan modifier and has no scan
+# interface of its own, so reaching the scan with one means the step was never
+# resolved.
+# Name the modifier and point at the seam rather than failing with a bare
+# `MethodError` from inside the recursion.
 function _unresolved_modifier(mod)
     return error(
         "$(typeof(mod)) has no scan interface. A modifier " *
@@ -82,9 +72,9 @@ function apply_modifier(mod::AbstractRenewalModifier, incidence, substate)
     return _unresolved_modifier(mod)
 end
 
-# The default pre-scan seam: a modifier with no parameters of its own samples
-# nothing and scans as itself. Kept as a `@model` so every modifier resolves
-# through the same submodel call, with no branch on whether it samples.
+# A modifier with no parameters of its own samples nothing and scans as itself.
+# Kept as a `@model` so every modifier resolves through the same submodel call,
+# with no branch on whether it samples.
 @model function as_turing_model(mod::AbstractRenewalModifier, n)
     return mod
 end
@@ -140,10 +130,10 @@ function _match_strata(pop_size::AbstractVector, window::AbstractMatrix)
     return pop_size
 end
 
-# The susceptible fraction is floored because a large force of infection can
-# take more than the pool holds, leaving `S` negative for the rest of the run.
-# The floor keeps the recursion going there. Every operation is broadcast, so
-# one line serves a scalar and a per-stratum pool.
+# The susceptible fraction is floored because a large force of infection can take
+# more than the pool holds, leaving `S` negative for the rest of the run.
+# Every operation is broadcast, so one line serves a scalar and a per-stratum
+# pool.
 function apply_modifier(mod::SusceptibleDepletion, incidence, S)
     new_incidence = max.(S ./ mod.pop_size, 1.0e-6) .* incidence
     return new_incidence, S .- new_incidence
@@ -195,8 +185,9 @@ function get_state(step::_PlainRenewalStep, initial_state, state)
 end
 
 # Thread the proposed incidence through the modifier tuple, collecting each
-# modifier's updated substate. Recursive over the tuple to stay type-stable and
-# AD-friendly (no mutation of tracked state).
+# modifier's updated substate.
+# Recursive over the tuple to stay type-stable and free of mutation of tracked
+# state.
 _thread_modifiers(::Tuple{}, incidence, ::Tuple{}) = (incidence, ())
 function _thread_modifiers(mods::Tuple, incidence, substates::Tuple)
     inc, s = apply_modifier(first(mods), incidence, first(substates))
@@ -233,11 +224,10 @@ end
 # --- the pre-scan seam ------------------------------------------------------
 #
 # A scan step is a deterministic function, so a modifier that needs sampled
-# parameters (an importation rate, say) cannot draw them inside the scan. The
-# step is resolved ONCE before the scan: every modifier is sampled through its
-# own `as_turing_model` and the step is rebuilt from the resolved modifiers.
-# Modifiers that sample nothing return themselves, so one call covers both and
-# nothing here ever tests what a modifier is.
+# parameters cannot draw them inside the scan.
+# The step is resolved once beforehand and rebuilt from the resolved modifiers.
+# A modifier that samples nothing returns itself, so nothing here tests what a
+# modifier is.
 
 @doc raw"
 Resolve an accumulation step ahead of the scan, sampling any parameters its
@@ -265,19 +255,18 @@ modifier's variables are namespaced `modifier_<i>` (see
 end
 
 @model function as_turing_model(step::RenewalStep, n)
-    # The core composes flat, as it does when a modifier-free renewal scans the
-    # core directly, so a drawn coupling operator is named the same way whether
-    # or not the step carries modifiers. The modifiers below carry their own
-    # positional prefixes, so nothing here can collide.
+    # The core composes flat, as it does when a modifier-free renewal scans it
+    # directly, so a drawn coupling operator is named the same way whether or not
+    # the step carries modifiers.
     core ~ as_turing_submodel(step.core, n)
     modifiers ~ to_submodel(_resolve_modifiers(step.modifiers, n, 1), false)
     return RenewalStep(core, modifiers)
 end
 
-# Resolve a modifier tuple, one submodel per modifier. The recursion is
-# structural (over the tuple, not an index into it) so each level has a
-# concrete tuple type. Each modifier is prefixed by its position, so two
-# modifiers of the same kind cannot collide on a variable name.
+# The recursion is structural, over the tuple rather than an index into it, so
+# each level has a concrete tuple type.
+# Each modifier is prefixed by its position, so two modifiers of the same kind
+# cannot collide on a variable name.
 @model function _resolve_modifiers(mods::Tuple{}, n, index)
     return ()
 end

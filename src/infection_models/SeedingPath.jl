@@ -47,10 +47,10 @@ end
 # does, giving a flat but estimated seeding window.
 SeedingPath(model::Distribution) = SeedingPath(path_prior(model))
 
-# Only `Renewal` knows what a seeding window is: it reads the wrapper and draws
-# the process it holds at the window shape. A `SeedingPath` anywhere else is an
-# error rather than a silently unwrapped process. One method per `ModelShape`
-# member, so neither is ambiguous with the `Dims{2}` path-model guard.
+# Only `Renewal` knows what a seeding window is, so a `SeedingPath` anywhere else
+# is an error rather than a silently unwrapped process.
+# One method per `ModelShape` member, so neither is ambiguous with the `Dims{2}`
+# path-model guard.
 function _seeding_path_misuse(m::SeedingPath)
     return error(
         "`SeedingPath` marks the seeding window of a `Renewal` and is only " *

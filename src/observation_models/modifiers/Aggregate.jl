@@ -2,12 +2,11 @@
 # windows).
 
 # Scatter the predictions for the present time points back into a length-`n`
-# vector (zeros where not present). A `LatentDelay` shortens the window series
-# whichever side of the aggregation it sits on — nested inside it consumes
-# leading windows, wrapped outside it leaves leading windows uncovered — so
-# there can be fewer predictions than present windows. They are the *last*
-# windows, matching the right-alignment every other observation chain uses, so
-# the leading windows are left at zero.
+# vector, zero where not present.
+# A `LatentDelay` shortens the window series whichever side of the aggregation it
+# sits on, so there can be fewer predictions than present windows.
+# They are the last windows, matching the right-alignment every other observation
+# chain uses, so the leading windows are left at zero.
 function _return_aggregate(pred_obs, idx, n)
     k = length(pred_obs)
     @assert k <= length(idx) "The aggregated model returned more predictions ($k) than reporting windows ($(length(idx)))"
@@ -85,19 +84,18 @@ struct Aggregate{
         return new{M, A, typeof(present)}(model, aggregation, present)
     end
 
-    # The raw constructor, taking the derived presence mask as stored rather
-    # than deriving it. Rebuilding a component goes through this; the public
-    # constructor takes only the two underived arguments and so cannot accept
-    # an `Aggregate`'s own fields back.
+    # The raw constructor, taking the derived presence mask as stored.
+    # Rebuilding a component goes through this, because the public constructor
+    # takes only the two underived arguments.
     function Aggregate{M, A, P}(model, aggregation, present) where {M, A, P}
         return new{M, A, P}(model, aggregation, present)
     end
 end
 
-# An `Aggregate` derives its presence mask from its window lengths, so its
-# public constructor takes fewer arguments than it has fields and a generic
-# rebuild fails outright. Point `ConstructionBase` (and so `Accessors`) at the
-# raw constructor.
+# An `Aggregate` derives its presence mask from its window lengths, so its public
+# constructor takes fewer arguments than it has fields and a generic rebuild
+# fails outright.
+# Point `ConstructionBase`, and so `Accessors`, at the raw constructor.
 ConstructionBase.constructorof(::Type{<:Aggregate}) = _rebuild_aggregate
 
 function _rebuild_aggregate(model, aggregation, present)
@@ -119,21 +117,20 @@ end
     m = length(ag.aggregation)
     aggregation = broadcast_rule(RepeatEach(), ag.aggregation, n, m)
     present = broadcast_rule(RepeatEach(), ag.present, n, m)
-    # An outer modifier can hand over a `Y_t` shorter than `y_t`. Like every
-    # other chain it is right-aligned, so it covers the last `length(Y_t)` time
-    # points and the window indices shift by `offset`. A window reaching back
-    # before the start of `Y_t` is clipped, as one reaching before time 1
-    # already is.
+    # An outer modifier can hand over a `Y_t` shorter than `y_t`.
+    # It is right-aligned like every other chain, so it covers the last
+    # `length(Y_t)` time points and the window indices shift by `offset`.
+    # A window reaching back before the start of `Y_t` is clipped, as one
+    # reaching before time 1 already is.
     offset = n - length(Y_t)
     idx = findall(present)
-    # A window ending at or before `offset` covers no expected value, so its
-    # sum would be an exact zero meaning "nothing here" rather than "we expect
-    # zero" — a silent, arbitrarily strong likelihood contribution. Those
-    # leading windows are dropped from the window series instead, the same
-    # treatment an unobservable lead-in gets elsewhere: the error model's
-    # right-alignment leaves their counts unscored and `_return_aggregate`
-    # scatters the rest back into place. A window only *partially* covered
-    # still has expected values to sum and is kept.
+    # A window ending at or before `offset` covers no expected value, so its sum
+    # would be an exact zero meaning "nothing here" rather than "we expect zero",
+    # which is a silent and arbitrarily strong likelihood contribution.
+    # Those leading windows are dropped from the window series instead, so the
+    # error model's right-alignment leaves their counts unscored.
+    # A window only partially covered still has expected values to sum and is
+    # kept.
     scored = filter(>(offset), idx)
     @assert !isempty(scored) "Every reporting window ends before the start of the expected observations, so there is nothing to score. Shorten the delay applied outside the aggregation, or lengthen the series."
     agg_Y_t = map(scored) do i

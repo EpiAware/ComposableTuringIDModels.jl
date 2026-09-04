@@ -47,18 +47,10 @@ rand(as_turing_model(problem, (; y_t = missing)))
 end
 
 # The infection process's `ModelShape` implied by an observation model and a
-# data value, at a given time-axis length. Shared by `IDProblem` (`time_steps`
-# from `tspan`) and `forecast` (the fitted length plus the horizon), so the two
-# build the shape of a data-driven model the same way. A plain vector gives the
-# single-series `time_steps::Int` shape unchanged. A matrix or `NamedTuple` of
-# streams gives `(n_strata, time_steps)`, with `n_strata` read from
-# `infection_strata` applied to the observation stream count (the matrix's row
-# count, or the number of NamedTuple entries).
+# data value, shared by `IDProblem` and `forecast` so the two build a
+# data-driven model's shape the same way.
 # With `y_t === missing` there is no data to read a stream count from, so the
-# shape falls back to the observation model alone: a `Split` with a weight
-# `map` fixes the stratum count at `size(map, 2)`, a `Split` with named
-# streams (no map) has as many strata as streams, and anything else is a
-# single series.
+# shape falls back to the observation model alone.
 _obs_data_shape(obs, y_t, time_steps) = time_steps
 _obs_data_shape(obs, y_t::Missing, time_steps) = _obs_data_shape_missing(
     obs, time_steps

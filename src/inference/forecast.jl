@@ -80,11 +80,9 @@ function forecast(
     horizon ≥ 1 ||
         throw(ArgumentError("horizon must be ≥ 1, got $horizon"))
     n_time = _series_time_length(y)
-    # The forecast model sees NO observations: every time point is drawn from
-    # the error model at the expected values each posterior draw replays. The
-    # in-sample data would only pin points the fit has already accounted for,
-    # and conditioning on it cannot change the horizon, since `y_t` never feeds
-    # back into the latent path.
+    # The forecast model sees no observations.
+    # Conditioning on the in-sample data cannot change the horizon, because
+    # `y_t` never feeds back into the latent path.
     y_blank = _blank_series(y, n_time + horizon)
     shape = _obs_data_shape(model.observation_model, y, n_time + horizon)
     fc_model = as_turing_model(model, y_blank, shape)
@@ -92,19 +90,14 @@ function forecast(
     return predict(rng, fc_model, extended)
 end
 
-# The observed series' length along the time axis, whatever its shape: a plain
-# vector's length, a `strata x time` matrix's column count, or (recursively) a
-# `NamedTuple` of streams' shared time length (read off its first stream).
+# A `NamedTuple` of streams shares one time length, read off its first stream.
 _series_time_length(y::AbstractVector) = length(y)
 _series_time_length(y::AbstractMatrix) = size(y, 2)
 _series_time_length(y::NamedTuple) = _series_time_length(first(y))
 
-# A wholly unobserved series of `n_time` time points, shaped like `y`: a vector,
-# a `strata x time` matrix, or a `NamedTuple` with the same stream names (which
-# is what tells a data-driven `Split` which streams to build). Every entry is
-# `missing`, so the observation model draws every point predictively — the same
-# argument `as_turing_model(model, fill(missing, n), n)` takes to sample the
-# posterior predictive in-sample.
+# A wholly unobserved series shaped like `y`.
+# The stream names of a `NamedTuple` are what tells a data-driven `Split` which
+# streams to build, so they are preserved.
 _blank_series(::AbstractVector, n_time) = Vector{Missing}(missing, n_time)
 function _blank_series(y::AbstractMatrix, n_time)
     return Matrix{Missing}(missing, size(y, 1), n_time)
@@ -124,27 +117,18 @@ function forecast(
     return forecast(model, y, chain, horizon; rng = rng)
 end
 
-# Extend the latent innovation streams in `chain` to the length the horizon
-# model `fc_model` expects, drawing the extra tail entries from the prior so
-# each draw's in-sample path is preserved and its future is a genuine prior
-# continuation.
+# Extend the latent innovation streams in `chain` to the length `fc_model`
+# expects, drawing the extra tail entries from the prior.
+# A stored stream's length is tied to the fitting length, so `predict` alone
+# errors on the dimension mismatch at `T + h`.
 #
-# Each stored innovation stream's length is tied to the fitting length `T`;
-# rebuilding the model at `T + h` asks for the same parameter at the longer
-# length, so `predict` alone errors on the dimension mismatch. Every vector
-# parameter is a candidate and the forecast model decides which are extended:
-# a stream is spliced only when the model draws MORE of it than the chain
-# holds. Parameters on an axis the horizon does not grow (a `Hierarchy`'s
-# per-stratum effects, say) are the same length in both models and are left
-# alone. No heuristic on the time-axis length is used or wanted: an innovation
-# stream is typically shorter than the series it drives.
+# A stream is spliced only when the model draws more of it than the chain holds,
+# which leaves parameters on an axis the horizon does not grow alone.
+# The time-axis length is not used as a heuristic, because an innovation stream
+# is typically shorter than the series it drives.
 #
-# The tail is a fresh prior draw of the horizon model, so it follows
-# that stream's actual prior; fitted scale and correlation are re-applied
-# deterministically by `predict`, not resampled.
-#
-# This reaches into the FlexiChains storage `predict` consumes; a public
-# length-extension API there would replace it.
+# This reaches into the FlexiChains storage `predict` consumes.
+# A public length-extension API there would replace it.
 function _extend_latent_draws(rng::AbstractRNG, fc_model, chain)
     extended = deepcopy(chain)
     data = extended._data
@@ -170,15 +154,12 @@ function _extend_latent_draws(rng::AbstractRNG, fc_model, chain)
     return extended
 end
 
-# Correctness guard for the independent-tail extension above. Splicing an
-# independent prior tail onto the fitted head is exact only when the stream
-# *factorises* across the forecast boundary. Every latent in this package is
-# non-centred (its resized stream is a parameter-free i.i.d. innovation
-# sequence), so this holds. A stored stream with joint correlation (an
-# exact-GP `MvNormal`) would need its tail drawn conditional on the head.
-# Detect that case generically by checking on a batch of prior draws that each
-# resized stream's tail is uncorrelated with its head, and refuse rather than
-# silently mis-forecast.
+# Splicing an independent prior tail onto the fitted head is exact only when the
+# stream factorises across the forecast boundary.
+# Every latent here is non-centred, so it holds.
+# A stored stream with joint correlation, such as an exact-GP `MvNormal`, would
+# need its tail drawn conditional on the head, so that case is detected on a
+# batch of prior draws and refused rather than silently mis-forecast.
 const _FORECAST_INDEP_TOL = 0.5
 
 function _assert_factorised(rng::AbstractRNG, fc_model, resized)

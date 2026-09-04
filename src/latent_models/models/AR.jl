@@ -1,11 +1,8 @@
-# Autoregressive (AR) latent process model. Its constant higher-order step
-# (`ARStep`) and the order-1 step it uses for a scalar or time-varying coefficient
-# (`TVARStep`) both live in `src/steps/`.
+# `ARStep` and `TVARStep`, the steps this model scans over, live in `src/steps/`.
 
-# Default coefficient transform: a process `damp` prior is unbounded, so `tanh`
-# maps its draws into the stationary band ``(-1, 1)``; a `Distribution` prior is
-# already bounded by the user, so it is used as-is. Overridable via the `transform`
-# keyword.
+# A process `damp` prior is unbounded, so `tanh` maps its draws into the
+# stationary band ``(-1, 1)``.
+# A `Distribution` prior is already bounded by the user, so it is used as it is.
 _default_transform(::Distribution) = identity
 _default_transform(::AbstractVector{<:Distribution}) = identity
 _default_transform(::AbstractPriorModel) = tanh
@@ -76,9 +73,9 @@ struct AR{
         @assert p > 0 "p must be greater than 0"
         assert_prior_length(damp, p, "damp")
         assert_prior_length(init, p, "init")
-        # `ϵ_t` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
-        # an `Intercept` (a constant innovation path), never left as a scalar.
-        # `damp` and `init` are per-step PARAMETER slots and stay bare.
+        # `ϵ_t` is a length-`n` path slot, so a bare `Distribution` is wrapped
+        # in an `Intercept` rather than left as a scalar.
+        # `damp` and `init` are per-step parameter slots and stay bare.
         wrapped = path_prior(ϵ_t)
         return new{
             typeof(damp), typeof(init), typeof(p), typeof(wrapped),
@@ -98,11 +95,11 @@ function AR(;
         damp = truncated(Normal(0.0, 0.05), 0, 1), init = Normal(),
         ϵ_t = HierarchicalNormal(), transform = _default_transform(damp)
     )
-    # Order `p` is fixed by the damping prior (a length-`k` vector ⇒ order `k`, a
-    # single distribution / process ⇒ order 1). The order-`p` initial-conditions
-    # slot needs `p` values, so a bare `Distribution` is sized to a length-`p`
-    # vector (one i.i.d. draw per lag); an explicit vector must already be length
-    # `p`, and a process supplies its own length.
+    # Order `p` is fixed by the damping prior.
+    # The order-`p` initial-conditions slot needs `p` values, so a bare
+    # `Distribution` is sized to a length-`p` vector of i.i.d. draws.
+    # An explicit vector must already be length `p`, and a process supplies its
+    # own length.
     p = prior_order(damp)
     init = (p > 1 && init isa Distribution) ? fill(init, p) : init
     return AR(damp, init, p, ϵ_t, transform)
@@ -113,17 +110,16 @@ end
     @assert n > p "n must be longer than the order of the autoregressive process"
     init ~ as_turing_submodel(model.init, p; prefix = true)
     if p == 1
-        # Order 1: draw the coefficient through the single seam. A `Distribution`
-        # gives a scalar (constant, no length-`n` allocation); a process gives a
-        # length-`(n-1)` path. `TVARStep` reads it per step with `at`, so one
-        # recursion serves both.
+        # Order 1 draws the coefficient through the single seam.
+        # `TVARStep` reads it per step with `at`, so one recursion serves both a
+        # scalar and a length-`(n-1)` path.
         damp ~ as_turing_submodel(
             _order1_prior(model.damp), n - 1;
             prefix = true
         )
-        # Track the (possibly time-varying) coefficient as a generated quantity so
-        # it is recoverable from the chain; `transform` broadcasts over a scalar or
-        # a path.
+        # Track the coefficient as a generated quantity so it is recoverable from
+        # the chain.
+        # `transform` broadcasts over a scalar or a path.
         ρ := model.transform.(damp)
         ϵ_t ~ as_turing_submodel(model.ϵ_t, n - 1)
         z = accumulate_scan(
@@ -134,11 +130,12 @@ end
     end
     damp ~ as_turing_submodel(model.damp, p; prefix = true)
     ϵ_t ~ as_turing_submodel(model.ϵ_t, n - p)
-    # `ARStep`'s state runs oldest→newest (`[Z_{t-p}, …, Z_{t-1}]`), so reverse
-    # the damping coefficients so `damp[i]` multiplies the lag-`i` term
-    # `Z_{t-i}`, matching the documented recursion `Z_t = Σ ρ_i Z_{t-i}`. Without
-    # the reversal `damp[1]` was applied to the *longest* lag; identical for the
-    # default i.i.d. priors, but wrong for heterogeneous per-lag priors.
+    # `ARStep`'s state runs oldest to newest, `[Z_{t-p}, …, Z_{t-1}]`, so the
+    # damping coefficients are reversed to make `damp[i]` multiply the lag-`i`
+    # term `Z_{t-i}` as the documented recursion `Z_t = Σ ρ_i Z_{t-i}` says.
+    # Without the reversal `damp[1]` applies to the longest lag, which is
+    # identical for the default i.i.d. priors but wrong for heterogeneous
+    # per-lag priors.
     ar = accumulate_scan(
         ARStep(reverse(damp)), (; val = last(init), window = init), ϵ_t
     )

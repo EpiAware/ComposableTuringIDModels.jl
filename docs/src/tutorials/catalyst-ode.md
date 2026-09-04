@@ -1,35 +1,27 @@
 # [Declarative compartmental models with Catalyst](@id tutorial-catalyst)
 
-The [SIR tutorial](@ref tutorial-sir) builds its dynamics from a
-hand-written vector field, and the package hand-writes that model's Jacobian too
-so the stiff/auto solver stays fast and stable. A hand-written Jacobian has to
-be re-derived, and kept in sync, for every new compartmental model.
+The [SIR tutorial](@ref tutorial-sir) builds its dynamics from a hand-written vector field, and the package hand-writes that model's Jacobian too so the stiff/auto solver stays fast and stable.
+A hand-written Jacobian has to be re-derived, and kept in sync, for every new compartmental model.
 
-[Catalyst.jl](https://github.com/SciML/Catalyst.jl) [loman2023catalyst](@citep)
-removes that step. You *declare* a reaction network, and Catalyst together with
-[ModelingToolkit.jl](https://github.com/SciML/ModelingToolkit.jl) generate the
-ODE system **and a symbolic Jacobian** for you, kept consistent by construction.
+[Catalyst.jl](https://github.com/SciML/Catalyst.jl) [loman2023catalyst](@citep) removes that step.
+You *declare* a reaction network, and Catalyst together with [ModelingToolkit.jl](https://github.com/SciML/ModelingToolkit.jl) generate the ODE system **and a symbolic Jacobian** for you, kept consistent by construction.
 
-The extension's [`CatalystODEParams`](@ref) is **model-agnostic**. It takes
-*any* Catalyst `ReactionSystem`, reads off its species and rate parameters
-symbolically, and asks only for a prior per species and per rate. The same type
-builds an SIR model, an SEIR model, or a network with a vaccinated class or a
-second strain. Only the reactions change. This page fits the SIR network to a
-real outbreak, then swaps in SEIR without touching the rest of the model to show
-the API is generic.
+The extension's [`CatalystODEParams`](@ref) is **model-agnostic**.
+It takes *any* Catalyst `ReactionSystem`, reads off its species and rate parameters symbolically, and asks only for a prior per species and per rate.
+The same type builds an SIR model, an SEIR model, or a network with a vaccinated class or a second strain.
+Only the reactions change.
+This page fits the SIR network to a real outbreak, then swaps in SEIR without touching the rest of the model to show the API is generic.
 
 !!! note "Optional extension"
-    The Catalyst path lives in an optional package extension. It loads only when
-    you add and import `Catalyst` (and `ModelingToolkit`) alongside
-    `ComposableTuringIDModels`, which keeps the heavy symbolic stack out of the
-    default install. The hand-coded [`SIRParams`](@ref) / [`SEIRParams`](@ref)
-    remain the zero-latency default; the declarative path is opt-in for users
-    building new or more complex compartmental models.
+    The Catalyst path lives in an optional package extension.
+    It loads only when you add and import `Catalyst` (and `ModelingToolkit`) alongside `ComposableTuringIDModels`, which keeps the heavy symbolic stack out of the default install.
+    The hand-coded [`SIRParams`](@ref) / [`SEIRParams`](@ref) remain the zero-latency default.
+    The declarative path is opt-in for users building new or more complex compartmental models.
 
-## Declaring and grokking a network
+## Declaring and inspecting a network
 
-We declare SIR as two reactions. Each reads like the transmission diagram, a
-rate constant then the species that react.
+We declare SIR as two reactions.
+Each reads like the transmission diagram, a rate constant then the species that react.
 
 ```math
 \begin{aligned}
@@ -38,8 +30,7 @@ I &\xrightarrow{\gamma} R & &\text{recovery}
 \end{aligned}
 ```
 
-Catalyst expands these into the SIR drift and generates its Jacobian
-symbolically, so there is no vector field or Jacobian to write or maintain.
+Catalyst expands these into the SIR drift and generates its Jacobian symbolically, so there is no vector field or Jacobian to write or maintain.
 
 ```@example catalyst
 using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq
@@ -54,7 +45,6 @@ end
 nothing # hide
 ```
 
-The point of the generic path is that we can *grok* any network symbolically.
 Catalyst reads off the species and rate parameters we then attach priors to.
 
 ```@example catalyst
@@ -63,18 +53,12 @@ Catalyst reads off the species and rate parameters we then attach priors to.
 
 ## Building the parameter component
 
-Loading `Catalyst` activates the extension that backs
-[`CatalystODEParams`](@ref) (the type itself is a normal, exported
-`ComposableTuringIDModels` component). We hand it the network, a solver time
-span, and a prior per species and per rate, as symbolic-handle ⇒ spec pairs. A
-spec is either a `Distribution` (sampled, and named after its symbol in the
-chain, `β`, `γ`) or a plain number (a fixed value, not sampled, here the empty
-recovered class `R(0)`). The `(u0, p)` sampling contract is the same as the
-hand-coded parameter models, so it drops straight into an [`ODEProcess`](@ref).
+Loading `Catalyst` activates the extension that backs [`CatalystODEParams`](@ref), though the type itself is a normal, exported `ComposableTuringIDModels` component.
+We hand it the network, a solver time span, and a prior per species and per rate, as symbolic-handle ⇒ spec pairs.
+A spec is either a `Distribution` (sampled, and named after its symbol in the chain, `β`, `γ`) or a plain number (a fixed value, not sampled, here the empty recovered class `R(0)`).
+The `(u0, p)` sampling contract is the same as the hand-coded parameter models, so it drops straight into an [`ODEProcess`](@ref).
 
-We fit the classic influenza outbreak in an English boarding school
-[chatzilena2019contemporary](@citep), taking the children confined to bed each
-day as a proxy for the infectious compartment.
+We fit the classic influenza outbreak in an English boarding school [chatzilena2019contemporary](@citep), taking the children confined to bed each day as a proxy for the infectious compartment.
 
 ```@example catalyst
 N = 763          # children in the school
@@ -95,12 +79,9 @@ nothing # hide
 
 ### A note on species ordering
 
-Catalyst **sorts** the species and parameters when it builds the problem, so the
-internal layout is generally not the order you wrote the network in. We never
-rely on that order. [`CatalystODEParams`](@ref) samples into **symbolic**
-`symbol => value` maps that `remake` places by name, and the `sol2infs` link
-indexes the solution **symbolically** with the network's own handle, so it pulls
-the infectious compartment out by identity rather than by a hard-coded position.
+Catalyst **sorts** the species and parameters when it builds the problem, so the internal layout is generally not the order you wrote the network in.
+We never rely on that order.
+[`CatalystODEParams`](@ref) samples into **symbolic** `symbol => value` maps that `remake` places by name, and the `sol2infs` link indexes the solution **symbolically** with the network's own handle, so it pulls the infectious compartment out by identity rather than by a hard-coded position.
 
 ```@example catalyst
 sir_process = ODEProcess(
@@ -112,9 +93,8 @@ nothing # hide
 
 ## Composing and fitting
 
-From here nothing is Catalyst-specific. We scale the infectious proportion to
-expected counts with a population [`TransformObservationModel`](@ref) and a
-[`PoissonError`](@ref), assemble with [`IDModel`](@ref), and fit.
+From here nothing is Catalyst-specific.
+We scale the infectious proportion to expected counts with a population [`TransformObservationModel`](@ref) and a [`PoissonError`](@ref), assemble with [`IDModel`](@ref), and fit.
 
 ```@example catalyst
 observation = TransformObservationModel(PoissonError(), x -> softplus.(N .* x))
@@ -123,14 +103,10 @@ nothing # hide
 ```
 
 !!! warning "Use forward-mode autodiff for ODE models"
-    The rest of these docs recommend Mooncake as the default AD backend, but ODE
-    infection models are the exception, they sample under **ForwardDiff** today.
-    Reverse-mode **Mooncake-driven NUTS through the ODE solver is not yet
-    supported** for the hand-coded *or* the Catalyst model, a pre-existing
-    Turing/`SciMLSensitivity` integration gap (tracked in [issue
-    #46](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/46)) rather
-    than anything introduced by Catalyst. We therefore pass `AutoForwardDiff()`
-    to NUTS explicitly.
+    The rest of these docs recommend Mooncake as the default AD backend, but ODE infection models are the exception and sample under **ForwardDiff** today.
+    Reverse-mode **Mooncake-driven NUTS through the ODE solver is not yet supported** for the hand-coded *or* the Catalyst model.
+    This is a pre-existing Turing/`SciMLSensitivity` integration gap (tracked in [issue #46](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/46)) rather than anything introduced by Catalyst.
+    We therefore pass `AutoForwardDiff()` to NUTS explicitly.
 
 ```@example catalyst
 posterior = as_turing_model(model, y_obs, n)
@@ -140,11 +116,9 @@ chain = sample(
 nothing # hide
 ```
 
-`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl)
-chain. FlexiChains keys draws by their `@varname`, so we read parameters back by
-name directly, with no `MCMCChains` conversion. The basic reproduction number
-``R_0 = \beta / \gamma`` is a deterministic function of the rates, formed per
-draw from the ``\beta`` and ``\gamma`` columns.
+`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain.
+FlexiChains keys draws by their `@varname`, so we read parameters back by name directly.
+The basic reproduction number ``R_0 = \beta / \gamma`` is a deterministic function of the rates, formed per draw from the ``\beta`` and ``\gamma`` columns.
 
 ```@example catalyst
 using Statistics
@@ -155,12 +129,9 @@ using Statistics
 
 ## Prior versus posterior
 
-Sampling the same model with [`Prior`](https://turinglang.org/) gives prior
-draws over the transmission and recovery rates. Overlaying them on the posterior
-with [PairPlots.jl](https://sefffal.github.io/PairPlots.jl/) shows how sharply
-the boarding-school outbreak identifies the mechanistic rates. The FlexiChains
-PairPlots extension takes a chain subset to a few keys with `chain[[...]]`
-directly.
+Sampling the same model with [`Prior`](https://turinglang.org/) gives prior draws over the transmission and recovery rates.
+Overlaying them on the posterior with [PairPlots.jl](https://sefffal.github.io/PairPlots.jl/) shows how sharply the boarding-school outbreak identifies the mechanistic rates.
+The FlexiChains PairPlots extension takes a chain subset to a few keys with `chain[[...]]` directly.
 
 ```@example catalyst
 using CairoMakie, PairPlots
@@ -173,17 +144,13 @@ pairplot(
 ```
 
 Both rates collapse from broad priors onto tight, correlated posteriors.
-``\beta`` and ``\gamma`` trade off along the ``R_0 = \beta/\gamma`` ridge that
-the 14 days of data constrain.
+``\beta`` and ``\gamma`` trade off along the ``R_0 = \beta/\gamma`` ridge that the 14 days of data constrain.
 
 ## Posterior trajectories
 
-A compartmental model has no time-varying ``R_t`` (its ``Z_t`` generated
-quantity is `nothing`); the infection signal is the infectious proportion
-``I(t)`` solved from the ODE. [`generated_observables`](@ref) recovers ``I_t``
-per draw, and the posterior-predictive in-bed counts come from `predict` on the
-model with the observations set to `missing`. Two small helpers reduce the
-per-draw trajectories to credible bands.
+A compartmental model has no time-varying ``R_t``, so the infection signal is the infectious proportion ``I(t)`` solved from the ODE.
+[`generated_observables`](@ref) recovers ``I_t`` per draw, and the posterior-predictive in-bed counts come from `predict` on the model with the observations set to `missing`.
+Two small helpers reduce the per-draw trajectories to credible bands.
 
 ```@setup catalyst
 const CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
@@ -234,15 +201,12 @@ axislegend(ax2; position = :rt)
 fig
 ```
 
-The declarative SIR dynamics, scaled by the population and Poisson observation
-model, reproduce the boarding-school outbreak.
+The declarative SIR dynamics, scaled by the population and Poisson observation model, reproduce the boarding-school outbreak.
 
 ## The same API on a different network
 
-The payoff of the generic path is that a different compartmental model is a
-different reaction network passed to the *same* [`CatalystODEParams`](@ref). We
-add an exposed class ``E`` to make SEIR, grok it the same way, and fit it with
-no change to the observation model or the composition.
+The payoff of the generic path is that a different compartmental model is a different reaction network passed to the *same* [`CatalystODEParams`](@ref).
+We add an exposed class ``E`` to make SEIR, read it the same way, and fit it with no change to the observation model or the composition.
 
 ```math
 \begin{aligned}
@@ -261,10 +225,8 @@ end
 (species = species(seir), parameters = parameters(seir))
 ```
 
-The network now has four species and three rates, and Catalyst regenerates the
-drift and Jacobian for us. We attach a prior per species and per rate exactly as
-before, index the same infectious compartment symbolically, and reuse the same
-observation model.
+The network now has four species and three rates, and Catalyst regenerates the drift and Jacobian for us.
+We attach a prior per species and per rate exactly as before, index the same infectious compartment symbolically, and reuse the same observation model.
 
 ```@example catalyst
 seir_params = CatalystODEParams(seir;
@@ -289,13 +251,8 @@ seir_chain = sample(
 (β = mean(βe), α = mean(αe), γ = mean(γe), R0 = mean(βe ./ γe))
 ```
 
-Both fits ran through the same [`CatalystODEParams`](@ref), the same
-[`ODEProcess`](@ref) contract, and the same FlexiChains readback. Adding a
-fourth compartment, a vaccinated class, or a second strain is a matter of
-writing a different reaction network and passing it to the same type, and the
-vector field and Jacobian follow automatically. That is the trade the Catalyst
-extension offers, a one-off symbolic-compilation cost and a heavier dependency
-tree in exchange for declarative, model-agnostic, self-consistent dynamics.
+Adding a fourth compartment, a vaccinated class, or a second strain is a matter of writing a different reaction network and passing it to the same type, and the vector field and Jacobian follow automatically.
+The Catalyst extension trades a one-off symbolic-compilation cost and a heavier dependency tree for declarative, model-agnostic dynamics.
 
 ## References
 

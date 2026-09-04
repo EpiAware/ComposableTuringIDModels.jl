@@ -189,11 +189,12 @@ struct Renewal{
             gen_int::G, transformation::F, rt, initialisation::S,
             recurrent_step::A, mixing::K, modifiers::M
         ) where {G, F <: Function, S <: PriorLike, A, K, M <: Tuple}
-        # `rt` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
-        # an `Intercept` (a constant path), never left as a scalar. The
-        # widening runs here rather than in the keyword constructor so the
-        # positional form cannot bypass it. `path_prior` is idempotent, so
-        # rebuilding a `Renewal` from its own fields changes nothing.
+        # `rt` is a length-`n` path slot, so a bare `Distribution` is wrapped in
+        # an `Intercept` rather than left as a scalar.
+        # The widening runs here rather than in the keyword constructor so the
+        # positional form cannot bypass it.
+        # `path_prior` is idempotent, so rebuilding a `Renewal` from its own
+        # fields changes nothing.
         path = path_prior(rt)
         return new{G, F, typeof(path), S, A, K, M}(
             gen_int, transformation, path, initialisation, recurrent_step,
@@ -217,11 +218,9 @@ function Renewal(;
     )
 end
 
-# Positional modifier form: the generation time first, then the
-# [`AbstractRenewalModifier`](@ref)s composed onto the renewal step — e.g.
-# `Renewal([0.2, 0.3, 0.5], SusceptibleDepletion(1000.0); rt = RandomWalk())`.
-# It takes the same generation times and discretisation keywords as the keyword
-# form and delegates to it, so there is one construction path.
+# Positional modifier form, taking the generation time first and then the
+# [`AbstractRenewalModifier`](@ref)s composed onto the renewal step.
+# It delegates to the keyword form, so there is one construction path.
 function Renewal(
         generation_time::Union{AbstractVector, Distribution, AbstractPriorModel},
         modifiers::AbstractRenewalModifier...;
@@ -235,10 +234,10 @@ function Renewal(
     )
 end
 
-# The modifier slot takes one modifier or a collection of them; a tuple keeps
-# the step's modifier types concrete. The keyword form has no signature to
-# constrain it, as the positional one does, so what it was given is checked here
-# rather than failing as a `MethodError` from inside the step's seam.
+# The modifier slot takes one modifier or a collection of them, and a tuple keeps
+# the step's modifier types concrete.
+# The keyword form has no signature to constrain it, so what it was given is
+# checked here rather than failing as a `MethodError` from inside the step's seam.
 _modifier_tuple(mod::AbstractRenewalModifier) = (mod,)
 
 function _modifier_tuple(mods)
@@ -252,15 +251,14 @@ function _modifier_tuple(mods)
     return tup
 end
 
-# The step a core and a modifier tuple make: the core with the modifiers
-# composed on, and the bare core when there are none, so a modifier-free renewal
-# keeps the step (and so the variable names) it has always had.
+# The step a core and a modifier tuple make.
+# With no modifiers this is the bare core, so a modifier-free renewal keeps the
+# step, and so the variable names, it has always had.
 _bake_step(core, mods::Tuple) = RenewalStep(core, mods)
 _bake_step(core, ::Tuple{}) = core
 
-# Fixed generation interval (a pmf vector or a continuous distribution): bake the
-# discretised interval and its renewal step (with `mixing` and the modifiers
-# folded in) at construction, exactly as before.
+# A fixed generation interval bakes the discretised interval and its renewal
+# step, with `mixing` and the modifiers folded in, at construction.
 function _renewal_fields(
         generation_time, mixing, mods; D_gen = nothing, Δd = 1.0
     )
@@ -268,10 +266,9 @@ function _renewal_fields(
     return gen_int, _bake_step(_renewal_step(gen_int, mixing), mods)
 end
 
-# Inferred generation interval: hold the pmf-producing prior model and build the
-# renewal step per draw inside the `@model`, so no interval or step is baked.
-# `mixing` and the modifiers are folded in there instead (both live on the
-# struct, not on the step).
+# An inferred generation interval holds the pmf-producing prior model and builds
+# the renewal step per draw inside the `@model`, so no interval or step is baked.
+# `mixing` and the modifiers live on the struct and are folded in there instead.
 function _renewal_fields(
         generation_time::AbstractPriorModel, mixing, mods;
         D_gen = nothing, Δd = 1.0
@@ -286,9 +283,9 @@ function _renewal_gen_int(gen_int::AbstractVector; D_gen = nothing, Δd = 1.0)
     return collect(gen_int)
 end
 
-# `generation_time` as a continuous distribution: discretise via double-interval
-# censoring, drop the delay-0 bin (a generation interval has no mass at lag 0) and
-# renormalise.
+# A continuous `generation_time` is discretised by double-interval censoring.
+# The delay-0 bin is dropped, because a generation interval has no mass at lag 0,
+# and the remainder renormalised.
 function _renewal_gen_int(
         gen_distribution::ContinuousDistribution;
         D_gen = nothing, Δd = 1.0
@@ -297,17 +294,17 @@ function _renewal_gen_int(
         p -> p[2:end] ./ sum(p[2:end])
 end
 
-# The generation-interval shape a `gen_int` prior slot is drawn at: no shape
-# argument (giving one pmf) for a single series, `n_strata` (giving one pmf per
-# stratum) for a stratified renewal. Returned as a tuple so it splats straight
-# into the `as_turing_submodel` call — `()` splats to no extra argument.
+# The shape a `gen_int` prior slot is drawn at.
+# A single series takes no shape argument and a stratified renewal takes
+# `n_strata`, giving one pmf per stratum.
+# Returned as a tuple so it splats straight into the `as_turing_submodel` call.
 _gen_int_shape(n::Int) = ()
 _gen_int_shape(n::Dims{2}) = (n[1],)
 
-# Drop the lag-0 bin and renormalise, the generation-interval convention the
-# fixed-distribution path applies at construction, applied here to a drawn pmf
-# (or one pmf per stratum). `_stack_pmfs` assembles a vector of per-stratum pmfs
-# into a `strata × lags` matrix before the matrix method renormalises each row.
+# Drop the lag-0 bin and renormalise, which is the convention the
+# fixed-distribution path applies at construction, applied here to a drawn pmf.
+# `_stack_pmfs` assembles a vector of per-stratum pmfs into a `strata × lags`
+# matrix before the matrix method renormalises each row.
 _drop_lag_zero(p::AbstractVector) = p[2:end] ./ sum(p[2:end])
 function _drop_lag_zero(ps::AbstractVector{<:AbstractVector})
     return _drop_lag_zero(_stack_pmfs(ps))
@@ -319,10 +316,9 @@ end
 
 _stack_pmfs(ps) = permutedims(reduce(hcat, ps))
 
-# Initial renewal state from sampled I₀ and R₀, decaying at the implied rate. The
-# generation interval and its step are passed in so the fixed (baked) and
-# inferred (per-draw) paths share one initialiser; `_init_rate`/`_n_lags` widen
-# it to a per-stratum seed, `R_t` and/or generation interval.
+# Initial renewal state from sampled I₀ and R₀, decaying at the implied rate.
+# The generation interval and its step are passed in so the baked and per-draw
+# paths share one initialiser.
 function _make_renewal_init(step::AbstractConstantRenewalStep, gen_int, I₀, Rt₀)
     r_approx = _init_rate(Rt₀, gen_int)
     return renewal_init_state(step, I₀, r_approx, _n_lags(gen_int))
@@ -332,12 +328,10 @@ end
     Z_t ~ as_turing_submodel(infection.rt, n)
     Rt = infection.transformation.(Z_t)
 
-    # The generation interval is either fixed (its baked renewal step used
-    # directly) or inferred: a pmf-producing prior model sampled through the
-    # single seam at the shape the renewal needs, with the lag-0 bin dropped
-    # and the remainder renormalised per draw. The step is rebuilt per draw so
-    # the gradient flows through the discretisation, with `mixing` and the
-    # modifiers folded in as the constructors fold them into the baked step.
+    # An inferred generation interval is sampled through the single seam, with
+    # the lag-0 bin dropped and the remainder renormalised per draw.
+    # The step is rebuilt per draw so the gradient flows through the
+    # discretisation.
     if infection.gen_int isa AbstractPriorModel
         gen ~ as_turing_submodel(
             infection.gen_int, _gen_int_shape(n)...; prefix = true
@@ -351,10 +345,10 @@ end
         step = infection.recurrent_step
     end
 
-    # The `initialisation` slot is either a level at ``t_0`` — one value, or one
-    # per stratum — or a whole seeding path, drawn at the incidence window's own
-    # shape. Both branches are decided by the slot's type, so nothing is chosen
-    # at run time.
+    # The `initialisation` slot is either a level at ``t_0`` or a whole seeding
+    # path drawn at the incidence window's own shape.
+    # Both branches are decided by the slot's type, so nothing is chosen at run
+    # time.
     if infection.initialisation isa SeedingPath
         init_incidence ~ as_turing_submodel(
             infection.initialisation.model,
@@ -366,11 +360,10 @@ end
         )
     end
 
-    # Resolve the step before scanning: any modifier carrying priors (e.g.
-    # `ImportedCases`) draws them here and hands back the modifier the scan
-    # uses, and a drawn `mixing` model (e.g. `Gravity`) draws its parameters and
-    # hands back a resolved core, while a purely deterministic step returns
-    # itself. One seam, no branch on what the step's modifiers or mixing are.
+    # Resolve the step before scanning, so a modifier or a `mixing` model
+    # carrying priors draws them here and hands back what the scan uses.
+    # A purely deterministic step returns itself, so nothing here branches on
+    # what the step holds.
     scan_step ~ as_turing_submodel(step, n)
 
     Rts = _steps(Rt)
