@@ -173,7 +173,7 @@ Convenience 2-argument form: read the infection process's shape from the data.
 The observation model and the data together fix the shape of the infection
 process, so nothing about it needs to be supplied explicitly or stored on the
 model. `as_turing_model(model, Y)` is `as_turing_model(model, Y, shape)` with
-`shape` resolved the same way [`IDProblem`](@ref) resolves it: the observation
+`shape` resolved the same way [`IDProblem`](@ref) resolves it. The observation
 model states what it can of its own stratum count (see
 [`infection_strata`](@ref)), and the data's row count is read only where the
 model leaves that count open.

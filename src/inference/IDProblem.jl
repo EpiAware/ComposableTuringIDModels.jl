@@ -9,11 +9,10 @@ model, so it is not a separate slot here.
 over `tspan` and conditions it on `data.y_t`. The infection process's shape is
 fixed at build time rather than stored on the problem. The observation model
 states what it can of its own stratum count (see [`infection_strata`](@ref)), and
-`data.y_t` is read only where the model leaves that count open, along the axis
-the component consuming the data calls a stream axis. A plain vector (or
-`missing`) gives a single-series infection process, while a data matrix or a
+`data.y_t` is read only where the model leaves that count open. A plain vector
+(or `missing`) gives a single-series infection process, while a data matrix or a
 `NamedTuple` of streams gives one infection stratum per stream. Data whose array
-dimensions mean something else does not stratify anything: a
+dimensions mean something else does not stratify anything. A
 [`ReportTriangle`](@ref)'s rows are reference days, and a [`BinomialError`](@ref)'s
 `N` field is a trials covariate rather than a second stream.
 

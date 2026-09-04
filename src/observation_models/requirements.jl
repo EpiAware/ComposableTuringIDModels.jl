@@ -468,18 +468,15 @@ _data_contract(::ReportTriangle) = (shape = :triangle, fields = ())
 # --- the shape the infection process is built at -----------------------------
 
 # The infection strata a chain fixes for itself, before it sees any data.
-# `nothing` leaves the count to the data, and a strata template replicated once
-# per data stream is the only case where the data gets to decide.
+# `nothing` leaves the count to the data.
 _declared_strata(model::AbstractObservationModel) = _declared_strata(
     _wrapped_model(model)
 )
 _declared_strata(::Nothing) = nothing
 
-# A weight map fixes the count outright, named streams fix one stratum per
-# stream, and a strata template fixes neither because its streams arrive with the
-# data.
-# Every path goes through `infection_strata`, so the streams-to-strata rule is
-# stated in one place even where the map already answers it.
+# A strata template fixes nothing, because its streams arrive with the data.
+# The map's rows are its observation streams, and every path goes through
+# `infection_strata` so the streams-to-strata rule stays in one place.
 function _declared_strata(m::Split)
     m.map === nothing || return infection_strata(m, size(m.map, 1))
     m.streams isa NamedTuple || return nothing
@@ -490,10 +487,9 @@ end
 The number of observation streams a data value holds for a model, or `nothing`
 when it holds a single series.
 
-The seam a component uses to say how its data is laid out, so nothing has to be
-guessed from whichever array dimensions the data happens to have. The count is
-what stratifies the infection process an [`IDProblem`](@ref) builds, mapped
-through [`infection_strata`](@ref).
+The seam a component uses to say how its data is laid out. The count is what
+stratifies the infection process an [`IDProblem`](@ref) builds, mapped through
+[`infection_strata`](@ref).
 
 The default reads a stream axis off the value itself. A matrix is a panel with
 one row per stream, a `NamedTuple` is one entry per stream, and anything else is
@@ -531,8 +527,7 @@ function observation_streams(model::AbstractObservationModel, y_t)
 end
 
 # The walk stops at the first component that reads the raw data rather than the
-# expected series: a `Split` slices it into per-stream values, and otherwise it
-# reaches whatever consumes the series.
+# expected series.
 _wrapped_streams(::Nothing, y_t) = _stream_axis_size(y_t)
 _wrapped_streams(inner, y_t) = observation_streams(inner, y_t)
 
@@ -542,9 +537,9 @@ observation_streams(::Split, y_t) = _stream_axis_size(y_t)
 # matrix names no streams however it is supplied.
 observation_streams(::ReportTriangle, y_t) = nothing
 
-# An error family handed a `NamedTuple` takes its observations from the `y`
-# field, which is the field `define_y_t` unpacks whatever else is supplied
-# beside it. The other fields are per-time-point covariates, not streams.
+# `define_y_t` unpacks an error family's observations from the `y` field
+# whatever else is supplied beside it.
+# The other fields are per-time-point covariates, not streams.
 function observation_streams(::AbstractObservationErrorModel, y_t::NamedTuple)
     return _stream_axis_size(y_t.y)
 end
@@ -558,13 +553,13 @@ _stream_axis_size(::Any) = nothing
 # value, shared by `IDProblem` and `forecast` so the two build a data-driven
 # model's shape the same way.
 # The chain states what it can before any data is seen, and only what it leaves
-# open is read off the data — and then only along the axis the component
-# consuming that data calls a stream axis, so a value whose array dimensions mean
-# something else does not shape the infection process.
+# open is read off the data.
 _obs_data_shape(obs, y_t, time_steps) = _shape_from_strata(
     _resolved_strata(obs, y_t), time_steps
 )
 
+# Split across two methods rather than branched inside one, so `_obs_data_shape`
+# returns a concrete type in a `@model` body instead of a union.
 _shape_from_strata(::Nothing, time_steps) = time_steps
 _shape_from_strata(strata::Int, time_steps) = (strata, time_steps)
 
