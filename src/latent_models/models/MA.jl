@@ -38,9 +38,11 @@ struct MA{C <: PriorLike, Q <: Int, E <: PriorLike} <: AbstractLatentModel
     "Error model for the innovations."
     ϵ_t::E
 
-    function MA(θ, q::Int, ϵ_t)
-        @assert q > 0 "q must be greater than 0"
-        assert_prior_length(θ, q, "θ")
+    function MA(θ, _q, ϵ_t)
+        # The order is what the coefficient prior implies, so it is read off `θ`
+        # here rather than taken, which keeps every construction path, the
+        # field-wise rebuild included, agreeing on it.
+        q = _slot_order(θ)
         # `ϵ_t` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
         # an `Intercept` (a constant innovation path), never left as a scalar.
         wrapped = path_prior(ϵ_t)
@@ -56,8 +58,7 @@ function MA(;
         θ = [truncated(Normal(0.0, 0.05), -1, 1)],
         ϵ_t = HierarchicalNormal()
     )
-    q = prior_order(θ)
-    return MA(θ, q, ϵ_t)
+    return MA(θ, nothing, ϵ_t)
 end
 
 @model function as_turing_model(model::MA, n::Int)

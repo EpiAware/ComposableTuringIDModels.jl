@@ -114,8 +114,10 @@ struct ImportedCases{I <: PriorLike, F <: Function} <: AbstractRenewalModifier
     "The map from the unconstrained rate onto the positive rate."
     transformation::F
 
+    # The fields in declaration order, which is the form a field-wise rebuild
+    # supplies and the keyword constructor below has no signature for.
     function ImportedCases(
-            importation_rate::PriorLike; transformation::Function = exp
+            importation_rate::PriorLike, transformation::Function
         )
         return new{typeof(importation_rate), typeof(transformation)}(
             importation_rate, transformation
@@ -123,12 +125,10 @@ struct ImportedCases{I <: PriorLike, F <: Function} <: AbstractRenewalModifier
     end
 end
 
-# `ImportedCases` takes its transformation as a keyword, so a rebuild from its
-# fields in declaration order has no method to land on and throws.
-ConstructionBase.constructorof(::Type{<:ImportedCases}) = _rebuild_imported_cases
-
-function _rebuild_imported_cases(importation_rate, transformation)
-    return ImportedCases(importation_rate; transformation = transformation)
+function ImportedCases(
+        importation_rate::PriorLike; transformation::Function = exp
+    )
+    return ImportedCases(importation_rate, transformation)
 end
 
 @doc raw"

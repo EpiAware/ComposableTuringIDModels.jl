@@ -40,13 +40,16 @@ struct ConcatLatentModels{
     prefixes::P
 
     function ConcatLatentModels(
-            models::AbstractVector, no_models::I,
+            models::AbstractVector, _no_models,
             dimension_adaptor::F, prefixes::P
         ) where {
-            I <: Int, F <: Function, P <: AbstractVector{<:String},
+            F <: Function, P <: AbstractVector{<:String},
         }
         @assert length(models) > 1 "At least two models are required"
-        @assert length(models) == no_models "no_models must be equal to the number of models"
+        # The count is what `models` implies, so it is read off it rather than
+        # taken, which keeps every construction path, the field-wise rebuild
+        # included, agreeing on it.
+        no_models = length(models)
         check_dim = dimension_adaptor(no_models, no_models)
         @assert typeof(check_dim) <: AbstractVector{Int} "Output of dimension_adaptor must be a vector of integers"
         @assert length(check_dim) == no_models "The vector of dimensions must have the same length as the number of models"

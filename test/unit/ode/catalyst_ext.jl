@@ -222,3 +222,37 @@ end
     @test length(βs) == 20
     @test all(isfinite, βs)
 end
+
+@testitem "CatalystODEParams rebuilds to itself and takes a set field" begin
+    using ComposableTuringIDModels, Catalyst, ModelingToolkit, Distributions
+    using Accessors: Accessors
+
+    # The general rebuild cases in `test/unit/base/reconstruction.jl` skip this
+    # component, because building one needs a `ReactionSystem` and so this
+    # extension. The two properties they check are checked here instead.
+    sir = @reaction_network begin
+        β, S + I --> 2I
+        γ, I --> R
+    end
+    build(p_priors) = CatalystODEParams(
+        sir; tspan = (0.0, 30.0),
+        u0_priors = [sir.S => Beta(99, 1), sir.I => Beta(1, 99), sir.R => 0.0],
+        p_priors = p_priors
+    )
+    slow = [sir.β => LogNormal(log(0.3), 0.05), sir.γ => LogNormal(log(0.1), 0.05)]
+    fast = [sir.β => LogNormal(log(0.5), 0.05), sir.γ => LogNormal(log(0.2), 0.05)]
+
+    a = build(slow)
+    rebuilt = Accessors.modify(identity, a, Accessors.Properties())
+    @test typeof(rebuilt) === typeof(a)
+    @test rebuilt.prob === a.prob
+    @test rebuilt.u0_specs == a.u0_specs
+    @test rebuilt.p_specs == a.p_specs
+
+    # `prob` comes from the reaction network's structure rather than from the
+    # priors, so setting the priors leaves it describing the same system.
+    set = Accessors.set(a, Accessors.PropertyLens{:p_specs}(), build(fast).p_specs)
+    @test set.p_specs == build(fast).p_specs
+    @test set.u0_specs == a.u0_specs
+    @test set.prob === a.prob
+end

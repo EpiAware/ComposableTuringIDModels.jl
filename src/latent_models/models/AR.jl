@@ -69,9 +69,15 @@ struct AR{
     prior, `identity` for a bounded `Distribution`)."
     transform::F
 
-    function AR(damp, init, p::Int, ϵ_t, transform)
-        @assert p > 0 "p must be greater than 0"
-        assert_prior_length(damp, p, "damp")
+    function AR(damp, init, _p, ϵ_t, transform)
+        # The order is what the damping prior implies, so it is read off `damp`
+        # rather than taken, and the order-`p` initial-conditions slot is sized
+        # to it.
+        # Both run here rather than in the keyword constructor so the positional
+        # form cannot bypass them, and both are idempotent, so rebuilding an
+        # `AR` from its own fields is a fixed point.
+        p = _slot_order(damp)
+        init = (p > 1 && init isa Distribution) ? fill(init, p) : init
         assert_prior_length(init, p, "init")
         # `ϵ_t` is a length-`n` path slot, so a bare `Distribution` is wrapped
         # in an `Intercept` rather than left as a scalar.
@@ -95,14 +101,7 @@ function AR(;
         damp = truncated(Normal(0.0, 0.05), 0, 1), init = Normal(),
         ϵ_t = HierarchicalNormal(), transform = _default_transform(damp)
     )
-    # Order `p` is fixed by the damping prior.
-    # The order-`p` initial-conditions slot needs `p` values, so a bare
-    # `Distribution` is sized to a length-`p` vector of i.i.d. draws.
-    # An explicit vector must already be length `p`, and a process supplies its
-    # own length.
-    p = prior_order(damp)
-    init = (p > 1 && init isa Distribution) ? fill(init, p) : init
-    return AR(damp, init, p, ϵ_t, transform)
+    return AR(damp, init, nothing, ϵ_t, transform)
 end
 
 @model function as_turing_model(model::AR, n::Int)

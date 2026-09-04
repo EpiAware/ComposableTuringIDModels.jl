@@ -78,21 +78,15 @@ struct Aggregate{
         present = aggregation .!= 0
         return new{M, A, typeof(present)}(model, aggregation, present)
     end
-
-    # The raw constructor, taking the derived presence mask as stored.
-    function Aggregate{M, A, P}(model, aggregation, present) where {M, A, P}
-        return new{M, A, P}(model, aggregation, present)
-    end
 end
 
-# An `Aggregate` derives its presence mask from its window lengths, so its public
-# constructor takes fewer arguments than it has fields and a generic rebuild
-# fails outright.
-# The mask given to the rebuild is what the window lengths imply, so it is
-# discarded rather than kept beside an `aggregation` it no longer describes.
-ConstructionBase.constructorof(::Type{<:Aggregate}) = _rebuild_aggregate
-
-_rebuild_aggregate(model, aggregation, _present) = Aggregate(model, aggregation)
+# `present` is a pure function of `aggregation`, so deriving it on the
+# all-fields form as well is what makes every construction path agree.
+# It is idempotent, so rebuilding from stored fields is a fixed point and no
+# `ConstructionBase.constructorof` is needed. Without this method a field-wise
+# rebuild has nothing to call, because the public constructor takes fewer
+# arguments than the struct has fields.
+Aggregate(model, aggregation, _present) = Aggregate(model, aggregation)
 
 function Aggregate(; model::M, aggregation::A) where {
         M <: AbstractObservationModel, A <: AbstractVector{<:Int},

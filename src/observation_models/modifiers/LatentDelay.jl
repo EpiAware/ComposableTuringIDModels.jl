@@ -198,29 +198,29 @@ struct UncertainDelay{P <: AbstractVector, F, T <: Real, TV} <: AbstractPriorMod
     family::F
     D::T
     Δd::T
+
+    # The fields in declaration order, which is the form a field-wise rebuild
+    # supplies and which the keyword constructor below has no signature for.
+    # `TV` is read off `params` here rather than taken, so it cannot come to
+    # describe parameters the delay no longer holds.
+    function UncertainDelay(params::AbstractVector, family, D, Δd)
+        @assert !isnothing(D) "UncertainDelay needs a fixed horizon `D` so the delay PMF length is constant across draws"
+        @assert Δd > 0.0 "Δd must be positive"
+        @assert all(p -> p isa Distribution || p isa AbstractPriorModel, params) "Each UncertainDelay parameter must be a `Distribution` (constant → uncertain) or a process (an `AbstractPriorModel` → time-varying)"
+        Dp, Δdp = promote(float(D), float(Δd))
+        @assert Dp >= Δdp "D can't be shorter than Δd"
+        # A process-valued parameter makes the delay time-varying; recorded as a
+        # type parameter so the `LatentDelay` convolution branch stays
+        # type-stable.
+        tv = any(p -> p isa AbstractPriorModel, params)
+        return new{typeof(params), typeof(family), typeof(Dp), tv}(
+            params, family, Dp, Δdp
+        )
+    end
 end
 
 function UncertainDelay(family, params::AbstractVector; D, Δd = 1.0)
-    @assert !isnothing(D) "UncertainDelay needs a fixed horizon `D` so the delay PMF length is constant across draws"
-    @assert Δd > 0.0 "Δd must be positive"
-    @assert all(p -> p isa Distribution || p isa AbstractPriorModel, params) "Each UncertainDelay parameter must be a `Distribution` (constant → uncertain) or a process (an `AbstractPriorModel` → time-varying)"
-    Dp, Δdp = promote(float(D), float(Δd))
-    @assert Dp >= Δdp "D can't be shorter than Δd"
-    # A process-valued parameter makes the delay time-varying; recorded as a type
-    # parameter so the `LatentDelay` convolution branch stays type-stable.
-    tv = any(p -> p isa AbstractPriorModel, params)
-    return UncertainDelay{typeof(params), typeof(family), typeof(Dp), tv}(
-        params, family, Dp, Δdp
-    )
-end
-
-# An `UncertainDelay`'s only constructor takes its horizon and bin width as
-# keywords and its family before its parameters, so a rebuild from its fields in
-# declaration order has no method to land on and throws.
-ConstructionBase.constructorof(::Type{<:UncertainDelay}) = _rebuild_uncertain_delay
-
-function _rebuild_uncertain_delay(params, family, D, Δd)
-    return UncertainDelay(family, params; D = D, Δd = Δd)
+    return UncertainDelay(params, family, D, Δd)
 end
 
 # An all-constant delay gives a single time-invariant pmf.
@@ -316,7 +316,20 @@ _delay_timevarying(::AbstractVector{<:AbstractVector{<:Real}}) = true
 _delay_timevarying(::AbstractPriorModel) = false
 _delay_timevarying(::UncertainDelay{P, F, T, TV}) where {P, F, T, TV} = TV
 
-@model function as_turing_model(obs_model::LatentDelay, y_t, Y_t)
+# A fixed PMF is stored as it was given and the convolution wants it reversed,
+# so it is reversed here, once when the model is built, rather than in the
+# `@model` body where it would land on the differentiated path.
+# The other specifications build their PMFs per draw and reverse them there.
+_reversed_fixed_delay(spec::AbstractVector{<:Real}) = reverse(spec)
+_reversed_fixed_delay(spec) = spec
+
+function as_turing_model(obs_model::LatentDelay, y_t, Y_t)
+    return _latent_delay(
+        obs_model, _reversed_fixed_delay(obs_model.delay), y_t, Y_t
+    )
+end
+
+@model function _latent_delay(obs_model::LatentDelay, spec, y_t, Y_t)
     # A `missing` series is passed down as it is, so the component that scores
     # it sizes it from the convolved series it actually reads.
     # Sizing it here instead would simulate a series as long as the input, with
@@ -329,7 +342,6 @@ _delay_timevarying(::UncertainDelay{P, F, T, TV}) where {P, F, T, TV} = TV
     if ismissing(y_t) && _needs_input_calendar(obs_model.model)
         y_t = Vector{Missing}(missing, length(Y_t))
     end
-    spec = obs_model.delay
     n = length(Y_t)
 
     # `_delay_timevarying` is a compile-time-constant trait on the `delay` field
@@ -355,13 +367,13 @@ _delay_timevarying(::UncertainDelay{P, F, T, TV}) where {P, F, T, TV} = TV
         )
     else
         # A single reversed pmf drives `LDStep`, which is the fast path.
-        # A fixed PMF vector is stored forward, and an all-constant uncertain
-        # delay builds its forward PMF per draw, so both are reversed here.
+        # A fixed PMF arrives already reversed; an all-constant uncertain delay
+        # builds its forward PMF per draw, which is reversed here.
         if spec isa AbstractPriorModel
             delay ~ as_turing_submodel(spec; prefix = true)
             rev_pmf = reverse(delay)
         else
-            rev_pmf = reverse(spec)
+            rev_pmf = spec
         end
         d = length(rev_pmf)
         @assert d <= n "The delay PMF must be no longer than the observation vector"

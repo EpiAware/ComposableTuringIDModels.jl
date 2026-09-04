@@ -77,35 +77,15 @@ struct Ascertainment{
         # factor drawn once and broadcast.
         # `PrefixLatentModel` namespaces it under `latent_prefix` so the
         # ascertainment variables stay distinct, and an empty prefix opts out.
+        # Wrapping here rather than in the keyword constructor is what makes
+        # every construction path agree.
+        # `_prefixed_path` is idempotent, so rebuilding from stored fields is a
+        # fixed point and no `ConstructionBase.constructorof` is needed.
         prior = _prefixed_path(latent_model, latent_prefix)
         return new{M, typeof(prior), F, P}(
             model, prior, transform, latent_prefix
         )
     end
-
-    # The raw constructor, taking the fields exactly as stored with the prior
-    # already coerced and prefixed.
-    # Rebuilding goes through this rather than through the constructor above,
-    # whose `hasmethod` check is runtime reflection an AD backend cannot see
-    # through when the component is built inside a model.
-    function Ascertainment{M, L, F, P}(
-            model, latent_model, transform, latent_prefix
-        ) where {M, L, F, P}
-        return new{M, L, F, P}(model, latent_model, transform, latent_prefix)
-    end
-end
-
-# An `Ascertainment` stores its prior already wrapped in a `PrefixLatentModel`,
-# so its rebuild re-applies the same idempotent wrapping.
-ConstructionBase.constructorof(::Type{<:Ascertainment}) = _rebuild_ascertainment
-
-function _rebuild_ascertainment(model, latent_model, transform, latent_prefix)
-    prior = _prefixed_path(latent_model, latent_prefix)
-    T = Ascertainment{
-        typeof(model), typeof(prior), typeof(transform),
-        typeof(latent_prefix),
-    }
-    return T(model, prior, transform, latent_prefix)
 end
 
 function Ascertainment(

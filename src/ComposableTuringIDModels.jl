@@ -31,10 +31,10 @@ using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
 using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
-# Several wrappers derive a field from the others at construction, so they point
-# `constructorof` at a rebuild that re-derives it.
-# That keeps `Accessors` and `rewrap` from carrying a derived field across to
-# fields it no longer describes.
+# `ConstructionBase.constructorof` is what `Accessors` and `rewrap` rebuild a
+# component through. No component here declares one: each derives its fields
+# idempotently in the constructor taking them in declaration order, which that
+# rebuild calls, so the default is already right.
 using ConstructionBase: ConstructionBase
 using LinearAlgebra: dot, cholesky, Symmetric, I, UniformScaling
 using LogExpFunctions: softmax, xexpy, log1pexp
