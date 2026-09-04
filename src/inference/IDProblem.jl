@@ -2,7 +2,7 @@
 # infection process comes from the data rather than being stored on the model.
 
 @doc raw"
-A composed model and the data it is fitted to, held together.
+A composed model and the data it is fitted to.
 
 An [`IDModel`](@ref) says what the process is. The data says how long it runs
 and how many streams it has. `IDProblem` is the pair, so the two travel
