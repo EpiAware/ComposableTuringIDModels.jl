@@ -104,8 +104,8 @@ nothing # hide
 
 !!! warning "Use forward-mode autodiff for ODE models"
     The rest of these docs recommend Mooncake as the default AD backend, but ODE infection models are the exception and sample under **ForwardDiff** today.
-    Reverse-mode **Mooncake-driven NUTS through the ODE solver is not yet supported** for the hand-coded *or* the Catalyst model.
-    This is a pre-existing Turing/`SciMLSensitivity` integration gap (tracked in [issue #46](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/46)) rather than anything introduced by Catalyst.
+    Reverse-mode **NUTS through the ODE solver is not yet supported** on the Catalyst path.
+    The block is in how this extension builds and remakes its `ODEProblem`, not in Turing or `SciMLSensitivity`.
     We therefore pass `AutoForwardDiff()` to NUTS explicitly.
 
 ```@example catalyst
@@ -203,10 +203,14 @@ fig
 
 The declarative SIR dynamics, scaled by the population and Poisson observation model, reproduce the boarding-school outbreak.
 
-## The same API on a different network
+## The same API on a network built from parts
 
-The payoff of the generic path is that a different compartmental model is a different reaction network passed to the *same* [`CatalystODEParams`](@ref).
-We add an exposed class ``E`` to make SEIR, read it the same way, and fit it with no change to the observation model or the composition.
+A different compartmental model is a different reaction network passed to the *same* [`CatalystODEParams`](@ref).
+A network also does not have to be written out whole.
+It can be assembled from smaller networks.
+
+We build SEIR from two reaction components.
+`@network_component` declares a network that is deliberately unfinished, and `extend` merges components into one network, unifying species that share a name.
 
 ```math
 \begin{aligned}
@@ -217,15 +221,30 @@ I &\xrightarrow{\gamma} R & &\text{recovery}
 ```
 
 ```@example catalyst
-seir = @reaction_network begin
+transmission = @network_component transmission begin
     β, S + I --> E + I
     α, E --> I
+end
+
+removal = @network_component removal begin
     γ, I --> R
 end
+
+seir = complete(extend(transmission, removal; name = :seir))
 (species = species(seir), parameters = parameters(seir))
 ```
 
-The network now has four species and three rates, and Catalyst regenerates the drift and Jacobian for us.
+``I`` is written in both components and is unified into one compartment, so the assembled network has four species and three rates.
+`complete` marks it finished and ready to build a problem from.
+The species come back in neither component's written order, since the layout now depends on which components were merged and in what order.
+Sampling and indexing stay symbolic, so nothing downstream reads that layout, as [A note on species ordering](@ref) sets out.
+
+!!! note "`extend` and `compose` namespace differently"
+    `extend` merges components into one flat network, which is what a compartmental model wants, because compartments must be shared rather than duplicated.
+    `compose` instead nests one network inside another and namespaces the inner species, so a subsystem's ``I`` becomes `patch₊I`.
+    [`CatalystODEParams`](@ref) reads either, but a composed system names its sampled variables after the namespaced symbols.
+
+Catalyst regenerates the drift and Jacobian for the assembled network.
 We attach a prior per species and per rate exactly as before, index the same infectious compartment symbolically, and reuse the same observation model.
 
 ```@example catalyst
@@ -251,7 +270,7 @@ seir_chain = sample(
 (β = mean(βe), α = mean(αe), γ = mean(γe), R0 = mean(βe ./ γe))
 ```
 
-Adding a fourth compartment, a vaccinated class, or a second strain is a matter of writing a different reaction network and passing it to the same type, and the vector field and Jacobian follow automatically.
+A vaccinated class or a second strain is one more component to merge in, and the vector field and Jacobian follow automatically.
 The Catalyst extension trades a one-off symbolic-compilation cost and a heavier dependency tree for declarative, model-agnostic dynamics.
 
 ## References
