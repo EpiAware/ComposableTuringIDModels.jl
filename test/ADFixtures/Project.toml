@@ -5,6 +5,7 @@ authors = ["Sam Abbott"]
 
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
+AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
 DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
 DifferentiationInterfaceTest = "a82114a7-5aa3-49a8-9643-716bb13727a3"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -19,6 +20,7 @@ ComposableTuringIDModels = {path = "../.."}
 
 [compat]
 ADTypes = "1.23.0"
+AbstractMCMC = "5.15.1"
 DifferentiationInterface = "0.7.20"
 DifferentiationInterfaceTest = "0.11.0"
 Distributions = "0.25.128"
