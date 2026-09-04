@@ -46,15 +46,24 @@ end
     )
     @test occursin("└─ data: 30 observations, 1 missing", gappy)
 
+    # A `NamedTuple` names its entries without claiming they are streams: they
+    # are for a `Split`, but a `BinomialError` reads `(y, N)` as one stream's
+    # fields.
     streams = render(
         IDProblem(
             infection, Split((cases = PoissonError(), deaths = PoissonError())),
             (cases = fill(5, 30), deaths = fill(1, 30))
         )
     )
-    @test occursin(
-        "└─ data: 2 streams (cases, deaths), 30 observations each", streams
+    @test occursin("└─ data: 30 observations in each of cases, deaths", streams)
+
+    binom = render(
+        IDProblem(
+            infection, BinomialError(),
+            (y = fill(5, 30), N = fill(20, 30))
+        )
     )
+    @test occursin("└─ data: 30 observations in each of y, N", binom)
 
     strata = render(
         IDProblem(

@@ -134,4 +134,7 @@ end
 
     # A scalar `missing` carries no length, and says so.
     @test_throws ArgumentError as_turing_model(model, missing)
+    # So does any other value with no time axis, rather than a `MethodError`
+    # naming a private helper.
+    @test_throws ArgumentError as_turing_model(model, 20)
 end

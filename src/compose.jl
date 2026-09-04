@@ -210,8 +210,21 @@ _data_shape(model::IDModel, y_t) = _obs_data_shape(
 
 # A data value's length along the time axis.
 # A `NamedTuple` of streams shares one time length, read off its first stream.
-# A scalar `missing` has no axis to read, and saying so beats a `MethodError`
-# from whichever helper reaches it first.
+# The two-argument `as_turing_model` is public, so a value with no time axis is
+# refused by name rather than by a `MethodError` from whichever private helper
+# reaches it first.
+# A scalar `missing` gets its own message, because passing it is the one mistake
+# with an obvious intent behind it.
+function _series_time_length(y_t)
+    throw(
+        ArgumentError(
+            "cannot read a number of observations from data of type " *
+                "$(typeof(y_t)); pass it explicitly, as " *
+                "`as_turing_model(model, y_t, n)`"
+        )
+    )
+end
+
 function _series_time_length(::Missing)
     throw(
         ArgumentError(

@@ -131,12 +131,13 @@ function _data_summary(y::AbstractMatrix)
     )
 end
 
+# A `NamedTuple` is a stream per entry for a `Split`, and a field per entry for a
+# model that reads more than the counts (a `BinomialError` takes `(y, N)`), so
+# the summary names the entries without claiming which. `data_requirements` says
+# which, and is where to look.
 function _data_summary(y::NamedTuple)
-    n_streams = length(y)
-    names = join(keys(y), ", ")
     return string(
-        n_streams, " stream", n_streams == 1 ? "" : "s", " (", names, "), ",
-        _series_time_length(y), " observations each"
+        _series_time_length(y), " observations in each of ", join(keys(y), ", ")
     )
 end
 
