@@ -627,3 +627,45 @@ end
     @test ComposableTuringIDModels._needs_input_calendar(weekly)
     @test !ComposableTuringIDModels._needs_input_calendar(PoissonError())
 end
+
+@testitem "observation_streams reads a data value's stream axis" begin
+    using ComposableTuringIDModels, Distributions
+    using ComposableTuringIDModels: observation_streams
+    # The default reads the value's own axes.
+    @test observation_streams(PoissonError(), fill(5.0, 2, 10)) == 2
+    @test observation_streams(PoissonError(), fill(5.0, 10)) === nothing
+    @test observation_streams(PoissonError(), missing) === nothing
+    @test observation_streams(
+        PoissonError(), (a = fill(5.0, 10), b = fill(5.0, 10))
+    ) == 2
+
+    # A modifier passes the question down to whatever consumes the series.
+    delayed = LatentDelay(PoissonError(), fill(1 / 4, 4))
+    @test observation_streams(delayed, fill(5.0, 3, 10)) == 3
+
+    # A component whose data means something else says so.
+    tri = ReportTriangle(PoissonError(), [0.5, 0.3, 0.2])
+    @test observation_streams(tri, [10 5 2; 12 6 3]) === nothing
+    @test observation_streams(LatentDelay(tri, [0.5, 0.5]), [10 5 2]) === nothing
+    binom = BinomialError()
+    @test observation_streams(binom, (y = fill(5, 10), N = fill(20, 10))) ===
+        nothing
+    @test observation_streams(
+        binom, (y = fill(5, 2, 10), N = fill(20, 2, 10))
+    ) == 2
+
+    # A `Split` slices the value before any stream sees it, so its outer axis is
+    # streams whatever a stream then reads.
+    @test observation_streams(
+        Split(tri), (a = [10 5 2], b = [12 6 3])
+    ) == 2
+
+    # An IDModel and an IDProblem delegate to their observation model.
+    infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal())
+    @test observation_streams(IDModel(infection, tri), [10 5 2; 12 6 3]) ===
+        nothing
+    problem = IDProblem(
+        infection = infection, observation_model = delayed, tspan = (1, 10)
+    )
+    @test observation_streams(problem, fill(5.0, 3, 10)) == 3
+end

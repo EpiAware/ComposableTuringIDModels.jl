@@ -478,6 +478,8 @@ _declared_strata(::Nothing) = nothing
 # A weight map fixes the count outright, named streams fix one stratum per
 # stream, and a strata template fixes neither because its streams arrive with the
 # data.
+# Every path goes through `infection_strata`, so the streams-to-strata rule is
+# stated in one place even where the map already answers it.
 function _declared_strata(m::Split)
     m.map === nothing || return infection_strata(m, size(m.map, 1))
     m.streams isa NamedTuple || return nothing
