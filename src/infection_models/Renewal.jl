@@ -109,6 +109,10 @@ A partially pooled generation interval therefore needs no new component, e.g.
         length constant across draws; the lag-0 bin is dropped and the remainder
         renormalised per draw, exactly as for the fixed distribution.
 
+    `D_gen` and `Δd` are not fields, so a `gen_int` set with `Accessors.@set`
+    is re-discretised with their defaults. Set it to a pmf vector, or rebuild
+    the model, to keep a non-default horizon or bin width.
+
   - `Renewal(generation_time, modifiers...; rt, initialisation, ...)` — the same
     constructor with the generation time and the modifiers given positionally.
 
