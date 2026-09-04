@@ -131,7 +131,7 @@ higher_start = @set base.infection_model.Z.init = Normal(log(2.0), 0.1)
 higher_start.infection_model.Z.init
 ```
 
-A path also reaches one branch of a [`Split`](@ref), and everything wrapped around it comes through untouched.
+A path also reaches one branch of a [`Split`](@ref), and everything wrapped around it comes through untouched, down to a [`LatentDelay`](@ref)'s stored pmf.
 
 ```@example design
 split_obs = LatentDelay(
