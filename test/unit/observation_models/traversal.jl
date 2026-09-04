@@ -42,7 +42,7 @@ end
     # Find by type instead of writing a field path.
     delays = filter(x -> x isa LatentDelay, observation_components(obs))
     @test length(delays) == 1
-    @test only(delays).delay == [0.2, 0.3, 0.5]
+    @test only(delays).delay == [0.5, 0.3, 0.2]
 
     # The lead-in a downstream package hand-rolls is a sum over the walk.
     lead_in = sum(
@@ -78,9 +78,7 @@ end
     swapped = rewrap(ld, (replacement,))
     @test swapped isa LatentDelay
     @test only(wrapped_models(swapped)) === replacement
-    # The wrapper's own state is carried across untouched: the stored PMF is
-    # already reversed, and rebuilding through the public constructor would
-    # reverse it a second time.
+    # The wrapper's own state is carried across untouched.
     @test swapped.delay == ld.delay
 
     # `Ascertainment` stores its prior already wrapped in a `PrefixLatentModel`,

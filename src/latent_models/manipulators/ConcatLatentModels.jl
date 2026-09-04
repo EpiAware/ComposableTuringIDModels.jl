@@ -40,25 +40,23 @@ struct ConcatLatentModels{
     prefixes::P
 
     function ConcatLatentModels(
-            models::AbstractVector, no_models::I,
+            models::AbstractVector, _no_models,
             dimension_adaptor::F, prefixes::P
         ) where {
-            I <: Int, F <: Function, P <: AbstractVector{<:String},
+            F <: Function, P <: AbstractVector{<:String},
         }
         @assert length(models) > 1 "At least two models are required"
-        @assert length(models) == no_models "no_models must be equal to the number of models"
+        # The count is read off `models` rather than taken, which keeps every
+        # construction path agreeing on it. See `rewrap`'s docstring.
+        no_models = length(models)
         check_dim = dimension_adaptor(no_models, no_models)
         @assert typeof(check_dim) <: AbstractVector{Int} "Output of dimension_adaptor must be a vector of integers"
         @assert length(check_dim) == no_models "The vector of dimensions must have the same length as the number of models"
         @assert length(prefixes) == no_models "The number of models and prefixes must be equal"
         # Each member is a length-`n` segment path slot, so a bare
         # `Distribution` is wrapped in an `Intercept` before it is namespaced.
-        # Non-empty prefixes then get a `PrefixLatentModel` so variables stay
-        # distinct.
         prefix_models = [
-            prefixes[i] == "" ? path_prior(models[i]) :
-                PrefixLatentModel(path_prior(models[i]), prefixes[i])
-                for i in eachindex(models)
+            _prefixed_path(models[i], prefixes[i]) for i in eachindex(models)
         ]
         return new{
             AbstractVector, Int, Function,

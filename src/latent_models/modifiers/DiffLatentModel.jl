@@ -54,9 +54,12 @@ struct DiffLatentModel{M <: PriorLike, P <: PriorLike} <: AbstractLatentModel
     "Number of times differenced."
     d::Int
 
-    function DiffLatentModel(model, init, d::Int)
+    function DiffLatentModel(model, init, _d)
+        # The differencing order is read off `init` rather than taken, which
+        # keeps every construction path agreeing on it. See `rewrap`'s
+        # docstring.
+        d = _slot_order(init)
         @assert d > 0 "d must be greater than 0"
-        assert_prior_length(init, d, "init")
         # `model` is a length-`n` PATH slot: a bare `Distribution` is wrapped in
         # an `Intercept` (a constant inner path), never left as a scalar.
         wrapped = path_prior(model)
@@ -69,8 +72,7 @@ function DiffLatentModel(model, init::Distribution; d::Int)
 end
 
 function DiffLatentModel(; model, init = [Normal()])
-    d = prior_order(init)
-    return DiffLatentModel(model, init, d)
+    return DiffLatentModel(model, init, nothing)
 end
 
 @model function as_turing_model(model::DiffLatentModel, n::Int)
