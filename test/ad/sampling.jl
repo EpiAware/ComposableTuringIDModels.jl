@@ -3,11 +3,8 @@
 # Per-backend NUTS sampling smoke tests, the sampling half of the qualification
 # the AD backend comparison page describes.
 #
-# Everything about a scenario comes from the same `ADFixtures` registry the
-# gradient items use: the models, the sampler budget, and the per-backend
-# broken and skip bookkeeping. A sampling scenario carries its ensemble
-# strategy in its name, so it can be declared broken or skipped without
-# touching the gradient scenario of the same model.
+# The models, the sampler budget and the broken and skip bookkeeping all come
+# from the `ADFixtures` registry the gradient items use.
 
 @testsnippet SamplingSmoke begin
     using Test
@@ -15,27 +12,25 @@
 
     const CHILD = joinpath(@__DIR__, "sampling_child.jl")
 
-    # Wall-clock cap on a single scenario, and how often the child's progress
-    # is checked against it. Seven per-backend jobs share one CI time limit, so
-    # a hung sampler is reported as a failure rather than left to spend the
-    # budget. The cap is per scenario, not per child, so a slow first-use
-    # compile cannot leave a healthy second scenario with no time.
+    # Seven per-backend jobs share one CI time limit, so a hung sampler is
+    # failed rather than left to spend the budget. The cap is per scenario, not
+    # per child, so a slow first-use compile cannot leave a healthy second
+    # scenario with no time.
     const SCENARIO_TIMEOUT = 900
     const POLL_INTERVAL = 5
 
-    # The status a scenario carries when it never ran.
     const SKIPPED = "skipped by the registry"
 
-    # Run the child over `names` and return its output plus a description of
-    # how it exited. Output goes to a file rather than a pipe so it survives a
-    # process that dies mid-write.
+    # Run the child over `names`, returning its output and how it exited. The
+    # output goes to a file rather than a pipe so it survives a process that
+    # dies mid-write.
     function run_child(backend_name, names)
         cmd = `$(Base.julia_cmd()) --project=$(@__DIR__) --threads=2
             --startup-file=no $CHILD $backend_name $names`
         path, io = mktemp()
         proc = run(pipeline(cmd; stdout = io, stderr = io), wait = false)
-        # Each result the child flushes restarts the clock, so the cap applies
-        # to whichever scenario is currently running.
+        # A flushed result restarts the clock, so the cap applies to the
+        # scenario currently running.
         deadline = Ref(time() + SCENARIO_TIMEOUT)
         reported = Ref(0)
         timer = Timer(POLL_INTERVAL; interval = POLL_INTERVAL) do _
@@ -72,10 +67,9 @@
         return results
     end
 
-    # Sample every non-skipped scenario for `backend_name`, one result string
-    # per scenario name. A child that dies takes the first scenario it had not
-    # yet reported with it, so that one is recorded as crashed and the rest are
-    # retried in a fresh child.
+    # Sample every non-skipped scenario for `backend_name`, one status per name.
+    # A child that dies takes the first scenario it had not reported with it, so
+    # that one is recorded as crashed and the rest retried in a fresh child.
     function smoke_statuses(backend_name, all_names, skip)
         statuses = Dict{String, String}(n => SKIPPED for n in all_names if n in skip)
         pending = filter(n -> !(n in skip), all_names)
@@ -92,14 +86,11 @@
         return statuses
     end
 
-    # Drive the sampling smoke scenarios for one backend.
-    #
-    # A scenario the registry skips is reported skipped, one it declares broken
-    # records `@test_broken` when it fails and passes when it does not (the
-    # shape `check_broken` uses, so over-listing is safe), and anything else is
-    # a hard test. The assertion compares the status string so a failure prints
-    # the sampler error, or the signal that killed the child, rather than a
-    # bare `false`.
+    # Drive the sampling smoke scenarios for one backend. A listed-broken
+    # scenario records `@test_broken` only when it fails, the shape
+    # `check_broken` uses, so over-listing is safe. The assertion compares the
+    # status string so a failure prints the sampler error or the signal that
+    # killed the child.
     function test_sampling_smoke(backend_name)
         skip = get(
             ADFixtures.backend_skip_scenarios(), backend_name, Set{String}()

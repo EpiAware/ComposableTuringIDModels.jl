@@ -638,25 +638,22 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
     return out
 end
 
-# The composed models the sampling smoke test drives, named as in `_models()`.
-# One renewal posterior is enough: the failures this guards against need a
-# sustained sampler loop rather than model variety, and every extra entry costs
-# a NUTS run in each of the seven per-backend CI jobs.
+# Models the sampling smoke test drives, named as in `_models()`. Every extra
+# entry costs a NUTS run in each of the seven per-backend CI jobs, and the
+# failures this guards against need a sustained sampler loop rather than model
+# variety.
 const _SAMPLING_MODEL_NAMES = ["Renewal+NegativeBinomial posterior"]
 
-# The two ensemble strategies, and the labels their scenario names carry. A
-# backend can survive one and not the other, so each is its own scenario.
+# A backend can survive one ensemble strategy and not the other, so each is its
+# own scenario.
 const _SAMPLING_ENSEMBLES = (
     ("MCMCSerial", MCMCSerial()), ("MCMCThreads", MCMCThreads()),
 )
 
-# `NUTSampler` settings shared by every sampling scenario. `ndraws` is the
-# total across chains, so each chain keeps ten draws after twenty-five
-# adaptation iterations. The budget is small and `max_depth` is capped because
-# the question is whether the sampler loop survives the backend, not whether it
-# recovers anything. Adaptation is the longer phase because the step size is
-# still moving there, so it drives the sampler over the widest range of the
-# target.
+# `NUTSampler` settings shared by every sampling scenario. `ndraws` is the total
+# across chains, so each chain draws ten. The budget is small and `max_depth` is
+# capped because the question is whether the sampler loop survives the backend,
+# not whether it recovers anything.
 const _SAMPLING_KWARGS = (;
     nchains = 2, ndraws = 20, nadapts = 25, max_depth = 4,
 )
@@ -665,15 +662,14 @@ const _SAMPLING_KWARGS = (;
     sampling_scenarios()
 
 The NUTS sampling smoke scenarios, as `(; name, model, method_kwargs)` named
-tuples. Each pairs a composed model from the same registry the gradient
-scenarios use with the `NUTSampler` keywords that sample it.
+tuples, each pairing a composed model from the gradient registry with the
+`NUTSampler` keywords that sample it.
 
-There is one scenario per model and ensemble strategy. The name is the model's
-gradient-scenario name with the strategy appended. A backend that samples
-correctly under one strategy and not the other is then recorded precisely, and
-a sampling entry in [`backend_broken_scenarios`](@ref) or
-[`backend_skip_scenarios`](@ref) never collides with the gradient scenario of
-the same model.
+There is one scenario per model and ensemble strategy, named for the model's
+gradient scenario with the strategy appended. A backend that samples correctly
+under one strategy and not the other is then recorded precisely, and a sampling
+entry in [`backend_broken_scenarios`](@ref) or [`backend_skip_scenarios`](@ref)
+never collides with the gradient scenario of the same model.
 """
 function sampling_scenarios()
     models = Dict(_models())
