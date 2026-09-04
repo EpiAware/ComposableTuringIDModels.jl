@@ -195,8 +195,7 @@ function ci_ribbon!(ax, ts, bands; color, label)
     lines!(ax, ts, bands[:, 3]; color = color, linewidth = 2, label = label)
 end
 
-# Every report is scored, so every predictive entry is there and no draw needs
-# filling in.
+# Every report is scored, so every predictive entry is there.
 function predictive_bands(pred, n)
     rows = map(1:n) do i
         permutedims(vec(pred[@varname(y_t[i])]))
@@ -212,8 +211,6 @@ Rt = credible_bands(reduce(hcat, (exp.(g.Z_t) for g in gens)))
 pred = predict(as_turing_model(problem, (y_t = fill(missing, n),)), chain)
 yt = predictive_bands(pred, n)
 
-# Day 1 is the first report, so the lead-in days the infection process runs
-# over before it are numbered backwards from there.
 lead_in = observation_lead_in(observation)
 infection_days = (1 - lead_in):n
 
@@ -236,14 +233,13 @@ fig
 ```
 
 Both panels are drawn on one calendar, numbered so that day 1 is the first Italian report.
-The ``R_t`` panel runs to the left of day 1 as well, over the lead-in the two delays consume, and the dotted line on both panels marks where the reports begin.
-Reading a reproduction number off the top panel against a report count below it therefore compares the same day.
+The ``R_t`` panel runs to the left of day 1 as well, over the lead-in the two delays consume.
+The dotted line on both panels marks where the reports begin.
 Nothing is observed on the lead-in days themselves.
 They are estimated from the reports they feed into through the two convolutions, so the band is at its widest there and narrows once the data starts.
 
 The weekly ``R_t`` is piecewise-constant by construction, stepping down through one as the first wave turns over.
-The posterior-predictive band covers all 42 reports, because the infection process is run long enough to support every one of them.
-It tracks the observed Italian reports, the layered observation model having absorbed the reporting pattern rather than the infection signal.
+The posterior-predictive band tracks all 42 observed Italian reports, the layered observation model having absorbed the reporting pattern rather than the infection signal.
 
 ## A time-varying reporting pattern
 
