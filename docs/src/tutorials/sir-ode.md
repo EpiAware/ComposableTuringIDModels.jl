@@ -92,7 +92,6 @@ The [`ODEProcess`](@ref) carries no latent process at all, and its `Z_t` generat
 
 ```@example sir
 model = IDModel(sir_process, observation)
-nothing # hide
 ```
 
 ## Fit
@@ -110,8 +109,6 @@ chain = sample(
     MCMCThreads(), 250, 2; progress = false)
 nothing # hide
 ```
-
-`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which `summarystats` summarises directly.
 
 ```@example sir
 using MCMCChains
@@ -228,6 +225,8 @@ No part of the infection model changes.
 The priors are weakly informative, damping near zero (highly autocorrelated increments), an initial state near zero (no baseline adjustment), and a small innovation standard deviation.
 
 ```@example sir
+using Accessors
+
 ascertainment = AR(
     damp = [HalfNormal(0.005)],
     init = [Normal(0, 0.001)],
@@ -237,12 +236,10 @@ stochastic_obs = TransformObservationModel(
     Ascertainment(model = PoissonError(), latent_model = ascertainment),
     x -> softplus.(N .* x))
 
-stochastic_model = IDModel(sir_process, stochastic_obs)
-nothing # hide
+stochastic_model = @set model.observation_model = stochastic_obs
 ```
 
-Swapping the deterministic observation model for the stochastic one is a single structural change.
-The composed model is fit exactly as before.
+The infection process is carried over untouched, so only the observation branch differs.
 The ascertainment process adds latent parameters, so we raise the NUTS target acceptance rate a little to keep the sampler stable through the ODE solve.
 
 ```@example sir

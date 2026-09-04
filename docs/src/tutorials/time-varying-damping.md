@@ -20,7 +20,6 @@ using ADTypes: AutoMooncake
 Random.seed!(80)
 
 constant = AR(; damp = Normal(0.4, 0.1))
-(order = constant.p, coefficient_is_constant = true)
 ```
 
 Swapping the `Distribution` for a **process** turns the same slot into a time-varying coefficient path ``\rho_t``.

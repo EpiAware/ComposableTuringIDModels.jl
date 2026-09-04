@@ -51,10 +51,17 @@ renewal.gen_int
 
 The stored `gen_int` is a probability vector, the continuous serial interval binned into daily weights that sum to one.
 Double interval censoring is not the same as evaluating the continuous density at integer days.
-It accounts for both the primary and secondary events falling anywhere within their days, which shifts and spreads the mass relative to the underlying ``\mathrm{Gamma}`` [charniga2024best](@citep).
+It accounts for both the primary and secondary events falling anywhere within their days [charniga2024best](@citep).
+The lag-0 bin is dropped and the weights renormalised over the days kept, so the discrete interval is a little shorter and a little tighter than the ``\mathrm{Gamma}`` behind it.
 
 ```@example renewal
-sum(renewal.gen_int)
+using Statistics
+lags = 1:length(renewal.gen_int)
+discrete_mean = sum(lags .* renewal.gen_int)
+discrete_sd = sqrt(sum((lags .- discrete_mean) .^ 2 .* renewal.gen_int))
+serial_interval = Gamma(6.5, 0.62)
+(discrete = round.((discrete_mean, discrete_sd), digits = 2),
+    continuous = round.((mean(serial_interval), std(serial_interval)), digits = 2))
 ```
 
 ## The infection process in isolation
@@ -85,7 +92,7 @@ obs = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 nothing # hide
 ```
 
-[`IDModel`](@ref) assembles the renewal infection process, which already carries the latent ``R_t`` process, and the observation model into one composed model.
+The renewal infection process already carries the latent ``R_t`` process, so [`IDModel`](@ref) needs only it and the observation model.
 
 ```@example renewal
 model = IDModel(renewal, obs)
@@ -136,7 +143,7 @@ nothing # hide
 Sampling returns a chain whose parameter names are flat.
 Composition does not namespace by default, so a component's own parameter keeps its plain name however deeply it is nested, and `damp` and `std` below belong to the AR process folded into the renewal model.
 A few components deliberately prefix their children, and two components that would otherwise use the same name are separated by wrapping one in `PrefixLatentModel` or `PrefixObservationModel`.
-`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which `summarystats` summarises directly, giving point estimates and their uncertainty alongside the effective sample size and ``\hat{R}`` convergence diagnostic.
+`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which `summarystats` summarises directly.
 
 ```@example renewal
 using MCMCChains
@@ -243,7 +250,8 @@ It holds the fitted parameters and the in-sample ``\log R_t`` path fixed, and co
 ```@example renewal
 h = 14
 fc = forecast(model, y_obs, chain, h)
-size(fc)
+round.(quantile(Float64.(vec(fc[@varname(y_t[n + h])])), [0.05, 0.5, 0.95]),
+    digits = 1)
 ```
 
 The returned chain carries the predicted ``y_t`` over ``t = n+1, \dots, n+h``.

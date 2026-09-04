@@ -54,8 +54,8 @@ The three roles feed one another and plug into that single interface.
 <line x1="550" y1="202" x2="550" y2="246" stroke="#6d5b8a" stroke-width="1.4" stroke-dasharray="3 4"/>
 <rect x="28" y="248" width="672" height="52" rx="12" fill="#ece7f3" stroke="#6d5b8a" stroke-width="1.8" stroke-dasharray="6 4"/>
 <text x="364" y="272" font-size="14" font-weight="700" text-anchor="middle" fill="#4c3d6b" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">as_turing_model</text>
-<text x="364" y="290" font-size="11" text-anchor="middle" fill="#6b5c86">the one interface every part implements — parts compose as submodels</text>
-<text x="419" y="336" font-size="12.5" font-weight="700" text-anchor="middle" fill="#4a4553">Swap any part — change one assumption without touching the rest</text>
+<text x="364" y="290" font-size="11" text-anchor="middle" fill="#6b5c86">the one interface every part implements, so parts compose as submodels</text>
+<text x="419" y="336" font-size="12.5" font-weight="700" text-anchor="middle" fill="#4a4553">Swap any part to change one assumption without touching the rest</text>
 <text x="42" y="356" font-size="12" font-weight="700" fill="#6a3d8f">Latent</text>
 <rect x="36" y="362" width="226" height="20" rx="6" fill="#f4eef9" stroke="#8a4faf"/><text x="46" y="376" font-size="11" fill="#6a3d8f">RandomWalk</text>
 <rect x="36" y="386" width="226" height="20" rx="6" fill="#f4eef9" stroke="#8a4faf"/><text x="46" y="400" font-size="11" fill="#6a3d8f">AR · MA · ARIMA</text>

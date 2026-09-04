@@ -10,7 +10,7 @@ The package ships two GP latent models built on the same [KernelFunctions.jl](ht
   - [`ExactGP`](@ref) forms the full ``n \times n`` covariance and factorises it.
     It is accurate but ``O(n^3)`` per log-density evaluation, so use it on short series and as the accuracy reference.
   - [`HilbertSpaceGP`](@ref) is the basis-function approximation of [riutortmayol2023practical](@citet), building on [solin2020hilbert](@citep).
-    A fixed basis makes each evaluation an ``n \times m`` matrix–vector product, so use it for anything longer.
+    A fixed basis makes each evaluation an ``n \times m`` matrix-vector product, so use it for anything longer.
 
 ## Two GP latent models
 
@@ -30,7 +30,7 @@ Both sample a length scale ``\ell`` and a marginal standard deviation ``\sigma``
 [`HilbertSpaceGP`](@ref) then draws ``m`` standard-normal basis weights ``\beta``, and [`ExactGP`](@ref) draws ``n`` weights ``z`` that it pushes through the Cholesky factor of the full covariance.
 Both are non-centred parameterisations, which NUTS handles well.
 
-The basis depends only on `n`, `m` and `c`, so [`as_turing_model`](@ref) builds it before returning the model and only the matrix–vector product is differentiated.
+The basis depends only on `n`, `m` and `c`, so [`as_turing_model`](@ref) builds it before returning the model and only the matrix-vector product is differentiated.
 The exact GP rebuilds and differentiates its covariance and Cholesky factor on every evaluation, which is where the timing gap below comes from.
 
 ## Kernels and a check against AbstractGPs

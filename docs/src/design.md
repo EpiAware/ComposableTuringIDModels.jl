@@ -91,6 +91,59 @@ So `as_turing_model` for an infection model takes only a series length and retur
 Only [`Renewal`](@ref) needs a generation interval, so it alone takes one.
 The others take a `transformation` directly.
 
+## [Swap-in, swap-out](@id swapping)
+
+A modelling assumption changes by replacing a part, not by rewriting the model.
+Which tool to reach for depends on how many parts you are aiming at.
+The [overview](@ref overview) shows the plainest case, rebuilding the assembly with one argument different.
+That is the right thing when the two models share little.
+When they share almost everything, derive one from the other.
+
+```@example design
+using ComposableTuringIDModels, Distributions
+base = IDModel(
+    DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+    PoissonError())
+```
+
+[`swap`](@ref) replaces **every** component matching a predicate.
+It is the type-driven tool, so reach for it when the target is "the error model, wherever it is" rather than a known address.
+
+```@example design
+using ComposableTuringIDModels: swap
+negbin = swap(x -> x isa PoissonError ? NegativeBinomialError() : x, base)
+```
+
+`Accessors.@set` replaces **one** component named by its path.
+The path is the field path the model prints, so a component nested several levels down is one line.
+
+```@example design
+using Accessors
+autoregressive = @set base.infection_model.Z = AR()
+```
+
+The target does not have to be an observation model, and it does not have to be a whole component.
+Changing a prior on a nested component is the case a path handles and a predicate cannot, because a distribution carries no identity to match on.
+
+```@example design
+higher_start = @set base.infection_model.Z.init = Normal(log(2.0), 0.1)
+higher_start.infection_model.Z.init
+```
+
+A path also reaches one branch of a [`Split`](@ref), and everything wrapped around it comes through untouched.
+
+```@example design
+split_obs = LatentDelay(
+    Split((cases = PoissonError(), deaths = PoissonError())), [0.5, 0.3, 0.2])
+deaths_negbin = @set split_obs.model.streams.deaths = NegativeBinomialError()
+```
+
+The [`LatentDelay`](@ref) survives with its delay intact, so only the named stream changes.
+
+`ComposableTuringIDModels.wrapped_models` and `ComposableTuringIDModels.rewrap` sit underneath both tools.
+They are the seam a component *author* implements so that `swap` and `@set` work on a new component, rather than something a user calls.
+[Inspecting and updating an observation chain](@ref obs-traversal) covers them and the walk built on them.
+
 ## Composing accumulation steps
 
 The recurrences that drive the time series are expressed as [`accumulate_scan`](@ref) steps.
@@ -100,7 +153,6 @@ As a demonstration, a [`SusceptibleDepletion`](@ref) modifier is composed onto t
 See [Renewal modifiers](@ref renewal-modifiers) for what each modifier contributes to a fitted model.
 
 ```@example design
-using ComposableTuringIDModels, Distributions
 gen_int = [0.2, 0.3, 0.5]
 
 depleting = Renewal(gen_int, SusceptibleDepletion(1000.0); rt = RandomWalk())
@@ -148,9 +200,8 @@ We set the automatic-differentiation backend explicitly with `NUTS(; adtype = ..
 ```julia
 using Turing, Mooncake
 using ADTypes: AutoMooncake
-model = IDModel(depleting, PoissonError())
-y = as_turing_model(model, fill(missing, 30), 30)().generated_y_t
-posterior = as_turing_model(model, y, 30)
+y = as_turing_model(base, fill(missing, 30), 30)().generated_y_t
+posterior = as_turing_model(base, y, 30)
 chain = sample(posterior, NUTS(; adtype = AutoMooncake(; config = nothing)),
     MCMCThreads(), 1_000, 2)
 ```
@@ -228,12 +279,12 @@ obs = LatentDelay(
 )
 ```
 
-Reading a component out of that structure, or putting a different one in, goes through two functions rather than through field paths.
+Reading a component out of that structure without knowing where it sits goes through a walk rather than a field path.
 `ComposableTuringIDModels.wrapped_models` reports what a single component wraps.
 `ComposableTuringIDModels.observation_components` is the walk built on it, giving every component of a chain outermost first, with a [`Split`](@ref)'s branches followed in stream order.
 Both are public but not exported, so they are reached through the module name.
 
-Locating a component is a `filter` over the walk instead of a field path.
+Locating a component is a `filter` over the walk.
 
 ```@example traversal
 using ComposableTuringIDModels: observation_components
@@ -245,23 +296,19 @@ A quantity accumulated over a chain is a `sum` over the same walk.
 A quantity that does not accumulate reads the branching structure through `wrapped_models` instead, because a `Split`'s streams run in parallel off one expected series rather than nesting.
 
 `ComposableTuringIDModels.rewrap` is the other direction, rebuilding the same wrapper around new wrapped models with everything else it holds carried across.
-Swapping every component of a given type is [`swap`](@ref), which is those two together.
+[`swap`](@ref) is those two together, applied to every component matching a predicate.
 
 ```@example traversal
 using ComposableTuringIDModels: swap
 swapped = swap(x -> x isa PoissonError ? NegativeBinomialError() : x, obs)
 ```
 
-Targeting a *single* component rather than every one of a type, one error model in a [`Split`](@ref) say, is the same pair on one address.
-It is built from [`wrapped_models`](@ref) and [`rewrap`](@ref) by position in `wrapped_models` order.
+Neither is what you call to change one known component.
+That is `Accessors.@set` on its path, as in [Swap-in, swap-out](@ref swapping), and it reaches one stream of a [`Split`](@ref) the same way.
 
 ```@example traversal
-using ComposableTuringIDModels: wrapped_models, rewrap
-split = obs.model.model
-updated_split = rewrap(
-    split, (split.streams.cases, NegativeBinomialError())
-)
-one_swapped = rewrap(obs, (updated_split,))
+using Accessors
+one_swapped = @set obs.model.model.streams.deaths = NegativeBinomialError()
 ```
 
 Several components transform or derive a field on construction.

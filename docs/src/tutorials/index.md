@@ -11,7 +11,23 @@ Each one is self-contained and runs when the documentation is built, so the numb
     That is enough to demonstrate the models and produce stable figures.
     A real analysis would use more draws and check convergence diagnostics carefully.
 
-They progress from a single renewal model to a layered observation process, a mechanistic compartmental model, and a Gaussian-process latent.
+Most readers arrive with a task rather than a concept, so start with [Renewal model with negative-binomial reporting](@ref tutorial-renewal) if you want to fit a renewal model to reported cases, and follow it with [Reporting delays and day-of-week effects](@ref tutorial-delays) for a realistic observation process.
+
+The table groups the pages by theme once the vocabulary is familiar.
+The infection, observation, and latent themes are the package's three component roles, the same names used on the [Composable design](@ref) page and in the [Public API](@ref public-api).
+A page covering more than one theme appears under each.
+
+| Theme | Tutorials |
+|:--|:--|
+| End-to-end worked examples | [Renewal with negative-binomial reporting](@ref tutorial-renewal), [Reporting delays and day-of-week effects](@ref tutorial-delays), [An SIR compartmental model](@ref tutorial-sir) |
+| Infection processes | [Renewal with negative-binomial reporting](@ref tutorial-renewal), [Renewal modifiers](@ref renewal-modifiers), [An SIR compartmental model](@ref tutorial-sir), [Declarative compartmental models](@ref tutorial-catalyst), [Coupled patch models](@ref tutorial-patches) |
+| Observation models | [Reporting delays and day-of-week effects](@ref tutorial-delays), [Real-time nowcasting](@ref tutorial-nowcast), [Multiple observation streams](@ref tutorial-split) |
+| Latent processes | [A Gaussian-process latent process](@ref tutorial-gp), [Time-varying damping in an AR process](@ref tutorial-tvdamp), [Renewal with negative-binomial reporting](@ref tutorial-renewal) |
+| Multiple strata and groups | [Multiple observation streams](@ref tutorial-split), [Partial pooling across groups](@ref tutorial-hierarchy), [Coupled patch models](@ref tutorial-patches) |
+| Mechanistic and ODE models | [An SIR compartmental model](@ref tutorial-sir), [Declarative compartmental models](@ref tutorial-catalyst) |
+| Nowcasting and forecasting | [Real-time nowcasting](@ref tutorial-nowcast), [Renewal with negative-binomial reporting](@ref tutorial-renewal) |
+
+## The tutorials
 
   - [Renewal model with negative-binomial reporting](@ref tutorial-renewal).
     A time-varying reproduction number ``R_t`` driven by an autoregressive latent process, mapped to infections through the renewal equation and observed with overdispersed counts.
@@ -39,7 +55,7 @@ They progress from a single renewal model to a layered observation process, a me
     One delayed renewal process compared against the same process extended with [`SusceptibleDepletion`](@ref) and [`ImportedCases`](@ref), so each modifier's contribution is visible against a shared baseline.
 
 Every example uses the same recipe.
-Assemble components into a model, call [`as_turing_model`](@ref) (directly or through [`IDModel`](@ref) / [`IDProblem`](@ref)), simulate by passing `missing` data, and fit by passing observed data and sampling.
+Assemble components into a model, call [`as_turing_model`](@ref) on it, simulate by passing `missing` data, and fit by passing observed data and sampling.
 Because the components share one interface, you swap a modelling assumption by swapping a struct.
 The [Composable design](@ref) page explains the mechanism.
 

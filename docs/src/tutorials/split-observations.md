@@ -61,7 +61,7 @@ deaths = LatentDelay(
 parallel = Split((cases = cases, deaths = deaths))
 ```
 
-The composed model assembles the renewal infection process and the two-stream observation model exactly like a single-stream study.
+A multi-stream model is assembled exactly like a single-stream one.
 
 ```@example split
 model = IDModel(renewal, parallel)
@@ -189,7 +189,6 @@ In the parallel model, cases and deaths both branch off infections, so a reporti
 Sometimes we want the opposite, deaths modelled as a delayed fraction of the *reported cases*, so whatever is reflected in cases propagates into deaths.
 That is a cascade ``I_t \to \text{cases} \to \text{deaths}``, and it is the same [`Split`](@ref) placed *lower* in the stack.
 Share the infection→case-report delay, then split.
-The cases stream applies its error to the delayed expectation, and the deaths stream sits downstream, delayed again by the case-report→death interval and scaled by the fatality fraction.
 
 ```@example split
 cascade = LatentDelay(                                   # infection→case delay
@@ -200,18 +199,17 @@ cascade = LatentDelay(                                   # infection→case dela
                 FixedIntercept(log(0.02))),
             LogNormal(2.2, 0.3)))),
     LogNormal(1.6, 0.5))
-cascade_model = IDModel(renewal, cascade)
-cas = as_turing_model(cascade_model, (cases = missing, deaths = missing), n)()
 ```
 
-The `Split` sits *after* the shared case delay and *before* the error leaves, so the deaths stream's expected input is the delayed-and-ascertained *expected cases* rather than the raw infections.
-It is both scaled by the fatality fraction and shortened by the case delay.
+The deaths stream's expected input is the delayed-and-ascertained *expected cases* rather than the raw infections, so it is both scaled by the fatality fraction and shortened by the case delay.
 
 ```@example split
-(cases_expected_length = length(cas.expected_y_t.cases),
-    deaths_expected_length = length(cas.expected_y_t.deaths),
-    deaths_are_a_fraction_of_cases =
-        sum(cas.expected_y_t.deaths) < sum(cas.expected_y_t.cases))
+cascade_model = IDModel(renewal, cascade)
+cas = as_turing_model(cascade_model, (cases = missing, deaths = missing), n)()
+(cases_expected = length(cas.expected_y_t.cases),
+    deaths_expected = length(cas.expected_y_t.deaths),
+    deaths_per_case = round(
+        sum(cas.expected_y_t.deaths) / sum(cas.expected_y_t.cases), digits = 3))
 ```
 
 ## Strata: one stream per age band

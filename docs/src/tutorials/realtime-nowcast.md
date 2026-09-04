@@ -126,37 +126,41 @@ The naive fit treats the truncated totals as complete, and motivates the problem
 [`RightTruncate`](@ref) applies the marginal correction to the same observed-so-far totals.
 [`ReportTriangle`](@ref) applies the joint correction to the reporting triangle, built through the shared [`define_y_t`](@ref) hook.
 
+A fourth fit takes the plain model to the **complete** (untruncated) series, what the analyst would eventually see, as a reference.
+
+The corrections differ from the plain model only in their observation model, so each is derived from it with `Accessors.@set` rather than rebuilt.
+
 ```@example nowcast
+using Accessors
+
 naive_model = IDModel(renewal, error)
-naive_post = as_turing_model(naive_model, observed_so_far, n)
-naive_chain = sample(
-    naive_post, NUTS(1000, 0.95; adtype = adt), MCMCThreads(), 250, 2;
-    progress = false)
-
 rt_obs = RightTruncate(error, ReportingCDF(reporting_delay; D = 10))
-rt_model = IDModel(renewal, rt_obs)
-rt_post = as_turing_model(rt_model, observed_so_far, n)
-rt_chain = sample(
-    rt_post, NUTS(1000, 0.95; adtype = adt), MCMCThreads(), 250, 2;
-    progress = false)
-
+rt_model = @set naive_model.observation_model = rt_obs
 tri_obs = ReportTriangle(error, delay_pmf)
-tri_data = define_y_t(tri_obs, reported_triangle, eventual)
-tri_model = IDModel(renewal, tri_obs)
-tri_post = as_turing_model(tri_model, tri_data, n)
-tri_chain = sample(
-    tri_post, NUTS(1000, 0.95; adtype = adt), MCMCThreads(), 250, 2;
-    progress = false)
-nothing # hide
+tri_model = @set naive_model.observation_model = tri_obs
 ```
 
-As a reference we also fit the plain model to the **complete** (untruncated) series, what the analyst would eventually see.
+A fit is a model and the data it is scored against, so the four are a table of pairs and the sampler call is written once.
 
 ```@example nowcast
-complete_post = as_turing_model(naive_model, eventual, n)
-complete_chain = sample(
-    complete_post, NUTS(1000, 0.95; adtype = adt), MCMCThreads(), 250, 2;
-    progress = false)
+specs = (
+    naive = (model = naive_model, data = observed_so_far),
+    right_truncate = (model = rt_model, data = observed_so_far),
+    report_triangle = (model = tri_model,
+        data = define_y_t(tri_obs, reported_triangle, eventual)),
+    complete = (model = naive_model, data = eventual))
+
+fits = map(specs) do spec
+    post = as_turing_model(spec.model, spec.data, n)
+    chain = sample(post, NUTS(1000, 0.95; adtype = adt), MCMCThreads(), 250, 2;
+        progress = false)
+    (; post, chain)
+end
+
+naive_post, naive_chain = fits.naive
+rt_post, rt_chain = fits.right_truncate
+tri_post, tri_chain = fits.report_triangle
+complete_post, complete_chain = fits.complete
 nothing # hide
 ```
 
@@ -176,10 +180,7 @@ function recent_Rt(post, chain; window = 7)
     round(mean(Rt_mean[(end - window + 1):end]), digits = 2)
 end
 
-(complete = recent_Rt(complete_post, complete_chain),
-    naive = recent_Rt(naive_post, naive_chain),
-    right_truncate = recent_Rt(rt_post, rt_chain),
-    report_triangle = recent_Rt(tri_post, tri_chain))
+map(fit -> recent_Rt(fit.post, fit.chain), fits)
 ```
 
 ## Posterior prediction, nowcast, and Rt
@@ -280,7 +281,6 @@ The posterior-predictive panel confirms the [`RightTruncate`](@ref) fit reproduc
 ## Shared parameters
 
 Neither correction touches the renewal process, so both recover the *same* shared parameters, the autoregressive damping ``\rho`` (`damp[1]`), the innovation scale ``\sigma`` (`std`), the observation overdispersion (`cluster_factor`) and the initial infections (`init_incidence`).
-`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain that `summarystats` summarises directly, giving point estimates and their uncertainty alongside the effective sample size and ``\hat R``.
 
 ```@example nowcast
 using MCMCChains
