@@ -45,8 +45,9 @@ end
     using ComposableTuringIDModels, Distributions
     using ComposableTuringIDModels: _obs_data_shape
     # A reporting triangle's rows are reference days and its columns reporting
-    # delays, so neither axis is a stream axis. The dense matrix and the built
-    # carrier are two spellings of one dataset and must give the same shape.
+    # delays, so neither axis is a stream axis.
+    # The dense matrix and the built carrier are two spellings of one dataset
+    # and must give the same shape.
     tri = ReportTriangle(PoissonError(), [0.5, 0.3, 0.2])
     N = [10 5 2; 12 6 3; 14 7 4]
     carrier = define_y_t(tri, N, fill(20.0, 3))
