@@ -107,7 +107,7 @@ export renewal_pressure, pairwise_gen_int, AbstractMixingModel, MixingStep,
     Gravity, gravity
 
 # --- ODE compartmental models ---
-export SIRParams, SEIRParams, ODEProcess, CatalystODEParams
+export SIRParams, ODEProcess, CatalystODEParams
 
 # --- observation models ---
 export PoissonError, NegativeBinomialError, NormalError, BinomialError, LatentDelay,
@@ -216,7 +216,6 @@ include("infection_models/CombineInfections.jl")
 
 # --- ODE compartmental models ---
 include("ode/SIRParams.jl")
-include("ode/SEIRParams.jl")
 include("ode/ODEProcess.jl")
 include("ode/CatalystODEParams.jl")
 

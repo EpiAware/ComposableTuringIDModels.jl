@@ -15,7 +15,7 @@ This page fits the SIR network to a real outbreak, then swaps in SEIR without to
 !!! note "Optional extension"
     The Catalyst path lives in an optional package extension.
     It loads only when you add and import `Catalyst` (and `ModelingToolkit`) alongside `ComposableTuringIDModels`, which keeps the heavy symbolic stack out of the default install.
-    The hand-coded [`SIRParams`](@ref) / [`SEIRParams`](@ref) remain the zero-latency default.
+    The hand-coded [`SIRParams`](@ref) remains the zero-latency default.
     The declarative path is opt-in for users building new or more complex compartmental models.
 
 ## Declaring and inspecting a network
