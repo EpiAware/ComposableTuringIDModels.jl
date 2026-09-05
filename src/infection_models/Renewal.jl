@@ -109,6 +109,10 @@ A partially pooled generation interval therefore needs no new component, e.g.
         length constant across draws; the lag-0 bin is dropped and the remainder
         renormalised per draw, exactly as for the fixed distribution.
 
+    `D_gen` and `Δd` are not fields, so a `gen_int` set with `Accessors.@set`
+    is re-discretised with their defaults. Set it to a pmf vector, or rebuild
+    the model, to keep a non-default horizon or bin width.
+
   - `Renewal(generation_time, modifiers...; rt, initialisation, ...)` — the same
     constructor with the generation time and the modifiers given positionally.
 
@@ -186,18 +190,22 @@ struct Renewal{
     modifiers::M
 
     function Renewal(
-            gen_int::G, transformation::F, rt, initialisation::S,
-            recurrent_step::A, mixing::K, modifiers::M
-        ) where {G, F <: Function, S <: PriorLike, A, K, M <: Tuple}
+            gen_int, transformation::F, rt, initialisation::S,
+            _recurrent_step, mixing::K, modifiers::M
+        ) where {F <: Function, S <: PriorLike, K, M <: Tuple}
         # `rt` is a length-`n` path slot, so a bare `Distribution` is wrapped in
         # an `Intercept` rather than left as a scalar.
-        # The widening runs here rather than in the keyword constructor so the
-        # positional form cannot bypass it.
-        # `path_prior` is idempotent, so rebuilding a `Renewal` from its own
-        # fields changes nothing.
+        # The step is a pure function of the interval, the coupling operator
+        # and the modifiers, so it is baked from them rather than taken.
+        # Both run here rather than in the keyword constructor so the positional
+        # form cannot bypass them. See `rewrap`'s docstring.
         path = path_prior(rt)
-        return new{G, F, typeof(path), S, A, K, M}(
-            gen_int, transformation, path, initialisation, recurrent_step,
+        interval = _renewal_gen_int(gen_int)
+        step = _renewal_step_for(interval, mixing, modifiers)
+        return new{
+            typeof(interval), F, typeof(path), S, typeof(step), K, M,
+        }(
+            interval, transformation, path, initialisation, step,
             mixing, modifiers
         )
     end
@@ -208,13 +216,12 @@ function Renewal(;
         initialisation = Normal(), transformation::Function = exp,
         mixing = I, D_gen = nothing, Δd = 1.0
     )
-    mods = _modifier_tuple(modifiers)
-    gen_int, recurrent_step = _renewal_fields(
-        generation_time, mixing, mods; D_gen = D_gen, Δd = Δd
-    )
+    # The horizon and bin width are not fields, so the discretisation they
+    # govern happens here and the constructor above sees a pmf it leaves alone.
+    gen_int = _renewal_gen_int(generation_time; D_gen = D_gen, Δd = Δd)
     return Renewal(
         gen_int, transformation, rt, initialisation,
-        recurrent_step, mixing, mods
+        nothing, mixing, _modifier_tuple(modifiers)
     )
 end
 
@@ -257,25 +264,17 @@ end
 _bake_step(core, mods::Tuple) = RenewalStep(core, mods)
 _bake_step(core, ::Tuple{}) = core
 
-# A fixed generation interval bakes the discretised interval and its renewal
-# step, with `mixing` and the modifiers folded in, at construction.
-function _renewal_fields(
-        generation_time, mixing, mods; D_gen = nothing, Δd = 1.0
-    )
-    gen_int = _renewal_gen_int(generation_time; D_gen = D_gen, Δd = Δd)
-    return gen_int, _bake_step(_renewal_step(gen_int, mixing), mods)
-end
+# The step a fixed interval bakes, with `mixing` and the modifiers folded in.
+_renewal_step_for(gen_int, mixing, mods) =
+    _bake_step(_renewal_step(gen_int, mixing), mods)
 
-# An inferred generation interval holds the pmf-producing prior model and builds
-# the renewal step per draw inside the `@model`, so no interval or step is baked.
-# `mixing` and the modifiers live on the struct and are folded in there instead.
-function _renewal_fields(
-        generation_time::AbstractPriorModel, mixing, mods;
-        D_gen = nothing, Δd = 1.0
-    )
-    return generation_time, nothing
-end
+# An inferred generation interval builds its renewal step per draw inside the
+# `@model`, so none is baked. `mixing` and the modifiers live on the struct and
+# are folded in there instead.
+_renewal_step_for(::AbstractPriorModel, mixing, mods) = nothing
 
+# The stored generation interval, which discretising a pmf vector leaves alone
+# and an inferred interval passes straight through, so it is idempotent.
 # `generation_time` as a discrete PMF: use it directly (must be a valid pmf).
 function _renewal_gen_int(gen_int::AbstractVector; D_gen = nothing, Δd = 1.0)
     @assert all(gen_int .>= 0) "Generation interval must be non-negative"
@@ -293,6 +292,9 @@ function _renewal_gen_int(
     return _discretised_pmf(gen_distribution; Δd = Δd, D = D_gen) |>
         p -> p[2:end] ./ sum(p[2:end])
 end
+
+# An inferred generation interval is the pmf-producing prior model itself.
+_renewal_gen_int(gen_int::AbstractPriorModel; D_gen = nothing, Δd = 1.0) = gen_int
 
 # The shape a `gen_int` prior slot is drawn at.
 # A single series takes no shape argument and a stratified renewal takes
