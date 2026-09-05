@@ -138,9 +138,9 @@ end
         Distributions, Random
     Random.seed!(104)
 
-    # The tutorial builds SEIR from two `@network_component`s joined with
-    # `extend`, so the claim that `extend` unifies the shared `I` into one
-    # compartment is checked here rather than only by the docs build.
+    # `extend` unifies species that share a name, so the assembled SEIR
+    # has the same species, rates and trajectory as the network written
+    # whole.
     transmission = @network_component transmission begin
         β, S + I --> E + I
         α, E --> I
