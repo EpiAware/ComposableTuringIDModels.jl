@@ -133,6 +133,56 @@ end
     @test isapprox(cat_I, hand_I; atol = 1.0e-7)
 end
 
+@testitem "Catalyst SEIR assembled with extend matches the network written whole" begin
+    using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq,
+        Distributions, Random
+    Random.seed!(104)
+
+    # The tutorial builds SEIR from two `@network_component`s joined with
+    # `extend`, so the claim that `extend` unifies the shared `I` into one
+    # compartment is checked here rather than only by the docs build.
+    transmission = @network_component transmission begin
+        β, S + I --> E + I
+        α, E --> I
+    end
+    removal = @network_component removal begin
+        γ, I --> R
+    end
+    assembled = complete(extend(transmission, removal; name = :seir))
+    whole = @reaction_network begin
+        β, S + I --> E + I
+        α, E --> I
+        γ, I --> R
+    end
+
+    @test length(species(assembled)) == 4
+    @test length(parameters(assembled)) == 3
+    @test Set(string.(species(assembled))) == Set(string.(species(whole)))
+    @test Set(string.(parameters(assembled))) ==
+        Set(string.(parameters(whole)))
+
+    # Same fixed states and rates through both networks give the same
+    # infectious trajectory, whatever order the merged layout puts them in.
+    fixed = (β = 0.31, α = 0.095, γ = 0.105, E0 = 0.01, I0 = 0.01)
+    build(rn) = ODEProcess(
+        params = CatalystODEParams(
+            rn;
+            tspan = (0.0, 30.0),
+            u0_priors = [
+                rn.S => 1.0 - fixed.E0 - fixed.I0, rn.E => fixed.E0,
+                rn.I => fixed.I0, rn.R => 0.0,
+            ],
+            p_priors = [rn.β => fixed.β, rn.α => fixed.α, rn.γ => fixed.γ]
+        ),
+        sol2infs = sol -> sol[rn.I, :],
+        solver_options = Dict(:saveat => 1.0)
+    )
+    I_assembled = as_turing_model(build(assembled), nothing)().I_t
+    I_whole = as_turing_model(build(whole), nothing)().I_t
+    @test length(I_assembled) == length(I_whole)
+    @test isapprox(I_assembled, I_whole; atol = 1.0e-7)
+end
+
 @testitem "CatalystODEParams composes into an ODEProcess and exposes no latent" begin
     using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq,
         Distributions, LogExpFunctions, Random
