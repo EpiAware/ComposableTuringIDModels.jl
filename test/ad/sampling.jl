@@ -15,8 +15,10 @@
     # Seven per-backend jobs share one CI time limit, so a hung sampler is
     # failed rather than left to spend the budget. The cap is per scenario, not
     # per child, so a slow first-use compile cannot leave a healthy second
-    # scenario with no time.
-    const SCENARIO_TIMEOUT = 900
+    # scenario with no time. It starts once the child reports its packages
+    # loaded, and the first scenario on a backend still pays that backend's
+    # rule compilation, which for Mooncake runs to several minutes.
+    const SCENARIO_TIMEOUT = 1800
     const POLL_INTERVAL = 5
 
     const SKIPPED = "skipped by the registry"
@@ -29,8 +31,9 @@
             --startup-file=no $CHILD $backend_name $names`
         path, io = mktemp()
         proc = run(pipeline(cmd; stdout = io, stderr = io), wait = false)
-        # A flushed result restarts the clock, so the cap applies to the
-        # scenario currently running.
+        # A flushed line restarts the clock, so the cap applies to the
+        # scenario currently running. The child's loaded marker is one such
+        # line, so package loading is not charged to the first scenario.
         deadline = Ref(time() + SCENARIO_TIMEOUT)
         reported = Ref(0)
         timed_out = Ref(false)
@@ -65,7 +68,9 @@
         return out, how
     end
 
-    # Pull the child's result lines out of its combined output.
+    # Pull the child's result lines out of its combined output. The loaded
+    # marker comes back as a result too, keyed by a name no scenario has, and
+    # is dropped where the statuses are read.
     function child_results(out)
         results = Dict{String, String}()
         for line in eachline(IOBuffer(out))

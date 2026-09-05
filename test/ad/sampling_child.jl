@@ -16,12 +16,16 @@ using ADFixtures
 # Load every backend package so DifferentiationInterface registers its
 # extensions, as `run_selected.jl` does.
 using ForwardDiff, ReverseDiff, Enzyme, Mooncake
-using ComposableTuringIDModels: apply_method, NUTSampler
+using Turing: NUTS, sample
 using Random: Random
 
 # Prefix marking a result line, so the parent can pick it out of the sampler's
 # own chatter on the same stream.
 const MARKER = "SMOKE"
+
+# Reported once the packages are loaded, so the parent's per-scenario clock
+# starts at the first scenario rather than at process start.
+const LOADED = "__loaded__"
 
 # Collapse an error into the single line a result carries.
 function _one_line(err)
@@ -36,16 +40,22 @@ function main()
         filter(e -> e.name == backend_name, ADFixtures.backends())
     ).backend
     by_name = Dict(s.name => s for s in ADFixtures.sampling_scenarios())
+    println(stdout, MARKER, "\t", LOADED, "\t", "READY")
+    flush(stdout)
     for name in wanted
         scen = by_name[name]
+        budget = scen.budget
+        sampler = NUTS(
+            budget.nadapts, budget.target_acceptance;
+            max_depth = budget.max_depth, adtype = adtype
+        )
         # Seed the sampler so a backend's pass or fail does not depend on the
         # trajectory it happens to draw.
         Random.seed!(1)
         status = try
-            apply_method(
-                scen.model,
-                NUTSampler(; adtype = adtype, scen.method_kwargs...);
-                progress = false
+            sample(
+                scen.model, sampler, scen.ensemble, budget.ndraws,
+                budget.nchains; progress = false
             )
             "PASS"
         catch err

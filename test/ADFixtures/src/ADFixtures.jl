@@ -650,20 +650,20 @@ const _SAMPLING_ENSEMBLES = (
     ("MCMCSerial", MCMCSerial()), ("MCMCThreads", MCMCThreads()),
 )
 
-# `NUTSampler` settings shared by every sampling scenario. `ndraws` is the total
-# across chains, so each chain draws ten. The budget is small and `max_depth` is
-# capped because the question is whether the sampler loop survives the backend,
-# not whether it recovers anything.
-const _SAMPLING_KWARGS = (;
-    nchains = 2, ndraws = 20, nadapts = 25, max_depth = 4,
+# The NUTS budget shared by every sampling scenario. `ndraws` is per chain and
+# `nadapts` warm-up steps are discarded ahead of them. The budget is small and
+# `max_depth` is capped because the question is whether the sampler loop
+# survives the backend, not whether it recovers anything.
+const _SAMPLING_BUDGET = (;
+    nchains = 2, ndraws = 10, nadapts = 25, max_depth = 4, target_acceptance = 0.8,
 )
 
 @doc """
     sampling_scenarios()
 
-The NUTS sampling smoke scenarios, as `(; name, model, method_kwargs)` named
+The NUTS sampling smoke scenarios, as `(; name, model, ensemble, budget)` named
 tuples, each pairing a composed model from the gradient registry with the
-`NUTSampler` keywords that sample it.
+ensemble strategy and the NUTS budget that sample it.
 
 There is one scenario per model and ensemble strategy, named for the model's
 gradient scenario with the strategy appended. A backend that samples correctly
@@ -684,9 +684,8 @@ function sampling_scenarios()
                 out, (
                     name = name * " (" * label * ")",
                     model = models[name],
-                    method_kwargs = (;
-                        _SAMPLING_KWARGS..., mcmc_parallel = ensemble,
-                    ),
+                    ensemble = ensemble,
+                    budget = _SAMPLING_BUDGET,
                 )
             )
         end
