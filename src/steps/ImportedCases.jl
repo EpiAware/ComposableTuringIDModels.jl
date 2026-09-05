@@ -114,13 +114,21 @@ struct ImportedCases{I <: PriorLike, F <: Function} <: AbstractRenewalModifier
     "The map from the unconstrained rate onto the positive rate."
     transformation::F
 
+    # The fields in declaration order, which is the form a field-wise rebuild
+    # supplies and the keyword constructor below has no signature for.
     function ImportedCases(
-            importation_rate::PriorLike; transformation::Function = exp
+            importation_rate::PriorLike, transformation::Function
         )
         return new{typeof(importation_rate), typeof(transformation)}(
             importation_rate, transformation
         )
     end
+end
+
+function ImportedCases(
+        importation_rate::PriorLike; transformation::Function = exp
+    )
+    return ImportedCases(importation_rate, transformation)
 end
 
 @doc raw"

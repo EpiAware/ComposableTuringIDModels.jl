@@ -148,11 +148,14 @@ component that holds what it wraps somewhere the field walk cannot see it (a
 [`Split`](@ref)'s `NamedTuple` of streams) must define its own `rewrap`,
 alongside its [`wrapped_models`](@ref).
 
-A component whose *public* constructor transforms or derives a field, so that it
-cannot accept its own stored fields back, needs no `rewrap` method: it defines
-`ConstructionBase.constructorof` instead, which fixes `Accessors` on the type at
-the same time. [`LatentDelay`](@ref), [`Ascertainment`](@ref) and
-[`Aggregate`](@ref) all do.
+A component that transforms or derives a field at construction needs no `rewrap`
+method either, and no `ConstructionBase.constructorof`. It needs the derivation
+to be **idempotent**, and to run in the constructor taking the fields in
+declaration order, which is the one a rebuild calls. The rebuild then
+re-derives, idempotence makes it a fixed point, and the same constructor gives
+`Accessors.@set` the component the derivation implies.
+[`Ascertainment`](@ref) prefixes its prior that way, [`Aggregate`](@ref) derives
+its presence mask, and [`Renewal`](@ref) bakes its accumulation step.
 
 ## Arguments
 

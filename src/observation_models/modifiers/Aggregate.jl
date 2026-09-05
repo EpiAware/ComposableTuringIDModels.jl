@@ -78,25 +78,12 @@ struct Aggregate{
         present = aggregation .!= 0
         return new{M, A, typeof(present)}(model, aggregation, present)
     end
-
-    # The raw constructor, taking the derived presence mask as stored.
-    # Rebuilding a component goes through this, because the public constructor
-    # takes only the two underived arguments.
-    function Aggregate{M, A, P}(model, aggregation, present) where {M, A, P}
-        return new{M, A, P}(model, aggregation, present)
-    end
 end
 
-# An `Aggregate` derives its presence mask from its window lengths, so its public
-# constructor takes fewer arguments than it has fields and a generic rebuild
-# fails outright.
-# Point `ConstructionBase`, and so `Accessors`, at the raw constructor.
-ConstructionBase.constructorof(::Type{<:Aggregate}) = _rebuild_aggregate
-
-function _rebuild_aggregate(model, aggregation, present)
-    T = Aggregate{typeof(model), typeof(aggregation), typeof(present)}
-    return T(model, aggregation, present)
-end
+# The form a field-wise rebuild supplies, which the public constructor has no
+# signature for because it takes fewer arguments than the struct has fields.
+# `present` is derived here too rather than taken. See `rewrap`'s docstring.
+Aggregate(model, aggregation, _present) = Aggregate(model, aggregation)
 
 function Aggregate(; model::M, aggregation::A) where {
         M <: AbstractObservationModel, A <: AbstractVector{<:Int},

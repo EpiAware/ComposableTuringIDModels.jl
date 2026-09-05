@@ -116,8 +116,6 @@ chain = sample(
 nothing # hide
 ```
 
-`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain.
-FlexiChains keys draws by their `@varname`, so we read parameters back by name directly.
 The basic reproduction number ``R_0 = \beta / \gamma`` is a deterministic function of the rates, formed per draw from the ``\beta`` and ``\gamma`` columns.
 
 ```@example catalyst
@@ -131,7 +129,6 @@ using Statistics
 
 Sampling the same model with [`Prior`](https://turinglang.org/) gives prior draws over the transmission and recovery rates.
 Overlaying them on the posterior with [PairPlots.jl](https://sefffal.github.io/PairPlots.jl/) shows how sharply the boarding-school outbreak identifies the mechanistic rates.
-The FlexiChains PairPlots extension takes a chain subset to a few keys with `chain[[...]]` directly.
 
 ```@example catalyst
 using CairoMakie, PairPlots

@@ -154,8 +154,6 @@ axislegend(ax_obs; position = :lt)
 fig_obs
 ```
 
-The model is a shared, partially pooled process, a one-directional mixing matrix, and a negative-binomial stream per patch.
-
 ## Fitting it
 
 Everything above ran forward.
