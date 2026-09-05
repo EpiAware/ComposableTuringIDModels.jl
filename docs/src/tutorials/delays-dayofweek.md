@@ -245,10 +245,10 @@ An [`UncertainDelay`](@ref) parameter is a prior slot like any other, so replaci
 It is then rediscretised at each time point and applied with a per-time convolution, while the log-scale spread keeps a constant prior.
 
 ```@example delays
+using Accessors
 drifting = UncertainDelay(
     LogNormal, [RandomWalk(), truncated(Normal(0.47, 0.2), 0, Inf)]; D = 8.0)
-tv_observation = LatentDelay(
-    LatentDelay(dayofweek_negbin, incubation), drifting)
+tv_observation = @set observation.delay = drifting
 ```
 
 As with the weekday profile we flag rather than fit it here, because a delay that drifts day to day asks more of six weeks of data than they can answer.
