@@ -317,7 +317,7 @@ end
 
     # An `IDProblem` reads the observation count from the data it holds, so its
     # report is the model's over that data.
-    problem = IDProblem(model.infection_model, obs, fill(10, 60))
+    problem = IDProblem(IDModel(model.infection_model, obs), fill(10, 60))
     @test data_requirements(problem).series_length == 103
     report(x...) = sprint(show, MIME"text/plain"(), data_requirements(x...))
     @test report(problem) == report(model, fill(10, 60), 60)
@@ -513,7 +513,7 @@ end
     @test size(fc, 1) == 20
 
     # An `IDProblem` holds the series, so it needs no length of its own.
-    problem = IDProblem(model.infection_model, obs, y)
+    problem = IDProblem(IDModel(model.infection_model, obs), y)
     @test data_requirements(problem).n == length(y)
     pchain = sample(as_turing_model(problem), Prior(), 20; progress = false)
     pfc = forecast(problem, pchain, h)
