@@ -98,7 +98,8 @@ model = IDModel(sir_process, observation)
 
 Fitting recovers the SIR parameters from the observed "in bed" counts.
 This page differentiates with **ForwardDiff**, not the package's recommended [Mooncake](https://chalk-lab.github.io/Mooncake.jl/) default.
-Reverse-mode NUTS through the ODE solver is not available yet, a pre-existing Turing + Mooncake + `SciMLSensitivity` integration gap that affects every ODE infection model (tracked in [issue #46](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/46)).
+Reverse-mode NUTS through the ODE solver is not available yet for the ODE infection models.
+The block is in how the package builds its `ODEProblem`, not in Turing or `SciMLSensitivity`.
 Forward-mode autodiff suits a system this small anyway.
 We draw two chains in parallel with `MCMCThreads()` so a cross-chain ``\hat R`` is available.
 

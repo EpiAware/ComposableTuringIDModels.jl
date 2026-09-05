@@ -89,7 +89,7 @@ a presence mask, so it carries no `Missing` in its type.
 
 `value[i]` is the observed entry at `i` when `present[i]` is `true`, and an
 unused placeholder otherwise. Defined here (rather than in `compose.jl`, where
-[`concrete_observations`](@ref) builds one) so that it loads before the
+`concrete_observations` builds one) so that it loads before the
 observation-error models that score one directly, further down the include
 order.
 
