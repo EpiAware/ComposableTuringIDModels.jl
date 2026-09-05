@@ -90,15 +90,19 @@ struct StochasticRenewal{
     "The infection-noise specification."
     noise::N
 
-    # `rt` is widened here rather than in the keyword constructor, as
-    # `Renewal` widens its own, so no construction path can bypass it.
+    # The derived fields are settled here, as `Renewal` settles its own, so no
+    # construction path can bypass them. See `rewrap`'s docstring.
     function StochasticRenewal(
-            gen_int::G, transformation::F, rt, initialisation::S,
-            recurrent_step::A, mixing::K, modifiers::M, noise::N
-        ) where {G, F <: Function, S <: PriorLike, A, K, M <: Tuple, N}
+            gen_int, transformation::F, rt, initialisation::S,
+            _recurrent_step, mixing::K, modifiers::M, noise::N
+        ) where {F <: Function, S <: PriorLike, K, M <: Tuple, N}
         path = path_prior(rt)
-        return new{G, F, typeof(path), S, A, K, M, N}(
-            gen_int, transformation, path, initialisation, recurrent_step,
+        interval = _renewal_gen_int(gen_int)
+        step = _renewal_step_for(interval, mixing, modifiers)
+        return new{
+            typeof(interval), F, typeof(path), S, typeof(step), K, M, N,
+        }(
+            interval, transformation, path, initialisation, step,
             mixing, modifiers, noise
         )
     end
@@ -109,13 +113,10 @@ function StochasticRenewal(;
         initialisation = Normal(), transformation::Function = exp,
         mixing = I, D_gen = nothing, Δd = 1.0, noise = InfectionNoise()
     )
-    mods = _modifier_tuple(modifiers)
-    gen_int, recurrent_step = _renewal_fields(
-        generation_time, mixing, mods; D_gen = D_gen, Δd = Δd
-    )
+    gen_int = _renewal_gen_int(generation_time; D_gen = D_gen, Δd = Δd)
     return StochasticRenewal(
-        gen_int, transformation, rt, initialisation, recurrent_step,
-        mixing, mods, noise
+        gen_int, transformation, rt, initialisation, nothing,
+        mixing, _modifier_tuple(modifiers), noise
     )
 end
 
