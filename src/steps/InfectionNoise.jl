@@ -199,7 +199,7 @@ _noise_raw(::Dims{2}) = Replicate(IID(Normal()))
 @doc raw"
 Sample the **non-centred** infection noise ahead of the scan.
 
-Draws `n` standard normals through the [`IID`](@ref) seam and resolves the overdispersion slot, returning the [`InfectionNoiseDraws`](@ref) the scan uses.
+Draws `n` standard normals through the [`IID`](@ref) seam and resolves the overdispersion slot, returning the `InfectionNoiseDraws` the scan uses.
 A fixed scalar `overdispersion` costs no parameter.
 The draws are named `I_raw`, prefixed by the modifier's position in the renewal step's modifier tuple.
 
