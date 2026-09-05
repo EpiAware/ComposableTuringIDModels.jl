@@ -104,8 +104,7 @@ nothing # hide
 
 !!! warning "Use forward-mode autodiff for ODE models"
     The rest of these docs recommend Mooncake as the default AD backend, but ODE infection models are the exception and sample under **ForwardDiff** today.
-    Reverse-mode **NUTS through the ODE solver is not yet supported** on the Catalyst path.
-    The block is in how this extension builds and remakes its `ODEProblem`, not in Turing or `SciMLSensitivity`.
+    Reverse-mode **NUTS through the ODE solver is not available yet** for the ODE infection models, this one included.
     We therefore pass `AutoForwardDiff()` to NUTS explicitly.
 
 ```@example catalyst
@@ -236,10 +235,10 @@ seir = complete(extend(transmission, removal; name = :seir))
 The species come back in neither component's written order, since the layout now depends on which components were merged and in what order.
 Sampling and indexing stay symbolic, so nothing downstream reads that layout, as [A note on species ordering](@ref) sets out.
 
-!!! note "`extend` and `compose` namespace differently"
+!!! note "`extend` is not `compose`"
     `extend` merges components into one flat network, which is what a compartmental model wants, because compartments must be shared rather than duplicated.
-    `compose` instead nests one network inside another and namespaces the inner species, so a subsystem's ``I`` becomes `patch₊I`.
-    [`CatalystODEParams`](@ref) reads either, but a composed system names its sampled variables after the namespaced symbols.
+    Catalyst's `compose` instead keeps each network as its own subsystem, so it suits systems whose parts do not share compartments.
+    This page uses `extend` only.
 
 Catalyst regenerates the drift and Jacobian for the assembled network.
 We attach a prior per species and per rate exactly as before, index the same infectious compartment symbolically, and reuse the same observation model.
