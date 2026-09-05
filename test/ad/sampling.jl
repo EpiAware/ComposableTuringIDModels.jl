@@ -75,8 +75,11 @@
         results = Dict{String, String}()
         for line in eachline(IOBuffer(out))
             startswith(line, "SMOKE\t") || continue
-            _, name, status = split(line, '\t'; limit = 3)
-            results[name] = status
+            # The last line can be cut short when the child is killed
+            # mid-write, so it is dropped rather than destructured.
+            parts = split(line, '\t'; limit = 3)
+            length(parts) == 3 || continue
+            results[parts[2]] = parts[3]
         end
         return results
     end
@@ -100,23 +103,43 @@
         return statuses
     end
 
-    # Drive the sampling smoke scenarios for one backend. A listed-broken
-    # scenario records `@test_broken` only when it fails, the shape
-    # `check_broken` uses, so over-listing is safe. The assertion compares the
-    # status string so a failure prints the sampler error or the signal that
-    # killed the child.
-    function test_sampling_smoke(backend_name)
-        skip = get(
-            ADFixtures.backend_skip_scenarios(), backend_name, Set{String}()
+    # The sampling scenarios whose own name, or whose model's gradient
+    # scenario name, is in `listed`. A backend that cannot differentiate a
+    # model cannot sample it either, so a gradient entry carries over, while a
+    # sampling entry names one ensemble strategy alone.
+    function listed_names(scenarios, listed)
+        return Set(
+            s.name for s in scenarios
+                if s.name in listed || s.model_name in listed
         )
-        broken = union(
-            Set(ADFixtures.broken_scenario_names()),
+    end
+
+    # Drive the sampling smoke scenarios for one backend. A listed-broken
+    # scenario records `@test_broken` only when it fails, so over-listing is
+    # safe. The harness's `check_broken` is not reused here because it computes
+    # a gradient itself; there is no form of it that takes a result. The
+    # assertion compares the status string so a failure prints the sampler
+    # error or the signal that killed the child.
+    function test_sampling_smoke(backend_name)
+        scenarios = ADFixtures.sampling_scenarios()
+        skip = listed_names(
+            scenarios,
             get(
-                ADFixtures.backend_broken_scenarios(), backend_name,
+                ADFixtures.backend_skip_scenarios(), backend_name,
                 Set{String}()
             )
         )
-        all_names = [s.name for s in ADFixtures.sampling_scenarios()]
+        broken = listed_names(
+            scenarios,
+            union(
+                Set(ADFixtures.broken_scenario_names()),
+                get(
+                    ADFixtures.backend_broken_scenarios(), backend_name,
+                    Set{String}()
+                )
+            )
+        )
+        all_names = [s.name for s in scenarios]
         statuses = smoke_statuses(backend_name, all_names, skip)
         for name in all_names
             status = statuses[name]

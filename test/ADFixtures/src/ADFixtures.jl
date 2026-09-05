@@ -661,15 +661,17 @@ const _SAMPLING_BUDGET = (;
 @doc """
     sampling_scenarios()
 
-The NUTS sampling smoke scenarios, as `(; name, model, ensemble, budget)` named
-tuples, each pairing a composed model from the gradient registry with the
-ensemble strategy and the NUTS budget that sample it.
+The NUTS sampling smoke scenarios, as `(; name, model_name, model, ensemble,
+budget)` named tuples, each pairing a composed model from the gradient registry
+with the ensemble strategy and the NUTS budget that sample it.
 
 There is one scenario per model and ensemble strategy, named for the model's
 gradient scenario with the strategy appended. A backend that samples correctly
 under one strategy and not the other is then recorded precisely, and a sampling
 entry in [`backend_broken_scenarios`](@ref) or [`backend_skip_scenarios`](@ref)
-never collides with the gradient scenario of the same model.
+never collides with the gradient scenario of the same model. `model_name` is
+that gradient scenario's name, so a backend listed as broken on the gradient is
+also treated as broken on the sampling built from it.
 """
 function sampling_scenarios()
     models = Dict(_models())
@@ -683,6 +685,7 @@ function sampling_scenarios()
             push!(
                 out, (
                     name = name * " (" * label * ")",
+                    model_name = name,
                     model = models[name],
                     ensemble = ensemble,
                     budget = _SAMPLING_BUDGET,
