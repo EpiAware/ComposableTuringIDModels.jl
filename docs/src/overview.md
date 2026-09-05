@@ -54,8 +54,8 @@ The three roles feed one another and plug into that single interface.
 <line x1="550" y1="202" x2="550" y2="246" stroke="#6d5b8a" stroke-width="1.4" stroke-dasharray="3 4"/>
 <rect x="28" y="248" width="672" height="52" rx="12" fill="#ece7f3" stroke="#6d5b8a" stroke-width="1.8" stroke-dasharray="6 4"/>
 <text x="364" y="272" font-size="14" font-weight="700" text-anchor="middle" fill="#4c3d6b" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">as_turing_model</text>
-<text x="364" y="290" font-size="11" text-anchor="middle" fill="#6b5c86">the one interface every part implements — parts compose as submodels</text>
-<text x="419" y="336" font-size="12.5" font-weight="700" text-anchor="middle" fill="#4a4553">Swap any part — change one assumption without touching the rest</text>
+<text x="364" y="290" font-size="11" text-anchor="middle" fill="#6b5c86">the one interface every part implements, so parts compose as submodels</text>
+<text x="419" y="336" font-size="12.5" font-weight="700" text-anchor="middle" fill="#4a4553">Swap any part to change one assumption without touching the rest</text>
 <text x="42" y="356" font-size="12" font-weight="700" fill="#6a3d8f">Latent</text>
 <rect x="36" y="362" width="226" height="20" rx="6" fill="#f4eef9" stroke="#8a4faf"/><text x="46" y="376" font-size="11" fill="#6a3d8f">RandomWalk</text>
 <rect x="36" y="386" width="226" height="20" rx="6" fill="#f4eef9" stroke="#8a4faf"/><text x="46" y="400" font-size="11" fill="#6a3d8f">AR · MA · ARIMA</text>
@@ -84,16 +84,20 @@ using ComposableTuringIDModels, Distributions
 latent = DiffLatentModel(; model = AR(), init = [Normal(), Normal()])
 ```
 
-Fold it into a direct-infections process, then swap only the observation model.
+Fold it into a direct-infections process observed with Poisson noise.
 
 ```@example overview
 poisson_model = IDModel(
     DirectInfections(; Z = latent, initialisation = Normal()),
     PoissonError())
+```
 
-negbin_model = IDModel(
-    DirectInfections(; Z = latent, initialisation = Normal()),
-    NegativeBinomialError())
+[`swap`](@ref) then changes the count noise.
+
+```@example overview
+using ComposableTuringIDModels: swap
+negbin_model = swap(
+    err -> err isa PoissonError ? NegativeBinomialError() : err, poisson_model)
 ```
 
 Each assembly is turned into one Turing model.
@@ -102,7 +106,7 @@ Each assembly is turned into one Turing model.
 ```@example overview
 turing_model = as_turing_model(poisson_model, missing, 20)
 (; generated_y_t, I_t, Z_t) = turing_model()
-length(generated_y_t), length(I_t), length(Z_t)
+Z_t
 ```
 
 ## Where to go next

@@ -39,7 +39,6 @@ arma21 = arma(
     ϵ_t = HierarchicalNormal(std = HalfNormal(0.1)))
 
 arima211 = DiffLatentModel(; model = arma21, init = [Normal(0.3, 0.3)])
-nothing # hide
 ```
 
 [`broadcast_weekly`](@ref) makes the process piecewise-constant by week, drawing a new value each week and holding it for seven days.
@@ -47,7 +46,6 @@ This models ``R_t`` as changing weekly rather than daily, which regularises the 
 
 ```@example delays
 weekly_latent = broadcast_weekly(arima211)
-nothing # hide
 ```
 
 ## The infection process
@@ -70,7 +68,6 @@ We start from the [`NegativeBinomialError`](@ref) link and build outward.
 negbin = NegativeBinomialError(cluster_factor = HalfNormal(0.1))
 dayofweek_negbin = ascertainment_dayofweek(
     negbin; latent_model = HierarchicalNormal(std = HalfNormal(1.0)))
-nothing # hide
 ```
 
 [`LatentDelay`](@ref) convolves the expected observations with a delay distribution discretised by double interval censoring.
@@ -85,11 +82,7 @@ reporting = UncertainDelay(         # symptom onset -> report (inferred)
     D = 8.0)
 
 observation = LatentDelay(LatentDelay(dayofweek_negbin, incubation), reporting)
-nothing # hide
 ```
-
-That single `observation` object now carries, from the inside out, a negative binomial link, a day-of-week ascertainment modifier, a fixed incubation-delay convolution, and an inferred reporting-delay convolution.
-The reporting-delay parameters flow through the same priors seam as every other parameter, so inferring the delay needs no change to the rest of the model.
 
 Each convolution shortens the expected series by `length(pmf) - 1`.
 Two stacked delays therefore need the infection process to start that many days before the first report.
@@ -142,7 +135,6 @@ chain = sample(
 nothing # hide
 ```
 
-`sample` returns a [FlexiChains](https://github.com/penelopeysm/FlexiChains.jl) chain, which `summarystats` summarises directly.
 `DayofWeek.std` is the scale of the partially pooled weekday multipliers, namespaced because the ascertainment modifier introduces a named sub-process.
 `cluster_factor` is the negative-binomial overdispersion, and `delay.θ` are the inferred reporting-delay parameters, the `LogNormal` log-mean and log-sd.
 
@@ -158,7 +150,6 @@ Any of them can be swapped, fixed, or removed by editing one line of the composi
 
 Sampling the same model with [`Prior`](https://turinglang.org/) gives a prior draw over the same parameters.
 Overlaying it on the posterior with [PairPlots.jl](https://sefffal.github.io/PairPlots.jl/) shows which parameters the six weeks of Italian data moved.
-The FlexiChains extension turns each chain, subset to a few keys, into a `PairPlots.Series`.
 
 ```@example delays
 using CairoMakie, PairPlots
@@ -186,21 +177,16 @@ using Statistics
 const CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
 
 function credible_bands(mat; qs = CI_QS)
-    reduce(hcat, (map(eachrow(mat)) do row
-        vals = collect(skipmissing(row))
-        isempty(vals) ? missing : quantile(vals, q)
-    end for q in qs))
+    reduce(hcat, (map(row -> quantile(row, q), eachrow(mat)) for q in qs))
 end
 
 function ci_ribbon!(ax, ts, bands; color, label)
-    keep = findall(!ismissing, view(bands, :, 3))
-    x, b = ts[keep], Float64.(bands[keep, :])
-    band!(ax, x, b[:, 1], b[:, 5]; color = (color, 0.15))
-    band!(ax, x, b[:, 2], b[:, 4]; color = (color, 0.3))
-    lines!(ax, x, b[:, 3]; color = color, linewidth = 2, label = label)
+    band!(ax, ts, bands[:, 1], bands[:, 5]; color = (color, 0.15))
+    band!(ax, ts, bands[:, 2], bands[:, 4]; color = (color, 0.3))
+    lines!(ax, ts, bands[:, 3]; color = color, linewidth = 2, label = label)
 end
 
-# every reference day is scored, so every predictive entry is there
+# Every report is scored, so every predictive entry is there.
 function predictive_bands(pred, n)
     rows = map(1:n) do i
         permutedims(vec(pred[@varname(y_t[i])]))
@@ -216,22 +202,35 @@ Rt = credible_bands(reduce(hcat, (exp.(g.Z_t) for g in gens)))
 pred = predict(as_turing_model(problem, (y_t = fill(missing, n),)), chain)
 yt = predictive_bands(pred, n)
 
+lead_in = observation_lead_in(observation)
+infection_days = (1 - lead_in):n
+
 fig = Figure(; size = (760, 620))
 ax1 = Axis(fig[1, 1]; ylabel = "Reproduction number Rₜ")
-ci_ribbon!(ax1, 1:size(Rt, 1), Rt; color = :purple, label = "posterior median")
+ci_ribbon!(ax1, infection_days, Rt; color = :purple,
+    label = "posterior median")
 hlines!(ax1, [1.0]; color = :grey, linestyle = :dash)
+vlines!(ax1, [0.5]; color = :grey, linestyle = :dot)
 axislegend(ax1; position = :rt)
-ax2 = Axis(fig[2, 1]; xlabel = "Day", ylabel = "Confirmed cases")
-ci_ribbon!(ax2, 1:size(yt, 1), yt; color = :teal,
-    label = "posterior predictive")
+ax2 = Axis(fig[2, 1]; xlabel = "Day, numbered from the first report",
+    ylabel = "Confirmed cases")
+ci_ribbon!(ax2, 1:n, yt; color = :teal, label = "posterior predictive")
 scatter!(ax2, 1:n, y_obs; color = :black, markersize = 7, label = "observed")
+vlines!(ax2, [0.5]; color = :grey, linestyle = :dot)
 axislegend(ax2; position = :lt)
+linkxaxes!(ax1, ax2)
+hidexdecorations!(ax1; grid = false)
 fig
 ```
 
+Both panels are drawn on one calendar, numbered so that day 1 is the first Italian report.
+The ``R_t`` panel runs to the left of day 1 as well, over the lead-in the two delays consume.
+The dotted line on both panels marks where the reports begin.
+Nothing is observed on the lead-in days themselves.
+They are estimated from the reports they feed into through the two convolutions, so the band is at its widest there and narrows once the data starts.
+
 The weekly ``R_t`` is piecewise-constant by construction, stepping down through one as the first wave turns over.
-The ``R_t`` panel runs longer than the reports panel, because the infection process covers the delays' lead-in before the first report.
-The posterior-predictive band tracks the observed Italian reports, the layered observation model having absorbed the reporting pattern rather than the infection signal.
+The posterior-predictive band tracks all 42 observed Italian reports, the layered observation model having absorbed the reporting pattern rather than the infection signal.
 
 ## A time-varying reporting pattern
 
@@ -250,10 +249,8 @@ drifting = UncertainDelay(
     LogNormal, [RandomWalk(), truncated(Normal(0.47, 0.2), 0, Inf)]; D = 8.0)
 tv_observation = LatentDelay(
     LatentDelay(dayofweek_negbin, incubation), drifting)
-nothing # hide
 ```
 
-Only which prior fills the delay's log-mean slot changes, leaving the infection process, the ``R_t`` prior and the fitting code identical.
 As with the weekday profile we flag rather than fit it here, because a delay that drifts day to day asks more of six weeks of data than they can answer.
 
 ## References
