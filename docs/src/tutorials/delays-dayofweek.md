@@ -123,7 +123,7 @@ y_obs = italy.confirm[1:n]
 Printing it shows the whole composition and a summary of the data.
 
 ```@example delays
-problem = IDProblem(renewal, observation, y_obs)
+problem = IDProblem(IDModel(renewal, observation), y_obs)
 ```
 
 The problem carries its own length, so [`data_requirements`](@ref) reads straight off it.

@@ -74,7 +74,7 @@ end
     # An IDModel and an IDProblem delegate to their observation model.
     infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal())
     @test observation_lead_in(IDModel(infection, stacked)) == 7
-    problem = IDProblem(infection, stacked, fill(10, 30))
+    problem = IDProblem(IDModel(infection, stacked), fill(10, 30))
     @test observation_lead_in(problem) == 7
 end
 

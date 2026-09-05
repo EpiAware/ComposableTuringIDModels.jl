@@ -167,21 +167,17 @@ end
 @doc raw"
 Convenience 2-argument form: read the infection process's shape from the data.
 
-The observation model and the data together fix the shape of the infection
-process, so nothing about it needs to be supplied explicitly or stored on the
-model. `as_turing_model(model, y_t)` is `as_turing_model(model, y_t, shape)`
-with `shape` read from `y_t`. That is the data's time length, and for
-stratified data the number of infection strata the observation model consumes,
-resolved via [`infection_strata`](@ref).
-
-The data may be a plain vector of observations, a `strata x time` matrix, or a
-`NamedTuple` of per-stream series. Three age strata observed as one
-hospitalisation stream is `Split(NegativeBinomialError(), [1.0 1.0 1.0])`, and
-a `1 x T` data matrix then builds a 3-stratum infection process.
+`as_turing_model(model, y_t)` is `as_turing_model(model, y_t, shape)` with
+`shape` read from `y_t`. A plain vector, a `strata x time` matrix, or a
+`NamedTuple` of per-stream series gives the time length, and for stratified
+data the number of infection strata the observation model consumes (see
+[`infection_strata`](@ref)). Three age strata observed as one hospitalisation
+stream is `Split(NegativeBinomialError(), [1.0 1.0 1.0])`, and a `1 x T` data
+matrix then builds a 3-stratum infection process.
 
 A scalar `missing` has no length to read, so simulating from the prior at a
-chosen length is either `as_turing_model(model, missing, n)` or the two-argument
-form over a blank series of that length.
+chosen length is `as_turing_model(model, missing, n)`, or the two-argument form
+over a blank series such as `Vector{Missing}(missing, n)`.
 
 # Examples
 ```@example IDModel_shape

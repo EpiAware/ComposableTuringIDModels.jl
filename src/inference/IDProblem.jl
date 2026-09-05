@@ -5,56 +5,43 @@
 A composed model and the data it is fitted to.
 
 An [`IDModel`](@ref) says what the process is. The data says how long it runs
-and how many streams it has. `IDProblem` is the pair, so the two travel
-together and cannot drift apart. From it,
-[`as_turing_model(problem)`](@ref as_turing_model) builds the
-`DynamicPPL.Model` and [`data_requirements(problem)`](@ref data_requirements)
-reports what the model asks of the data, neither of which needs the length
-restating.
+and how many streams it has. Holding the two together means
+[`as_turing_model(problem)`](@ref as_turing_model) and
+[`data_requirements(problem)`](@ref data_requirements) need no length restated.
 
 The shape of the infection process is read from the observation model and the
-data at build time (see [`infection_strata`](@ref)), not stored. A plain vector
-gives a single-series infection process, while a `strata x time` matrix or a
-`NamedTuple` of streams gives a stratified one.
+data at build time (see [`infection_strata`](@ref)). A plain vector gives a
+single series. A `strata x time` matrix or a `NamedTuple` of streams gives a
+stratified process.
 
-Printing an `IDProblem` shows the component tree and a summary of the data.
-That is the reason to hold one rather than a conditioned `DynamicPPL.Model`,
-which renders as its full nested parametric type with the observations dumped
-inline.
+Construction refuses streams that disagree with each other. It cannot see a
+length disagreement on a single series, because the observation count is read
+from that same series, so ask [`data_requirements`](@ref) for that.
 
-Construction rejects data the model cannot fit, but the check is narrow and
-worth knowing the shape of. It cannot see a length disagreement on a single
-series, nor across streams that imply their own strata, because in both the
-observation count is read from the same data it would be checked against. Ask
-properly with [`data_requirements`](@ref).
-
-There is no data-free `IDProblem`, because the pairing is what the type is.
-[`IDModel`](@ref) is the object for a model on its own. A problem whose
-observations have not arrived yet is one over a blank series,
-`Vector{Missing}(missing, n)`, which fixes the shape and carries the length the
-way observations do. The data is attached the way anything else in a
-composition is respecified.
+A problem whose observations have not arrived yet is one over a blank series,
+`Vector{Missing}(missing, n)`. The data is attached, or swapped for a refit,
+with `Accessors`:
 
 ```julia
 using Accessors
-problem = IDProblem(model, Vector{Missing}(missing, 20))  # shape fixed, none observed
-fitted = @set problem.data = y                            # observations attached
+fitted = @set problem.data = y
 ```
+
+Printing an `IDProblem` shows the component tree and a summary of the data.
 
 # Arguments
 
-  - `model`: the composed [`IDModel`](@ref), or an infection model and an
-    observation model to compose into one.
-  - `data`: the observations the model is fitted to. A vector, a
-    `strata x time` matrix, or a `NamedTuple` of streams.
+  - `model`: the composed [`IDModel`](@ref).
+  - `data`: the observations. A vector, a `strata x time` matrix, or a
+    `NamedTuple` of streams.
 
 # Examples
 ```@example IDProblem
 using ComposableTuringIDModels, Distributions
-problem = IDProblem(
+model = IDModel(
     DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-    PoissonError(),
-    Vector{Missing}(missing, 20))
+    PoissonError())
+problem = IDProblem(model, Vector{Missing}(missing, 20))
 ```
 
 ```@example IDProblem
@@ -95,13 +82,6 @@ function _assert_data_fits(model::IDModel, data)
     )
 end
 
-function IDProblem(
-        infection::AbstractInfectionModel, observation_model::AbstractObservationModel,
-        data
-    )
-    return IDProblem(IDModel(infection, observation_model), data)
-end
-
 # The problem's lead-in and observation chain are its model's, so a requirements
 # report reads the same either way.
 observation_lead_in(problem::IDProblem) = observation_lead_in(problem.model)
@@ -132,13 +112,10 @@ end
 @doc raw"
 Build the `DynamicPPL.Model` for an [`IDProblem`](@ref).
 
-The problem already holds the data, so there is no length to restate.
-`as_turing_model(problem)` is `as_turing_model(problem.model, problem.data)`.
-
-There is deliberately no method taking data alongside the problem. An
-`IDProblem` *is* a model and its data, so fitting the same model to a different
-series is a different problem, not a different call on this one. Build it with
-`Accessors`, which is how every other part of this package is respecified:
+The problem holds the data, so `as_turing_model(problem)` is
+`as_turing_model(problem.model, problem.data)`. There is no method taking data
+alongside the problem. Fitting the same model to a different series is a
+different problem, built with `Accessors`:
 
 ```julia
 using Accessors

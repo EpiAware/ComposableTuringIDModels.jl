@@ -2,16 +2,18 @@
     using ComposableTuringIDModels, Distributions, Random, Accessors
     using DynamicPPL: VarInfo
     Random.seed!(71)
-    infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal())
-    problem = IDProblem(infection, PoissonError(), Vector{Missing}(missing, 20))
-    @test problem.model == IDModel(infection, PoissonError())
+    model = IDModel(
+        DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+        PoissonError()
+    )
+    problem = IDProblem(model, Vector{Missing}(missing, 20))
+    @test problem.model === model
     sim = as_turing_model(problem)()
     @test length(sim.generated_y_t) == 20
     @test length(sim.Z_t) == 20
 
     # The problem's route and the model's route build the same model, so
     # holding one is a convenience rather than a fork in the API.
-    model = IDModel(infection, PoissonError())
     y = sim.generated_y_t
     @test keys(VarInfo(as_turing_model(IDProblem(model, y)))) ==
         keys(VarInfo(as_turing_model(model, y, length(y))))
@@ -19,7 +21,7 @@
     # Refitting to a different series is a new problem, built with `Accessors`,
     # rather than a second argument to `as_turing_model`.
     refit = @set problem.data = fill(5, 12)
-    @test isequal(refit.model, problem.model)
+    @test refit.model === model
     @test isequal(refit.data, fill(5, 12))
     @test isequal(problem.data, Vector{Missing}(missing, 20))
     @test length(as_turing_model(refit)().generated_y_t) == 12
@@ -34,32 +36,31 @@ end
         (cases = PoissonError(), deaths = PoissonError()),
         reshape([1.0, 1.0], 2, 1)
     )
+    model = IDModel(infection, obs)
     ragged = (cases = fill(5, 30), deaths = fill(1, 40))
-    @test_throws ArgumentError IDProblem(infection, obs, ragged)
+    @test_throws ArgumentError IDProblem(model, ragged)
     # The guard is an inner constructor, so respecifying into the same mistake
     # is refused too.
-    ok = IDProblem(infection, obs, (cases = fill(5, 30), deaths = fill(1, 30)))
+    ok = IDProblem(model, (cases = fill(5, 30), deaths = fill(1, 30)))
     @test_throws ArgumentError @set ok.data = ragged
 
     # It never refuses what `as_turing_model` accepts. A shorter stream is
     # right-aligned rather than wrong, and a single series cannot disagree with
     # a count read off itself.
-    @test IDProblem(infection, obs, (cases = fill(5, 30), deaths = fill(1, 20))) isa
+    @test IDProblem(model, (cases = fill(5, 30), deaths = fill(1, 20))) isa
         IDProblem
-    @test IDProblem(infection, PoissonError(), fill(5, 30)) isa IDProblem
+    plain = IDModel(infection, PoissonError())
+    @test IDProblem(plain, fill(5, 30)) isa IDProblem
     # Both simulation routes stay constructible.
-    @test IDProblem(infection, PoissonError(), Vector{Missing}(missing, 20)) isa
-        IDProblem
-    @test IDProblem(
-        infection, obs, (
-            cases = Vector{Missing}(missing, 20), deaths = Vector{Missing}(missing, 20),
-        )
-    ) isa IDProblem
+    @test IDProblem(plain, Vector{Missing}(missing, 20)) isa IDProblem
+    blank = (
+        cases = Vector{Missing}(missing, 20), deaths = Vector{Missing}(missing, 20),
+    )
+    @test IDProblem(model, blank) isa IDProblem
     # And a model reading named fields rather than streams is not mistaken for
     # two disagreeing streams.
-    @test IDProblem(
-        infection, BinomialError(), (y = fill(5, 30), N = fill(20, 30))
-    ) isa IDProblem
+    binomial = IDModel(infection, BinomialError())
+    @test IDProblem(binomial, (y = fill(5, 30), N = fill(20, 30))) isa IDProblem
 end
 
 @testitem "a blank series is a problem awaiting its observations" begin
@@ -100,10 +101,11 @@ end
 
 @testitem "IDProblem refuses a bare length in place of its data" begin
     using ComposableTuringIDModels, Distributions
-    problem = IDProblem(
+    model = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-        PoissonError(), fill(5, 30)
+        PoissonError()
     )
+    problem = IDProblem(model, fill(5, 30))
     # The generic method would report as if no data had been supplied, which
     # discards the half of the pairing the type exists for.
     @test_throws ArgumentError data_requirements(problem, 30)
@@ -113,9 +115,10 @@ end
 @testitem "IDProblem prints its component tree and a data summary" begin
     using ComposableTuringIDModels, Distributions
     infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal())
+    model = IDModel(infection, PoissonError())
     render(x) = sprint(show, MIME"text/plain"(), x)
 
-    plain = render(IDProblem(infection, PoissonError(), fill(5, 30)))
+    plain = render(IDProblem(model, fill(5, 30)))
     @test startswith(plain, "IDProblem\n")
     # The model's components hang off the problem rather than under a node of
     # their own, and the data is the last sibling.
@@ -125,40 +128,33 @@ end
 
     # A wholly blank series says it is simulating rather than reporting zero
     # observations.
-    blank = render(IDProblem(infection, PoissonError(), Vector{Missing}(missing, 30)))
+    blank = render(IDProblem(model, Vector{Missing}(missing, 30)))
     @test occursin("└─ data: none, 30 time points (simulating from the prior)", blank)
 
     gappy = render(
-        IDProblem(
-            infection, PoissonError(),
-            Vector{Union{Missing, Int}}([missing; fill(5, 29)])
-        )
+        IDProblem(model, Vector{Union{Missing, Int}}([missing; fill(5, 29)]))
     )
     @test occursin("└─ data: 30 observations, 1 missing", gappy)
 
     # A `NamedTuple` names its entries without claiming they are streams: they
     # are for a `Split`, but a `BinomialError` reads `(y, N)` as one stream's
     # fields.
-    streams = render(
-        IDProblem(
-            infection, Split((cases = PoissonError(), deaths = PoissonError())),
-            (cases = fill(5, 30), deaths = fill(1, 30))
-        )
+    split = IDModel(
+        infection, Split((cases = PoissonError(), deaths = PoissonError()))
     )
+    streams = render(IDProblem(split, (cases = fill(5, 30), deaths = fill(1, 30))))
     @test occursin("└─ data: 30 observations in each of cases, deaths", streams)
 
     binom = render(
         IDProblem(
-            infection, BinomialError(),
-            (y = fill(5, 30), N = fill(20, 30))
+            IDModel(infection, BinomialError()), (y = fill(5, 30), N = fill(20, 30))
         )
     )
     @test occursin("└─ data: 30 observations in each of y, N", binom)
 
     blank_streams = render(
         IDProblem(
-            infection, Split((cases = PoissonError(), deaths = PoissonError())),
-            (
+            split, (
                 cases = Vector{Missing}(missing, 30),
                 deaths = Vector{Missing}(missing, 30),
             )
@@ -168,33 +164,23 @@ end
         "└─ data: none, 30 time points (simulating from the prior)", blank_streams
     )
 
-    strata = render(
-        IDProblem(
-            DirectInfections(;
-                Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
-                initialisation = IID(Normal())
-            ),
-            PoissonError(), fill(5, 2, 30)
-        )
+    stratified = IDModel(
+        DirectInfections(;
+            Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
+            initialisation = IID(Normal())
+        ),
+        PoissonError()
     )
+    strata = render(IDProblem(stratified, fill(5, 2, 30)))
     @test occursin("└─ data: 2 strata x 30 observations", strata)
 
-    blank_strata = render(
-        IDProblem(
-            DirectInfections(;
-                Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
-                initialisation = IID(Normal())
-            ),
-            PoissonError(), Matrix{Missing}(missing, 2, 30)
-        )
-    )
+    blank_strata = render(IDProblem(stratified, Matrix{Missing}(missing, 2, 30)))
     @test occursin(
         "└─ data: none, 30 time points (simulating from the prior)", blank_strata
     )
 
     # Compact rendering stays one line, as it does for a component.
-    @test sprint(show, IDProblem(infection, PoissonError(), fill(5, 30))) ==
-        "IDProblem"
+    @test sprint(show, IDProblem(model, fill(5, 30))) == "IDProblem"
 end
 
 @testitem "IDProblem reports its own data requirements" begin
@@ -202,7 +188,7 @@ end
     infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal())
     obs = LatentDelay(PoissonError(), fill(1 / 5, 5))       # lead-in 4
 
-    problem = IDProblem(infection, obs, fill(10, 30))
+    problem = IDProblem(IDModel(infection, obs), fill(10, 30))
     @test data_requirements(problem).n == 30
     @test data_requirements(problem).series_length == 34
     # The report is the model's over the same data, printed the same way.
@@ -211,14 +197,14 @@ end
 
     # A stratified problem reports on the stratum axis, because the shape comes
     # from the same helper `as_turing_model` builds with.
-    strata = IDProblem(
+    stratified = IDModel(
         DirectInfections(;
             Z = Stratify(RandomWalk(), FixedIntercept(0.0)),
             initialisation = IID(Normal())
         ),
-        obs, fill(10, 2, 30)
+        obs
     )
-    @test data_requirements(strata).n == 30
+    @test data_requirements(IDProblem(stratified, fill(10, 2, 30))).n == 30
 end
 
 @testitem "_obs_data_shape resolves stratified shapes from data or Split" begin
@@ -263,15 +249,14 @@ end
         initialisation = Normal(log(20), 0.2)
     )
     Y = Matrix{Union{Missing, Float64}}(missing, 1, T)
-    problem_map = IDProblem(infection, Split(PoissonError(), [1.0 1.0 1.0]), Y)
+    mapped = IDModel(infection, Split(PoissonError(), [1.0 1.0 1.0]))
+    problem_map = IDProblem(mapped, Y)
     @test size(as_turing_model(problem_map)().I_t) == (3, T)
 
     # A Split with named streams over a blank series builds one stratum per
     # name, reading the length off the series.
-    problem_named = IDProblem(
-        infection, Split((a = PoissonError(), b = PoissonError())),
-        Vector{Missing}(missing, T)
-    )
+    named = IDModel(infection, Split((a = PoissonError(), b = PoissonError())))
+    problem_named = IDProblem(named, Vector{Missing}(missing, T))
     @test size(as_turing_model(problem_named)().I_t) == (2, T)
 end
 
@@ -345,13 +330,13 @@ end
     using ComposableTuringIDModels, Distributions, Turing, Random
     Random.seed!(102)
     T, h = 18, 5
-    infection = DirectInfections(; Z = AR(), initialisation = Normal())
-    y = as_turing_model(
-        IDProblem(infection, PoissonError(), Vector{Missing}(missing, T))
-    )().generated_y_t
+    model = IDModel(
+        DirectInfections(; Z = AR(), initialisation = Normal()), PoissonError()
+    )
+    y = as_turing_model(IDProblem(model, Vector{Missing}(missing, T)))().generated_y_t
     # The fitted problem holds the series, so the forecast needs only the chain
     # and the horizon.
-    problem = IDProblem(infection, PoissonError(), y)
+    problem = IDProblem(model, y)
     chain = sample(as_turing_model(problem), Prior(), 30; progress = false)
     fc = forecast(problem, chain, h)
     @test size(fc, 1) == 30
