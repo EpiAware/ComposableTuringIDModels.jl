@@ -163,14 +163,17 @@ end
 _restore_missing(y) = y
 _restore_missing(y::MissingObservations) = map((v, p) -> p ? v : missing, y.value, y.present)
 
+# A blank in a series is marginalised, not drawn, whichever route the series
+# arrives by.
+# Narrowing it with `concrete_observations` turns a gap into a
+# [`MissingObservations`](@ref) carrier that is scored by reading only, and a
+# series with nothing observed in it into the predictive form.
 # A series reached through a `NamedTuple` field is not a model argument, so
 # DynamicPPL neither copies nor promotes it and the `y_t[i] ~ …` sugar would
-# write a blank's draw straight back into the caller's array.
-# Narrowing it with [`concrete_observations`](@ref) turns any blank into a
-# [`MissingObservations`](@ref) carrier that is scored by reading only.
-# A series passed as the model's own `y_t` argument already has DynamicPPL's
-# copy, so it passes through untouched.
-_scored_series(obs_model, y_t, Y_t) = define_y_t(obs_model, y_t, Y_t)
+# otherwise write a blank's draw straight back into the caller's array.
+function _scored_series(obs_model, y_t, Y_t)
+    return concrete_observations(define_y_t(obs_model, y_t, Y_t))
+end
 _scored_series(obs_model, y_t::MissingObservations, Y_t) = y_t
 function _scored_series(obs_model, y_t::NamedTuple, Y_t)
     y_t.y isa MissingObservations && return y_t.y

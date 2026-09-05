@@ -113,9 +113,13 @@ function concrete_observations(y::AbstractVector)
     T = nonmissingtype(eltype(y))
     # A `Vector{Missing}` has no value type to put in the carrier, and nothing
     # can be written into it either, so leave it.
+    # A series with nothing observed in it is the same request as `missing`, a
+    # predictive draw at that length, so it takes that form whatever its
+    # element type.
     # Any other element type without a `zero` is copied instead, so the caller's
     # array is still out of reach.
     T === Union{} && return y
+    all(ismissing, y) && return Vector{Missing}(missing, length(y))
     (isconcretetype(T) && T <: Number) || return copy(y)
     present = .!ismissing.(y)
     value = identity.(coalesce.(y, zero(T)))
