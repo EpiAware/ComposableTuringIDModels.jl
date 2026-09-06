@@ -26,9 +26,15 @@
     # Run the child over `names`, returning its output and how it exited. The
     # output goes to a file rather than a pipe so it survives a process that
     # dies mid-write.
+    #
+    # `julia_cmd` carries the parent's `--code-coverage` flag into the child.
+    # The child's coverage is never collected, and under coverage Mooncake's
+    # `MCMCSerial` scenario spends the whole cap in type inference of
+    # `sample`, so coverage is switched back off; a later flag wins.
     function run_child(backend_name, names)
         cmd = `$(Base.julia_cmd()) --project=$(@__DIR__) --threads=2
-            --startup-file=no $CHILD $backend_name $names`
+            --startup-file=no --code-coverage=none
+            $CHILD $backend_name $names`
         path, io = mktemp()
         proc = run(pipeline(cmd; stdout = io, stderr = io), wait = false)
         # A flushed line restarts the clock, so the cap applies to the
