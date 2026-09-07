@@ -133,7 +133,7 @@ fig_sim
 ## Fit both GPs and compare
 
 Conditioning on the counts and sampling with NUTS recovers the posterior, differentiated with [Mooncake](https://chalk-lab.github.io/Mooncake.jl/), the recommended backend for this package.
-The helper below fits a chosen GP latent to the first `n_fit` days, times the run, recovers the per-draw ``\log R_t`` with [`generated_observables`](@ref) and scores the posterior mean against the truth.
+The helper below fits a chosen GP latent to the first `n_fit` days, times the run, recovers the per-draw ``\log R_t`` with `returned` and scores the posterior mean against the truth.
 
 ```@example gp
 using Turing, Mooncake, Statistics
@@ -148,7 +148,7 @@ function fit_gp(latent, n_fit)
         NUTS(0.9; adtype = AutoMooncake(; config = nothing)),
         MCMCThreads(), 300, n_chains;
         initial_params = fill(InitFromPrior(), n_chains), progress = false)
-    gen = vec(generated_observables(posterior, y, chain).generated)
+    gen = vec(returned(posterior, chain))
     Z = reduce(hcat, (g.Z_t for g in gen))          # time × draw
     Z_mean = vec(mean(Z; dims = 2))
     Z_ref = Z_true[1:n_fit]

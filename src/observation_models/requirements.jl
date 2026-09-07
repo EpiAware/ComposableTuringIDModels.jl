@@ -207,8 +207,10 @@ What a single observation stream requires of the data supplied for it.
   - `fields`: the fields the scoring model reads when it needs more than the
     counts, e.g. `(:y, :N)` for [`BinomialError`](@ref); empty when a plain
     series is enough.
-  - `n_supplied`: how much data was actually supplied, or `nothing` when the
-    requirements were asked for without data.
+  - `n_supplied`: the length of the supplied series, or `nothing` when the
+    requirements were asked for without data. It counts positions in the
+    series, so one that is wholly `missing` reports its length rather than
+    `nothing`.
 "
 struct StreamRequirement
     "The stream's name, or `:y_t` for a single series."
@@ -227,7 +229,7 @@ struct StreamRequirement
     alignment::Symbol
     "The fields the scoring model reads, when it needs more than the counts."
     fields::Tuple{Vararg{Symbol}}
-    "How much data was supplied, or `nothing` if none was."
+    "The length of the supplied series, or `nothing` when asked for without data."
     n_supplied::Union{Int, Nothing}
 end
 
@@ -355,7 +357,8 @@ that builds its own prompts from them.
   - `y_t`: (optional) the data, to report what was supplied alongside what is
     required.
   - `n`: the number of observations (an `Int`, or the `(n_strata, n_time)` shape
-    of a stratified model). An [`IDProblem`](@ref) reads it from `tspan`.
+    of a stratified model). An [`IDProblem`](@ref) already holds its data, so
+    `data_requirements(problem)` needs neither.
 
 # Examples
 ```@example data_requirements
@@ -588,9 +591,8 @@ end
 # is scored at the end.
 # The one exception is a shortfall of exactly the chain's lead-in.
 #
-# This walks the chain rather than building a `DataRequirements`.
-# An `IDProblem`'s model body reassembles its `IDModel` on every evaluation, so
-# the check runs per evaluation and must not allocate.
+# This walks the chain rather than building a `DataRequirements`, since the
+# report would be built only to be discarded.
 function _check_observation_count(model, y_t, n::ModelShape)
     chain = _observation_chain(model)
     lead_in = observation_lead_in(chain)
