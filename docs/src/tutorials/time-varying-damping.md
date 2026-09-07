@@ -120,7 +120,7 @@ fig
 
 The band covers the true trajectory across the series, so the time-varying damping is recovered from data.
 Only the order-1 case is built so far.
-Time-varying coefficients for higher-order AR(`p`) are tracked in [#113](https://github.com/EpiAware/ComposableTuringIDModels.jl/issues/113).
+Time-varying coefficients for a higher-order AR(`p`) are not built yet.
 
 Nothing about this is specific to `AR`.
 [`arma`](@ref) takes the same `damp` slot, and [`DiffLatentModel`](@ref) differences whatever it wraps, so a time-varying-damping ARIMA is the two of them composed.

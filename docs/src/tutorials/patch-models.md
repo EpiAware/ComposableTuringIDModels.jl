@@ -64,11 +64,11 @@ There is no common driver and no infection pressure moving between patches.
 A [`Hierarchy`](@ref) in the `across` slot shrinks each patch's deviation toward the shared level.
 
 ```@example patches
+using Accessors
 Random.seed!(11)
 rt_process = Stratify(walk,
     Hierarchy(; mean = Normal(0.0, 0.1), across = IID(Normal(0.0, 0.2))))
-pooled = Renewal(gen_int; rt = rt_process,
-    initialisation = Normal(log(50.0), 0.2))
+pooled = @set independent.rt = rt_process
 sim_pooled = as_turing_model(pooled, (n_strata, n_time))()
 patch_lines(exp.(sim_pooled.Z_t); ylabel = "Rₜ",
     title = "Shared process: one shape, three levels")
@@ -101,8 +101,7 @@ K = [1.0 0.0 0.0
      0.4 0.0 1.0]
 
 Random.seed!(11)
-coupled = Renewal(gen_int; rt = rt_process,
-    initialisation = Normal(log(50.0), 0.2), mixing = K)
+coupled = @set pooled.mixing = K
 sim_coupled = as_turing_model(coupled, (n_strata, n_time))()
 nothing # hide
 ```

@@ -166,7 +166,7 @@ _restore_missing(y::MissingObservations) = map((v, p) -> p ? v : missing, y.valu
 # A series reached through a `NamedTuple` field is not a model argument, so
 # DynamicPPL neither copies nor promotes it and the `y_t[i] ~ …` sugar would
 # write a blank's draw straight back into the caller's array.
-# Narrowing it with [`concrete_observations`](@ref) turns any blank into a
+# Narrowing it with `concrete_observations` turns any blank into a
 # [`MissingObservations`](@ref) carrier that is scored by reading only.
 # A series passed as the model's own `y_t` argument already has DynamicPPL's
 # copy, so it passes through untouched.
