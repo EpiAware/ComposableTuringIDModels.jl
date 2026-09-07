@@ -291,6 +291,31 @@ end
     @test all(x -> x isa Integer && x ≥ 0, vec(fc[@varname(y_t[T + 1])]))
 end
 
+@testitem "forecast recomputes a generated quantity, never splices it" tags = [
+    :sample,
+] begin
+    using ComposableTuringIDModels, Distributions, Turing, Random
+    Random.seed!(104)
+    # A `:=` quantity such as a recorded `exp_I_t` is stored as a parameter but
+    # is not a model input, so it has no prior tail to splice. `predict`
+    # recomputes it, and the horizon model's length is what comes back.
+    model = IDModel(
+        RecordExpectedInfections(
+            Renewal(;
+                generation_time = [0.2, 0.3, 0.5], rt = RandomWalk(),
+                initialisation = Normal()
+            )
+        ),
+        PoissonError()
+    )
+    T, h = 18, 5
+    y = as_turing_model(model, fill(missing, T), T)().generated_y_t
+    chain = sample(as_turing_model(model, y, T), Prior(), 30; progress = false)
+    @test all(d -> length(d) == T, vec(chain[:exp_I_t]))
+    fc = forecast(model, y, chain, h)
+    @test all(d -> length(d) == T + h, vec(fc[:exp_I_t]))
+end
+
 @testitem "forecast's factorisation probe fails clearly on an explosive prior" tags = [
     :sample,
 ] begin

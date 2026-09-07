@@ -72,6 +72,31 @@ function apply_modifier(mod::AbstractRenewalModifier, incidence, substate)
     return _unresolved_modifier(mod)
 end
 
+@doc raw"
+Whether a modifier is the one that gives infections their noise.
+
+A trait, `false` for every modifier by default.
+A stochastic-infection modifier sets it `true`, marking the point in the
+modifier tuple where the renewal expectation stops being an expectation.
+The incidence entering the first such modifier is the last value that still is
+one, and the incidence after it is a draw.
+
+Implement `is_noise` alongside [`apply_modifier`](@ref) on any modifier that
+draws infections.
+
+# Arguments
+
+  - `mod`: the modifier.
+
+# Examples
+```@example is_noise
+using ComposableTuringIDModels, Distributions
+import ComposableTuringIDModels: is_noise
+is_noise(SusceptibleDepletion(1000.0)), is_noise(InfectionNoise())
+```
+"
+is_noise(::AbstractRenewalModifier) = false
+
 # A modifier with no parameters of its own samples nothing and scans as itself.
 # Kept as a `@model` so every modifier resolves through the same submodel call,
 # with no branch on whether it samples.
@@ -180,30 +205,47 @@ function renewal_init_state(step::_PlainRenewalStep, window::AbstractArray)
     return renewal_init_state(step.core, window)
 end
 
+# Its state is the core's, so the two halves of the step are the core's too.
+_propose(step::_PlainRenewalStep, state, Rt) = _propose(step.core, state, Rt)
+
+function _commit(step::_PlainRenewalStep, state, incidence, substates)
+    return _commit(step.core, state, incidence, substates)
+end
+
 function get_state(step::_PlainRenewalStep, initial_state, state)
     return get_state(step.core, initial_state, state)
 end
 
-# Thread the proposed incidence through the modifier tuple, collecting each
-# modifier's updated substate.
+# Thread the proposed incidence through the modifier tuple.
 # Recursive over the tuple to stay type-stable and free of mutation of tracked
 # state.
-_thread_modifiers(::Tuple{}, incidence, ::Tuple{}) = (incidence, ())
+# `is_noise` is a method on the modifier's type, so the branch picking the
+# expectation folds at compile time.
+_thread_modifiers(::Tuple{}, incidence, ::Tuple{}) = (incidence, incidence, ())
 function _thread_modifiers(mods::Tuple, incidence, substates::Tuple)
-    inc, s = apply_modifier(first(mods), incidence, first(substates))
-    rest_inc, rest_states = _thread_modifiers(
+    mod = first(mods)
+    inc, s = apply_modifier(mod, incidence, first(substates))
+    rest_inc, rest_exp, rest_states = _thread_modifiers(
         Base.tail(mods), inc, Base.tail(substates)
     )
-    return rest_inc, (s, rest_states...)
+    return rest_inc, (is_noise(mod) ? incidence : rest_exp), (s, rest_states...)
 end
 
 function (step::RenewalStep)(state, Rt)
+    incidence, _, substates = _propose(step, state, Rt)
+    return _commit(step, state, incidence, substates)
+end
+
+function _propose(step::RenewalStep, state, Rt)
     foi = renewal_foi(step.core, state.window, Rt)
-    new_incidence, new_substates = _thread_modifiers(
-        step.modifiers, foi, state.substates
+    return _thread_modifiers(step.modifiers, foi, state.substates)
+end
+
+function _commit(::RenewalStep, state, incidence, substates)
+    return (;
+        val = incidence, window = _advance(state.window, incidence),
+        substates = substates,
     )
-    new_window = _advance(state.window, new_incidence)
-    return (; val = new_incidence, window = new_window, substates = new_substates)
 end
 
 function renewal_init_state(step::RenewalStep, I₀, r_approx, len_gen_int)
@@ -219,6 +261,55 @@ end
 
 function get_state(::RenewalStep, initial_state, state)
     return _series(state .|> x -> x.val)
+end
+
+# --- recording the expectation ----------------------------------------------
+
+@doc raw"
+A renewal step that keeps each step's noise-free expectation in its state, so a
+scan can report the series alongside the committed one.
+
+The expectation is a reporting-only quantity, so it is a new step type rather
+than a field on the state every renewal carries.
+[`with_expected_infections`](@ref) wraps the step it scans in one of these, and
+nothing else builds one.
+
+Its state is the wrapped step's with an `exp_val` appended, so `get_state`
+reads through to the wrapped step unchanged and `get_expected_state` reads the
+extra field. It is a plain [`AbstractAccumulationStep`](@ref) rather than a
+renewal core, because it delegates the whole recurrence and implements no part
+of the core interface itself.
+"
+struct RecordingRenewalStep{S <: AbstractConstantRenewalStep} <:
+    AbstractAccumulationStep
+    step::S
+end
+
+# A seed state has committed nothing, so its expectation is its own value.
+_recording_state(state) = (; state..., exp_val = state.val)
+
+function renewal_init_state(step::RecordingRenewalStep, I₀, r_approx, len_gen_int)
+    return _recording_state(
+        renewal_init_state(step.step, I₀, r_approx, len_gen_int)
+    )
+end
+
+function renewal_init_state(step::RecordingRenewalStep, window::AbstractArray)
+    return _recording_state(renewal_init_state(step.step, window))
+end
+
+function (step::RecordingRenewalStep)(state, Rt)
+    incidence, expectation, substates = _propose(step.step, state, Rt)
+    committed = _commit(step.step, state, incidence, substates)
+    return (; committed..., exp_val = expectation)
+end
+
+function get_state(step::RecordingRenewalStep, initial_state, state)
+    return get_state(step.step, initial_state, state)
+end
+
+function get_expected_state(::RecordingRenewalStep, initial_state, state)
+    return _series(state .|> x -> x.exp_val)
 end
 
 # --- the pre-scan seam ------------------------------------------------------

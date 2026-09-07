@@ -191,9 +191,40 @@ _reverse_lags(g::AbstractVector) = reverse(g)
 _reverse_lags(g::AbstractMatrix) = reverse(g; dims = 2)
 
 function (recurrent_step::ConstantRenewalStep)(state, Rt)
-    new_incidence = renewal_foi(recurrent_step, state.window, Rt)
-    new_window = _advance(state.window, new_incidence)
-    return (; val = new_incidence, window = new_window)
+    incidence, _, substates = _propose(recurrent_step, state, Rt)
+    return _commit(recurrent_step, state, incidence, substates)
+end
+
+# --- the propose/commit split -----------------------------------------------
+#
+# A scan step computes an incidence and commits it in one call. A stochastic
+# renewal has to get between the two, so the step is split in half and both
+# parameterisations run the same arithmetic.
+
+@doc raw"
+The incidence a renewal step proposes at `state`, as
+`(incidence, expectation, substates)`.
+
+The first half of a step.
+[`accumulate_scan`](@ref) commits the proposal straight away, while a [`StochasticRenewal`](@ref) draws around it first.
+`expectation` is the last value along the modifier chain that is still a mean rather than a draw, marked by [`is_noise`](@ref).
+It equals `incidence` where nothing on the chain draws.
+The default method is the plain force of infection with no substates.
+"
+function _propose(step::AbstractConstantRenewalStep, state, Rt)
+    foi = renewal_foi(step, state.window, Rt)
+    return foi, foi, ()
+end
+
+@doc raw"
+Advance a renewal step's state by committing `incidence`, with the substates
+[`_propose`](@ref) returned alongside it.
+
+The second half of a step.
+The shared incidence window advances once, whether the committed value is the proposal itself or a draw around it.
+"
+function _commit(::AbstractConstantRenewalStep, state, incidence, substates)
+    return (; val = incidence, window = _advance(state.window, incidence))
 end
 
 # A single series is a window decaying at the implied rate, and several strata

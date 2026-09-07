@@ -7,6 +7,7 @@
     using ComposableTuringIDModels: equal_dimensions
     using OrdinaryDiffEq: AutoVern7, Rodas5P
     using Accessors: Accessors
+    using LinearAlgebra: I
 
     # Both properties `rewrap`'s docstring asks of a derived field. Rebuilt
     # from its own stored fields a component does not change, and with a field
@@ -59,6 +60,12 @@
             (:cluster_factor,), (HalfNormal(0.1),), (HalfNormal(0.5),),
         ),
         ("NormalError", s -> NormalError(s), (:std,), (HalfNormal(0.1),), (HalfNormal(0.5),)),
+        ("LogNormalError", c -> LogNormalError(c), (:cv,), (HalfNormal(0.1),), (HalfNormal(0.5),)),
+        (
+            "ObservationError", (d, s, r) -> ObservationError(d; sd = s, relative = r),
+            (:dist, :sd, :relative), (LogNormal, HalfNormal(0.1), false),
+            (Gamma, HalfNormal(0.5), true),
+        ),
         ("FixedIntercept", i -> FixedIntercept(i), (:intercept,), (0.1,), (0.5,)),
         ("Intercept", i -> Intercept(i), (:intercept,), (Normal(),), (Normal(1.0, 2.0),)),
         ("IID", e -> IID(e), (:ϵ_t,), (Normal(),), (Normal(1.0, 2.0),)),
@@ -172,6 +179,23 @@
                 [0.2, 0.8], identity, Normal(), Normal(1.0, 2.0),
                 Gravity([50.0, 400.0], [1.0 3.0; 3.0 1.0]), (ImportedCases(Normal(-1.0, 0.5)),),
             ),
+        ),
+        (
+            "StochasticRenewal", (g, tr, r, i, mx, mo, no) -> StochasticRenewal(;
+                generation_time = g, transformation = tr, rt = r,
+                initialisation = i, mixing = mx, modifiers = mo, noise = no
+            ),
+            (:gen_int, :transformation, :rt, :initialisation, :mixing, :modifiers, :noise),
+            ([0.4, 0.6], exp, RandomWalk(), Normal(), I, (), InfectionNoise()),
+            (
+                [0.2, 0.8], identity, Normal(), Normal(1.0, 2.0), I,
+                (ImportedCases(Normal(-1.0, 0.5)),),
+                InfectionNoise(; dist = Normal, overdispersion = 0.3, cv_cap = Inf),
+            ),
+        ),
+        (
+            "RecordExpectedInfections", m -> RecordExpectedInfections(m), (:model,),
+            (di,), (di2,),
         ),
         (
             "UncertainDelay", (p, f, d, dd) -> UncertainDelay(f, p; D = d, Δd = dd),
@@ -316,13 +340,14 @@ end
             :ConcatLatentModels, :DiffLatentModel, :DirectInfections, :ExactGP,
             :ExpGrowthRate, :FixedIntercept, :Gravity, :HierarchicalNormal,
             :Hierarchy, :HilbertSpaceGP, :IDModel, :IID, :Intercept,
-            :LatentDelay, :MA, :NegativeBinomialError, :NormalError, :Null,
-            :ODEProcess, :PoissonError, :PrefixLatentModel,
-            :PrefixObservationModel, :RandomWalk, :RecordExpectedLatent,
+            :LatentDelay, :LogNormalError, :MA, :NegativeBinomialError,
+            :NormalError, :Null, :ODEProcess, :ObservationError, :PoissonError,
+            :PrefixLatentModel, :PrefixObservationModel, :RandomWalk,
+            :RecordExpectedInfections, :RecordExpectedLatent,
             :RecordExpectedObs, :Renewal, :Replicate, :ReportTriangle,
             :ReportingCDF, :ReportingPMF, :RightTruncate, :SEIRParams,
-            :SIRParams, :SeedingPath, :Split, :Stratify, :TransformLatentModel,
-            :TransformObservationModel, :UncertainDelay,
+            :SIRParams, :SeedingPath, :Split, :StochasticRenewal, :Stratify,
+            :TransformLatentModel, :TransformObservationModel, :UncertainDelay,
         ]
     )
     concrete = Set(nameof.(leaves(AbstractComposableModel)))
