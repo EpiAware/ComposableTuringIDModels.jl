@@ -39,6 +39,7 @@ Each stream is a full observation model, so its ascertainment can be a fixed fra
 ```@example split
 using ComposableTuringIDModels, Distributions, Random, Turing, Mooncake
 using ADTypes: AutoMooncake
+using Accessors
 Random.seed!(1234)
 
 latent = AR(
@@ -53,10 +54,8 @@ cases = LatentDelay(
     Ascertainment(NegativeBinomialError(cluster_factor = HalfNormal(0.1)),
         FixedIntercept(log(0.6))),                     # ~60% case ascertainment
     LogNormal(1.6, 0.5))                                # short infection→report delay
-deaths = LatentDelay(
-    Ascertainment(NegativeBinomialError(cluster_factor = HalfNormal(0.1)),
-        Intercept(Normal(log(0.015), 0.25))),          # estimated ~1.5% IFR
-    LogNormal(2.8, 0.4))                                # long infection→death delay
+deaths = @set cases.model.latent_model = Intercept(Normal(log(0.015), 0.25))  # ~1.5% IFR
+deaths = @set deaths.delay = LogNormal(2.8, 0.4)    # long infection→death delay
 
 parallel = Split((cases = cases, deaths = deaths))
 ```

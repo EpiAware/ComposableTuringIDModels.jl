@@ -39,7 +39,7 @@ time-varying ``\iota_t`` stays positive even as the underlying path crosses
 zero.
 
 The rate is drawn before the scan through the modifier seam (see
-[`AbstractRenewalModifier`](@ref)), giving an [`ImportedRate`](@ref) that adds
+[`AbstractRenewalModifier`](@ref)), giving an `ImportedRate` that adds
 ``\iota_t`` at step ``t``. Where it sits in the modifier tuple therefore decides
 how it composes: placed *after* a [`SusceptibleDepletion`](@ref) the imports are
 added to the depleted incidence, so they are not scaled by the susceptible
@@ -163,7 +163,7 @@ Sample the importation rate ahead of the scan.
 Draws the unconstrained rate slot through [`as_turing_submodel`](@ref) — a bare
 `Distribution` giving one constant rate, a process giving a length-`n` path —
 maps it onto the positive scale with the modifier's `transformation`, and
-returns the [`ImportedRate`](@ref) the scan uses. The map is broadcast, so a
+returns the `ImportedRate` the scan uses. The map is broadcast, so a
 constant stays a scalar (no length-`n` allocation) and the scan reads either
 shape with [`at`](@ref).
 
