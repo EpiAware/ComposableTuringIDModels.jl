@@ -236,6 +236,9 @@ function _split_names(m::Split, y_t)
     m.names === nothing || return m.names
     y_t isa NamedTuple && return collect(string.(keys(y_t)))
     y_t isa AbstractMatrix && return "group" .* string.(1:size(y_t, 1))
+    # A weight map fixes the stream count as its row count, so a simulation
+    # with no data names the streams the way a data matrix would.
+    m.map === nothing || return "group" .* string.(1:size(m.map, 1))
     error(
         "A strata Split needs a NamedTuple or AbstractMatrix `y_t` to name " *
             "its streams"
