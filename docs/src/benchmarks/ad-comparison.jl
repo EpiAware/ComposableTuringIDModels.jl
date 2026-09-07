@@ -396,6 +396,12 @@ Runtime activity is not free. On paths that do not need it, it can make
 Enzyme several times slower, so where one Enzyme configuration is applied
 to every scenario the rows for it above are conservative.
 
+A backend can match the reference gradient to machine precision and still
+kill the process once a sampler drives it.
+The AD suite therefore also runs a short NUTS smoke test per backend, in
+serial and threaded modes, over a composed model from the same registry as
+the gradients above.
+
 When a backend misbehaves, start with ForwardDiff: it fails with ordinary
 Julia `MethodError`s that point at the offending call, where Enzyme and
 Mooncake report at the compiled-IR level.

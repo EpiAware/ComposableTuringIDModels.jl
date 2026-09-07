@@ -10,6 +10,7 @@
 module ADFixtures
 
 using ADTypes: AutoForwardDiff
+using AbstractMCMC: MCMCSerial, MCMCThreads
 using DifferentiationInterface: DifferentiationInterface
 import DifferentiationInterfaceTest as DIT
 import ForwardDiff
@@ -19,7 +20,7 @@ using Random: Random, MersenneTwister
 using DynamicPPL: DynamicPPL, LogDensityFunction, VarInfo, link, getlogjoint
 import LogDensityProblems as LDP
 
-export scenarios, backends, broken_scenario_names,
+export scenarios, sampling_scenarios, backends, broken_scenario_names,
     backend_broken_scenarios, backend_skip_scenarios
 
 # Turn a DynamicPPL model into a real differentiable scalar log-density.
@@ -637,6 +638,64 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
     return out
 end
 
+# Models the sampling smoke test drives, named as in `_models()`. Every extra
+# entry costs a NUTS run in each of the seven per-backend CI jobs, and the
+# failures this guards against need a sustained sampler loop rather than model
+# variety.
+const _SAMPLING_MODEL_NAMES = ["Renewal+NegativeBinomial posterior"]
+
+# A backend can survive one ensemble strategy and not the other, so each is its
+# own scenario.
+const _SAMPLING_ENSEMBLES = (
+    ("MCMCSerial", MCMCSerial()), ("MCMCThreads", MCMCThreads()),
+)
+
+# The NUTS budget shared by every sampling scenario. `ndraws` is per chain and
+# `nadapts` warm-up steps are discarded ahead of them. The budget is small and
+# `max_depth` is capped because the question is whether the sampler loop
+# survives the backend, not whether it recovers anything.
+const _SAMPLING_BUDGET = (;
+    nchains = 2, ndraws = 10, nadapts = 25, max_depth = 4, target_acceptance = 0.8,
+)
+
+@doc """
+    sampling_scenarios()
+
+The NUTS sampling smoke scenarios, as `(; name, model_name, model, ensemble,
+budget)` named tuples, each pairing a composed model from the gradient registry
+with the ensemble strategy and the NUTS budget that sample it.
+
+There is one scenario per model and ensemble strategy, named for the model's
+gradient scenario with the strategy appended. A backend that samples correctly
+under one strategy and not the other is then recorded precisely, and a sampling
+entry in [`backend_broken_scenarios`](@ref) or [`backend_skip_scenarios`](@ref)
+never collides with the gradient scenario of the same model. `model_name` is
+that gradient scenario's name, so a backend listed as broken on the gradient is
+also treated as broken on the sampling built from it.
+"""
+function sampling_scenarios()
+    models = Dict(_models())
+    out = NamedTuple[]
+    for name in _SAMPLING_MODEL_NAMES
+        haskey(models, name) || error(
+            "sampling scenario \"" * name * "\" names no model in the " *
+                "registry; keep `_SAMPLING_MODEL_NAMES` in step with `_models()`."
+        )
+        for (label, ensemble) in _SAMPLING_ENSEMBLES
+            push!(
+                out, (
+                    name = name * " (" * label * ")",
+                    model_name = name,
+                    model = models[name],
+                    ensemble = ensemble,
+                    budget = _SAMPLING_BUDGET,
+                )
+            )
+        end
+    end
+    return out
+end
+
 @doc """
     backends()
 
@@ -774,7 +833,19 @@ function backend_broken_scenarios()
     )
 end
 
-"Per-backend scenario names too unstable to even run (segfault/hang)."
+@doc """
+    backend_skip_scenarios()
+
+Per-backend scenario names too unstable to even run (`Dict{String,
+Set{String}}`), because they segfault or hang rather than fail.
+
+This is where a backend whose sampling smoke run kills the process belongs. A
+sampling scenario carries its ensemble strategy in its name (see
+[`sampling_scenarios`](@ref)), so listing one leaves the same model's gradient
+scenario running.
+
+Add an entry only with a measured failure.
+"""
 backend_skip_scenarios() = Dict{String, Set{String}}()
 
 end # module ADFixtures
