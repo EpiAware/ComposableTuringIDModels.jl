@@ -139,7 +139,7 @@ export IDProblem, NUTSampler, DirectSample,
 # Names a component author implements against but rarely calls.
 # Public but not exported, so they are documented and supported without crowding
 # the namespace of a `using` call.
-public ModelShape, across_shape, infection_strata,
+public ModelShape, across_shape, infection_strata, observation_streams,
     AbstractAccumulationStep, AbstractConstantRenewalStep,
     ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
     apply_modifier, renewal_foi, renewal_init_state, renewal_init_window,
