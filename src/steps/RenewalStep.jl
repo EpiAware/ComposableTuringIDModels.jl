@@ -31,7 +31,7 @@ interface:
     extra. A prior-carrying modifier implements this method, draws its slots
     through [`as_turing_submodel`](@ref), and returns a *resolved* scan
     modifier holding the drawn values — e.g. [`ImportedCases`](@ref) resolves
-    to an [`ImportedRate`](@ref) and implements no scan interface of its own.
+    to an `ImportedRate` and implements no scan interface of its own.
 
 [`RenewalStep`](@ref) resolves its whole modifier tuple through this one seam
 (see its `as_turing_model` method), so a sampling modifier needs no special
