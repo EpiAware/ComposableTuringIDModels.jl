@@ -186,33 +186,20 @@ const CI_QS = [0.025, 0.25, 0.5, 0.75, 0.975]
 
 # time × 5 credible bands from a time × draws matrix
 function credible_bands(mat; qs = CI_QS)
-    reduce(hcat, (map(eachrow(mat)) do row
-        vals = collect(skipmissing(row))
-        isempty(vals) ? missing : quantile(vals, q)
-    end for q in qs))
+    reduce(vcat, (permutedims(quantile(row, qs)) for row in eachrow(mat)))
 end
 
 # median line with 50% and 95% ribbons
 function ci_ribbon!(ax, ts, bands; color, label)
-    keep = findall(!ismissing, view(bands, :, 3))
-    x, b = ts[keep], Float64.(bands[keep, :])
-    band!(ax, x, b[:, 1], b[:, 5]; color = (color, 0.15))
-    band!(ax, x, b[:, 2], b[:, 4]; color = (color, 0.3))
-    lines!(ax, x, b[:, 3]; color = color, linewidth = 2, label = label)
+    band!(ax, ts, bands[:, 1], bands[:, 5]; color = (color, 0.15))
+    band!(ax, ts, bands[:, 2], bands[:, 4]; color = (color, 0.3))
+    lines!(ax, ts, bands[:, 3]; color = color, linewidth = 2, label = label)
 end
 
-# posterior-predictive y_t bands from a `predict` chain; any leading
-# indices a reporting delay leaves unscored are filled with `missing`
+# posterior-predictive y_t bands from a `predict` chain
 function predictive_bands(pred, n)
-    ndraws = length(vec(pred[@varname(y_t[n])]))
-    rows = map(1:n) do i
-        try
-            permutedims(vec(pred[@varname(y_t[i])]))
-        catch
-            fill(missing, 1, ndraws)
-        end
-    end
-    credible_bands(reduce(vcat, rows))
+    credible_bands(
+        reduce(vcat, (permutedims(vec(pred[@varname(y_t[i])])) for i in 1:n)))
 end
 ```
 
@@ -262,16 +249,14 @@ FC_CI_QS = [0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95]
 
 # Draw three nested CI ribbons with the median line
 function multi_ci_ribbon!(ax, ts, bands; color, label)
-    keep = findall(!ismissing, view(bands, :, 4))
-    x, b = ts[keep], Float64.(bands[keep, :])
     # 90% CI (cols 1, 7)
-    band!(ax, x, b[:, 1], b[:, 7]; color = (color, 0.1))
+    band!(ax, ts, bands[:, 1], bands[:, 7]; color = (color, 0.1))
     # 60% CI (cols 2, 6)
-    band!(ax, x, b[:, 2], b[:, 6]; color = (color, 0.25))
+    band!(ax, ts, bands[:, 2], bands[:, 6]; color = (color, 0.25))
     # 30% CI (cols 3, 5)
-    band!(ax, x, b[:, 3], b[:, 5]; color = (color, 0.5))
+    band!(ax, ts, bands[:, 3], bands[:, 5]; color = (color, 0.5))
     # median (col 4)
-    lines!(ax, x, b[:, 4]; color = color, linewidth = 2, label = label)
+    lines!(ax, ts, bands[:, 4]; color = color, linewidth = 2, label = label)
 end
 
 # Multi-level credible bands for the forecast

@@ -143,7 +143,7 @@ public ModelShape, across_shape, infection_strata,
     AbstractAccumulationStep, AbstractConstantRenewalStep,
     ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
     apply_modifier, renewal_foi, renewal_init_state, renewal_init_window,
-    MissingObservations,
+    MissingObservations, AbstractBroadcastRule,
     at, path_prior, prior_order, assert_prior_length,
     wrapped_models, observation_components, rewrap, swap
 
