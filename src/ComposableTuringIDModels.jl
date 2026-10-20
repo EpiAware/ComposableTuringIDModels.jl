@@ -41,7 +41,7 @@ const CR = ComposableRecurrences
 # `ConstructionBase.constructorof`. No component here declares one. `rewrap`'s
 # docstring says what a derived field needs instead.
 using ConstructionBase: ConstructionBase
-using LinearAlgebra: dot, cholesky, Symmetric, I, UniformScaling
+using LinearAlgebra: dot, cholesky, Symmetric, I
 using LogExpFunctions: softmax, xexpy, log1pexp
 using OrdinaryDiffEq: ODEProblem, ODEFunction, solve, remake, AutoVern7, Rodas5P
 using Random: AbstractRNG, randexp, default_rng
