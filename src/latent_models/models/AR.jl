@@ -122,7 +122,7 @@ end
         ρ := model.transform.(damp)
         ϵ_t ~ as_turing_submodel(model.ϵ_t, n - 1)
         return Recurrence(_UNIT_LAG)(
-            ρ; history = init, add = ϵ_t, prepend = true
+            ρ; history = _history(init), add = ϵ_t, prepend = true
         )
     end
     damp ~ as_turing_submodel(model.damp, p; prefix = true)
