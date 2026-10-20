@@ -21,15 +21,14 @@
     @test ic_id.transformation === identity
 end
 
-@testitem "ImportedCases composes into a Renewal step" begin
+@testitem "ImportedCases composes into a Renewal" begin
     using ComposableTuringIDModels, Distributions
     ic = ImportedCases(Normal(0.0, 0.1))
     gen_int = [0.2, 0.3, 0.5]
     # Via the positional modifier constructor
     r = Renewal(gen_int, ic; rt = RandomWalk(), initialisation = Normal())
-    @test r.recurrent_step isa ComposableTuringIDModels.RenewalStep
-    @test only(r.recurrent_step.modifiers) isa ImportedCases
-    @test r.recurrent_step.modifiers[1].importation_rate isa Normal
+    @test only(r.modifiers) isa ImportedCases
+    @test r.modifiers[1].importation_rate isa Normal
 
     # Composed with another modifier, in the order given
     ic2 = ImportedCases(Normal(0.0, 0.1))
@@ -38,10 +37,9 @@ end
         ComposableTuringIDModels.SusceptibleDepletion(1000.0);
         rt = RandomWalk(), initialisation = Normal()
     )
-    @test length(r2.recurrent_step.modifiers) == 2
-    @test r2.recurrent_step.modifiers[1] isa ImportedCases
-    @test r2.recurrent_step.modifiers[2] isa
-        ComposableTuringIDModels.SusceptibleDepletion
+    @test length(r2.modifiers) == 2
+    @test r2.modifiers[1] isa ImportedCases
+    @test r2.modifiers[2] isa ComposableTuringIDModels.SusceptibleDepletion
 end
 
 @testitem "ImportedCases with constant rate adds to incidence" begin
@@ -119,51 +117,42 @@ end
     @test all(isfinite, draws)
 end
 
-@testitem "ImportedCases resolves to an ImportedRate before the scan" begin
+@testitem "ImportedCases resolves to an Add before the scan" begin
     using ComposableTuringIDModels, Distributions
-    using ComposableTuringIDModels: ImportedRate, modifier_init_state,
-        apply_modifier
+    import ComposableRecurrences as CR
     # The pre-scan seam draws the unconstrained slot and hands back the
-    # modifier the scan actually uses.
+    # ComposableRecurrences modifier the scan actually uses.
     resolved = as_turing_model(ImportedCases(FixedIntercept(log(2.0))), 5)()
-    @test resolved isa ImportedRate
-    @test resolved.rate ≈ fill(2.0, 5)
+    @test resolved isa CR.Add
+    @test resolved.b isa CR.TimeVarying
+    @test resolved.b.x ≈ fill(2.0, 5)
 
     # A bare `Distribution` is one constant, so the drawn rate stays a scalar
     # rather than being materialised as `n` copies of itself.
     constant = as_turing_model(ImportedCases(Dirac(log(3.0))), 5)()
-    @test constant.rate isa Number
-    @test constant.rate ≈ 3.0
-    @test first(apply_modifier(constant, 1.0, 7)) ≈ 4.0
+    @test constant.b isa Number
+    @test constant.b ≈ 3.0
 
-    # The resolved modifier is a plain scan modifier: its substate is the step
-    # counter, so step `t` adds the rate at `t`. The initial substate is built
-    # from the incidence window, which a step counter ignores.
-    inc, s0 = 3.5, modifier_init_state(resolved, [1.0, 1.0, 1.0])
-    @test s0 == 0
-    inc1, s1 = apply_modifier(resolved, inc, s0)
-    @test inc1 ≈ inc + 2.0
-    @test s1 == 1
-    inc2, s2 = apply_modifier(resolved, inc, s1)
-    @test inc2 ≈ inc + 2.0
-    @test s2 == 2
+    # Step `t` adds the rate at `t`.
+    rate = [1.0, 2.0, 3.0]
+    path = as_turing_model(ImportedCases([Dirac(log(x)) for x in rate]), 3)()
+    @test CR.Recurrence([0.0]; modifiers = (path,))(; stop = 3) ≈ rate
 end
 
-@testitem "a modifier with no pre-scan contribution resolves to itself" begin
+@testitem "SusceptibleDepletion resolves to a floored Depletion" begin
     using ComposableTuringIDModels, Distributions, Random
-    using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
-        SusceptibleDepletion
+    using ComposableTuringIDModels: SusceptibleDepletion
+    import ComposableRecurrences as CR
     using DynamicPPL: fix
-    core = ConstantRenewalStep(reverse([0.2, 0.3, 0.5]))
-    # `SusceptibleDepletion` implements nothing beyond the scan interface, so
-    # the default seam returns it unchanged.
+    # `SusceptibleDepletion` samples nothing, and resolves to the
+    # ComposableRecurrences depletion with the floored form.
     dep = SusceptibleDepletion(1000.0)
-    @test as_turing_model(dep, 10)() === dep
-    # The bare force-of-infection core and a modifier-free step likewise.
-    @test as_turing_model(core, 10)() === core
-    resolved = as_turing_model(RenewalStep(core, (dep,)), 10)()
-    @test resolved isa RenewalStep
-    @test only(resolved.modifiers) === dep
+    resolved = as_turing_model(dep, 10)()
+    @test resolved isa CR.Depletion
+    @test resolved.form isa CR.Floor
+    # One population per stratum is read per stratum.
+    per_stratum = as_turing_model(SusceptibleDepletion([1.0, 2.0]), (2, 10))()
+    @test per_stratum isa CR.Depletion
 
     # And a depleting renewal is unchanged end to end by the seam.
     gen_int = [0.2, 0.3, 0.5]
@@ -184,29 +173,22 @@ end
     using ComposableTuringIDModels, Distributions, Random, Turing
     using ComposableTuringIDModels: AbstractRenewalModifier,
         SusceptibleDepletion, _at
+    import ComposableRecurrences as CR
     using DynamicPPL: fix
     Random.seed!(1895)
 
     # A modifier defined here rather than in the package: it carries a prior,
-    # draws it through the seam, and resolves to a plain scan modifier. Nothing
-    # in the renewal model knows what it is.
+    # draws it through the seam, and resolves to a ComposableRecurrences
+    # modifier scaling each step's incidence. Nothing in the renewal model
+    # knows what it is.
     struct ScaledIncidence{P} <: AbstractRenewalModifier
         log_scale::P
-    end
-    struct FixedScale{T} <: AbstractRenewalModifier
-        scale::T
-    end
-    ComposableTuringIDModels.modifier_init_state(::FixedScale, window) = 0
-    function ComposableTuringIDModels.apply_modifier(
-            mod::FixedScale, incidence, t
-        )
-        return mod.scale * incidence, t + 1
     end
     Turing.@model function ComposableTuringIDModels.as_turing_model(
             mod::ScaledIncidence, n
         )
         log_scale ~ as_turing_submodel(mod.log_scale, n; prefix = true)
-        return FixedScale(exp(_at(log_scale, 1)))
+        return CR.Transform((v, c) -> c * v, exp(_at(log_scale, 1)))
     end
 
     gen_int = [0.2, 0.3, 0.5]
@@ -239,16 +221,6 @@ end
     out = as_turing_model(r, 15)()
     @test length(out.I_t) == 15
     @test all(>(0), out.I_t)
-end
-
-@testitem "an unresolved modifier says so instead of a MethodError" begin
-    using ComposableTuringIDModels, Distributions
-    using ComposableTuringIDModels: modifier_init_state, apply_modifier
-    # `ImportedCases` carries priors and has no scan interface of its own, so
-    # scanning a hand-built step that was never resolved names the problem.
-    ic = ImportedCases(Normal(0.0, 0.1))
-    @test_throws "has no scan interface" modifier_init_state(ic, [1.0, 1.0])
-    @test_throws "has no scan interface" apply_modifier(ic, 1.0, 0)
 end
 
 @testitem "several sampling modifiers compose without colliding" begin
@@ -346,7 +318,6 @@ end
 
 @testitem "a per-element importation prior gives a length-n rate" begin
     using ComposableTuringIDModels, Distributions, Random
-    using ComposableTuringIDModels: ImportedRate
     using DynamicPPL: fix
     Random.seed!(1898)
     n = 8
@@ -355,8 +326,7 @@ end
     resolved = as_turing_model(
         ImportedCases([Dirac(log(float(t))) for t in 1:n]), n
     )()
-    @test resolved isa ImportedRate
-    @test resolved.rate ≈ collect(1.0:n)
+    @test resolved.b.x ≈ collect(1.0:n)
 
     # It drives a renewal like any other slot shape, and the length is checked
     # against the series rather than silently recycled.
@@ -382,21 +352,19 @@ end
 
 @testitem "a renewal with importation is ForwardDiff-differentiable" begin
     using ComposableTuringIDModels, Distributions, ForwardDiff
-    using ComposableTuringIDModels: ImportedRate, RenewalStep,
-        ConstantRenewalStep, SusceptibleDepletion,
-        accumulate_scan, renewal_init_state
+    using ComposableTuringIDModels: _renewal_recurrence, SusceptibleDepletion
+    import ComposableRecurrences as CR
+    using LinearAlgebra: I
     gen_int = [0.2, 0.3, 0.5]
-    core = ConstantRenewalStep(reverse(gen_int))
     n = 20
-    # The scan runs over resolved modifiers, so the gradient flows through the
-    # sampled importation rate exactly as it does through `Rt`.
+    window = ones(length(gen_int))
+    depletion = as_turing_model(SusceptibleDepletion(1000.0), n)()
+    # The recurrence runs over resolved modifiers, so the gradient flows
+    # through the sampled importation rate exactly as it does through `Rt`.
     function total(θ)
-        step = RenewalStep(
-            core,
-            (SusceptibleDepletion(1000.0), ImportedRate(fill(θ[2], n)))
-        )
-        init = renewal_init_state(step, 1.0, 0.0, length(gen_int))
-        return sum(accumulate_scan(step, init, fill(θ[1], n)))
+        imports = CR.Add(CR.TimeVarying(fill(θ[2], n)))
+        r = _renewal_recurrence(gen_int, I, (depletion, imports))
+        return sum(r(fill(θ[1], n); history = window))
     end
     g = ForwardDiff.gradient(total, [1.1, 0.5])
     @test all(isfinite, g)

@@ -91,6 +91,18 @@ function Aggregate(; model::M, aggregation::A) where {
     return Aggregate(model, aggregation)
 end
 
+# The sum of each reporting window ending at each time of `Y_t`: a causal
+# convolution whose kernel at time `t` is a box from lag 0 as wide as the window
+# reported at `t + offset`. A window reaching back before the start of `Y_t` is
+# clipped, because the convolution reads no input before it.
+function _window_sums(aggregation, Y_t, offset)
+    box = [
+        d < aggregation[t + offset]
+            for d in 0:(maximum(aggregation) - 1), t in eachindex(Y_t)
+    ]
+    return Convolution(TimeVarying(box))(Y_t)
+end
+
 @model function as_turing_model(ag::Aggregate, y_t, Y_t)
     if ismissing(y_t)
         y_t = Vector{Missing}(missing, length(Y_t))
@@ -115,9 +127,7 @@ end
     # kept.
     scored = filter(>(offset), idx)
     @assert !isempty(scored) "Every reporting window ends before the start of the expected observations, so there is nothing to score. Shorten the delay applied outside the aggregation, or lengthen the series."
-    agg_Y_t = map(scored) do i
-        sum(Y_t[max(1, i - aggregation[i] + 1 - offset):(i - offset)])
-    end
+    agg_Y_t = _window_sums(aggregation, Y_t, offset)[scored .- offset]
     inner ~ as_turing_submodel(ag.model, y_t[present], agg_Y_t)
     # Scatter counts and means back into length-`n` vectors (zeros where absent).
     y_t = _return_aggregate(inner.y_t, idx, n)

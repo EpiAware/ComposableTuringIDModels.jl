@@ -81,16 +81,20 @@ function ExpGrowthRate(;
     return ExpGrowthRate(rt, transformation, initialisation)
 end
 
-# Cumulative sum along the time axis: the whole path for a single series, each
-# stratum's row independently for a strata × time matrix.
-_cumsum(Z_t::AbstractVector) = cumsum(Z_t)
-_cumsum(Z_t::AbstractMatrix) = cumsum(Z_t; dims = 2)
+# The running total of the growth rate from the seed: a unit lag-1 recurrence
+# whose history is the seed, one value or one per stratum, and which adds the
+# growth rate each step.
+function _growth_path(seed, Z_t)
+    return Recurrence(_UNIT_LAG)(
+        1.0; history = _strata_history(seed), add = Z_t
+    )
+end
 
 @model function as_turing_model(model::ExpGrowthRate, n::ModelShape)
     Z_t ~ as_turing_submodel(model.rt, n)
     init_incidence ~ as_turing_submodel(
         model.initialisation, _n_strata(n); prefix = true
     )
-    I_t = model.transformation.(_seed(init_incidence, n) .+ _cumsum(Z_t))
+    I_t = model.transformation.(_growth_path(_seed(init_incidence, n), Z_t))
     return (; I_t, Z_t)
 end

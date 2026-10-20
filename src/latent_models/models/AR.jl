@@ -1,4 +1,5 @@
-# `ARStep` and `TVARStep`, the steps this model scans over, live in `src/steps/`.
+# The AR recursion is a ComposableRecurrences `Recurrence` whose kernel is the
+# damping coefficients, lag 1 first, driven by the innovations.
 
 # A process `damp` prior is unbounded, so `tanh` maps its draws into the
 # stationary band ``(-1, 1)``.
@@ -103,14 +104,30 @@ function AR(;
     return AR(damp, init, nothing, ϵ_t, transform)
 end
 
+# An order-1 AR recursion: a constant coefficient is the lag-1 kernel and a
+# coefficient path is the gain on a unit lag-1 kernel, read per step.
+# The constant is the kernel rather than a scalar gain because Enzyme reverse
+# rejects the recurrence's rule for an active scalar gain whose path is unused
+# (EpiAware/ComposableRecurrences.jl#300).
+function _ar1(ρ::Real, init, ϵ_t)
+    return Recurrence([ρ])(
+        1.0; history = _history(init), add = ϵ_t, prepend = true
+    )
+end
+
+function _ar1(ρ::AbstractVector, init, ϵ_t)
+    return Recurrence(_UNIT_LAG)(
+        ρ; history = _history(init), add = ϵ_t, prepend = true
+    )
+end
+
 @model function as_turing_model(model::AR, n::Int)
     p = model.p
     @assert n > p "n must be longer than the order of the autoregressive process"
     init ~ as_turing_submodel(model.init, p; prefix = true)
     if p == 1
-        # Order 1 draws the coefficient through the single seam.
-        # `TVARStep` reads it per step with `at`, so one recursion serves both a
-        # scalar and a length-`(n-1)` path.
+        # Order 1 draws the coefficient through the single seam, so one
+        # recursion serves both a scalar and a length-`(n-1)` path.
         damp ~ as_turing_submodel(
             _order1_prior(model.damp), n - 1;
             prefix = true
@@ -120,22 +137,14 @@ end
         # `transform` broadcasts over a scalar or a path.
         ρ := model.transform.(damp)
         ϵ_t ~ as_turing_submodel(model.ϵ_t, n - 1)
-        z = accumulate_scan(
-            TVARStep(ρ), only(init),
-            collect(zip(1:(n - 1), ϵ_t))
-        )
-        return z
+        return _ar1(ρ, init, ϵ_t)
     end
     damp ~ as_turing_submodel(model.damp, p; prefix = true)
     ϵ_t ~ as_turing_submodel(model.ϵ_t, n - p)
-    # `ARStep`'s state runs oldest to newest, `[Z_{t-p}, …, Z_{t-1}]`, so the
-    # damping coefficients are reversed to make `damp[i]` multiply the lag-`i`
-    # term `Z_{t-i}` as the documented recursion `Z_t = Σ ρ_i Z_{t-i}` says.
-    # Without the reversal `damp[1]` applies to the longest lag, which is
-    # identical for the default i.i.d. priors but wrong for heterogeneous
-    # per-lag priors.
-    ar = accumulate_scan(
-        ARStep(reverse(damp)), (; val = last(init), window = init), ϵ_t
+    # The kernel runs lag 1 first, so `damp[i]` multiplies the lag-`i` term
+    # `Z_{t-i}` as the documented recursion `Z_t = Σ ρ_i Z_{t-i}` says.
+    # `init` runs oldest to newest, `[Z_1, …, Z_p]`, and is returned first.
+    return Recurrence(damp)(
+        1.0; history = _history(init), add = ϵ_t, prepend = true
     )
-    return ar
 end

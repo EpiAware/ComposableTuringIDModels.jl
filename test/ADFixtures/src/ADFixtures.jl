@@ -77,8 +77,8 @@ function _models()
     # from the sampled `ℓ`/`σ` — the most AD-sensitive path of the two GPs, and
     # the one the Gaussian-process case study drives under Mooncake.
     exactgp = as_turing_model(ExactGP(), n)
-    # Moving-average: exercises `accumulate_scan(MAStep(θ), ...)` and its
-    # `dot(θ, state)` innovation buffer (the MA counterpart of `AR`).
+    # Moving-average: exercises the causal `Convolution` of the innovations
+    # with `[1; θ]` (the MA counterpart of `AR`).
     ma = as_turing_model(MA(), 8)
     # Non-centred hierarchical normal: `σ ~ prior`, `η = σ ⋅ ϵ` — the simplest
     # scale-mixture latent (and the default innovation model everything reuses).
@@ -88,7 +88,8 @@ function _models()
     diffrw = as_turing_model(
         DiffLatentModel(; model = RandomWalk(), init = [Normal(), Normal()]), 8
     )
-    # ARMA(p, q): an `AR` whose innovations are an `MA` (double accumulate-scan).
+    # ARMA(p, q): an `AR` whose innovations are an `MA` (a recurrence over a
+    # convolution).
     armamdl = as_turing_model(arma(), 8)
     # Day-of-week broadcast: a `TransformLatentModel` (7·softmax) inner process
     # repeated across a 7-day period (`RepeatEach`).
@@ -171,7 +172,7 @@ function _models()
 
     # --- observation modifiers / error families over a composed model ----------
     # Reporting delay: convolves the expected observations with a delay PMF
-    # (`accumulate_scan(LDStep(rev_pmf), ...)`) before the inner error.
+    # (a causal `Convolution`) before the inner error.
     latdelay = IDModel(
         Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         LatentDelay(NegativeBinomialError(), [0.3, 0.4, 0.3])
@@ -190,7 +191,7 @@ function _models()
         )
     )
     # Time-varying reporting delay: the meanlog is a `RandomWalk`, so the pmf is
-    # rebuilt per time step and convolved through `TimeVaryingLDStep`.
+    # rebuilt per time step and convolved through a `TimeVarying` kernel.
     tvdelay = IDModel(
         Renewal(; generation_time = gen_int, rt = RandomWalk(), initialisation = Normal()),
         LatentDelay(
