@@ -130,5 +130,7 @@ end
     # The kernel runs lag 1 first, so `damp[i]` multiplies the lag-`i` term
     # `Z_{t-i}` as the documented recursion `Z_t = Σ ρ_i Z_{t-i}` says.
     # `init` runs oldest to newest, `[Z_1, …, Z_p]`, and is returned first.
-    return Recurrence(damp)(1.0; history = init, add = ϵ_t, prepend = true)
+    return Recurrence(damp)(
+        1.0; history = _history(init), add = ϵ_t, prepend = true
+    )
 end
