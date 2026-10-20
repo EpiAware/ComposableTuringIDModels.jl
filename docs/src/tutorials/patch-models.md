@@ -269,21 +269,24 @@ patch_lines(sim_exo.I_t ./ sim_coupled.I_t;
 
 ## Writing a coupling
 
-A coupling is a method of [`renewal_pressure`](@ref) taking the convolved incidence window and returning the pressure on each patch.
+A coupling is a ComposableRecurrences coupling: a type with a `forward!` method for the `Pressure` role.
+It takes each patch's generation-interval convolution `p` and writes the pressure on each patch into `q`.
 Here the patches sit on a ring, and each takes a share of its two neighbours.
 
 ```@example patches
-using LinearAlgebra: I
+import ComposableRecurrences as CR
 
 struct Ring{T}
     weight::T
 end
 
-function ComposableTuringIDModels.renewal_pressure(
-        m::Ring, g, window::AbstractMatrix
-    )
-    own = renewal_pressure(I, g, window)
-    return own .+ m.weight .* (circshift(own, 1) .+ circshift(own, -1))
+function CR.forward!(m::Ring, ::CR.Pressure, q, p, t)
+    n = length(p)
+    for a in eachindex(q)
+        left, right = p[mod1(a - 1, n)], p[mod1(a + 1, n)]
+        q[a] = p[a] + m.weight * (left + right)
+    end
+    return nothing
 end
 ```
 

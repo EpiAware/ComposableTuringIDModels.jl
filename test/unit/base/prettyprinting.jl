@@ -25,7 +25,7 @@
 
     # The raw parametric type signature must NOT leak into the display.
     @test !occursin("{", out)
-    @test !occursin("ConstantRenewalStep", out)
+    @test !occursin("Recurrence", out)
 end
 
 @testitem "show recurses through a vector of component children" begin

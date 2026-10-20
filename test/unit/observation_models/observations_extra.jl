@@ -574,7 +574,7 @@ end
     @test !isapprox(exp_tv, exp_fixed)
 
     # Reduction invariant: a per-time sequence of IDENTICAL PMFs reproduces the
-    # single-fixed-PMF expected series exactly (TimeVaryingLDStep ≡ LDStep).
+    # single-fixed-PMF expected series exactly.
     same = [copy(first(pmfs)) for _ in 1:n]
     exp_same = as_turing_model(
         LatentDelay(PoissonError(), same), missing, Y
@@ -653,7 +653,7 @@ end
     Random.seed!(82)
     # A process-parameter (time-varying) reporting delay composed with a renewal
     # model. The gradient must flow through the per-time discretisation
-    # (`_discretised_pmf`) and the time-indexed convolution (`TimeVaryingLDStep`).
+    # (`_discretised_pmf`) and the time-indexed convolution.
     model = IDModel(
         Renewal(;
             generation_time = [0.2, 0.3, 0.5], rt = RandomWalk(),
