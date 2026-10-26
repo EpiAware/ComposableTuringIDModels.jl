@@ -63,7 +63,7 @@ A scalar given to a stratified renewal is shared by every stratum, so each
 depletes a separate pool of the same size.
 
 It samples nothing, and resolves to ComposableRecurrences'
-`Depletion(N, Floor())`.
+`Depletion(N; form = Floor())`.
 
 ## Fields
 
@@ -84,7 +84,7 @@ ComposableRecurrences `Depletion` the recurrence applies.
   - `n`: the renewal's [`ModelShape`](@ref).
 "
 @model function as_turing_model(mod::SusceptibleDepletion, n)
-    return CR.Depletion(_strata_param(mod.pop_size, n), CR.Floor())
+    return CR.Depletion(_strata_param(mod.pop_size, n); form = CR.Floor())
 end
 
 # A population is one value shared by every stratum or one value per stratum.
