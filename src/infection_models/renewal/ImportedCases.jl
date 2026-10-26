@@ -1,6 +1,6 @@
-# A scan step is a deterministic function, so the rate is drawn once before the
-# scan through the modifier seam (`as_turing_model(mod, n)`), which returns an
-# `ImportedRate` holding the drawn path.
+# A scan is a deterministic function, so the rate is drawn once before the
+# scan through the modifier seam (`as_turing_model(mod, n)`), which returns the
+# ComposableRecurrences `Add` of the drawn path.
 #
 # The prior is on the UNCONSTRAINED scale and is mapped through the modifier's
 # own `transformation` before being added.
@@ -9,7 +9,7 @@
 # spends much of its time below zero.
 
 @doc raw"
-Imported-cases modifier for [`RenewalStep`](@ref).
+Imported-cases modifier for a [`Renewal`](@ref).
 
 Adds an externally seeded importation rate to the renewal incidence,
 
@@ -23,8 +23,8 @@ behind a renewal process that would otherwise die out from a zero initial
 incidence, and behind reintroduction after local elimination.
 
 For infection arriving from another *modelled* stratum, rather than from
-outside the system altogether, use the renewal `mixing` slot instead (see
-[`renewal_pressure`](@ref)); handing this modifier a [`Stratify`](@ref) rate
+outside the system altogether, use the renewal `mixing` slot instead;
+handing this modifier a [`Stratify`](@ref) rate
 gives a `strata × time` importation rate, one exogenous stream per stratum,
 read per step with [`at`](@ref) exactly as a shared rate is.
 
@@ -39,15 +39,15 @@ time-varying ``\iota_t`` stays positive even as the underlying path crosses
 zero.
 
 The rate is drawn before the scan through the modifier seam (see
-[`AbstractRenewalModifier`](@ref)), giving an `ImportedRate` that adds
-``\iota_t`` at step ``t``. Where it sits in the modifier tuple therefore decides
+[`AbstractRenewalModifier`](@ref)), giving the ComposableRecurrences
+`Add` modifier that adds ``\iota_t`` at step ``t``. Where it sits in the modifier tuple therefore decides
 how it composes: placed *after* a [`SusceptibleDepletion`](@ref) the imports are
 added to the depleted incidence, so they are not scaled by the susceptible
 fraction and do not themselves deplete the pool; placed *before* it they are
 treated as part of the incidence the pool depletes.
 
 The drawn rate is named `import_rates`, prefixed by the modifier's **position**
-in the renewal step's modifier tuple, so its posterior is read from a chain as
+in the renewal's modifier tuple, so its posterior is read from a chain as
 
 ```julia
 model = Renewal(gen_int, SusceptibleDepletion(N), ImportedCases(Normal());
@@ -76,26 +76,24 @@ then subtracts from the incidence.
 
 # Examples
 
-Drawing the modifier through its pre-scan seam shows the rate the scan will
-add. A bare `Distribution` gives one constant, here with median
-``\exp(-1) \approx 0.37`` imports per unit time:
+A fixed unconstrained rate of ``\log 2`` adds two imports per unit time.
+Against the same renewal without them, incidence gains those imports and the
+infections they go on to cause:
 
 ```@example ImportedCases
-using ComposableTuringIDModels, Distributions, Random
-Random.seed!(189)
-as_turing_model(ImportedCases(Normal(-1.0, 0.5)), 5)().rate
+using ComposableTuringIDModels, Distributions
+using DynamicPPL: fix
+gen_int = [0.2, 0.3, 0.5]
+args = (; rt = FixedIntercept(0.0), initialisation = Normal())
+plain = Renewal(gen_int; args...)
+imported = Renewal(gen_int, ImportedCases(FixedIntercept(log(2.0))); args...)
+seed = (init_incidence = 0.0,)
+I_plain = fix(as_turing_model(plain, 5), seed)().I_t
+I_imported = fix(as_turing_model(imported, 5), seed)().I_t
+I_imported .- I_plain
 ```
 
-A latent process gives a path, positive at every time despite the walk itself
-being unconstrained:
-
-```@example ImportedCases
-Random.seed!(189)
-as_turing_model(ImportedCases(RandomWalk()), 5)().rate
-```
-
-Either goes onto a renewal process as a positional modifier, where the rate
-joins the model's parameters under the modifier's position:
+A prior on the rate joins the model's parameters under the modifier's position:
 
 ```@example ImportedCases
 r = Renewal([0.2, 0.3, 0.5], ImportedCases(Normal(-1.0, 0.5));
@@ -132,40 +130,14 @@ function ImportedCases(
 end
 
 @doc raw"
-A resolved [`ImportedCases`](@ref): the drawn importation rate, ready to scan.
-
-This is what [`ImportedCases`](@ref) returns from its pre-scan
-`as_turing_model` seam — the prior has been sampled and transformed, so the scan
-sees a plain deterministic modifier. Its substate is the step counter, so step
-``t`` adds ``\iota_t`` read with [`at`](@ref) (a constant rate stays a scalar).
-
-## Fields
-
-  - `rate`: the positive importation rate, constant or one value per time.
-"
-struct ImportedRate{V} <: AbstractRenewalModifier
-    "The positive importation rate: one constant, or one value per time."
-    rate::V
-end
-
-# A scan step has no clock of its own, so a per-time modifier carries the index
-# it has reached as its substate.
-# The window is unused, because a step counter has no shape to match.
-modifier_init_state(::ImportedRate, window) = 0
-
-function apply_modifier(mod::ImportedRate, incidence, t)
-    return incidence + at(mod.rate, t + 1), t + 1
-end
-
-@doc raw"
 Sample the importation rate ahead of the scan.
 
 Draws the unconstrained rate slot through [`as_turing_submodel`](@ref) — a bare
 `Distribution` giving one constant rate, a process giving a length-`n` path —
 maps it onto the positive scale with the modifier's `transformation`, and
-returns the `ImportedRate` the scan uses. The map is broadcast, so a
-constant stays a scalar (no length-`n` allocation) and the scan reads either
-shape with [`at`](@ref).
+returns the ComposableRecurrences `Add` the scan uses. The map is broadcast,
+so a constant stays a scalar (no length-`n` allocation), a path is read per
+time and a `strata × time` rate per stratum and time.
 
 # Arguments
 
@@ -174,5 +146,11 @@ shape with [`at`](@ref).
 "
 @model function as_turing_model(mod::ImportedCases, n)
     import_rates ~ as_turing_submodel(mod.importation_rate, n; prefix = true)
-    return ImportedRate(mod.transformation.(import_rates))
+    return CR.Add(_time_param(mod.transformation.(import_rates)))
 end
+
+# A rate read at each step: one constant, one value per time, or one per
+# stratum and time.
+_time_param(x::Real) = x
+_time_param(x::AbstractVector) = TimeVarying(x)
+_time_param(x::AbstractMatrix) = TimeVarying(PerStratum(x))

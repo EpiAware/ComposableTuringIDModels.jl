@@ -9,6 +9,7 @@ ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
 AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
 AdvancedHMC = "0bf59076-c3b1-5ca4-86bd-e02cd72cde3d"
 CensoredDistributions = "b2eeebe4-5992-4301-9193-7ebc9f62c855"
+ComposableRecurrences = "4e7e49c6-d082-4112-9a58-49588f39a74b"
 ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
 DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -34,12 +35,18 @@ ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 ComposableTuringIDModelsCatalystExt = ["Catalyst", "ModelingToolkit"]
 ComposableTuringIDModelsEnzymeExt = "Enzyme"
 
+# ComposableRecurrences 0.2 is not yet registered, so a main commit is pinned.
+# Drop this once it is.
+[sources]
+ComposableRecurrences = {url = "https://github.com/EpiAware/ComposableRecurrences.jl", rev = "7d4675c86400ec31f897ed5be50d1d5f0e205ed8"}  # pragma: allowlist secret
+
 [compat]
 ADTypes = "1.22.1"
 AbstractMCMC = "5.15.1"
 AdvancedHMC = "0.8.5"
 Catalyst = "16"
 CensoredDistributions = "0.2.22"
+ComposableRecurrences = "0.2"
 ConstructionBase = "1.6.0"
 DataFramesMeta = "0.15.6"
 Distributions = "0.25.128"

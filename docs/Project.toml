@@ -9,6 +9,7 @@ CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Catalyst = "479239e8-5488-4da2-87a7-35f2df7eef83"
 Chairmarks = "0ca39b1e-fe0b-4e98-acfc-b1656634c4de"
+ComposableRecurrences = "4e7e49c6-d082-4112-9a58-49588f39a74b"
 ComposableTuringIDModels = "cbebd14a-101c-4997-a79f-d008ad7c07b2"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
@@ -38,10 +39,12 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [sources]
+ComposableRecurrences = {url = "https://github.com/EpiAware/ComposableRecurrences.jl", rev = "7d4675c86400ec31f897ed5be50d1d5f0e205ed8"}  # pragma: allowlist secret
 ADFixtures = {path = "../test/ADFixtures"}
 ComposableTuringIDModels = {path = ".."}
 
 [compat]
+ComposableRecurrences = "0.2"
 Enzyme = "0.13.199"
 EpiAwarePackageTools = "0.3, 0.4"
 ADTypes = "1"

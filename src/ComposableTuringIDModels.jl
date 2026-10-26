@@ -31,11 +31,17 @@ using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
 using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
+# The renewal, latent and delay recursions run on ComposableRecurrences.
+# Its modifiers and helpers are public but not exported, so they are qualified
+# through `CR`.
+using ComposableRecurrences: ComposableRecurrences, Recurrence, Convolution,
+    TimeVarying, PerStratum, Pairwise
+const CR = ComposableRecurrences
 # `Accessors` and `rewrap` rebuild a component through
 # `ConstructionBase.constructorof`. No component here declares one. `rewrap`'s
 # docstring says what a derived field needs instead.
 using ConstructionBase: ConstructionBase
-using LinearAlgebra: dot, cholesky, Symmetric, I, UniformScaling
+using LinearAlgebra: dot, cholesky, Symmetric, I
 using LogExpFunctions: softmax, xexpy, log1pexp
 using OrdinaryDiffEq: ODEProblem, ODEFunction, solve, remake, AutoVern7, Rodas5P
 using Random: AbstractRNG, randexp, default_rng
@@ -98,13 +104,12 @@ export TransformLatentModel, PrefixLatentModel, RecordExpectedLatent,
 
 # --- infection models ---
 export DirectInfections, ExpGrowthRate, Renewal, SeedingPath,
-    RenewalStep, SusceptibleDepletion, ImportedCases,
+    SusceptibleDepletion, ImportedCases,
     R_to_r, r_to_R, expected_Rt
 export CombineInfections
 
 # --- coupling between strata ---
-export renewal_pressure, pairwise_gen_int, AbstractMixingModel, MixingStep,
-    Gravity, gravity
+export pairwise_gen_int, AbstractMixingModel, Gravity, gravity
 
 # --- ODE compartmental models ---
 export SIRParams, SEIRParams, ODEProcess, CatalystODEParams
@@ -140,9 +145,7 @@ export IDProblem, NUTSampler, DirectSample,
 # Public but not exported, so they are documented and supported without crowding
 # the namespace of a `using` call.
 public ModelShape, across_shape, infection_strata,
-    AbstractAccumulationStep, AbstractConstantRenewalStep,
-    ConstantRenewalStep, AbstractRenewalModifier, modifier_init_state,
-    apply_modifier, renewal_foi, renewal_init_state, renewal_init_window,
+    AbstractAccumulationStep, AbstractRenewalModifier,
     MissingObservations, AbstractBroadcastRule,
     at, path_prior, prior_order, assert_prior_length,
     wrapped_models, observation_components, rewrap, swap
@@ -156,21 +159,8 @@ include("base/priors.jl")
 include("base/prettyprinting.jl")
 
 # --- accumulation steps ---
-# Included early so every step type is defined before the model components that
-# construct them.
 include("steps/AbstractAccumulationStep.jl")
 include("steps/accumulate_scan.jl")
-include("steps/RWStep.jl")
-include("steps/ARStep.jl")
-include("steps/TVARStep.jl")
-include("steps/MAStep.jl")
-include("steps/LDStep.jl")
-include("steps/TimeVaryingLDStep.jl")
-include("steps/RenewalSteps.jl")
-include("steps/RenewalStep.jl")
-include("steps/MixingStep.jl")
-include("steps/Gravity.jl")
-include("steps/ImportedCases.jl")
 
 # --- utilities and distributions ---
 include("utils/HalfNormal.jl")
@@ -179,6 +169,7 @@ include("utils/SafePoisson.jl")
 include("utils/SafeNegativeBinomial.jl")
 include("utils/censored_pmf.jl")
 include("utils/turing-methods.jl")
+include("utils/recurrences.jl")
 
 # --- latent models ---
 include("latent_models/models/IID.jl")
@@ -209,6 +200,12 @@ include("latent_models/combinations/arima.jl")
 include("infection_models/DirectInfections.jl")
 include("infection_models/ExpGrowthRate.jl")
 include("infection_models/SeedingPath.jl")
+# The renewal's modifiers and couplings, resolved into the ComposableRecurrences
+# `Recurrence` the renewal runs.
+include("infection_models/renewal/modifiers.jl")
+include("infection_models/renewal/mixing.jl")
+include("infection_models/renewal/Gravity.jl")
+include("infection_models/renewal/ImportedCases.jl")
 include("infection_models/Renewal.jl")
 # `utils.jl` defines the `R_to_r(::Renewal)` method, so it follows `Renewal`.
 include("infection_models/utils.jl")

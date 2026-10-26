@@ -1,48 +1,58 @@
-# Tests for the coupling seam: `renewal_pressure`'s methods (each checked
-# against a hand-written sum, not a re-implementation of the same broadcast),
-# a fixed off-diagonal mixing matrix moving incidence between strata, the
-# drawn `Gravity` operator (and the plain `gravity` function underneath it),
-# and `pairwise_gen_int`.
+# Tests for the coupling between strata: the first step of the renewal
+# recurrence under each `mixing` form (each checked against a hand-written sum,
+# not a re-implementation of the same broadcast), a fixed off-diagonal mixing
+# matrix moving incidence between strata, the drawn `Gravity` operator (and the
+# plain `gravity` function underneath it), and `pairwise_gen_int`.
 
-@testitem "renewal_pressure: single series, UniformScaling" begin
-    using ComposableTuringIDModels: renewal_pressure
+@testsnippet FirstStep begin
+    using ComposableTuringIDModels: _renewal_recurrence
+    # The first step's new infections at R = 1: the generation-interval
+    # weighted pressure on each stratum, after the coupling.
+    first_step(g, mixing, window::AbstractVector) =
+        only(_renewal_recurrence(g, mixing, ())([1.0]; history = window))
+    function first_step(g, mixing, window::AbstractMatrix)
+        R = ones(size(window, 1), 1)
+        return vec(_renewal_recurrence(g, mixing, ())(R; history = window))
+    end
+    # The window runs oldest to newest, so lag `l` is column `end - l + 1`.
+    lag(window::AbstractVector, l) = window[end - l + 1]
+    lag(window::AbstractMatrix, s, l) = window[s, end - l + 1]
+end
+
+@testitem "renewal pressure: single series, UniformScaling" setup = [FirstStep] begin
     using LinearAlgebra: I
     g = [0.2, 0.3, 0.5]
     window = [10.0, 20.0, 30.0]
-    hand = sum(window[i] * g[i] for i in eachindex(g))
-    @test renewal_pressure(I, g, window) ≈ hand
+    hand = sum(g[l] * lag(window, l) for l in eachindex(g))
+    @test first_step(g, I, window) ≈ hand
 end
 
-@testitem "renewal_pressure: strata window, shared generation interval" begin
-    using ComposableTuringIDModels: renewal_pressure
+@testitem "renewal pressure: strata window, shared generation interval" setup = [FirstStep] begin
     using LinearAlgebra: I
     g = [0.2, 0.3, 0.5]
     window = [10.0 20.0 30.0; 1.0 2.0 3.0]   # 2 strata x 3 lags
-    hand = [sum(window[s, i] * g[i] for i in eachindex(g)) for s in 1:2]
-    @test renewal_pressure(I, g, window) ≈ hand
+    hand = [sum(g[l] * lag(window, s, l) for l in eachindex(g)) for s in 1:2]
+    @test first_step(g, I, window) ≈ hand
 end
 
-@testitem "renewal_pressure: strata window, one interval per stratum" begin
-    using ComposableTuringIDModels: renewal_pressure
+@testitem "renewal pressure: strata window, one interval per stratum" setup = [FirstStep] begin
     using LinearAlgebra: I
     g = [0.2 0.3 0.5; 0.5 0.3 0.2]            # 2 strata x 3 lags
     window = [10.0 20.0 30.0; 1.0 2.0 3.0]
-    hand = [sum(window[s, i] * g[s, i] for i in 1:3) for s in 1:2]
-    @test renewal_pressure(I, g, window) ≈ hand
+    hand = [sum(g[s, l] * lag(window, s, l) for l in 1:3) for s in 1:2]
+    @test first_step(g, I, window) ≈ hand
 end
 
-@testitem "renewal_pressure: a mixing matrix redistributes histories" begin
-    using ComposableTuringIDModels: renewal_pressure
+@testitem "renewal pressure: a mixing matrix redistributes histories" setup = [FirstStep] begin
     g = [0.2, 0.3, 0.5]
     window = [10.0 20.0 30.0; 1.0 2.0 3.0]
     K = [0.9 0.1; 0.2 0.8]
-    conv = [sum(window[s, i] * g[i] for i in eachindex(g)) for s in 1:2]
+    conv = [sum(g[l] * lag(window, s, l) for l in eachindex(g)) for s in 1:2]
     hand = [sum(K[gg, h] * conv[h] for h in 1:2) for gg in 1:2]
-    @test renewal_pressure(K, g, window) ≈ hand
+    @test first_step(g, K, window) ≈ hand
 end
 
-@testitem "renewal_pressure: a per-pair strata x strata x lags interval" begin
-    using ComposableTuringIDModels: renewal_pressure
+@testitem "renewal pressure: a per-pair strata x strata x lags interval" setup = [FirstStep] begin
     n_strata, n_lags = 2, 3
     window = [10.0 20.0 30.0; 1.0 2.0 3.0]   # oldest -> newest columns
     K = zeros(n_strata, n_strata, n_lags)
@@ -50,30 +60,26 @@ end
     K[1, 2, :] = [0.1, 0.05, 0.05]
     K[2, 1, :] = [0.0, 0.02, 0.03]
     K[2, 2, :] = [0.6, 0.2, 0.1]
-    n_time = size(window, 2)
     hand = [
-        sum(
-                K[gg, h, i] * window[h, n_time - i + 1]
-                for h in 1:n_strata, i in 1:n_lags
-            )
+        sum(K[gg, h, l] * lag(window, h, l) for h in 1:n_strata, l in 1:n_lags)
             for gg in 1:n_strata
     ]
-    # The reversed generation interval `g` is unused: the array carries the
+    # The shared generation interval only sets the seeding window, so it needs
+    # the same number of lags but its values are unused: the array carries the
     # per-pair intervals itself.
-    @test renewal_pressure(K, [0.0], window) ≈ hand
+    @test first_step(zeros(n_lags), K, window) ≈ hand
 end
 
-@testitem "renewal_pressure: a mixing matrix AND a per-stratum interval" begin
-    using ComposableTuringIDModels: renewal_pressure
+@testitem "renewal pressure: a mixing matrix AND a per-stratum interval" setup = [FirstStep] begin
     # `K` is checked with a shared `g`, and a per-stratum `g` is checked with
-    # `I`, but never both non-identity together, so the general path (a
-    # mixing matrix on top of per-stratum convolved histories) is unchecked.
+    # `I`, so this checks the general path: a mixing matrix on top of
+    # per-stratum convolved histories.
     g = [0.2 0.3 0.5; 0.5 0.3 0.2]            # 2 strata x 3 lags
     window = [10.0 20.0 30.0; 1.0 2.0 3.0]
     K = [0.9 0.1; 0.2 0.8]
-    conv = [sum(window[s, i] * g[s, i] for i in 1:3) for s in 1:2]
+    conv = [sum(g[s, l] * lag(window, s, l) for l in 1:3) for s in 1:2]
     hand = [sum(K[gg, h] * conv[h] for h in 1:2) for gg in 1:2]
-    @test renewal_pressure(K, g, window) ≈ hand
+    @test first_step(g, K, window) ≈ hand
 end
 
 @testitem "an off-diagonal mixing matrix moves incidence between strata" begin
@@ -216,6 +222,7 @@ end
 
 @testitem "a Gravity mixing's inferred exponent is named under mixing" begin
     using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: @varname
     Random.seed!(707)
     pop = [1.0e6, 2.0e5]
     dist = [0.0 40.0; 40.0 0.0]
@@ -231,23 +238,25 @@ end
     )
     mdl = as_turing_model(model, (2, 20))
     names = string.(collect(keys(rand(mdl))))
-    # `scan_step ~ ...` composes flat (no `scan_step.` prefix), so the drawn
+    # The coupling resolves flat (no `coupling.` prefix), so the drawn
     # exponent's own prefix (`mixing.α`) reaches the top level unchanged.
     @test any(startswith(n, "mixing.") for n in names)
-    @test !any(startswith(n, "scan_step.") for n in names)
+    @test !any(startswith(n, "coupling.") for n in names)
+
+    # The exponent is drawn, not conditioned on, so it varies between draws.
+    α_draws = [rand(mdl)[@varname(mixing.α)] for _ in 1:5]
+    @test length(unique(α_draws)) == 5
 end
 
-@testitem "an unresolved MixingStep says so instead of a MethodError" begin
+@testitem "a pairwise mixing array must match the interval's lags" begin
     using ComposableTuringIDModels, Distributions
-    using ComposableTuringIDModels: MixingStep, renewal_init_state
-    step = MixingStep(
-        reverse([0.2, 0.3, 0.5]),
-        Gravity([1.0e6, 2.0e5], [0.0 1.0; 1.0 0.0])
+    model = Renewal(;
+        generation_time = [0.2, 0.3, 0.5],
+        rt = Stratify(RandomWalk(), FixedIntercept(0.0)),
+        initialisation = Normal(),
+        mixing = pairwise_gen_int([0.9 0.1; 0.2 0.8], [0.5, 0.5])
     )
-    @test_throws "has no scan interface" step([1.0 2.0; 1.0 2.0], [1.0, 1.0])
-    @test_throws "has no scan interface" renewal_init_state(
-        step, [1.0, 1.0], [0.1, 0.1], 3
-    )
+    @test_throws DimensionMismatch as_turing_model(model, (2, 10))()
 end
 
 @testitem "pairwise_gen_int builds a strata x strata x lags mixing array" begin
@@ -314,4 +323,18 @@ end
     I_coupled = as_turing_model(coupled, (n_strata, n_time))().I_t
     @test all(isfinite, I_coupled)
     @test I_coupled != I_uncoupled
+end
+
+@testitem "a pairwise mixing array replaces the shared generation interval" begin
+    using ComposableTuringIDModels
+    using ComposableTuringIDModels: _renewal_recurrence
+    # The per-pair intervals carry the convolution, so the shared interval
+    # changes nothing in the recurrence itself; it only sets the growth rate
+    # the seeding window decays at.
+    K = pairwise_gen_int([0.9 0.1; 0.2 0.8], [0.2, 0.3, 0.5])
+    window = [1.0 2.0 3.0; 2.0 1.0 0.5]
+    R = fill(1.2, 2, 6)
+    a = _renewal_recurrence([0.2, 0.3, 0.5], K, ())(R; history = window)
+    b = _renewal_recurrence([0.6, 0.3, 0.1], K, ())(R; history = window)
+    @test a == b
 end

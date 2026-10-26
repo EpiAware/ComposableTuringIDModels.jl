@@ -1,12 +1,16 @@
-@testitem "TVARStep threads a per-step coefficient through the recursion" begin
-    using ComposableTuringIDModels
-    using ComposableTuringIDModels: TVARStep, accumulate_scan
+@testitem "AR(1) threads a per-step coefficient through the recursion" begin
+    using ComposableTuringIDModels, Distributions
+    using DynamicPPL: fix, @varname
     z1 = 0.5
     ρ = [0.6, -0.3, 0.9, 0.1]
     ϵ = [0.1, -0.2, 0.05, 0.3]
-    # A vector coefficient is read per step via `_at`; the driving sequence is
-    # `(t, ϵ_t)` pairs.
-    got = accumulate_scan(TVARStep(ρ), z1, collect(zip(eachindex(ϵ), ϵ)))
+    # A process prior gives a coefficient path, read per step; `identity`
+    # keeps the fixed path as it is.
+    tvar = AR(; damp = IID(Normal()), ϵ_t = IID(Normal()), transform = identity)
+    values = Dict(
+        @varname(init) => z1, @varname(damp.ϵ_t) => ρ, @varname(ϵ_t) => ϵ
+    )
+    got = fix(as_turing_model(tvar, 5), values)()
     # explicit time-varying AR(1) recursion z_t = ρ_t z_{t-1} + ϵ_t
     want = [z1]
     for t in 1:4
@@ -14,8 +18,9 @@
     end
     @test got ≈ want
     @test length(got) == 5
-    # A scalar coefficient is the constant AR(1): `_at` ignores `t`.
-    gotc = accumulate_scan(TVARStep(0.6), z1, collect(zip(eachindex(ϵ), ϵ)))
+    # A scalar coefficient is the constant AR(1).
+    constant = AR(; damp = Normal(), ϵ_t = IID(Normal()))
+    gotc = fix(as_turing_model(constant, 5), (init = z1, damp = 0.6, ϵ_t = ϵ))()
     wantc = [z1]
     for t in 1:4
         push!(wantc, 0.6 * wantc[end] + ϵ[t])

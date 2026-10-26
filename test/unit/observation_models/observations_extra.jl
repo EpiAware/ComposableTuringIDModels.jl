@@ -68,6 +68,29 @@ end
     @test count(!=(0), res.expected) == 4
 end
 
+@testitem "Aggregate clips a window reaching back before the first value" begin
+    using ComposableTuringIDModels
+    Y = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0]
+    # The window ending on day 2 is four days wide, so it reaches back before
+    # day 1 and sums only the two values it covers.
+    agg = Aggregate(PoissonError(), [0, 4, 0, 0, 3, 0])
+    res = as_turing_model(agg, missing, Y)()
+    @test res.expected[2] ≈ 1.0 + 2.0
+    @test res.expected[5] ≈ 4.0 + 8.0 + 16.0
+    @test count(!=(0), res.expected) == 2
+
+    # A shorter expected series is right-aligned against the windows, so the
+    # window ending on day 5 covers its first three values and the window ending
+    # on day 2 covers none, and is dropped rather than scored as a zero.
+    short = as_turing_model(agg, Vector{Missing}(missing, 6), Y[1:4])()
+    @test short.expected[5] ≈ 1.0 + 2.0 + 4.0
+    @test short.expected[2] == 0
+
+    # A window wider than the whole series sums every value before it.
+    wide = Aggregate(PoissonError(), [0, 0, 9, 0, 0, 0])
+    @test as_turing_model(wide, missing, Y)().expected[3] ≈ 1.0 + 2.0 + 4.0
+end
+
 @testitem "ReportingCDF produces a length-n completeness curve" begin
     using ComposableTuringIDModels, Distributions
 
@@ -574,7 +597,7 @@ end
     @test !isapprox(exp_tv, exp_fixed)
 
     # Reduction invariant: a per-time sequence of IDENTICAL PMFs reproduces the
-    # single-fixed-PMF expected series exactly (TimeVaryingLDStep ≡ LDStep).
+    # single-fixed-PMF expected series exactly.
     same = [copy(first(pmfs)) for _ in 1:n]
     exp_same = as_turing_model(
         LatentDelay(PoissonError(), same), missing, Y
@@ -653,7 +676,7 @@ end
     Random.seed!(82)
     # A process-parameter (time-varying) reporting delay composed with a renewal
     # model. The gradient must flow through the per-time discretisation
-    # (`_discretised_pmf`) and the time-indexed convolution (`TimeVaryingLDStep`).
+    # (`_discretised_pmf`) and the time-indexed convolution.
     model = IDModel(
         Renewal(;
             generation_time = [0.2, 0.3, 0.5], rt = RandomWalk(),

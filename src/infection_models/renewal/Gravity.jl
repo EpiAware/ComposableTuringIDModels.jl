@@ -15,8 +15,8 @@ sets the self-weight relative to a typical pairwise term, so the default of
 `1.0` makes a stratum's own history count about as much as a neighbour's.
 
 Populations are taken in units of their mean and each row is normalised to sum
-to one. Both are required rather than optional: [`renewal_pressure`](@ref)
-computes ``R_g \sum_h K_{gh} \Lambda_h``, so any overall scale on `K` is
+to one. Both are required rather than optional: the renewal computes
+``R_g \sum_h K_{gh} \Lambda_h``, so any overall scale on `K` is
 indistinguishable from scaling ``R_t``. Normalising leaves `K` carrying only
 where a stratum's force comes from and ``R_t`` carrying its size. `pop` can
 therefore be raw counts.
@@ -66,7 +66,7 @@ rebuilt from sampled values on every draw.
 The coupling between strata is therefore estimated rather than assumed.
 Handing one to [`Renewal`](@ref)'s `mixing` keyword is the only difference
 from a fixed matrix.
-The renewal draws it through the step seam before the scan.
+The renewal draws it before the scan.
 
 Each exponent slot takes a bare `Distribution` (one scalar draw), a
 [`FixedIntercept`](@ref) to hold it fixed, or any other prior model, so a
@@ -130,7 +130,7 @@ end
 @doc raw"
 Fold per-pair generation intervals into a coupling operator.
 
-Returns the `strata × strata × lags` array [`renewal_pressure`](@ref) takes,
+Returns the `strata × strata × lags` array a [`Renewal`](@ref)'s `mixing` takes,
 with entry `[g, h, i]` equal to `K[g, h] * G[g, h, i]`: the weight stratum `h`
 puts on stratum `g` at lag `i`. A between-stratum transmission can therefore
 carry a longer effective interval than a within-stratum one, which a single

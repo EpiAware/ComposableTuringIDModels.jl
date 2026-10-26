@@ -144,13 +144,16 @@ Both tools rest on a seam a component *author* implements rather than one a user
 `@set` goes through `ConstructionBase.constructorof`, which a component whose public constructor derives a field defines for itself.
 [Inspecting and updating an observation chain](@ref obs-traversal) covers the walk and both seams.
 
-## Composing accumulation steps
+## Composing recurrences
 
-The recurrences that drive the time series are expressed as [`accumulate_scan`](@ref) steps.
-Within the renewal family these steps compose.
-A [`RenewalStep`](@ref) is a force-of-infection core plus an ordered tuple of modifiers that share one incidence window.
+The recurrences that drive the time series run on [ComposableRecurrences.jl](https://github.com/EpiAware/ComposableRecurrences.jl).
+A [`Renewal`](@ref) is a `Recurrence` whose kernel is the generation interval and whose gain is ``R_t``, a [`RandomWalk`](@ref) or [`AR`](@ref) is a `Recurrence` driven by its innovations, and a [`LatentDelay`](@ref) is a causal `Convolution`.
+Each operator brings its own gradient rules, so the package writes no recursion or adjoint of its own.
+
+Within the renewal family the recurrence's modifiers compose.
+A renewal is a generation-interval convolution plus an ordered tuple of modifiers that act on each step's new infections.
 The first modifier, [`SusceptibleDepletion`](@ref), scales the proposed incidence by the available susceptible fraction and depletes the pool, turning the renewal process into one with a fixed population.
-[`Renewal`](@ref) is a step-composing helper, so passing the modifier composes it onto the step.
+Passing the modifier to [`Renewal`](@ref) composes it onto the recurrence.
 
 ```@example design
 gen_int = [0.2, 0.3, 0.5]
@@ -158,9 +161,9 @@ gen_int = [0.2, 0.3, 0.5]
 depleting = Renewal(gen_int, SusceptibleDepletion(1000.0); rt = RandomWalk())
 ```
 
-A scan step is a deterministic function, so a modifier that needs *sampled* parameters, an importation rate say, draws them before the scan runs.
-That is the modifier's optional `as_turing_model(mod, n)` method, which samples through the same [`as_turing_submodel`](@ref) seam as everything else and returns the modifier the scan uses.
-Modifiers that sample nothing return themselves, so the step resolves its whole modifier tuple through one call and nothing in the renewal model tests what a modifier is.
+A scan is a deterministic function, so a modifier that needs *sampled* parameters, an importation rate say, draws them before the scan runs.
+That is the modifier's `as_turing_model(mod, n)` method, which samples through the same [`as_turing_submodel`](@ref) seam as everything else and returns the ComposableRecurrences modifier the recurrence applies.
+A modifier that samples nothing returns its ComposableRecurrences form directly, so the renewal resolves its whole modifier tuple through one call and nothing in the renewal model tests what a modifier is.
 [`ImportedCases`](@ref) is the worked example, and modifiers apply in the order given.
 
 ```@example design
