@@ -145,7 +145,8 @@ export IDProblem, NUTSampler, DirectSample,
 # Public but not exported, so they are documented and supported without crowding
 # the namespace of a `using` call.
 public ModelShape, across_shape, infection_strata,
-    AbstractAccumulationStep, AbstractRenewalModifier, MissingObservations, AbstractBroadcastRule,
+    AbstractAccumulationStep, AbstractRenewalModifier,
+    MissingObservations, AbstractBroadcastRule,
     at, path_prior, prior_order, assert_prior_length,
     wrapped_models, observation_components, rewrap, swap
 

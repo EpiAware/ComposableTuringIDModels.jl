@@ -8,8 +8,7 @@ level.
 
 [`Renewal`](@ref)'s `initialisation` slot is a *level*: one value (or one per
 stratum) transformed to ``I_0``, with the pre-window incidence decaying at the
-growth rate implied by ``\mathcal R_1``, as ComposableRecurrences'
-`exponential_history` gives it.
+growth rate implied by ``\mathcal R_1``.
 Wrapping a process in `SeedingPath` changes what that slot means. The process is
 drawn at the **window shape** — `len_gen_int` values for a single series,
 `n_strata × len_gen_int` for a stratified renewal (so the process needs a strata

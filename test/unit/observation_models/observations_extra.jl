@@ -85,6 +85,10 @@ end
     short = as_turing_model(agg, Vector{Missing}(missing, 6), Y[1:4])()
     @test short.expected[5] ≈ 1.0 + 2.0 + 4.0
     @test short.expected[2] == 0
+
+    # A window wider than the whole series sums every value before it.
+    wide = Aggregate(PoissonError(), [0, 0, 9, 0, 0, 0])
+    @test as_turing_model(wide, missing, Y)().expected[3] ≈ 1.0 + 2.0 + 4.0
 end
 
 @testitem "ReportingCDF produces a length-n completeness curve" begin

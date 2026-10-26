@@ -54,5 +54,5 @@ end
     @assert n > 0 "n must be greater than 0"
     init ~ as_turing_submodel(model.init, 1; prefix = true)
     ϵ_t ~ as_turing_submodel(model.ϵ_t, n - 1)
-    return _cumulate(init, ϵ_t)
+    return _cumulate(_history(init), ϵ_t)
 end

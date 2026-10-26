@@ -370,3 +370,15 @@ end
     @test all(isfinite, g)
     @test all(>(0), g)
 end
+
+@testitem "a modifier with no resolution fails with a clear error" begin
+    using ComposableTuringIDModels, Distributions
+    struct NoResolution <: ComposableTuringIDModels.AbstractRenewalModifier end
+    model = Renewal(;
+        generation_time = [0.2, 0.3, 0.5], rt = RandomWalk(),
+        initialisation = Normal(), modifiers = (NoResolution(),)
+    )
+    @test_throws "must implement `as_turing_model(mod, n)`" as_turing_model(
+        model, 10
+    )()
+end

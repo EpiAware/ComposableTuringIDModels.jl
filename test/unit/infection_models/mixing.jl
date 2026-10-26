@@ -64,9 +64,10 @@ end
         sum(K[gg, h, l] * lag(window, h, l) for h in 1:n_strata, l in 1:n_lags)
             for gg in 1:n_strata
     ]
-    # The shared generation interval is unused: the array carries the
+    # The shared generation interval only sets the seeding window, so it needs
+    # the same number of lags but its values are unused: the array carries the
     # per-pair intervals itself.
-    @test first_step([0.0], K, window) ≈ hand
+    @test first_step(zeros(n_lags), K, window) ≈ hand
 end
 
 @testitem "renewal pressure: a mixing matrix AND a per-stratum interval" setup = [FirstStep] begin
@@ -221,6 +222,7 @@ end
 
 @testitem "a Gravity mixing's inferred exponent is named under mixing" begin
     using ComposableTuringIDModels, Distributions, Random
+    using DynamicPPL: @varname
     Random.seed!(707)
     pop = [1.0e6, 2.0e5]
     dist = [0.0 40.0; 40.0 0.0]
@@ -240,6 +242,21 @@ end
     # exponent's own prefix (`mixing.α`) reaches the top level unchanged.
     @test any(startswith(n, "mixing.") for n in names)
     @test !any(startswith(n, "coupling.") for n in names)
+
+    # The exponent is drawn, not conditioned on, so it varies between draws.
+    α_draws = [rand(mdl)[@varname(mixing.α)] for _ in 1:5]
+    @test length(unique(α_draws)) == 5
+end
+
+@testitem "a pairwise mixing array must match the interval's lags" begin
+    using ComposableTuringIDModels, Distributions
+    model = Renewal(;
+        generation_time = [0.2, 0.3, 0.5],
+        rt = Stratify(RandomWalk(), FixedIntercept(0.0)),
+        initialisation = Normal(),
+        mixing = pairwise_gen_int([0.9 0.1; 0.2 0.8], [0.5, 0.5])
+    )
+    @test_throws DimensionMismatch as_turing_model(model, (2, 10))()
 end
 
 @testitem "pairwise_gen_int builds a strata x strata x lags mixing array" begin

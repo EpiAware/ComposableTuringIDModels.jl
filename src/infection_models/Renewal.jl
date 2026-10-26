@@ -61,7 +61,9 @@ convolutions before ``R_t``, so the force of infection on stratum ``g`` is
 (`LinearAlgebra.I`), leaving strata uncoupled: a `Dims{2}` shape with no mixing
 is `n_strata` independent single-series renewal processes sharing one model.
 It also takes a `strata × strata × lags` array from [`pairwise_gen_int`](@ref),
-whose per-pair intervals replace the shared one, and an
+whose per-pair intervals replace the shared one in the convolution; the shared
+interval then only sets the seeding window, and must have as many lags. It
+also takes an
 [`AbstractMixingModel`](@ref) such as [`Gravity`](@ref); the patch-models
 tutorial writes a custom coupling.
 
@@ -90,6 +92,8 @@ A partially pooled generation interval therefore needs no new component, e.g.
     [`SeedingPath`](@ref) to estimate the whole seeding window instead.
   - `mixing`: the coupling between strata, applied to the
     generation-interval convolutions before `R_t` (default `I`, uncoupled).
+    A `strata × strata × lags` array replaces the generation interval in the
+    convolution, which then only sets the seeding window.
   - `modifiers`: the [`AbstractRenewalModifier`](@ref)s applied to each
     step's new infections, in order.
 

@@ -74,6 +74,17 @@ struct SusceptibleDepletion{T} <: AbstractRenewalModifier
     pop_size::T
 end
 
+# A modifier with no resolution would otherwise fail with a bare `MethodError`
+# inside the pre-scan seam.
+function as_turing_model(mod::AbstractRenewalModifier, n)
+    throw(
+        ArgumentError(
+            "$(typeof(mod)) must implement `as_turing_model(mod, n)` " *
+                "returning a ComposableRecurrences modifier"
+        )
+    )
+end
+
 @doc raw"
 Resolve a [`SusceptibleDepletion`](@ref) into the floored
 ComposableRecurrences `Depletion` the recurrence applies.
