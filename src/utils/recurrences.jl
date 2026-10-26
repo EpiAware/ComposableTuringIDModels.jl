@@ -8,8 +8,8 @@ const _UNIT_LAG = [1.0]
 # A recurrence history: one past value is a length-1 window, and one past value
 # per stratum is a `strata × 1` window.
 # A vector is collected because a drawn parameter is often a view, and Enzyme
-# reverse cannot differentiate the `vcat` a `prepend = true` call makes of a
-# view (EpiAware/ComposableRecurrences.jl#299).
+# cannot differentiate the join a `prepend = true` call makes of a view and an
+# array.
 _history(x::Real) = [x]
 _history(x::AbstractVector) = collect(x)
 _strata_history(x::Real) = [x]

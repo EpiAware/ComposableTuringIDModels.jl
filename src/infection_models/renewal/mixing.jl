@@ -23,7 +23,8 @@ coupling differ in the chain and nowhere else.
 "
 abstract type AbstractMixingModel <: AbstractComposableModel end
 
-# A fixed coupling samples nothing and is used as it is.
+# A fixed coupling samples nothing and is used as it is; `n` is the shape a
+# drawn one is built at.
 @model function _resolve_coupling(mixing, n)
     return mixing
 end
@@ -37,8 +38,8 @@ end
 # The interval runs lag 1 first, as ComposableRecurrences takes it.
 # A `strata × lags` interval is one row per stratum.
 # A `strata × strata × lags` coupling carries a generation interval per pair
-# of strata (see `pairwise_gen_int`), so it is the kernel and the interval
-# itself is unused there.
+# of strata (see `pairwise_gen_int`), so it is the kernel and the shared
+# interval only sets the growth rate the seeding window decays at.
 _renewal_kernel(gen_int::AbstractVector) = gen_int
 _renewal_kernel(gen_int::AbstractMatrix) = PerStratum(gen_int)
 

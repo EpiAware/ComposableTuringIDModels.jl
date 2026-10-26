@@ -76,26 +76,24 @@ then subtracts from the incidence.
 
 # Examples
 
-Drawing the modifier through its pre-scan seam shows the rate the scan will
-add. A bare `Distribution` gives one constant, here with median
-``\exp(-1) \approx 0.37`` imports per unit time:
+A fixed unconstrained rate of ``\log 2`` adds two imports per unit time.
+Against the same renewal without them, incidence gains those imports and the
+infections they go on to cause:
 
 ```@example ImportedCases
-using ComposableTuringIDModels, Distributions, Random
-Random.seed!(189)
-as_turing_model(ImportedCases(Normal(-1.0, 0.5)), 5)().b
+using ComposableTuringIDModels, Distributions
+using DynamicPPL: fix
+gen_int = [0.2, 0.3, 0.5]
+args = (; rt = FixedIntercept(0.0), initialisation = Normal())
+plain = Renewal(gen_int; args...)
+imported = Renewal(gen_int, ImportedCases(FixedIntercept(log(2.0))); args...)
+seed = (init_incidence = 0.0,)
+I_plain = fix(as_turing_model(plain, 5), seed)().I_t
+I_imported = fix(as_turing_model(imported, 5), seed)().I_t
+I_imported .- I_plain
 ```
 
-A latent process gives a path, positive at every time despite the walk itself
-being unconstrained:
-
-```@example ImportedCases
-Random.seed!(189)
-as_turing_model(ImportedCases(RandomWalk()), 5)().b.x
-```
-
-Either goes onto a renewal process as a positional modifier, where the rate
-joins the model's parameters under the modifier's position:
+A prior on the rate joins the model's parameters under the modifier's position:
 
 ```@example ImportedCases
 r = Renewal([0.2, 0.3, 0.5], ImportedCases(Normal(-1.0, 0.5));

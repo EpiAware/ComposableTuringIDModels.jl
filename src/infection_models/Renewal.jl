@@ -60,22 +60,10 @@ convolutions before ``R_t``, so the force of infection on stratum ``g`` is
 ``R_{g,t} \sum_h K_{gh} \sum_i g_i I_{h,t-i}``. It defaults to `I`
 (`LinearAlgebra.I`), leaving strata uncoupled: a `Dims{2}` shape with no mixing
 is `n_strata` independent single-series renewal processes sharing one model.
-It takes
-
-  - a `strata × strata` matrix `K` (dense, sparse or `Diagonal`), whose row
-    `g` says where stratum `g`'s force of infection comes from;
-  - a `strata × strata × lags` array from [`pairwise_gen_int`](@ref), which
-    carries a generation interval per pair of strata and replaces the shared
-    one;
-  - an [`AbstractMixingModel`](@ref), such as [`Gravity`](@ref), drawn per
-    draw; or
-  - any other coupling ComposableRecurrences takes, including a
-    `TimeVarying` `strata × strata × time` array and a custom coupling type
-    with a `ComposableRecurrences.forward!` method for the `Pressure` role.
-
-Nothing about a mixing matrix is checked or normalised. A zero column
-`K[:, h]` means stratum `h` infects nobody, and a zero row `K[g, :]` means
-stratum `g` receives no force at all.
+It also takes a `strata × strata × lags` array from [`pairwise_gen_int`](@ref),
+whose per-pair intervals replace the shared one, and an
+[`AbstractMixingModel`](@ref) such as [`Gravity`](@ref); the patch-models
+tutorial writes a custom coupling.
 
 The generation interval, when inferred, is drawn at the shape the renewal needs:
 one pmf for `n::Int`, one pmf per stratum for `n::Dims{2}`. Because each

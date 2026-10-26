@@ -307,3 +307,17 @@ end
     @test all(isfinite, I_coupled)
     @test I_coupled != I_uncoupled
 end
+
+@testitem "a pairwise mixing array replaces the shared generation interval" begin
+    using ComposableTuringIDModels
+    using ComposableTuringIDModels: _renewal_recurrence
+    # The per-pair intervals carry the convolution, so the shared interval
+    # changes nothing in the recurrence itself; it only sets the growth rate
+    # the seeding window decays at.
+    K = pairwise_gen_int([0.9 0.1; 0.2 0.8], [0.2, 0.3, 0.5])
+    window = [1.0 2.0 3.0; 2.0 1.0 0.5]
+    R = fill(1.2, 2, 6)
+    a = _renewal_recurrence([0.2, 0.3, 0.5], K, ())(R; history = window)
+    b = _renewal_recurrence([0.6, 0.3, 0.1], K, ())(R; history = window)
+    @test a == b
+end
