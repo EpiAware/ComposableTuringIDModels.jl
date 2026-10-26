@@ -38,7 +38,7 @@ ComposableTuringIDModelsEnzymeExt = "Enzyme"
 # ComposableRecurrences 0.2 is not yet registered, so a main commit is pinned.
 # Drop this once it is.
 [sources]
-ComposableRecurrences = {url = "https://github.com/EpiAware/ComposableRecurrences.jl", rev = "7d4675c86400ec31f897ed5be50d1d5f0e205ed8"}
+ComposableRecurrences = {url = "https://github.com/EpiAware/ComposableRecurrences.jl", rev = "7d4675c86400ec31f897ed5be50d1d5f0e205ed8"}  # pragma: allowlist secret
 
 [compat]
 ADTypes = "1.22.1"
