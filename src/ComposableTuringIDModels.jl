@@ -31,7 +31,7 @@ using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
 using Turing: Turing, filldist, sample, MCMCSerial, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
-# The renewal, latent and delay recursions run on ComposableRecurrences.
+# The renewal, AR, MA and delay recursions run on ComposableRecurrences.
 # Its modifiers and helpers are public but not exported, so they are qualified
 # through `CR`.
 using ComposableRecurrences: ComposableRecurrences, Recurrence, Convolution,
@@ -161,6 +161,7 @@ include("base/prettyprinting.jl")
 # --- accumulation steps ---
 include("steps/AbstractAccumulationStep.jl")
 include("steps/accumulate_scan.jl")
+include("steps/RWStep.jl")
 
 # --- utilities and distributions ---
 include("utils/HalfNormal.jl")
