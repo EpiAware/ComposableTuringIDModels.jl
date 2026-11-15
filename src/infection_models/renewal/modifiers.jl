@@ -24,7 +24,8 @@ A deterministic modifier samples nothing and returns its ComposableRecurrences
 form, as [`SusceptibleDepletion`](@ref) returns a floored `Depletion`.
 A modifier carrying priors draws them here, through
 [`as_turing_submodel`](@ref), and returns a modifier holding the drawn values,
-as [`ImportedCases`](@ref) returns an `Add` of the drawn importation rate.
+as [`ImportedCases`](@ref) returns a `Transform(+, ι)` of the drawn
+importation rate.
 A new kind of step-level behaviour is a ComposableRecurrences modifier (a type
 with a `ComposableRecurrences.forward!` method for the `Step` role), wrapped
 by a renewal modifier that returns it.
@@ -63,7 +64,7 @@ A scalar given to a stratified renewal is shared by every stratum, so each
 depletes a separate pool of the same size.
 
 It samples nothing, and resolves to ComposableRecurrences'
-`Depletion(N; form = Floor())`.
+`Depletion(N, Floor())`.
 
 ## Fields
 
@@ -95,7 +96,7 @@ ComposableRecurrences `Depletion` the recurrence applies.
   - `n`: the renewal's [`ModelShape`](@ref).
 "
 @model function as_turing_model(mod::SusceptibleDepletion, n)
-    return CR.Depletion(_strata_param(mod.pop_size, n); form = CR.Floor())
+    return CR.Depletion(_strata_param(mod.pop_size, n), CR.Floor())
 end
 
 # A population is one value shared by every stratum or one value per stratum.

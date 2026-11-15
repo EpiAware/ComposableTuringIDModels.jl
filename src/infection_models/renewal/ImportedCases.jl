@@ -1,6 +1,6 @@
 # A scan is a deterministic function, so the rate is drawn once before the
 # scan through the modifier seam (`as_turing_model(mod, n)`), which returns the
-# ComposableRecurrences `Add` of the drawn path.
+# ComposableRecurrences `Transform(+, ι)` of the drawn path.
 #
 # The prior is on the UNCONSTRAINED scale and is mapped through the modifier's
 # own `transformation` before being added.
@@ -40,11 +40,12 @@ zero.
 
 The rate is drawn before the scan through the modifier seam (see
 [`AbstractRenewalModifier`](@ref)), giving the ComposableRecurrences
-`Add` modifier that adds ``\iota_t`` at step ``t``. Where it sits in the modifier tuple therefore decides
-how it composes: placed *after* a [`SusceptibleDepletion`](@ref) the imports are
-added to the depleted incidence, so they are not scaled by the susceptible
-fraction and do not themselves deplete the pool; placed *before* it they are
-treated as part of the incidence the pool depletes.
+`Transform(+, ι)` modifier that adds ``\iota_t`` at step ``t``.
+Where it sits in the modifier tuple therefore decides how it composes:
+placed *after* a [`SusceptibleDepletion`](@ref) the imports are added to
+the depleted incidence, so they are not scaled by the susceptible fraction
+and do not themselves deplete the pool; placed *before* it they are treated
+as part of the incidence the pool depletes.
 
 The drawn rate is named `import_rates`, prefixed by the modifier's **position**
 in the renewal's modifier tuple, so its posterior is read from a chain as
@@ -135,9 +136,10 @@ Sample the importation rate ahead of the scan.
 Draws the unconstrained rate slot through [`as_turing_submodel`](@ref) — a bare
 `Distribution` giving one constant rate, a process giving a length-`n` path —
 maps it onto the positive scale with the modifier's `transformation`, and
-returns the ComposableRecurrences `Add` the scan uses. The map is broadcast,
-so a constant stays a scalar (no length-`n` allocation), a path is read per
-time and a `strata × time` rate per stratum and time.
+returns the ComposableRecurrences `Transform(+, ι)` the scan uses.
+The map is broadcast, so a constant stays a scalar (no length-`n`
+allocation), a path is read per time and a `strata × time` rate per stratum
+and time.
 
 # Arguments
 
@@ -146,7 +148,7 @@ time and a `strata × time` rate per stratum and time.
 "
 @model function as_turing_model(mod::ImportedCases, n)
     import_rates ~ as_turing_submodel(mod.importation_rate, n; prefix = true)
-    return CR.Add(_time_param(mod.transformation.(import_rates)))
+    return CR.Transform(+, _time_param(mod.transformation.(import_rates)))
 end
 
 # A rate read at each step: one constant, one value per time, or one per

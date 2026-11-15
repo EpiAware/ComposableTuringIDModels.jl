@@ -117,21 +117,22 @@ end
     @test all(isfinite, draws)
 end
 
-@testitem "ImportedCases resolves to an Add before the scan" begin
+@testitem "ImportedCases resolves to an additive Transform" begin
     using ComposableTuringIDModels, Distributions
     import ComposableRecurrences as CR
     # The pre-scan seam draws the unconstrained slot and hands back the
     # ComposableRecurrences modifier the scan actually uses.
     resolved = as_turing_model(ImportedCases(FixedIntercept(log(2.0))), 5)()
-    @test resolved isa CR.Add
-    @test resolved.b isa CR.TimeVarying
-    @test resolved.b.x ≈ fill(2.0, 5)
+    @test resolved isa CR.Transform
+    @test resolved.f === +
+    @test resolved.θ isa CR.TimeVarying
+    @test resolved.θ.x ≈ fill(2.0, 5)
 
     # A bare `Distribution` is one constant, so the drawn rate stays a scalar
     # rather than being materialised as `n` copies of itself.
     constant = as_turing_model(ImportedCases(Dirac(log(3.0))), 5)()
-    @test constant.b isa Number
-    @test constant.b ≈ 3.0
+    @test constant.θ isa Number
+    @test constant.θ ≈ 3.0
 
     # Step `t` adds the rate at `t`.
     rate = [1.0, 2.0, 3.0]
@@ -149,7 +150,7 @@ end
     dep = SusceptibleDepletion(1000.0)
     resolved = as_turing_model(dep, 10)()
     @test resolved isa CR.Depletion
-    @test resolved.form isa CR.Floor
+    @test only(resolved.pieces).form isa CR.Floor
     # One population per stratum is read per stratum.
     per_stratum = as_turing_model(SusceptibleDepletion([1.0, 2.0]), (2, 10))()
     @test per_stratum isa CR.Depletion
@@ -326,7 +327,7 @@ end
     resolved = as_turing_model(
         ImportedCases([Dirac(log(float(t))) for t in 1:n]), n
     )()
-    @test resolved.b.x ≈ collect(1.0:n)
+    @test resolved.θ.x ≈ collect(1.0:n)
 
     # It drives a renewal like any other slot shape, and the length is checked
     # against the series rather than silently recycled.
@@ -362,7 +363,7 @@ end
     # The recurrence runs over resolved modifiers, so the gradient flows
     # through the sampled importation rate exactly as it does through `Rt`.
     function total(θ)
-        imports = CR.Add(CR.TimeVarying(fill(θ[2], n)))
+        imports = CR.Transform(+, CR.TimeVarying(fill(θ[2], n)))
         r = _renewal_recurrence(gen_int, I, (depletion, imports))
         return sum(r(fill(θ[1], n); history = window))
     end

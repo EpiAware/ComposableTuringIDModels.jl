@@ -121,8 +121,9 @@ end
         # `transform` broadcasts over a scalar or a path.
         ρ := model.transform.(damp)
         ϵ_t ~ as_turing_submodel(model.ϵ_t, n - 1)
-        return Recurrence(_UNIT_LAG)(
-            ρ; history = _history(init), add = ϵ_t, prepend = true
+        history = _history(init)
+        return vcat(
+            history, Recurrence(_UNIT_LAG)(ρ; history = history, add = ϵ_t)
         )
     end
     damp ~ as_turing_submodel(model.damp, p; prefix = true)
@@ -130,7 +131,8 @@ end
     # The kernel runs lag 1 first, so `damp[i]` multiplies the lag-`i` term
     # `Z_{t-i}` as the documented recursion `Z_t = Σ ρ_i Z_{t-i}` says.
     # `init` runs oldest to newest, `[Z_1, …, Z_p]`, and is returned first.
-    return Recurrence(damp)(
-        1.0; history = _history(init), add = ϵ_t, prepend = true
+    history = _history(init)
+    return vcat(
+        history, Recurrence(damp)(1.0; history = history, add = ϵ_t)
     )
 end
