@@ -91,6 +91,25 @@ end
     @test as_turing_model(wide, missing, Y)().expected[3] ≈ 1.0 + 2.0 + 4.0
 end
 
+@testitem "Aggregate sums gapped and overlapping windows" begin
+    using ComposableTuringIDModels
+    Y = [1.0, 2.0, 4.0, 8.0, 16.0, 32.0]
+    # Two-day windows ending on days 2 and 6 leave days 3 and 4 unreported.
+    gaps = as_turing_model(
+        Aggregate(PoissonError(), [0, 2, 0, 0, 0, 2]),
+        missing, Y
+    )()
+    @test gaps.expected[2] ≈ 1.0 + 2.0
+    @test gaps.expected[6] ≈ 16.0 + 32.0
+    # Windows ending on days 4 and 6 share days 3 and 4.
+    overlap = as_turing_model(
+        Aggregate(PoissonError(), [0, 0, 0, 4, 0, 4]),
+        missing, Y
+    )()
+    @test overlap.expected[4] ≈ 1.0 + 2.0 + 4.0 + 8.0
+    @test overlap.expected[6] ≈ 4.0 + 8.0 + 16.0 + 32.0
+end
+
 @testitem "ReportingCDF produces a length-n completeness curve" begin
     using ComposableTuringIDModels, Distributions
 
