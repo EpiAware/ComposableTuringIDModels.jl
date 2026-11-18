@@ -54,18 +54,22 @@ end
 end
 
 @testitem "a strata x lags interval convolves each stratum on its own" begin
-    using ComposableTuringIDModels: ConstantRenewalStep, accumulate_scan
-    G = [0.6 0.3 0.1; 0.1 0.3 0.6]   # 2 strata, already-reversed lags
-    core = ConstantRenewalStep(G)
+    using ComposableTuringIDModels: _renewal_recurrence
+    using LinearAlgebra: I
+    G = [0.1 0.3 0.6; 0.6 0.3 0.1]   # 2 strata, lag 1 first
     # Identical seed values in both rows: any divergence is down to the
     # per-stratum generation interval alone.
     window0 = [1.0 2.0 3.0; 1.0 2.0 3.0]
-    Rt = [fill(1.5, 2) for _ in 1:10]
-    I_t = accumulate_scan(
-        core, (; val = window0[:, end], window = window0), Rt
-    )
+    I_t = _renewal_recurrence(G, I, ())(fill(1.5, 2, 10); history = window0)
     @test size(I_t) == (2, 10)
     @test I_t[1, :] != I_t[2, :]
+    # Each row is the single-series renewal with that stratum's interval.
+    for k in 1:2
+        row = _renewal_recurrence(G[k, :], I, ())(
+            fill(1.5, 10); history = window0[k, :]
+        )
+        @test I_t[k, :] ≈ row
+    end
 end
 
 @testitem "a Hierarchy-parameterised UncertainDelay pools across strata" begin
@@ -106,44 +110,38 @@ end
 end
 
 @testitem "SusceptibleDepletion, scalar pop_size: one pool, all strata" begin
-    using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
-        SusceptibleDepletion, accumulate_scan,
-        renewal_init_state
-    rev_gen = reverse([0.2, 0.3, 0.5])
-    core = ConstantRenewalStep(rev_gen)
-    step = RenewalStep(core, (SusceptibleDepletion(1000.0),))
-    n_strata = 2
-    I0, r = fill(5.0, n_strata), fill(0.1, n_strata)
-    init = renewal_init_state(step, I0, r, length(rev_gen))
-    # The scalar pool is spread to a separate, equal-sized copy per stratum.
-    @test only(init.substates) == fill(1000.0, n_strata)
-
-    Rt = [fill(1.6, n_strata) for _ in 1:10]
-    I_t = accumulate_scan(step, init, Rt)
-    plain = accumulate_scan(
-        core, (; val = init.window[:, end], window = init.window), Rt
-    )
-    @test size(I_t) == (n_strata, 10)
+    using ComposableTuringIDModels
+    using ComposableTuringIDModels: _renewal_recurrence, SusceptibleDepletion
+    using LinearAlgebra: I
+    g = [0.2, 0.3, 0.5]
+    n_strata, n_time = 2, 10
+    window = 5.0 .* exp.(0.1 .* [-2 -1 0; -2 -1 0])
+    dep = as_turing_model(SusceptibleDepletion(1000.0), (n_strata, n_time))()
+    Rt = fill(1.6, n_strata, n_time)
+    I_t = _renewal_recurrence(g, I, (dep,))(Rt; history = window)
+    plain = _renewal_recurrence(g, I, ())(Rt; history = window)
+    @test size(I_t) == (n_strata, n_time)
     @test all(I_t .<= plain .+ 1.0e-8)
+    # The scalar pool is a separate, equal-sized copy per stratum, so each row
+    # is the single-series depleting renewal.
+    single = as_turing_model(SusceptibleDepletion(1000.0), n_time)()
+    row = _renewal_recurrence(g, I, (single,))(Rt[1, :]; history = window[1, :])
+    @test I_t[1, :] ≈ row
+    @test I_t[2, :] ≈ row
 end
 
 @testitem "SusceptibleDepletion, per-stratum pop_size: separate pools" begin
-    using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
-        SusceptibleDepletion, accumulate_scan,
-        renewal_init_state
-    rev_gen = reverse([0.2, 0.3, 0.5])
-    core = ConstantRenewalStep(rev_gen)
+    using ComposableTuringIDModels
+    using ComposableTuringIDModels: _renewal_recurrence, SusceptibleDepletion
+    using LinearAlgebra: I
+    g = [0.2, 0.3, 0.5]
     pop = [200.0, 20_000.0]
-    step = RenewalStep(core, (SusceptibleDepletion(pop),))
-    I0, r = fill(5.0, 2), fill(0.2, 2)
-    init = renewal_init_state(step, I0, r, length(rev_gen))
-    @test only(init.substates) == pop
-
-    Rt = [fill(1.6, 2) for _ in 1:20]
-    I_t = accumulate_scan(step, init, Rt)
-    plain = accumulate_scan(
-        core, (; val = init.window[:, end], window = init.window), Rt
-    )
+    shape = (2, 20)
+    window = 5.0 .* exp.(0.2 .* [-2 -1 0; -2 -1 0])
+    dep = as_turing_model(SusceptibleDepletion(pop), shape)()
+    Rt = fill(1.6, shape)
+    I_t = _renewal_recurrence(g, I, (dep,))(Rt; history = window)
+    plain = _renewal_recurrence(g, I, ())(Rt; history = window)
     @test all(I_t .<= plain .+ 1.0e-8)
     # The small pool depletes harder: it ends further below the unconstrained
     # path than the (barely touched) large pool.
@@ -151,10 +149,10 @@ end
     rel_large = I_t[2, end] / plain[2, end]
     @test rel_small < rel_large
 
-    mismatched = RenewalStep(core, (SusceptibleDepletion([1.0, 2.0, 3.0]),))
-    @test_throws AssertionError renewal_init_state(
-        mismatched, I0, r, length(rev_gen)
-    )
+    @test_throws DimensionMismatch as_turing_model(
+        SusceptibleDepletion([1.0, 2.0, 3.0]), shape
+    )()
+    @test_throws ArgumentError as_turing_model(SusceptibleDepletion(pop), 20)()
 end
 
 @testitem "_seed rejects a mismatched per-stratum initialisation" begin

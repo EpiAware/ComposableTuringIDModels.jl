@@ -1,111 +1,91 @@
-# The renewal accumulation step.
+# The renewal recurrence.
 #
-# `RenewalStep` is the renewal step: an internal `ConstantRenewalStep` force-of-
-# infection core with modifiers composing on top. With no modifiers it matches the
-# plain renewal exactly; with a `SusceptibleDepletion` modifier it is a renewal
-# with a fixed population. The `Renewal` helper composes modifiers onto the step.
+# `Renewal` runs a ComposableRecurrences `Recurrence` whose kernel is the
+# generation interval and whose gain is R_t, seeded on an exponential growth
+# path. Its modifiers resolve to ComposableRecurrences modifiers before the
+# scan, so a `SusceptibleDepletion` is a floored `Depletion`. These tests check
+# the recurrence it builds against hand-written renewal loops.
 
-@testitem "renewal_foi matches the ConstantRenewalStep recurrence" begin
-    using ComposableTuringIDModels: ConstantRenewalStep, renewal_foi
-    rev_gen = reverse([0.2, 0.3, 0.5])
-    step = ConstantRenewalStep(rev_gen)
-    window = [1.0, 2.0, 3.0]
-    Rt = 1.4
-    # The extracted FOI is exactly the new-incidence term the step commits.
-    state = (; val = last(window), window = window)
-    @test renewal_foi(step, window, Rt) ≈ step(state, Rt).val
-end
-
-@testitem "RenewalStep with no modifiers matches the plain renewal core" begin
-    using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
-        accumulate_scan, renewal_init_state
-    rev_gen = reverse([0.2, 0.3, 0.5])
-    core = ConstantRenewalStep(rev_gen)
-    step = RenewalStep(core)   # no modifiers -> plain renewal
-    Rt = [1.5, 1.2, 1.0, 0.8]
-    init = renewal_init_state(step, 5.0, 0.1, length(rev_gen))
-    init_core = renewal_init_state(core, 5.0, 0.1, length(rev_gen))
-    # Identical seed state and identical output: the default path is unchanged.
-    @test init == init_core
-    @test accumulate_scan(step, init, Rt) == accumulate_scan(core, init, Rt)
-end
-
-@testitem "RenewalStep with depletion matches the reference recurrence" begin
-    using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
-        SusceptibleDepletion, accumulate_scan,
-        renewal_init_state
+@testsnippet RenewalReference begin
     using LinearAlgebra: dot
-    rev_gen = reverse([0.2, 0.3, 0.5])
+    # I_t = R_t Σ_i g_i I_{t-i}, from a window of past incidence, oldest
+    # first, with optional floored susceptible depletion from a pool of `N`.
+    function renewal_reference(g, window0, Rt; N = nothing)
+        window = copy(window0)
+        S = N
+        out = similar(Rt, promote_type(eltype(Rt), eltype(window0)))
+        for (k, r) in enumerate(Rt)
+            inc = r * dot(window, reverse(g))
+            if N !== nothing
+                inc = max(S / N, 1.0e-6) * inc
+                S -= inc
+            end
+            window = vcat(window[2:end], inc)
+            out[k] = inc
+        end
+        return out
+    end
+end
+
+@testitem "the renewal recurrence matches a hand-written renewal loop" setup = [RenewalReference] begin
+    using ComposableTuringIDModels: _renewal_recurrence, _renewal_history,
+        R_to_r
+    using LinearAlgebra: I
+    g = [0.2, 0.3, 0.5]
+    Rt = [1.5, 1.2, 1.0, 0.8, 1.1, 1.3]
+    window = _renewal_history(g, 5.0, first(Rt))
+    # The window decays into the seed at the growth rate implied by R_1.
+    r = R_to_r(first(Rt), g)
+    @test window ≈ 5.0 .* exp.(-r .* [2, 1, 0])
+    I_t = _renewal_recurrence(g, I, ())(Rt; history = window)
+    @test I_t ≈ renewal_reference(g, window, Rt)
+end
+
+@testitem "the renewal recurrence with depletion matches a hand-written loop" setup = [RenewalReference] begin
+    using ComposableTuringIDModels
+    using ComposableTuringIDModels: _renewal_recurrence
+    using LinearAlgebra: I
+    g = [0.2, 0.3, 0.5]
     N = 1000.0
     Rt = [1.6, 1.4, 1.2, 1.0, 0.9, 0.8]
-
-    core = ConstantRenewalStep(rev_gen)
-    step = RenewalStep(core, (SusceptibleDepletion(N),))
-    init = renewal_init_state(step, 5.0, 0.1, length(rev_gen))
-    comp = accumulate_scan(step, init, Rt)
-
-    # Explicit reference: the S/N-scaled renewal recurrence, hand-rolled. Guards
-    # against drift in either the FOI core or the depletion modifier.
-    function depletion_reference(Rt, window0, S0, rev_gen, N)
-        window = copy(window0)
-        S = S0
-        ref = similar(Rt)
-        for (k, r) in enumerate(Rt)
-            inc = max(S / N, 1.0e-6) * r * dot(window, rev_gen)
-            S -= inc
-            window = vcat(window[2:end], inc)
-            ref[k] = inc
-        end
-        return ref
-    end
-    ref = depletion_reference(Rt, init.window, only(init.substates), rev_gen, N)
-
-    @test comp ≈ ref
-    @test only(init.substates) ≈ N          # seeded with the full population
+    window = 5.0 .* exp.(-0.1 .* [2, 1, 0])
+    depletion = as_turing_model(SusceptibleDepletion(N), 6)()
+    comp = _renewal_recurrence(g, I, (depletion,))(Rt; history = window)
+    @test comp ≈ renewal_reference(g, window, Rt; N = N)
     # Depletion never raises incidence above the unconstrained renewal path.
-    plain = accumulate_scan(
-        core, (; val = last(init.window), window = init.window), Rt
-    )
+    plain = _renewal_recurrence(g, I, ())(Rt; history = window)
     @test all(comp .<= plain .+ 1.0e-8)
+    # The floor binds once the pool is exhausted.
+    small = as_turing_model(SusceptibleDepletion(20.0), 6)()
+    @test _renewal_recurrence(g, I, (small,))(10 .* Rt; history = window) ≈
+        renewal_reference(g, window, 10 .* Rt; N = 20.0)
 end
 
-@testitem "RenewalStep with depletion is ForwardDiff-differentiable" begin
-    using ComposableTuringIDModels: ConstantRenewalStep, RenewalStep,
-        SusceptibleDepletion, accumulate_scan,
-        renewal_init_state
+@testitem "the renewal recurrence with depletion is ForwardDiff-differentiable" setup = [RenewalReference] begin
+    using ComposableTuringIDModels
+    using ComposableTuringIDModels: _renewal_recurrence
     using ForwardDiff
-    rev_gen = reverse([0.2, 0.3, 0.5])
-    N = 1000.0
-    step = RenewalStep(ConstantRenewalStep(rev_gen), (SusceptibleDepletion(N),))
-    # Differentiate the summed infection path with respect to the Rt path; the
-    # composed recurrence must stay AD-friendly (no mutation of tracked state).
-    f = function (Rt)
-        init = renewal_init_state(step, 5.0, 0.1, length(rev_gen))
-        sum(accumulate_scan(step, init, Rt))
-    end
-    g = ForwardDiff.gradient(f, [1.6, 1.4, 1.2, 1.0])
-    @test all(isfinite, g)
-    @test length(g) == 4
+    using LinearAlgebra: I
+    g = [0.2, 0.3, 0.5]
+    window = 5.0 .* exp.(-0.1 .* [2, 1, 0])
+    depletion = as_turing_model(SusceptibleDepletion(1000.0), 4)()
+    f(Rt) = sum(_renewal_recurrence(g, I, (depletion,))(Rt; history = window))
+    ref(Rt) = sum(renewal_reference(g, window, Rt; N = 1000.0))
+    Rt = [1.6, 1.4, 1.2, 1.0]
+    @test ForwardDiff.gradient(f, Rt) ≈ ForwardDiff.gradient(ref, Rt)
 end
 
-@testitem "Renewal composes modifiers onto a RenewalStep" begin
-    using ComposableTuringIDModels: RenewalStep, ConstantRenewalStep,
-        SusceptibleDepletion, Renewal, RandomWalk
+@testitem "Renewal holds its modifiers in order" begin
+    using ComposableTuringIDModels
     gen_int = [0.2, 0.3, 0.5]
     plain = Renewal(gen_int; rt = RandomWalk())
     depleting = Renewal(
         gen_int, SusceptibleDepletion(1000.0);
         rt = RandomWalk()
     )
-    # With no modifiers the step is the bare force-of-infection core, whichever
-    # constructor built it.
-    @test plain.recurrent_step isa ConstantRenewalStep
     @test isempty(plain.modifiers)
-    @test Renewal(; generation_time = gen_int).recurrent_step isa
-        ConstantRenewalStep
-    @test depleting.recurrent_step isa RenewalStep
-    @test depleting.recurrent_step.core isa ConstantRenewalStep
-    @test only(depleting.recurrent_step.modifiers) isa SusceptibleDepletion
+    @test isempty(Renewal(; generation_time = gen_int).modifiers)
+    @test only(depleting.modifiers) isa SusceptibleDepletion
 end
 
 @testitem "Renewal susceptible depletion bends incidence below the no-depletion path" begin
@@ -152,7 +132,6 @@ end
 
 @testitem "Renewal combines a continuous generation time with a modifier" begin
     using ComposableTuringIDModels, Distributions
-    using ComposableTuringIDModels: RenewalStep
     # A continuous generation time discretised by the constructor, carrying a
     # modifier: the two compose in either constructor form.
     renewal = Renewal(
@@ -161,8 +140,7 @@ end
     )
     @test renewal.gen_int isa AbstractVector
     @test sum(renewal.gen_int) ≈ 1
-    @test renewal.recurrent_step isa RenewalStep
-    @test only(renewal.recurrent_step.modifiers) isa SusceptibleDepletion
+    @test only(renewal.modifiers) isa SusceptibleDepletion
     # One discretisation path: the interval matches the modifier-free model's,
     # so a modifier does not force a second discretisation outside the package.
     base = Renewal(; generation_time = Gamma(2, 1.5), D_gen = 15.0)
@@ -187,8 +165,8 @@ end
         LogNormal,
         [Normal(1.9, 0.2), truncated(Normal(0.5, 0.2), 0, Inf)]; D = 14.0
     )
-    # No interval is baked, so the modifiers are held on the model and the step
-    # is rebuilt with them per draw.
+    # The interval is drawn per draw and the recurrence built from it and the
+    # modifiers.
     depleting = Renewal(
         gen, SusceptibleDepletion(50.0);
         rt = FixedIntercept(log(2.0)), initialisation = Normal(log(10), 0.1)
@@ -197,7 +175,6 @@ end
         gen; rt = FixedIntercept(log(2.0)),
         initialisation = Normal(log(10), 0.1)
     )
-    @test isnothing(depleting.recurrent_step)
     @test only(depleting.modifiers) isa SusceptibleDepletion
     @test isempty(plain.modifiers)
     fixinit = (init_incidence = log(10.0),)
@@ -214,7 +191,7 @@ end
     using ComposableTuringIDModels, Distributions
     gen_int = [0.2, 0.3, 0.5]
     # The positional form is constrained by its signature; the keyword form has
-    # to say so itself rather than failing inside the step's seam.
+    # to say so itself rather than failing inside the modifier seam.
     @test_throws "AbstractRenewalModifier" Renewal(;
         generation_time = gen_int, modifiers = (Normal(),)
     )
@@ -239,14 +216,12 @@ end
     # The positional constructor must widen a bare `Distribution` in the `rt`
     # PATH slot exactly as the keyword one does. Left to Julia's generated
     # constructor it does not: the slot draws a single scalar, which reaches
-    # the scan as an `R_t` with no time axis.
+    # the recurrence as an `R_t` with no time axis.
     gi = [0.2, 0.3, 0.5]
     kw = Renewal(;
         generation_time = gi, rt = Normal(0, 0.1), initialisation = Normal()
     )
-    pos = Renewal(
-        gi, exp, Normal(0, 0.1), Normal(), kw.recurrent_step, kw.mixing, ()
-    )
+    pos = Renewal(gi, exp, Normal(0, 0.1), Normal(), kw.mixing, ())
 
     @test typeof(pos.rt) == typeof(kw.rt)
     @test pos.rt isa Intercept
@@ -257,6 +232,6 @@ end
     @test path_prior(kw.rt) === kw.rt
     # Widening runs before `new`, so the slot's role guard still fires.
     @test_throws TypeError Renewal(
-        gi, exp, PoissonError(), Normal(), kw.recurrent_step, kw.mixing, ()
+        gi, exp, PoissonError(), Normal(), kw.mixing, ()
     )
 end

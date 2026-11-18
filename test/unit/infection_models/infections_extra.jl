@@ -37,24 +37,22 @@ end
     @test all(>=(0), out.I_t)
 end
 
-@testitem "fixed generation_time (vector / distribution) bakes an interval" begin
+@testitem "fixed generation_time (vector / distribution) stores a pmf" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(420)
-    # A pmf vector and a continuous distribution both bake a fixed interval and
-    # renewal step (the inferred path stores a prior model and no step instead).
+    # A pmf vector and a continuous distribution both store a fixed interval
+    # (the inferred path stores a prior model instead).
     r_vec = Renewal(;
         generation_time = [0.2, 0.3, 0.5], rt = RandomWalk(),
         initialisation = Normal()
     )
     @test r_vec.gen_int isa AbstractVector
-    @test !isnothing(r_vec.recurrent_step)
     r_dist = Renewal(;
         generation_time = Gamma(2.0, 1.0), D_gen = 10.0,
         rt = RandomWalk(), initialisation = Normal()
     )
     @test r_dist.gen_int isa AbstractVector
     @test isapprox(sum(r_dist.gen_int), 1.0)
-    @test !isnothing(r_dist.recurrent_step)
     for r in (r_vec, r_dist)
         out = as_turing_model(r, 20)()
         @test length(out.I_t) == 20
@@ -73,9 +71,8 @@ end
         generation_time = gen, rt = RandomWalk(),
         initialisation = Normal()
     )
-    # The inferred path holds the prior model and bakes no fixed interval/step.
+    # The inferred path holds the prior model rather than a fixed interval.
     @test renewal.gen_int isa UncertainDelay
-    @test isnothing(renewal.recurrent_step)
     out = as_turing_model(renewal, 20)()
     @test length(out.I_t) == 20
     @test length(out.Z_t) == 20

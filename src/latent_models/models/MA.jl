@@ -74,11 +74,9 @@ end
     end
     θ ~ as_turing_submodel(model.θ, q; prefix = true)
     ϵ_t ~ as_turing_submodel(model.ϵ_t, n)
-    # `MAStep`'s buffer is newest-first, so `reverse(ϵ_t[1:q])` puts `ϵ_q` first
-    # and pairs `θ[1]` with the most recent innovation.
-    # `get_state` reverses the output back to natural order.
-    ma = accumulate_scan(
-        MAStep(θ), (; val = 0.0, state = reverse(ϵ_t[1:q])), ϵ_t[(q + 1):end]
-    )
-    return ma
+    # A causal convolution with kernel `[1; θ]` from lag 0, from time `q + 1`
+    # on, reading the earlier innovations from the input itself.
+    # The first `q` innovations pass through unchanged.
+    ma = Convolution(vcat(one(eltype(θ)), θ))(ϵ_t; start = q + 1)
+    return vcat(ϵ_t[1:q], ma)
 end

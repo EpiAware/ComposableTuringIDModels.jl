@@ -3,7 +3,6 @@
 
 @testitem "the default seeding window decays a level and is returned as I_seed" begin
     using ComposableTuringIDModels, Distributions
-    using ComposableTuringIDModels: renewal_init_window
     using DynamicPPL: fix
     gen_int = [0.2, 0.3, 0.5]
     renewal = Renewal(;
@@ -12,7 +11,7 @@
     )
     out = fix(as_turing_model(renewal, 10), (init_incidence = log(10.0),))()
     r = R_to_r(1.5, gen_int)
-    @test out.I_seed ≈ renewal_init_window(renewal.recurrent_step, 10.0, r, 3)
+    @test out.I_seed ≈ 10.0 .* exp.(-r .* [2, 1, 0])
     # The window ends at the level it was seeded from, and is not part of `I_t`.
     @test last(out.I_seed) ≈ 10.0
     @test length(out.I_t) == 10

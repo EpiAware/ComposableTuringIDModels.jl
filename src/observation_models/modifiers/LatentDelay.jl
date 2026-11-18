@@ -1,11 +1,11 @@
-# Reporting-delay observation modifier. Its accumulation step (`LDStep`) lives in
-# `src/steps/`.
+# Reporting-delay observation modifier: a ComposableRecurrences causal
+# convolution of the expected observations with the delay PMF.
 
 @doc raw"
 Apply a reporting delay to an underlying observation model.
 
-The expected observations are convolved with the (reversed) delay PMF before
-being passed to the wrapped `model`. `LatentDelay` shortens the expected
+The expected observations are convolved with the delay PMF before being passed
+to the wrapped `model`. `LatentDelay` shortens the expected
 observation vector by the length of the delay PMF to avoid fitting to partially
 observed data.
 
@@ -16,7 +16,7 @@ whose distribution's parameters are prior slots, sampled and rediscretised per
 draw so the delay is inferred), or **time-varying** (a delay that changes with
 time). A time-varying delay is either a deterministic per-time sequence of PMFs or
 an [`UncertainDelay`](@ref) with a process-valued parameter; it is applied with a
-time-indexed convolution (one reversed kernel per step). The uncertain and
+time-indexed convolution (one kernel per step). The uncertain and
 process-valued cases thread their parameters through the same
 [`as_turing_submodel`](@ref) seam every other component uses, so a prior on the
 delay composes exactly like a prior anywhere else in the model.
@@ -45,7 +45,7 @@ delay composes exactly like a prior anywhere else in the model.
   - `delay`: the delay specification — the fixed delay PMF (a vector), a
     per-time sequence of PMFs, or an [`UncertainDelay`](@ref) component that
     samples the delay parameters and builds the PMF(s) per draw. It is held as
-    it was given and reversed for the convolution when the model is built.
+    it was given, lag 0 first.
 
 # Examples
 
@@ -107,8 +107,8 @@ end
 
 # A deterministic time-varying delay is one PMF per time point, all the same
 # length.
-# Each is validated and the sequence is stored forward, then reversed per step in
-# the `@model` for the `TimeVaryingLDStep`.
+# Each is validated and the sequence is stored forward, then stacked into the
+# `lags × time` kernel of a time-varying convolution in the `@model`.
 function LatentDelay(
         model::AbstractObservationModel,
         pmfs::AbstractVector{<:AbstractVector{<:Real}}
@@ -314,16 +314,8 @@ _delay_timevarying(::AbstractVector{<:AbstractVector{<:Real}}) = true
 _delay_timevarying(::AbstractPriorModel) = false
 _delay_timevarying(::UncertainDelay{P, F, T, TV}) where {P, F, T, TV} = TV
 
-# The convolution wants the fixed PMF reversed, done here once per model build
-# rather than in the `@model` body, which is on the differentiated path.
-# The other specifications build their PMFs per draw and reverse them there.
-_reversed_fixed_delay(spec::AbstractVector{<:Real}) = reverse(spec)
-_reversed_fixed_delay(spec) = spec
-
 function as_turing_model(obs_model::LatentDelay, y_t, Y_t)
-    return _latent_delay(
-        obs_model, _reversed_fixed_delay(obs_model.delay), y_t, Y_t
-    )
+    return _latent_delay(obs_model, obs_model.delay, y_t, Y_t)
 end
 
 @model function _latent_delay(obs_model::LatentDelay, spec, y_t, Y_t)
@@ -345,8 +337,8 @@ end
     # type, so this branch is type-stable and the fast time-invariant path is
     # untouched.
     if _delay_timevarying(spec)
-        # A reversed kernel per time drives `TimeVaryingLDStep`, with the kernel
-        # at time `t` applied to the window ending at `t`.
+        # A kernel per time, column `t` of the `lags × time` kernel weighting
+        # the inputs reaching time `t`.
         if spec isa AbstractPriorModel
             delay ~ as_turing_submodel(spec, n; prefix = true)
             pmfs = delay
@@ -354,31 +346,25 @@ end
             pmfs = spec
         end
         @assert length(pmfs) == n "A per-time delay needs one PMF per time point (length must equal the observation vector)"
-        rev_pmfs = reverse.(pmfs)
-        d = length(first(rev_pmfs))
+        d = length(first(pmfs))
         @assert d <= n "The delay PMF must be no longer than the observation vector"
-        expected_obs = accumulate_scan(
-            TimeVaryingLDStep(),
-            (; val = 0, current = Y_t[1:d]),
-            collect(zip(vcat(Y_t[(d + 1):end], 0.0), rev_pmfs[d:end]))
+        # Only the times with a full delay window, `d:n`, are reported.
+        expected_obs = Convolution(TimeVarying(reduce(hcat, pmfs)))(
+            Y_t; start = d
         )
     else
-        # A single reversed pmf drives `LDStep`, which is the fast path.
-        # A fixed PMF arrives already reversed; an all-constant uncertain delay
-        # builds its forward PMF per draw, which is reversed here.
+        # A single PMF, which is the fast path.
+        # An all-constant uncertain delay builds its PMF per draw.
         if spec isa AbstractPriorModel
             delay ~ as_turing_submodel(spec; prefix = true)
-            rev_pmf = reverse(delay)
+            pmf = delay
         else
-            rev_pmf = spec
+            pmf = spec
         end
-        d = length(rev_pmf)
+        d = length(pmf)
         @assert d <= n "The delay PMF must be no longer than the observation vector"
-        expected_obs = accumulate_scan(
-            LDStep(rev_pmf),
-            (; val = 0, current = Y_t[1:d]),
-            vcat(Y_t[(d + 1):end], 0.0)
-        )
+        # Only the times with a full delay window, `d:n`, are reported.
+        expected_obs = Convolution(pmf)(Y_t; start = d)
     end
 
     inner ~ as_turing_submodel(obs_model.model, y_t, expected_obs)

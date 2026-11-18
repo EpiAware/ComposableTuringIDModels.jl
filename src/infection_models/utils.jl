@@ -140,11 +140,6 @@ end
 # Shape helpers shared by `Renewal`, `DirectInfections` and `ExpGrowthRate`: how
 # the initial-infections seed and the latent path are read at a `ModelShape`.
 
-# Drive a scan one time step at a time: a path by its elements, a
-# strata × time matrix by its columns.
-_steps(Rt::AbstractVector) = Rt
-_steps(Rt::AbstractMatrix) = collect.(eachcol(Rt))
-
 # The initial-infections seed is one value for a single series and one per
 # stratum otherwise.
 # Broadcast against `n::Dims{2}` gives the same seed to every stratum.

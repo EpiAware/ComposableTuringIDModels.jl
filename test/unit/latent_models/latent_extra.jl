@@ -135,17 +135,15 @@ end
     @test ComposableTuringIDModels.equal_dimensions(10, 3) == [4, 3, 3]
 end
 
-@testitem "MAStep convolves innovations in correct lag order" begin
-    using ComposableTuringIDModels: MAStep, accumulate_scan
+@testitem "MA convolves innovations in correct lag order" begin
+    using ComposableTuringIDModels, Distributions
+    using DynamicPPL: fix
     # MA(2): Z_t = ϵ_t + θ1 ϵ_{t-1} + θ2 ϵ_{t-2}; the first q outputs are the raw
-    # warm-up innovations in natural order. Drives the same seeding MA.jl uses
-    # (newest-first buffer via `reverse(ϵ[1:q])`).
+    # warm-up innovations in natural order.
     θ = [0.5, 0.2]
-    q = 2
     ϵ = [1.0, 2.0, 3.0, 4.0, 5.0]
-    ma = accumulate_scan(
-        MAStep(θ), (; val = 0.0, state = reverse(ϵ[1:q])), ϵ[(q + 1):end]
-    )
+    model = MA(; θ = [Normal(), Normal()], ϵ_t = IID(Normal()))
+    ma = fix(as_turing_model(model, 5), (θ = θ, ϵ_t = ϵ))()
     expected = [
         1.0, 2.0,
         3.0 + 0.5 * 2.0 + 0.2 * 1.0,
@@ -155,17 +153,20 @@ end
     @test ma ≈ expected
 end
 
-@testitem "ARStep applies damping in correct lag order" begin
-    using ComposableTuringIDModels: ARStep, accumulate_scan
-    # AR reverses the damping coefficients before building the step (see AR.jl)
-    # so ρ[i] multiplies the lag-i term. With ρ = [ρ1, ρ2], init [Z1, Z2] and
+@testitem "AR applies damping in correct lag order" begin
+    using ComposableTuringIDModels, Distributions
+    using DynamicPPL: fix
+    # ρ[i] multiplies the lag-i term. With ρ = [ρ1, ρ2], init [Z1, Z2] and
     # zero innovations: Z3 = ρ1 Z2 + ρ2 Z1, Z4 = ρ1 Z3 + ρ2 Z2, …
     ρ = [0.6, 0.3]
     init = [0.0, 1.0]        # oldest→newest: Z1 = 0, Z2 = 1
-    ϵ = [0.0, 0.0, 0.0]
-    ar = accumulate_scan(
-        ARStep(reverse(ρ)), (; val = last(init), window = init), ϵ
+    model = AR(;
+        damp = [Normal(), Normal()], init = [Normal(), Normal()],
+        ϵ_t = IID(Normal())
     )
+    ar = fix(
+        as_turing_model(model, 5), (init = init, damp = ρ, ϵ_t = zeros(3))
+    )()
     z3 = 0.6 * 1.0 + 0.3 * 0.0
     z4 = 0.6 * z3 + 0.3 * 1.0
     z5 = 0.6 * z4 + 0.3 * z3

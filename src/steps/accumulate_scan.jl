@@ -17,9 +17,13 @@ the scan, and `ϵ_t` is the driving sequence. The returned value is assembled by
   - `ϵ_t`: the driving sequence accumulated over.
 
 # Examples
+A random walk, a step adding each increment to the last value:
+
 ```@example accumulate_scan
 using ComposableTuringIDModels
-accumulate_scan(ComposableTuringIDModels.RWStep(), 0.0, [1.0, 2.0, 3.0])
+struct Walk <: ComposableTuringIDModels.AbstractAccumulationStep end
+(::Walk)(state, ϵ) = state + ϵ
+accumulate_scan(Walk(), 0.0, [1.0, 2.0, 3.0])
 ```
 "
 function accumulate_scan(acc_step::AbstractAccumulationStep, initial_state, ϵ_t)
@@ -31,8 +35,8 @@ end
 Assemble the final sequence from the raw output of [`accumulate_scan`](@ref).
 
 The default method prepends `initial_state` to the last element of each
-accumulated state. Step structs whose state is a named tuple (e.g. the `MA` and
-`LatentDelay` steps) override this method to extract the relevant field.
+accumulated state. A step whose state is a named tuple overrides this method
+to extract the relevant field.
 
 # Arguments
 
@@ -44,7 +48,10 @@ accumulated state. Step structs whose state is a named tuple (e.g. the `MA` and
 # Examples
 ```@example get_state
 using ComposableTuringIDModels
-accumulate_scan(ComposableTuringIDModels.RWStep(), 0.0, [1.0, 2.0, 3.0])
+struct Walk <: ComposableTuringIDModels.AbstractAccumulationStep end
+(::Walk)(state, ϵ) = state + ϵ
+# The seed followed by the last element of each accumulated state.
+accumulate_scan(Walk(), 0.0, [1.0, 2.0, 3.0])
 ```
 "
 function get_state(acc_step::AbstractAccumulationStep, initial_state, state)

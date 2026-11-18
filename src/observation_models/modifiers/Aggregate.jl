@@ -15,6 +15,27 @@ function _return_aggregate(pred_obs, idx, n)
     return agg_obs
 end
 
+# Sum `Y_t` over the windows `starts[k]:stops[k]`.
+# Windows that do not overlap go through `window_sums`, which brings its own
+# gradient rules.
+# Consecutive windows from time 1 are its windows as they are; otherwise each
+# window is preceded by the gap before it, so the even-numbered sums are the
+# windows.
+# Overlapping windows are summed directly.
+function _window_sums(Y_t, starts, stops)
+    k = length(starts)
+    if starts[1] == 1 && all(j -> starts[j] == stops[j - 1] + 1, 2:k)
+        return CR.window_sums(Y_t, stops)
+    end
+    if all(j -> starts[j] > stops[j - 1], 2:k)
+        ends = Vector{Int}(undef, 2k)
+        ends[1:2:end] .= starts .- 1
+        ends[2:2:end] .= stops
+        return CR.window_sums(Y_t, ends)[2:2:end]
+    end
+    return map((s, e) -> sum(Y_t[s:e]), starts, stops)
+end
+
 @doc raw"
 Aggregate the expected observations of an underlying model over reporting windows.
 
@@ -115,9 +136,8 @@ end
     # kept.
     scored = filter(>(offset), idx)
     @assert !isempty(scored) "Every reporting window ends before the start of the expected observations, so there is nothing to score. Shorten the delay applied outside the aggregation, or lengthen the series."
-    agg_Y_t = map(scored) do i
-        sum(Y_t[max(1, i - aggregation[i] + 1 - offset):(i - offset)])
-    end
+    starts = [max(1, i - aggregation[i] + 1 - offset) for i in scored]
+    agg_Y_t = _window_sums(Y_t, starts, scored .- offset)
     inner ~ as_turing_submodel(ag.model, y_t[present], agg_Y_t)
     # Scatter counts and means back into length-`n` vectors (zeros where absent).
     y_t = _return_aggregate(inner.y_t, idx, n)
