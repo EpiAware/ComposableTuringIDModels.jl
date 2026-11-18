@@ -17,11 +17,16 @@ end
 
 # Sum `Y_t` over the windows `starts[k]:stops[k]`.
 # Windows that do not overlap go through `window_sums`, which brings its own
-# gradient rules: each window is preceded by the gap before it, so the
-# even-numbered sums are the windows.
+# gradient rules.
+# Consecutive windows from time 1 are its windows as they are; otherwise each
+# window is preceded by the gap before it, so the even-numbered sums are the
+# windows.
 # Overlapping windows are summed directly.
 function _window_sums(Y_t, starts, stops)
     k = length(starts)
+    if starts[1] == 1 && all(j -> starts[j] == stops[j - 1] + 1, 2:k)
+        return CR.window_sums(Y_t, stops)
+    end
     if all(j -> starts[j] > stops[j - 1], 2:k)
         ends = Vector{Int}(undef, 2k)
         ends[1:2:end] .= starts .- 1
