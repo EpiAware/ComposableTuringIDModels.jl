@@ -132,17 +132,23 @@ end
 # each level has a concrete tuple type.
 # Each modifier is prefixed by its position, so two modifiers of the same kind
 # cannot collide on a variable name.
-@model function _resolve_modifiers(mods::Tuple{}, n, index)
-    return ()
+# The resolved modifiers are passed down and returned from the last level, not
+# splatted back up: Enzyme rejects the splat when the levels mix a modifier
+# that draws parameters with one that draws none.
+@model function _resolve_modifiers(mods::Tuple{}, n, index, resolved)
+    return resolved
 end
 
-@model function _resolve_modifiers(mods::Tuple, n, index)
+@model function _resolve_modifiers(mods::Tuple, n, index, resolved)
     modifier ~ to_submodel(
         prefix(as_turing_model(first(mods), n), Symbol(:modifier_, index)),
         false
     )
-    rest ~ to_submodel(
-        _resolve_modifiers(Base.tail(mods), n, index + 1), false
+    complete ~ to_submodel(
+        _resolve_modifiers(
+            Base.tail(mods), n, index + 1, (resolved..., modifier)
+        ),
+        false
     )
-    return (modifier, rest...)
+    return complete
 end

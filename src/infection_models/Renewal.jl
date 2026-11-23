@@ -355,7 +355,7 @@ end
     # the recurrence uses.
     coupling ~ to_submodel(_resolve_coupling(infection.mixing, n), false)
     modifiers ~ to_submodel(
-        _resolve_modifiers(infection.modifiers, n, 1), false
+        _resolve_modifiers(infection.modifiers, n, 1, ()), false
     )
     renewal = _renewal_recurrence(gen_int, coupling, modifiers)
 
