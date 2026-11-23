@@ -178,8 +178,10 @@ _series(v::AbstractVector{<:AbstractVector}) = reduce(hcat, v)
 
 # Drop the oldest entry and commit the new incidence.
 _advance(window::AbstractVector, new) = vcat(window[2:end], new)
+# `cat` rather than `hcat`: ReverseDiff's `hcat` method for a tracked vector is
+# ambiguous with SparseArrays' once both are loaded.
 function _advance(window::AbstractMatrix, new)
-    return hcat(collect(view(window, :, 2:size(window, 2))), new)
+    return cat(collect(view(window, :, 2:size(window, 2))), new; dims = 2)
 end
 
 # The number of lags a generation interval covers.
