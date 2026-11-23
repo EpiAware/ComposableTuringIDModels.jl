@@ -383,3 +383,33 @@ end
         model, 10
     )()
 end
+
+@testitem "a renewal takes ComposableRecurrences modifiers as they are" begin
+    using ComposableTuringIDModels, Distributions, ComposableRecurrences
+    using ComposableTuringIDModels: SusceptibleDepletion
+    using DynamicPPL: fix
+    const CR = ComposableRecurrences
+    gen_int = [0.2, 0.3, 0.5]
+    fixinit = (init_incidence = log(1.0),)
+    run(mods...) = fix(
+        as_turing_model(
+            Renewal(
+                gen_int, mods...;
+                rt = FixedIntercept(log(1.5)), initialisation = Normal()
+            ),
+            40
+        ),
+        fixinit
+    )().I_t
+    # The same depletion and importation, wrapped and bare.
+    wrapped = run(SusceptibleDepletion(50.0), ImportedCases(FixedIntercept(0.0)))
+    bare = run(CR.Depletion(50.0, CR.Floor()), CR.Transform(+, 1.0))
+    @test bare ≈ wrapped
+    # A depletion form with no wrapper of its own.
+    truncated_run = run(CR.Depletion(50.0, CR.Truncate()))
+    @test all(isfinite, truncated_run)
+    @test sum(truncated_run) <= 50.0 + 1.0e-8
+    @test_throws "ComposableRecurrences modifiers" Renewal(;
+        generation_time = gen_int, modifiers = (1.0,)
+    )
+end

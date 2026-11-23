@@ -26,6 +26,9 @@ A modifier carrying priors draws them here, through
 [`as_turing_submodel`](@ref), and returns a modifier holding the drawn values,
 as [`ImportedCases`](@ref) returns a `Transform(+, ι)` of the drawn
 importation rate.
+A ComposableRecurrences modifier with fixed values (a `Depletion`, flows
+included, a `Redistribute`, an `Allocate` or a `Transform`) is passed to
+[`Renewal`](@ref) as it is, with no wrapper.
 A new kind of step-level behaviour is a ComposableRecurrences modifier (a type
 with a `ComposableRecurrences.forward!` method for the `Step` role), wrapped
 by a renewal modifier that returns it.
@@ -73,6 +76,17 @@ It samples nothing, and resolves to ComposableRecurrences'
 struct SusceptibleDepletion{T} <: AbstractRenewalModifier
     "The population size, one value or one per stratum."
     pop_size::T
+end
+
+# The ComposableRecurrences modifiers a renewal takes as they are, since they
+# hold no priors and resolve to themselves.
+const _RecurrenceModifier = Union{
+    CR.Depletion, CR.Redistribute, CR.Allocate, CR.Transform,
+}
+const _RenewalModifier = Union{AbstractRenewalModifier, _RecurrenceModifier}
+
+@model function as_turing_model(mod::_RecurrenceModifier, n)
+    return mod
 end
 
 # A modifier with no resolution would otherwise fail with a bare `MethodError`

@@ -59,8 +59,8 @@ as_turing_model(model, args...; kwargs...)  # returns a DynamicPPL.Model
 
 - Every model struct implements one `@model function as_turing_model(m::MyModel, ...)`.
 - Compose via submodels of `as_turing_model(component, ...)`.
-- Keep backend-agnostic pieces backend-agnostic (`accumulate_scan`,
-  `AbstractAccumulationStep` step structs, distribution/utility helpers).
+- Recursions and convolutions run on ComposableRecurrences.jl; keep the
+  distribution and utility helpers backend-agnostic.
 - Collapse the deep abstract hierarchy. A single light supertype (e.g.
   `AbstractComposableModel`) for shared behaviour/printing is fine; the deep
   `AbstractTuring*` tree is not needed.

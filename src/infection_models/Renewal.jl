@@ -94,8 +94,9 @@ A partially pooled generation interval therefore needs no new component, e.g.
     generation-interval convolutions before `R_t` (default `I`, uncoupled).
     A `strata × strata × lags` array replaces the generation interval in the
     convolution, which then only sets the seeding window.
-  - `modifiers`: the [`AbstractRenewalModifier`](@ref)s applied to each
-    step's new infections, in order.
+  - `modifiers`: the [`AbstractRenewalModifier`](@ref)s, or
+    ComposableRecurrences modifiers, applied to each step's new infections,
+    in order.
 
 ## Constructor
 
@@ -224,11 +225,11 @@ function Renewal(;
 end
 
 # Positional modifier form, taking the generation time first and then the
-# [`AbstractRenewalModifier`](@ref)s applied to each step.
+# modifiers applied to each step.
 # It delegates to the keyword form, so there is one construction path.
 function Renewal(
         generation_time::Union{AbstractVector, Distribution, AbstractPriorModel},
-        modifiers::AbstractRenewalModifier...;
+        modifiers::_RenewalModifier...;
         rt = RandomWalk(), mixing = I, initialisation = Normal(),
         transformation::Function = exp, D_gen = nothing, Δd = 1.0
     )
@@ -243,13 +244,14 @@ end
 # the modifier types concrete.
 # The keyword form has no signature to constrain it, so what it was given is
 # checked here rather than failing as a `MethodError` from inside the seam.
-_modifier_tuple(mod::AbstractRenewalModifier) = (mod,)
+_modifier_tuple(mod::_RenewalModifier) = (mod,)
 
 function _modifier_tuple(mods)
     tup = Tuple(mods)
-    all(m -> m isa AbstractRenewalModifier, tup) || throw(
+    all(m -> m isa _RenewalModifier, tup) || throw(
         ArgumentError(
-            "`modifiers` takes `AbstractRenewalModifier`s, but was given " *
+            "`modifiers` takes `AbstractRenewalModifier`s or " *
+                "ComposableRecurrences modifiers, but was given " *
                 "$(join(nameof.(typeof.(tup)), ", "))."
         )
     )
