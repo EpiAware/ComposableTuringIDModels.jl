@@ -82,7 +82,7 @@ export as_turing_submodel
 # --- utilities and distributions ---
 # Double-interval censoring comes from CensoredDistributions.jl and is not
 # re-exported here.
-export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial,
+export HalfNormal, SafePoisson, SafeNegativeBinomial,
     NegativeBinomialMeanClust, condition_model
 
 # --- latent models ---
@@ -145,7 +145,7 @@ export IDProblem, NUTSampler, DirectSample,
 # Public but not exported, so they are documented and supported without crowding
 # the namespace of a `using` call.
 public ModelShape, across_shape, infection_strata,
-    AbstractAccumulationStep, AbstractRenewalModifier,
+    AbstractRenewalModifier,
     MissingObservations, AbstractBroadcastRule,
     at, path_prior, prior_order, assert_prior_length,
     wrapped_models, observation_components, rewrap, swap
@@ -157,11 +157,6 @@ include("base/shapes.jl")
 include("base/interfaces.jl")
 include("base/priors.jl")
 include("base/prettyprinting.jl")
-
-# --- accumulation steps ---
-include("steps/AbstractAccumulationStep.jl")
-include("steps/accumulate_scan.jl")
-include("steps/RWStep.jl")
 
 # --- utilities and distributions ---
 include("utils/HalfNormal.jl")

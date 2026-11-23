@@ -1,5 +1,4 @@
-# Random walk latent process model. Its accumulation step (`RWStep`) lives in
-# `src/steps/`.
+# Random walk latent process model.
 
 @doc raw"
 Model the latent process ``Z_t`` as a random walk.
@@ -54,6 +53,6 @@ end
     @assert n > 0 "n must be greater than 0"
     init ~ as_turing_submodel(model.init, 1; prefix = true)
     ϵ_t ~ as_turing_submodel(model.ϵ_t, n - 1)
-    rw = accumulate_scan(RWStep(), only(init), ϵ_t)
-    return rw
+    Z_0 = only(init)
+    return vcat(Z_0, accumulate(+, ϵ_t; init = Z_0))
 end

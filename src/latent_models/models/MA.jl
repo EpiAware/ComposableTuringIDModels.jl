@@ -1,5 +1,5 @@
-# Moving-average (MA) latent process model. Its accumulation step (`MAStep`)
-# lives in `src/steps/`.
+# Moving-average (MA) latent process model, a causal ComposableRecurrences
+# `Convolution` of the innovations.
 
 @doc raw"
 A moving-average MA(`q`) latent process.

@@ -149,7 +149,8 @@ Both tools rest on a seam a component *author* implements rather than one a user
 The recurrences that drive the time series run on [ComposableRecurrences.jl](https://github.com/EpiAware/ComposableRecurrences.jl).
 A [`Renewal`](@ref) is a `Recurrence` whose kernel is the generation interval and whose gain is ``R_t``, an [`AR`](@ref) is a `Recurrence` driven by its innovations, and a [`LatentDelay`](@ref) is a causal `Convolution`.
 Each operator brings its own gradient rules.
-[`RandomWalk`](@ref) stays on [`accumulate_scan`](@ref), which is faster than a unit lag-1 `Recurrence` for now.
+[`RandomWalk`](@ref) and [`ExpGrowthRate`](@ref) use Base `accumulate` and `cumsum`, which are faster than a unit lag-1 `Recurrence` for now.
+A new recursion is written as a `Recurrence`, or as a renewal modifier, so the package keeps no scan machinery of its own.
 
 Within the renewal family the recurrence's modifiers compose.
 A renewal is a generation-interval convolution plus an ordered tuple of modifiers that act on each step's new infections.
