@@ -95,7 +95,10 @@ end
 
 # DynamicPPL names a sampled variable after the literal left-hand side of `~`,
 # so a name held at run time takes the calls `~` itself makes: a fixed value is
-# returned, a conditioned one is scored, and anything else is drawn.
+# returned unrecorded, as `~` returns it, a conditioned one is scored, and
+# anything else is drawn.
+# These are DynamicPPL internals, matching its 0.42 compiler; `y ~ dist`, the
+# documented replacement for `NamedDist`, needs the name when it is written.
 function _named_tilde!!(model, varinfo, dist, vn)
     context = model.context
     full_vn = DynamicPPL.prefix(context, vn)

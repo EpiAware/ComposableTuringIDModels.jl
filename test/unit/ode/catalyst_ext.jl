@@ -63,6 +63,46 @@ end
     @test !("R" in nms)
 end
 
+@testitem "CatalystODEParams names can be conditioned, fixed and prefixed" begin
+    using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq,
+        Distributions
+    using DynamicPPL: DynamicPPL, condition, fix, prefix, logprior
+    sir = @reaction_network begin
+        β, S + I --> 2I
+        γ, I --> R
+    end
+    β_prior = LogNormal(log(0.3), 0.05)
+    params = CatalystODEParams(
+        sir;
+        tspan = (0.0, 30.0),
+        u0_priors = [sir.S => 0.99, sir.I => 0.01, sir.R => 0.0],
+        p_priors = [sir.β => β_prior, sir.γ => LogNormal(log(0.1), 0.05)]
+    )
+    model = as_turing_model(params, nothing)
+    rate(pairs, value) = any(pr -> pr.second == value, pairs)
+
+    # Conditioned: β is no longer drawn, its value reaches the rates and it is
+    # scored against its prior.
+    conditioned = condition(model, (β = 0.25,))
+    _, p = conditioned()
+    @test rate(p, 0.25)
+    @test !("β" in string.(keys(rand(conditioned))))
+    vi = DynamicPPL.VarInfo(conditioned)
+    @test DynamicPPL.getlogp(vi).loglikelihood ≈ logpdf(β_prior, 0.25)
+
+    # Fixed: β takes the value and is neither drawn nor scored.
+    fixed = fix(model, (β = 0.25,))
+    _, p = fixed()
+    @test rate(p, 0.25)
+    @test !("β" in string.(keys(rand(fixed))))
+
+    # Inside a prefixed submodel the names take the prefix.
+    @test all(
+        n -> n in string.(keys(rand(prefix(model, :ode)))),
+        ["ode.β", "ode.γ"]
+    )
+end
+
 @testitem "CatalystODEParams enforces a prior for every species and parameter" begin
     using ComposableTuringIDModels, Catalyst, ModelingToolkit, OrdinaryDiffEq, Distributions
     sir = @reaction_network begin
