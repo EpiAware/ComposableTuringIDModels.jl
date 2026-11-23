@@ -1,12 +1,23 @@
 # Enzyme AD-safety machinery: `deepcopy` of missing-bearing conditioning data
-# is marked inactive, and forward-mode `dot` gets a rule BLAS does not provide.
+# and the rebuild of a partially missing series are marked inactive, and
+# forward-mode `dot` gets a rule BLAS does not provide.
 # Both are generic DynamicPPL/Enzyme fixes, so they belong in
 # `EpiAwareADTools.jl`.
 module ComposableTuringIDModelsEnzymeExt
 
+using ComposableTuringIDModels: ComposableTuringIDModels, MissingObservations
 using Enzyme: Enzyme
 using Enzyme.EnzymeRules: EnzymeRules
 using LinearAlgebra: dot
+
+# Rebuilding a partially missing series is data only, and its
+# `Union{Missing, T}` vector fails Enzyme's type analysis, so it is inactive.
+function EnzymeRules.inactive(
+        ::typeof(ComposableTuringIDModels._restore_missing),
+        ::MissingObservations
+    )
+    return nothing
+end
 
 # Keep the `T <: Real` bound. `Union{Missing, Any}` collapses to `Any`, so a
 # wider signature would also match `deepcopy(::Vector{Any})` and silently zero a
