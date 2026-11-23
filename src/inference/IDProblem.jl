@@ -1,104 +1,179 @@
-# `IDProblem`: an infection + observation model over a time span.
+# A composed model paired with the data it is fitted to, so the shape of the
+# infection process comes from the data rather than being stored on the model.
 
 @doc raw"
-A full epidemiological inference problem: an infection process, an observation
-model, and a time span. The latent (parameter) process is owned by the infection
-model, so it is not a separate slot here.
+A composed model and the data it is fitted to.
 
-`as_turing_model(problem, data)` assembles the corresponding [`IDModel`](@ref)
-over `tspan` and conditions it on `data.y_t`. The infection process's shape is
-read from the observation model and `data.y_t` at build time (see
-[`infection_strata`](@ref)), not stored on the problem: a plain vector (or
-`missing`) gives a single-series infection process, exactly as today, while a
-data matrix or a `NamedTuple` of streams gives a stratified infection process
-with one row per stratum.
+An [`IDModel`](@ref) says what the process is. The data says how long it runs
+and how many streams it has. Holding the two together means
+[`as_turing_model(problem)`](@ref as_turing_model) and
+[`data_requirements(problem)`](@ref data_requirements) need no length restated.
+
+The shape of the infection process is read from the observation model and the
+data at build time (see [`infection_strata`](@ref)). A plain vector gives a
+single series. A `strata x time` matrix or a `NamedTuple` of streams gives a
+stratified process.
+
+Construction refuses streams that disagree with each other. It cannot see a
+length disagreement on a single series, because the observation count is read
+from that same series, so ask [`data_requirements`](@ref) for that.
+
+A problem whose observations have not arrived yet is one over a blank series,
+`Vector{Missing}(missing, n)`. The data is attached, or swapped for a refit,
+with `Accessors`:
+
+```julia
+using Accessors
+fitted = @set problem.data = y
+```
+
+Printing an `IDProblem` shows the component tree and a summary of the data.
 
 # Arguments
 
-  - `idproblem`: the [`IDProblem`](@ref).
-  - `data`: a value with a `y_t` field holding the observations (or `missing`).
+  - `model`: the composed [`IDModel`](@ref).
+  - `data`: the observations. A vector, a `strata x time` matrix, or a
+    `NamedTuple` of streams.
 
 # Examples
 ```@example IDProblem
 using ComposableTuringIDModels, Distributions
-problem = IDProblem(
-    infection = DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
-    observation_model = PoissonError(),
-    tspan = (1, 20))
-rand(as_turing_model(problem, (; y_t = missing)))
+model = IDModel(
+    DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
+    PoissonError())
+problem = IDProblem(model, Vector{Missing}(missing, 20))
+```
+
+```@example IDProblem
+rand(as_turing_model(problem))
 ```
 
 ## Fields
 
-  - `infection`: the infection process model.
-  - `observation_model`: the observation model.
-  - `tspan`: the `(first, last)` time span of the observations. An observation
-    chain with delays consumes the head of the series it is handed, so the
-    infection process runs over a longer span than this; see
-    [`observation_lead_in`](@ref).
+  - `model`: the composed [`IDModel`](@ref).
+  - `data`: the observations.
 "
-@kwdef struct IDProblem{I <: AbstractInfectionModel, O <: AbstractObservationModel}
-    "The infection process model."
-    infection::I
-    "The observation model."
-    observation_model::O
-    "The `(first, last)` time span of the observations."
-    tspan::Tuple{Int, Int}
+struct IDProblem{M <: IDModel, D}
+    "The composed model."
+    model::M
+    "The observations the model is fitted to."
+    data::D
+
+    function IDProblem(model::M, data::D) where {M <: IDModel, D}
+        _assert_data_fits(model, data)
+        return new{M, D}(model, data)
+    end
 end
 
-# The infection process's `ModelShape` implied by an observation model and a
-# data value, shared by `IDProblem` and `forecast` so the two build a
-# data-driven model's shape the same way.
-# With `y_t === missing` there is no data to read a stream count from, so the
-# shape falls back to the observation model alone.
-_obs_data_shape(obs, y_t, time_steps) = time_steps
-_obs_data_shape(obs, y_t::Missing, time_steps) = _obs_data_shape_missing(
-    obs, time_steps
-)
-function _obs_data_shape(obs, y_t::AbstractMatrix, time_steps)
-    return (infection_strata(obs, size(y_t, 1)), time_steps)
-end
-function _obs_data_shape(obs, y_t::NamedTuple, time_steps)
-    return (infection_strata(obs, length(y_t)), time_steps)
-end
-
-_obs_data_shape_missing(obs, time_steps) = time_steps
-function _obs_data_shape_missing(s::Split, time_steps)
-    s.map === nothing || return (size(s.map, 2), time_steps)
-    s.names === nothing || return (length(s.names), time_steps)
-    return time_steps
+# An inner constructor, so `@set problem.data` is checked on the same terms.
+# The guard fires only when the streams disagree with each other, a stream
+# longer than the one the observation count is read from.
+# It never rejects data `as_turing_model` would accept, because `data_fits` is
+# the weaker of the two conditions.
+# The build check adds an exact-length rule and the legacy-`n` rule on top.
+function _assert_data_fits(model::IDModel, data)
+    required = data_requirements(model, data, _data_shape(model, data))
+    data_fits(required) && return nothing
+    return throw(
+        ArgumentError(
+            "the data does not fit the model:\n" *
+                sprint(show, MIME"text/plain"(), required)
+        )
+    )
 end
 
-# The problem's lead-in is its observation model's, and `tspan` is the span of
-# the OBSERVATIONS, so a requirements report needs no separate `n`.
-function observation_lead_in(idproblem::IDProblem)
-    return observation_lead_in(idproblem.observation_model)
-end
+# The problem's lead-in and observation chain are its model's, so a requirements
+# report reads the same either way.
+observation_lead_in(problem::IDProblem) = observation_lead_in(problem.model)
+_observation_chain(problem::IDProblem) = _observation_chain(problem.model)
 
-_observation_chain(idproblem::IDProblem) = idproblem.observation_model
+# There is deliberately no `data_fits(::IDProblem)`.
+# The count would be read from the same data it was checked against, so for a
+# single series it is true by construction and would be false reassurance.
+# `data_fits(model, y_t, n)` takes the two independently.
+_problem_shape(problem::IDProblem) = _data_shape(problem.model, problem.data)
 
-data_requirements(idproblem::IDProblem, data) = data_requirements(
-    idproblem, data.y_t, _tspan_length(idproblem)
-)
-
-data_requirements(idproblem::IDProblem) = data_requirements(
-    idproblem, missing, _tspan_length(idproblem)
+data_requirements(problem::IDProblem) = data_requirements(
+    problem.model, problem.data, _problem_shape(problem)
 )
 
-# Disambiguation: a bare `ModelShape` second argument is a length, not a data
-# carrier, so it overrides the problem's own `tspan`.
-data_requirements(idproblem::IDProblem, n::ModelShape) = data_requirements(
-    idproblem, missing, n
-)
-
-_tspan_length(idproblem::IDProblem) =
-    idproblem.tspan[end] - idproblem.tspan[1] + 1
-
-@model function as_turing_model(idproblem::IDProblem, data)
-    y_t = data.y_t
-    time_steps = _tspan_length(idproblem)
-    model = IDModel(idproblem.infection, idproblem.observation_model)
-    shape = _obs_data_shape(idproblem.observation_model, y_t, time_steps)
-    out ~ as_turing_submodel(model, y_t, shape)
-    return out
+# The generic method would report as if nothing had been supplied, discarding
+# the data the problem exists to hold, so a bare length is refused by name.
+function data_requirements(::IDProblem, ::ModelShape)
+    return throw(
+        ArgumentError(
+            "an `IDProblem` holds its own data, so `data_requirements(problem)` " *
+                "takes no length; to report over a different length or dataset " *
+                "use `data_requirements(problem.model, y_t, n)`"
+        )
+    )
 end
+
+@doc raw"
+Build the `DynamicPPL.Model` for an [`IDProblem`](@ref).
+
+The problem holds the data, so `as_turing_model(problem)` is
+`as_turing_model(problem.model, problem.data)`. There is no method taking data
+alongside the problem. Fitting the same model to a different series is a
+different problem, built with `Accessors`:
+
+```julia
+using Accessors
+refit = @set problem.data = y_new
+```
+
+# Arguments
+
+  - `problem`: the [`IDProblem`](@ref).
+"
+as_turing_model(problem::IDProblem) = as_turing_model(problem.model, problem.data)
+
+# --- printing ---------------------------------------------------------------
+
+# The model's components hang directly off the problem, with the data as a final
+# sibling, so the pairing reads as one tree.
+function Base.show(io::IO, ::MIME"text/plain", problem::IDProblem)
+    print(io, "IDProblem")
+    _print_component_tree(
+        io, _component_children(problem.model), "";
+        trailing = (string("data: ", _data_summary(problem.data)),)
+    )
+    return nothing
+end
+
+Base.show(io::IO, ::IDProblem) = print(io, "IDProblem")
+
+# Data with nothing observed in it reads as a simulation whatever shape it
+# takes, because a count of values that are all blank reads as if something had
+# been supplied.
+_blank_summary(n) = "none, $n time points (simulating from the prior)"
+function _data_summary(y::AbstractVector)
+    n = length(y)
+    blank = count(ismissing, y)
+    blank == n && return _blank_summary(n)
+    counted = string(n, " observation", n == 1 ? "" : "s")
+    blank == 0 && return string(counted, " (", eltype(y), ")")
+    return string(counted, ", ", blank, " missing")
+end
+
+function _data_summary(y::AbstractMatrix)
+    strata, n = size(y)
+    all(ismissing, y) && return _blank_summary(n)
+    return string(
+        strata, " strat", strata == 1 ? "um" : "a", " x ", n,
+        " observation", n == 1 ? "" : "s"
+    )
+end
+
+# A `NamedTuple` is a stream per entry for a `Split`, and a field per entry for
+# a model that reads more than the counts (a `BinomialError` takes `(y, N)`), so
+# the summary names the entries without claiming which.
+# `data_requirements` is what distinguishes them.
+function _data_summary(y::NamedTuple)
+    n = _series_time_length(y)
+    all(v -> all(ismissing, v), y) && return _blank_summary(n)
+    return string(n, " observations in each of ", join(keys(y), ", "))
+end
+
+# Anything else names its type, since the summary has to stay one line.
+_data_summary(y) = string(typeof(y))

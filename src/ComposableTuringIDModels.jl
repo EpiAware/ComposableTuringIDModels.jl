@@ -26,9 +26,8 @@ module ComposableTuringIDModels
 # write `using ComposableTuringIDModels, Distributions, Turing`.
 # Only the names the package itself uses or extends are imported below.
 
-using DynamicPPL: DynamicPPL, @model, to_submodel, fix, condition, prefix,
-    returned
-using Turing: Turing, filldist, sample, MCMCSerial, predict
+using DynamicPPL: DynamicPPL, @model, to_submodel, prefix
+using Turing: Turing, filldist, predict
 using FlexiChains: FlexiChains
 using CensoredDistributions: double_interval_censored
 # `Accessors` and `rewrap` rebuild a component through
@@ -46,12 +45,7 @@ using Random: AbstractRNG, randexp, default_rng
 using KernelFunctions: Kernel, SqExponentialKernel, Matern32Kernel,
     Matern52Kernel, with_lengthscale, kernelmatrix
 
-# Inference-layer dependencies.
-using ADTypes: ADTypes, AutoForwardDiff
-using AbstractMCMC: AbstractMCMC
-using AdvancedHMC: DiagEuclideanMetric
-using MCMCChains: Chains
-using DataFramesMeta: DataFrame, @rename!
+# `ReportTriangle` accepts reports as a long-form table of rows.
 using Tables: rowtable
 
 # Distributions names used (and, for many, extended) by the package, imported
@@ -77,7 +71,7 @@ export as_turing_submodel
 # Double-interval censoring comes from CensoredDistributions.jl and is not
 # re-exported here.
 export accumulate_scan, get_state, HalfNormal, SafePoisson, SafeNegativeBinomial,
-    NegativeBinomialMeanClust, condition_model
+    NegativeBinomialMeanClust
 
 # --- latent models ---
 export IID, HierarchicalNormal, RandomWalk, AR, MA, Intercept,
@@ -131,9 +125,7 @@ export DataRequirements, StreamRequirement
 export IDModel
 
 # --- inference orchestration ---
-export IDProblem, NUTSampler, DirectSample,
-    apply_method, IDObservables, generated_observables,
-    spread_draws, get_param_array, forecast
+export IDProblem, forecast
 
 # --- extension points ---
 # Names a component author implements against but rarely calls.
@@ -178,7 +170,6 @@ include("utils/SafeInt.jl")
 include("utils/SafePoisson.jl")
 include("utils/SafeNegativeBinomial.jl")
 include("utils/censored_pmf.jl")
-include("utils/turing-methods.jl")
 
 # --- latent models ---
 include("latent_models/models/IID.jl")
@@ -248,14 +239,7 @@ include("observation_models/traversal.jl")
 include("observation_models/requirements.jl")
 
 # --- inference orchestration ---
-include("inference/types.jl")
 include("inference/IDProblem.jl")
-include("inference/IDObservables.jl")
-include("inference/apply_method.jl")
-include("inference/NUTSampler.jl")
-include("inference/DirectSample.jl")
-include("inference/get_param_array.jl")
-include("inference/post-inference.jl")
 include("inference/forecast.jl")
 
 end

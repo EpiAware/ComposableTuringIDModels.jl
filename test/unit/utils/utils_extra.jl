@@ -74,28 +74,6 @@ end
     @test all(>(0), rt)
 end
 
-@testitem "DirectSample draws from the prior" begin
-    using ComposableTuringIDModels, Distributions, Turing, Random
-    Random.seed!(81)
-    @model g() = (x ~ Normal())
-    # apply_method wraps the solution in IDObservables; `.samples` is the
-    # raw inference result.
-    chain = apply_method(g(), DirectSample(; n_samples = 10))
-    @test chain isa IDObservables
-    @test chain.samples !== nothing
-    single = apply_method(g(), DirectSample())
-    @test haskey(single.samples, @varname(x))
-end
-
-@testitem "get_param_array reshapes a Chains into (draws, chains)" begin
-    using ComposableTuringIDModels, Distributions, Turing, MCMCChains, Random
-    Random.seed!(82)
-    @model g() = (x ~ Normal())
-    chn = MCMCChains.Chains(sample(g(), Prior(), MCMCSerial(), 3, 2; progress = false))
-    A = get_param_array(chn)
-    @test size(A) == (3, 2)
-end
-
 @testitem "_safe_int_floor rejects non-finite input with a clear DomainError" begin
     using ComposableTuringIDModels: _safe_int_floor
     # A non-finite value must raise a `DomainError` naming the offending value,

@@ -50,8 +50,12 @@ _node_label(model) = string(nameof(typeof(model)))
 
 # Recursively print the component children beneath an already-printed node, using
 # box-drawing connectors and an accumulated `prefix` for indentation.
-function _print_component_tree(io::IO, children, prefix::AbstractString)
-    n = length(children)
+# `trailing` holds already-formatted lines for siblings that are not components
+# and so have no subtree of their own, such as the data an `IDProblem` carries.
+function _print_component_tree(
+        io::IO, children, prefix::AbstractString; trailing = ()
+    )
+    n = length(children) + length(trailing)
     for (i, (role, child)) in enumerate(children)
         is_last = i == n
         print(
@@ -60,6 +64,10 @@ function _print_component_tree(io::IO, children, prefix::AbstractString)
         )
         child_prefix = string(prefix, is_last ? "   " : "│  ")
         _print_component_tree(io, _component_children(child), child_prefix)
+    end
+    for (i, line) in enumerate(trailing)
+        is_last = length(children) + i == n
+        print(io, '\n', prefix, is_last ? "└─ " : "├─ ", line)
     end
     return nothing
 end
