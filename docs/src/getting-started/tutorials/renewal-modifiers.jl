@@ -1,12 +1,16 @@
 md"""
-# [Renewal modifiers: susceptible depletion and importation](@id renewal-modifiers)
+# [Renewal modifiers](@id renewal-modifiers)
 
 A [`Renewal`](@ref) process can be extended by *modifiers* that change how the next incidence is formed.
-This page takes one delayed renewal process and adds two of them, so the contribution of each is visible against the same baseline.
-[`SusceptibleDepletion`](@ref) bounds the epidemic by a finite population, and [`ImportedCases`](@ref) seeds infections from outside it.
+This page takes one delayed renewal process and composes three of them onto it.
+[`SusceptibleDepletion`](@ref) bounds the epidemic by a finite population.
+[`ImportedCases`](@ref) seeds infections from outside it.
+[`InfectionNoise`](@ref) gives infections a distribution of their own rather than fixing them at the renewal expectation.
+Each is added against the same baseline, so its contribution is visible on its own.
 
-Everything else is held fixed: the same generation interval, the same reproduction number, the same reporting delay, and the same initial incidence.
-Only the modifier list changes.
+Everything else is held fixed.
+The generation interval, the reproduction number, the reporting delay and the initial incidence are the same in every run, and only the modifier list changes.
+The last two sections fit models carrying modifiers back to simulated data.
 """
 
 using ComposableTuringIDModels, Distributions, Random, Turing, Mooncake
@@ -174,6 +178,71 @@ axislegend(ax3; position = :rt)
 fig2
 
 md"""
+## Stochastic infections
+
+Both modifiers so far transform the incidence the renewal equation implies, and the result is still one number per day.
+[`InfectionNoise`](@ref) instead gives infections a distribution of their own, matched to the first two moments of a negative binomial about the renewal expectation ``\iota_t``.
+It composes positionally like the others, so a noisy, depleting, seeded renewal is one more argument.
+"""
+
+noise = InfectionNoise(; overdispersion = 0.2)
+noisy = IDModel(
+    renewal(
+        SusceptibleDepletion(pop_size),
+        ImportedCases(FixedIntercept(log(2.0))),
+        noise
+    ),
+    obs
+)
+
+paths = [simulate(noisy).I_t for _ in 1:20]
+nothing # hide
+
+md"""
+Each day's draw is centred on the incidence the renewal equation implies from the history it has reached.
+Noise moves that day off the deterministic path, and the recursion carries the displacement forward, so the paths separate rather than scattering about a common line.
+"""
+
+fig3 = Figure(; size = (760, 300))
+ax4 = Axis(
+    fig3[1, 1]; xlabel = "Day", ylabel = "Infections Iₜ", yscale = log10
+)
+for path in paths
+    lines!(ax4, inf_days, path; color = (:teal, 0.3), linewidth = 1)
+end
+lines!(
+    ax4, inf_days, sims.seeded.I_t; color = :black, linewidth = 2,
+    label = "deterministic"
+)
+axislegend(ax4; position = :lt)
+fig3
+
+md"""
+## Centred and non-centred
+
+A modifier is a deterministic function of the incidence reaching it, so as a modifier the noise has to be non-centred.
+The sampled parameters are standard normals and the location and scale are applied inside the scan.
+
+[`StochasticRenewal`](@ref) runs the same specification centred.
+It draws `I_t` with the expectation in hand, so infections are themselves the sampled parameters and the likelihood informs them directly.
+It takes [`Renewal`](@ref)'s arguments with a `noise` keyword added, and the deterministic modifiers compose onto it unchanged.
+Reach for it first, and for the modifier when a non-centred draw is wanted or when the renewal is stratified.
+"""
+
+stochastic = IDModel(
+    StochasticRenewal(
+        gen_int,
+        SusceptibleDepletion(pop_size),
+        ImportedCases(FixedIntercept(log(2.0)));
+        rt = FixedIntercept(log(1.3)), initialisation = Normal(),
+        noise = noise
+    ),
+    obs
+)
+sim_stochastic = simulate(stochastic)
+nothing # hide
+
+md"""
 ## Fitting a model with modifiers
 
 Modifiers are part of the model, so a model carrying them is fitted like any other.
@@ -223,31 +292,84 @@ y_draws(i) = Float64.(vec(pred[@varname(y_t[i])]))
 quantiles(i) = quantile(y_draws(i), [0.05, 0.5, 0.95])
 bands = reduce(hcat, map(quantiles, 1:n))
 
-fig3 = Figure(; size = (760, 300))
-ax4 = Axis(
-    fig3[1, 1]; xlabel = "Day", ylabel = "Reported cases",
+fig4 = Figure(; size = (760, 300))
+ax5 = Axis(
+    fig4[1, 1]; xlabel = "Day", ylabel = "Reported cases",
     yscale = log10
 )
 band!(
-    ax4, obs_days, max.(bands[1, :], 1), max.(bands[3, :], 1);
+    ax5, obs_days, max.(bands[1, :], 1), max.(bands[3, :], 1);
     color = (:teal, 0.25)
 )
 lines!(
-    ax4, obs_days, max.(bands[2, :], 1); color = :teal, linewidth = 2,
+    ax5, obs_days, max.(bands[2, :], 1); color = :teal, linewidth = 2,
     label = "posterior predictive"
 )
 scatter!(
-    ax4, obs_days, max.(y_obs, 1); color = :black,
+    ax5, obs_days, max.(y_obs, 1); color = :black,
     markersize = 7, label = "simulated"
 )
-axislegend(ax4; position = :lt)
-fig3
+axislegend(ax5; position = :lt)
+fig4
+
+md"""
+## Fitting the stochastic renewal
+
+Nothing about the fit changes when the infections are stochastic.
+The model is passed to `sample` the same way, and the noise specification is the one used to simulate.
+What changes is that infections are no longer a deterministic function of the other parameters, so they carry a posterior of their own and are recovered by name from the chain.
+"""
+
+y_stochastic = sim_stochastic.generated_y_t
+chain_stochastic = sample(
+    as_turing_model(stochastic, y_stochastic, n),
+    NUTS(0.95; adtype = AutoMooncake(; config = nothing)),
+    MCMCThreads(), 250, 2; progress = false
+)
+nothing # hide
+
+infection_draws(i) = Float64.(vec(chain_stochastic[@varname(I_t[i])]))
+infection_bands = reduce(
+    hcat, [quantile(infection_draws(i), [0.05, 0.5, 0.95]) for i in inf_days]
+)
+
+fig5 = Figure(; size = (760, 300))
+ax6 = Axis(
+    fig5[1, 1]; xlabel = "Day", ylabel = "Infections Iₜ", yscale = log10
+)
+band!(
+    ax6, inf_days, infection_bands[1, :], infection_bands[3, :];
+    color = (:teal, 0.25)
+)
+lines!(
+    ax6, inf_days, infection_bands[2, :]; color = :teal, linewidth = 2,
+    label = "posterior"
+)
+lines!(
+    ax6, inf_days, sim_stochastic.I_t; color = :black, linewidth = 2,
+    label = "simulated"
+)
+axislegend(ax6; position = :lt)
+fig5
+
+md"""
+The simulated path sits inside the 90% interval on most days.
+"""
+
+covered = count(
+    i -> infection_bands[1, i] <= sim_stochastic.I_t[i] <= infection_bands[3, i],
+    eachindex(inf_days)
+)
+(; covered, days = length(inf_days))
 
 md"""
 ## Summary
 
-Both extensions are one positional argument on [`Renewal`](@ref), and neither changes the observation model, the latent process, or the fitting code.
+Each extension is one positional argument on [`Renewal`](@ref), and none of them changes the observation model, the latent process, or the fitting code.
 Each draws whatever it does not know through the same seam every other component uses.
 The importation rate can therefore be a fixed constant, an unknown constant, or a time-varying process such as a [`RandomWalk`](@ref).
 In every case the prior is on the log scale.
+
+Stochastic infections are the one extension with a second form.
+As a modifier they are non-centred, and [`StochasticRenewal`](@ref) draws the same specification centred, which is the parameterisation to prefer when the data inform the infection path.
 """

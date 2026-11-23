@@ -60,24 +60,29 @@ function R_to_r(R₀, w::AbstractVector{T}; newton_steps = 2, Δd = 1.0) where {
     return r_approx
 end
 
-# The fixed generation interval of a `Renewal`, or a clear error when it is
+# The two models carrying a generation interval. They take the same arguments,
+# so the deterministic summaries below serve both.
+const _RenewalModel = Union{Renewal, StochasticRenewal}
+
+# The fixed generation interval of a renewal model, or a clear error when it is
 # inferred.
 # An uncertain interval varies per draw, so there is no single interval for these
 # deterministic summaries to use.
-function _fixed_gen_int(infection::Renewal)
+function _fixed_gen_int(infection::_RenewalModel)
     infection.gen_int isa AbstractVector && return infection.gen_int
     throw(
         ArgumentError(
             "`R_to_r`/`expected_Rt` need a fixed generation interval, but this " *
-                "`Renewal` has an inferred (uncertain) generation interval that varies " *
+                "model has an inferred (uncertain) generation interval that varies " *
                 "per draw. Summarise the sampled interval per posterior draw instead."
         )
     )
 end
 
-# Only `Renewal` carries a generation interval, so the model-typed method
-# dispatches on it specifically (the other infection models have no `gen_int`).
-function R_to_r(R₀, infection::Renewal; newton_steps = 2, Δd = 1.0)
+# Only the renewal models carry a generation interval, so the model-typed
+# method dispatches on them specifically (the other infection models have no
+# `gen_int`).
+function R_to_r(R₀, infection::_RenewalModel; newton_steps = 2, Δd = 1.0)
     return R_to_r(
         R₀, _fixed_gen_int(infection); newton_steps = newton_steps,
         Δd = Δd
@@ -114,7 +119,7 @@ function expected_Rt(gen_int::AbstractVector, infections::Vector{<:Real})
     return infections[(n + 1):end] ./ denom_Rt
 end
 
-function expected_Rt(infection::Renewal, infections::Vector{<:Real})
+function expected_Rt(infection::_RenewalModel, infections::Vector{<:Real})
     return expected_Rt(_fixed_gen_int(infection), infections)
 end
 
@@ -175,4 +180,67 @@ _init_rate(Rt₀::Real, w::AbstractVector) = R_to_r(Rt₀, w)
 _init_rate(Rt₀::AbstractVector, w::AbstractVector) = R_to_r.(Rt₀, Ref(w))
 function _init_rate(Rt₀::AbstractVector, w::AbstractMatrix)
     return [R_to_r(Rt₀[g], view(w, g, :)) for g in eachindex(Rt₀)]
+end
+
+# Everything both renewal models do before their recursions diverge.
+#
+# Called through `to_submodel(..., false)`, which keeps `Z_t`, `gen`,
+# `init_incidence` and `scan_step` at the names they carry when drawn inline.
+@model function _renewal_setup(infection::_RenewalModel, n::ModelShape)
+    Z_t ~ as_turing_submodel(infection.rt, n)
+    Rt = infection.transformation.(Z_t)
+
+    # An inferred generation interval is sampled through the single seam, with
+    # the lag-0 bin dropped and the remainder renormalised per draw.
+    # The step is rebuilt per draw so the gradient flows through the
+    # discretisation.
+    if infection.gen_int isa AbstractPriorModel
+        gen ~ as_turing_submodel(
+            infection.gen_int, _gen_int_shape(n)...; prefix = true
+        )
+        gen_int = _drop_lag_zero(gen)
+        step = _bake_step(
+            _renewal_step(gen_int, infection.mixing), infection.modifiers
+        )
+    else
+        gen_int = infection.gen_int
+        step = infection.recurrent_step
+    end
+
+    # The `initialisation` slot is either a level at ``t_0`` or a whole seeding
+    # path drawn at the incidence window's own shape.
+    # Both branches are decided by the slot's type, so nothing is chosen at run
+    # time.
+    if infection.initialisation isa SeedingPath
+        init_incidence ~ as_turing_submodel(
+            infection.initialisation.model,
+            _seeding_shape(n, _n_lags(gen_int)); prefix = true
+        )
+    else
+        init_incidence ~ as_turing_submodel(
+            infection.initialisation, _n_strata(n); prefix = true
+        )
+    end
+
+    # Resolve the step before the recursion, so a modifier or a `mixing` model
+    # carrying priors draws them here and hands back what the recursion uses.
+    # A purely deterministic step returns itself, so nothing here branches on
+    # what the step holds.
+    scan_step ~ as_turing_submodel(step, n)
+
+    Rts = _steps(Rt)
+    # A seeding path is the incidence window itself; a level is decayed into one
+    # at the growth rate implied by ``\mathcal R_1``.
+    if infection.initialisation isa SeedingPath
+        seed_window = infection.transformation.(init_incidence)
+        n_seed = _n_lags(seed_window)
+        @assert n_seed == _n_lags(gen_int) "a `SeedingPath` must draw one " *
+            "value per generation-interval lag, but it drew $(n_seed) for " *
+            "$(_n_lags(gen_int)) lags"
+        init = renewal_init_state(scan_step, seed_window)
+    else
+        I₀ = infection.transformation.(_seed(init_incidence, n))
+        init = _make_renewal_init(scan_step, gen_int, I₀, first(Rts))
+    end
+    return (; Z_t, Rts, scan_step, init)
 end
