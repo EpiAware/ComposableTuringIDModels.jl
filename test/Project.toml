@@ -33,7 +33,7 @@ TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [sources]
-ComposableRecurrences = {url = "https://github.com/EpiAware/ComposableRecurrences.jl", rev = "983284f570176d7e4830c29471c14ee3d10883fe"}  # pragma: allowlist secret
+ComposableRecurrences = {url = "https://github.com/EpiAware/ComposableRecurrences.jl", rev = "62b413531f584e36485a54f5f98bfca17235123e"}  # pragma: allowlist secret
 ComposableTuringIDModels = {path = ".."}
 
 [compat]
