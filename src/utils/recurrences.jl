@@ -12,3 +12,12 @@ _strata_history(x::AbstractVector) = reshape(x, :, 1)
 
 # The running total of `add` from `history`, a unit lag-1 `Recurrence`.
 _cumulate(history, add) = Recurrence(_UNIT_LAG)(1.0; history = history, add = add)
+
+# The series `init` extended by `Recurrence(kernel)` with `gain` and the
+# innovations `add`, `init` first.
+function _extend(kernel, gain, init, add)
+    history = _history(init)
+    return vcat(
+        history, Recurrence(kernel)(gain; history = history, add = add)
+    )
+end

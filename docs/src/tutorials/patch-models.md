@@ -267,27 +267,19 @@ patch_lines(sim_exo.I_t ./ sim_coupled.I_t;
     title = "Exogenous importation on top of the same mixing matrix")
 ```
 
-## Writing a coupling
+## A sparse coupling
 
-A coupling is a ComposableRecurrences coupling: a type with a `forward!` method for the `Pressure` role.
-It takes each patch's generation-interval convolution `p` and writes the pressure on each patch into `q`.
+`mixing` takes any ComposableRecurrences coupling, including a sparse matrix, which only touches the pairs that mix.
 Here the patches sit on a ring, and each takes a share of its two neighbours.
 
 ```@example patches
-import ComposableRecurrences as CR
-
-struct Ring{T}
-    weight::T
+using SparseArrays
+ring_K = spdiagm(0 => ones(n_strata))
+for a in 1:n_strata
+    ring_K[a, mod1(a - 1, n_strata)] = 0.05
+    ring_K[a, mod1(a + 1, n_strata)] = 0.05
 end
-
-function CR.forward!(m::Ring, ::CR.Pressure, q, p, t)
-    n = length(p)
-    for a in eachindex(q)
-        left, right = p[mod1(a - 1, n)], p[mod1(a + 1, n)]
-        q[a] = p[a] + m.weight * (left + right)
-    end
-    return nothing
-end
+ring_K
 ```
 
 It is passed exactly where the matrix and the [`Gravity`](@ref) model were.
@@ -295,12 +287,13 @@ It is passed exactly where the matrix and the [`Gravity`](@ref) model were.
 ```@example patches
 Random.seed!(11)
 ring = Renewal(gen_int; rt = rt_process,
-    initialisation = Normal(log(50.0), 0.2), mixing = Ring(0.05))
+    initialisation = Normal(log(50.0), 0.2), mixing = ring_K)
 sim_ring = as_turing_model(ring, (n_strata, n_time))()
 patch_lines(sim_ring.I_t ./ sim_pooled.I_t;
     ylabel = "Iₜ ring / Iₜ uncoupled",
-    title = "A coupling written from one method")
+    title = "A sparse ring coupling")
 ```
 
 Every patch lifts, because on a ring every patch has two neighbours, and the lift compounds because imported infections then transmit onward.
 The process, the seeding, the observation model and the renewal recursion are all unchanged.
+A coupling ComposableRecurrences does not provide is a type with a `forward!` method for its `Pressure` role.

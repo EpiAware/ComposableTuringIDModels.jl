@@ -77,26 +77,11 @@ then subtracts from the incidence.
 
 # Examples
 
-A fixed unconstrained rate of ``\log 2`` adds two imports per unit time.
-Against the same renewal without them, incidence gains those imports and the
-infections they go on to cause:
+The rate's prior joins the renewal's parameters under the modifier's position,
+here `modifier_1.import_rates`:
 
 ```@example ImportedCases
 using ComposableTuringIDModels, Distributions
-using DynamicPPL: fix
-gen_int = [0.2, 0.3, 0.5]
-args = (; rt = FixedIntercept(0.0), initialisation = Normal())
-plain = Renewal(gen_int; args...)
-imported = Renewal(gen_int, ImportedCases(FixedIntercept(log(2.0))); args...)
-seed = (init_incidence = 0.0,)
-I_plain = fix(as_turing_model(plain, 5), seed)().I_t
-I_imported = fix(as_turing_model(imported, 5), seed)().I_t
-I_imported .- I_plain
-```
-
-A prior on the rate joins the model's parameters under the modifier's position:
-
-```@example ImportedCases
 r = Renewal([0.2, 0.3, 0.5], ImportedCases(Normal(-1.0, 0.5));
     rt = FixedIntercept(0.0), initialisation = Normal())
 keys(rand(as_turing_model(r, 5)))
