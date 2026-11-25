@@ -194,13 +194,13 @@ end
     @test isequal(yp, yp_before)
     @test !has_y_t(mp)
 
-    # A fully blank series in a NamedTuple field is marginalised whole. The
-    # predictive route is `y = missing`, which sizes the draw off `Y_t`.
+    # A fully blank series in a NamedTuple field is the predictive route, the
+    # same as `y = missing`, and the caller's array is still not written into.
     ym = Vector{Union{Missing, Int}}(missing, 3)
     mm = as_turing_model(BinomialError(), (y = ym, N = trials), fill(0.02, 3))
-    @test all(ismissing, mm().y_t)
+    @test all(x -> 0 <= x <= 1000, mm().y_t)
     @test all(ismissing, ym)
-    @test !has_y_t(mm)
+    @test has_y_t(mm)
     sim = as_turing_model(
         BinomialError(), (y = missing, N = trials), fill(0.02, 3)
     )
@@ -229,6 +229,34 @@ end
     @test isequal(mc().generated_y_t, yc_before)
     @test isequal(yc, yc_before)
     @test !has_y_t(mc)
+end
+
+@testitem "a gap in a plain vector is marginalised on every route" begin
+    using ComposableTuringIDModels, Distributions
+    using DynamicPPL: VarInfo, logjoint
+    # The bare error model takes the same contract as a `NamedTuple` field and
+    # an `IDModel`: a blank leaves the likelihood rather than becoming a latent,
+    # and the caller's array is not written into.
+    y = Vector{Union{Missing, Int}}([5, missing, 7])
+    y_before = copy(y)
+    Y_t = fill(6.0, 3)
+    bare = as_turing_model(PoissonError(), y, Y_t)
+    named = as_turing_model(PoissonError(), (y = y,), Y_t)
+    @test isempty(keys(VarInfo(bare)))
+    @test isempty(keys(VarInfo(named)))
+    ref = logpdf(Poisson(6.0), 5) + logpdf(Poisson(6.0), 7)
+    @test logjoint(bare, VarInfo(bare)) ≈ ref
+    @test logjoint(named, VarInfo(named)) ≈ ref
+    @test isequal(bare().y_t, y_before)
+    @test isequal(y, y_before)
+
+    # A series with nothing observed in it is the predictive route on the bare
+    # path as well, at its own length.
+    blank = as_turing_model(
+        PoissonError(), Vector{Union{Missing, Int}}(missing, 3), Y_t
+    )
+    @test length(keys(VarInfo(blank))) == 3
+    @test all(x -> x isa Integer, blank().y_t)
 end
 
 @testitem "define_y_t unpacks counts for vector or NamedTuple data" begin

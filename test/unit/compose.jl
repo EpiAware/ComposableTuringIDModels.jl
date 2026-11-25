@@ -44,14 +44,15 @@ end
     )
     @test all(v -> v isa MissingObservations, concrete_observations(nt_gap))
 
-    # A fully missing vector is split too: `present` is all `false`, and the
-    # value vector is a placeholder. Nothing a draw could be written into
-    # survives, so the caller's array cannot be mutated by scoring it.
+    # A series with nothing observed in it is the same request as `missing`,
+    # so it takes the predictive form at its own length rather than a carrier
+    # that would marginalise the whole series. The fresh array also keeps the
+    # caller's array out of reach of a draw.
     y_allgap = Vector{Union{Missing, Int}}(missing, 3)
     allgap = concrete_observations(y_allgap)
-    @test allgap isa MissingObservations
-    @test !any(allgap.present)
-    @test !(eltype(allgap.value) >: Missing)
+    @test allgap isa Vector{Missing}
+    @test length(allgap) == 3
+    @test allgap !== y_allgap
 
     # A `Vector{Missing}` carries no value type to build a carrier from, and
     # nothing can be written into it either (the tilde sugar widens it into a
