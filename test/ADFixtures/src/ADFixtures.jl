@@ -228,9 +228,7 @@ function _models()
         Aggregate(PoissonError(), [0, 0, 0, 0, 0, 0, 7])
     )
     # Partially-missing observations: the blank entries are marginalised out,
-    # so the gradient covers the carrier's scoring loop skipping them. The
-    # scored series it returns is ragged, so Enzyme reverse cannot compile it
-    # and the scenario is listed broken for that backend below.
+    # so the gradient covers the carrier's scoring loop skipping them.
     partialmiss = IDModel(
         DirectInfections(; Z = RandomWalk(), initialisation = Normal()),
         NormalError()
@@ -760,13 +758,7 @@ function backend_broken_scenarios()
         "ReverseDiff (compiled)" => reverse_only,
         "Mooncake reverse" => reverse_only,
         "Mooncake forward" => reverse_only,
-        # A partially-missing series is marginalised, so the scored series
-        # comes back as `Vector{Union{Missing,T}}`. Enzyme's reverse-mode type
-        # analysis fails on the `similar(::Broadcasted, ::Type{Union{Missing,
-        # Float64}})` that rebuilds it.
-        "Enzyme reverse" => union(
-            reverse_only, Set(["DirectInfections+PartiallyMissing posterior"])
-        ),
+        "Enzyme reverse" => reverse_only,
         # Enzyme forward returns a finite but wrong gradient here, every entry
         # offset by the same constant. Every other backend agrees with the
         # reference, so the fault is in the backend rather than the model.

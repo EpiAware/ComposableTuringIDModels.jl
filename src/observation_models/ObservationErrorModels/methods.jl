@@ -94,30 +94,17 @@ end
 function _score_missing_observations!!(
         context, varinfo, y::MissingObservations, diff_t, Y_t, dist
     )
-    n = length(y.value)
-    # `scored` is untyped until every entry is in.
-    # The final `identity.()` narrowing runs after every tilde call has
-    # accumulated its log-probability, so it is not part of what Enzyme
-    # differentiates.
-    scored = Vector{Any}(undef, n)
     for i in _scored_steps(diff_t, Y_t)
         idx = i + diff_t
         y.present[idx] || continue
         vn = DynamicPPL.VarName{:y_t}(DynamicPPL.Index((idx,), NamedTuple()))
-        val = y.value[idx]
         _, varinfo = DynamicPPL.tilde_observe!!(
-            context, dist(i), val, vn, y.value, varinfo
+            context, dist(i), y.value[idx], vn, y.value, varinfo
         )
-        scored[idx] = val
     end
-    # Left unassigned above are the marginalised gaps and any entry outside the
-    # scored window, reached when `Y_t` is shorter than `y_t`.
-    # Keep both as given.
-    for idx in 1:n
-        isassigned(scored, idx) && continue
-        scored[idx] = y.present[idx] ? y.value[idx] : missing
-    end
-    return identity.(scored), varinfo
+    # The series returned is the data as given, gaps and all, so it carries no
+    # derivative; the Enzyme extension marks its rebuild inactive.
+    return _restore_missing(y), varinfo
 end
 
 @doc raw"
@@ -158,8 +145,6 @@ end
 
 # Rebuild the ragged `Vector{Union{Missing,T}}` a `MissingObservations` carrier
 # stands in for.
-# Only standalone `define_y_t` calls reach this.
-# The hot loop goes through `_score_missing_observations!!` instead.
 _restore_missing(y) = y
 _restore_missing(y::MissingObservations) = map((v, p) -> p ? v : missing, y.value, y.present)
 

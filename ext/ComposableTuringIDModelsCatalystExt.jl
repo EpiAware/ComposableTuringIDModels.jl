@@ -43,7 +43,7 @@ using Catalyst: Catalyst, ReactionSystem
 # public and owner-correct for ExplicitImports).
 using ModelingToolkit: ModelingToolkit
 using OrdinaryDiffEq: ODEProblem, remake
-using DynamicPPL: DynamicPPL, @model, NamedDist
+using DynamicPPL: DynamicPPL, @model
 using Distributions: Distribution
 
 # A specification for one species or parameter: its symbolic handle (used to build
@@ -93,6 +93,28 @@ function ComposableTuringIDModels.CatalystODEParams(
     return CatalystODEParams(prob, u0_specs, p_specs)
 end
 
+# DynamicPPL names a sampled variable after the literal left-hand side of `~`,
+# so a name held at run time takes the calls `~` itself makes: a fixed value is
+# returned unrecorded, as `~` returns it, a conditioned one is scored, and
+# anything else is drawn.
+# These are DynamicPPL internals, matching its 0.42 compiler; `y ~ dist`, the
+# documented replacement for `NamedDist`, needs the name when it is written.
+function _named_tilde!!(model, varinfo, dist, vn)
+    context = model.context
+    full_vn = DynamicPPL.prefix(context, vn)
+    template = DynamicPPL.VarNamedTuples.NoTemplate()
+    rhs = DynamicPPL.check_tilde_rhs(dist)
+    if DynamicPPL.contextual_isfixed(context, full_vn)
+        return DynamicPPL.getfixed_nested(context, full_vn), varinfo
+    elseif DynamicPPL.contextual_isassumption(context, full_vn)
+        return DynamicPPL.tilde_assume!!(context, rhs, vn, template, varinfo)
+    end
+    value = DynamicPPL.getconditioned_nested(context, full_vn)
+    return DynamicPPL.tilde_observe!!(
+        context, rhs, value, vn, template, varinfo
+    )
+end
+
 # Sample every distribution-valued spec into a flat, symbol-named Turing variable
 # (`β`, `S`, ...) — fixed `Real` specs are used as constants, NOT sampled — and
 # return the initial state and parameters as SYMBOLIC `symbol => value` maps. The
@@ -106,7 +128,9 @@ end
     p = Vector{Pair}(undef, length(params.p_specs))
     for (k, s) in enumerate(params.u0_specs)
         if s.spec isa Distribution
-            x ~ NamedDist(s.spec, DynamicPPL.VarName{s.name}())
+            x, __varinfo__ = _named_tilde!!(
+                __model__, __varinfo__, s.spec, DynamicPPL.VarName{s.name}()
+            )
             u0[k] = s.symbol => x
         else
             u0[k] = s.symbol => s.spec
@@ -114,7 +138,9 @@ end
     end
     for (k, s) in enumerate(params.p_specs)
         if s.spec isa Distribution
-            x ~ NamedDist(s.spec, DynamicPPL.VarName{s.name}())
+            x, __varinfo__ = _named_tilde!!(
+                __model__, __varinfo__, s.spec, DynamicPPL.VarName{s.name}()
+            )
             p[k] = s.symbol => x
         else
             p[k] = s.symbol => s.spec
