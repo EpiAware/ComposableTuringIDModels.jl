@@ -186,6 +186,36 @@ end
     @test_throws Exception as_turing_model(template, y_wrong, M)()
 end
 
+@testitem "a strata Split with a weight map simulates with no data" begin
+    using ComposableTuringIDModels, Distributions, Random
+    Random.seed!(453)
+    # The map's rows are the streams, so a simulation names them the way a
+    # data matrix with that many rows would, without needing the matrix.
+    mapped = Split(PoissonError(), [1.0 1.0 1.0])
+    out = as_turing_model(mapped, missing, fill(10.0, 3, 5))()
+    @test keys(out.y_t) == (:group1,)
+    @test length(out.y_t.group1) == 5
+    @test all(x -> x isa Integer, out.y_t.group1)
+
+    # And through a composed model over the three infection strata the map
+    # projects onto one stream.
+    model = IDModel(
+        DirectInfections(;
+            Z = Stratify(RandomWalk(), Hierarchy(; across = IID(Normal(0, 0.5)))),
+            initialisation = Normal(log(20), 0.2)
+        ),
+        mapped
+    )
+    sim = as_turing_model(model, missing, (3, 12))()
+    @test size(sim.I_t) == (3, 12)
+    @test length(sim.generated_y_t.group1) == 12
+
+    # A strata template with no map still has nothing to name its streams by.
+    @test_throws Exception as_turing_model(
+        Split(PoissonError()), missing, fill(10.0, 3, 5)
+    )()
+end
+
 @testitem "CombineInfections composes with Split for a many-to-many mapping" begin
     using ComposableTuringIDModels, Distributions, Random
     Random.seed!(452)
