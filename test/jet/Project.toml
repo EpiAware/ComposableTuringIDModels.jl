@@ -17,4 +17,4 @@ ComposableTuringIDModels = {path = "../.."}
 # than as drift between this pin and the one in ../Project.toml.
 [compat]
 EpiAwarePackageTools = "0.3, 0.4"
-JET = "0.11, 0.12"
+JET = "0.11, 0.12, 0.13"
